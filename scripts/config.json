@@ -1,0 +1,34 @@
+{
+  "_kommentar": "Deine persönliche Konfiguration für den rauMKult Assistenten",
+  "ntfy": {
+    "aktiv": true,
+    "_anleitung": "ntfy-App auf iOS installieren -> '+' -> Topic 'raumkult-kai-2026-x7k' abonnieren -> fertig",
+    "topic_name": "raumkult-kai-2026-x7k",
+    "server": "https://ntfy.sh"
+  },
+  "email_notification": {
+    "aktiv": false,
+    "_anleitung": "SMTP-Zugangsdaten eintragen. Für Gmail: smtp_server=smtp.gmail.com, port=587, App-Passwort verwenden",
+    "smtp_server": "",
+    "smtp_port": 587,
+    "absender_email": "",
+    "absender_passwort": "",
+    "empfaenger_email": ""
+  },
+  "aufgaben": {
+    "unanswered_check_days": 14,
+    "_kommentar": "Wie viele Tage zurück auf unbeantwortete Mails prüfen",
+    "erinnerung_intervall_stunden": 24,
+    "_kommentar2": "Nach wie vielen Stunden an offene Aufgaben erinnern"
+  },
+  "nachfass": {
+    "intervall_1_tage": 10,
+    "intervall_2_tage": 21,
+    "intervall_3_tage": 45,
+    "_kommentar": "Nachfass-Intervalle für offene Angebote (Tage)"
+  },
+  "server": {
+    "port": 8765,
+    "auto_open_browser": true
+  }
+}
