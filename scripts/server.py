@@ -15,6 +15,7 @@ SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
 ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -293,6 +294,21 @@ def build_organisation(db):
     return html
 
 # ── GESCHÄFT Panel ────────────────────────────────────────────────────────────
+def _load_rechnungen_detail():
+    """Lädt Detail-Daten aus rechnungen_detail.db, indexiert nach RE-Nummer."""
+    details = {}
+    mahnungen = []
+    try:
+        ddb = sqlite3.connect(str(DETAIL_DB))
+        ddb.row_factory = sqlite3.Row
+        for r in ddb.execute("SELECT * FROM rechnungen_detail"):
+            details[r["re_nummer"]] = dict(r)
+        mahnungen = [dict(r) for r in ddb.execute("SELECT * FROM mahnungen_detail ORDER BY datum DESC")]
+        ddb.close()
+    except: pass
+    return details, mahnungen
+
+
 def build_geschaeft(db):
     """Geschäft Dashboard mit 5 Sub-Tabs: Übersicht, Ausgangsrechnungen, Angebote, Eingangsrechnungen, Mahnungen."""
     try: ar = [dict(r) for r in db.execute("SELECT * FROM ausgangsrechnungen ORDER BY datum DESC").fetchall()]
@@ -302,20 +318,46 @@ def build_geschaeft(db):
     try: eingang = [dict(r) for r in db.execute("SELECT * FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt') ORDER BY datum DESC").fetchall()]
     except: eingang = []
 
+    # Detail-Daten laden und anreichern
+    re_details, mahnung_details = _load_rechnungen_detail()
+    for r in ar:
+        re_nr = r.get("re_nummer", "")
+        if re_nr in re_details:
+            d = re_details[re_nr]
+            # Kundennamen aus Detail-DB übernehmen wenn nicht gesetzt
+            if not r.get("kunde_name") and d.get("kunde_firma"):
+                r["kunde_name"] = d["kunde_firma"]
+            r["_detail"] = d  # volle Details für erweiterte Anzeige
+
     ar_offen = [r for r in ar if r.get("status") == "offen"]
     ar_gemahnt = [r for r in ar if (r.get("mahnung_count") or 0) > 0]
     ang_offen = [r for r in ang if r.get("status") == "offen"]
     s_ar_offen = sum(r.get("betrag_brutto") or 0 for r in ar_offen)
+    s_ar_gesamt = sum(r.get("betrag_brutto") or 0 for r in ar)
+    s_ar_bezahlt = sum(r.get("betrag_brutto") or 0 for r in ar if r.get("status") == "bezahlt")
     today = datetime.now().strftime("%Y-%m-%d")
     n_nf = sum(1 for r in ang if r.get("status") == "offen" and (r.get("naechster_nachfass") or "") <= today)
+
+    # Skonto-Fristen prüfen
+    skonto_dringend = []
+    for r in ar_offen:
+        d = r.get("_detail", {})
+        sd = d.get("skonto_datum", "")
+        if sd and sd >= today:
+            skonto_dringend.append({"re_nr": r.get("re_nummer", ""), "skonto_datum": sd,
+                                    "skonto_prozent": d.get("skonto_prozent", 0),
+                                    "skonto_betrag": d.get("skonto_betrag", 0)})
 
     # Statistik-Daten
     ang_angenommen = [r for r in ang if r.get("status") == "angenommen"]
     ang_abgelehnt = [r for r in ang if r.get("status") == "abgelehnt"]
-    ang_bearbeitet = [r for r in ang if r.get("status") == "bearbeitet"]
     ar_bezahlt = [r for r in ar if r.get("status") == "bezahlt"]
     stats = {"ang_total": len(ang), "ang_angenommen": len(ang_angenommen),
-             "ang_abgelehnt": len(ang_abgelehnt), "ar_bezahlt": len(ar_bezahlt), "ar_total": len(ar)}
+             "ang_abgelehnt": len(ang_abgelehnt), "ar_bezahlt": len(ar_bezahlt), "ar_total": len(ar),
+             "ar_gesamt_eur": s_ar_gesamt, "ar_bezahlt_eur": s_ar_bezahlt,
+             "skonto_dringend": skonto_dringend}
+
+    n_mahnungen = len(ar_gemahnt) + len([m for m in mahnung_details if not any(r.get("re_nummer") == m.get("re_nummer") for r in ar_gemahnt)])
 
     html = f"""
     <div class="gesch-tabs">
@@ -323,50 +365,65 @@ def build_geschaeft(db):
       <div class="gesch-tab" onclick="showGeschTab('ausgangsre')">Ausgangsrechnungen ({len(ar)})</div>
       <div class="gesch-tab" onclick="showGeschTab('angebote')">Angebote ({len(ang)})</div>
       <div class="gesch-tab" onclick="showGeschTab('eingangsre')">Eingangsrechnungen ({len(eingang)})</div>
-      <div class="gesch-tab" onclick="showGeschTab('mahnungen')">Mahnungen ({len(ar_gemahnt)})</div>
+      <div class="gesch-tab" onclick="showGeschTab('mahnungen')">Mahnungen ({n_mahnungen})</div>
     </div>
     <div id="gesch-uebersicht" class="gesch-panel active">{_build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats)}</div>
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
     <div id="gesch-angebote" class="gesch-panel">{_build_ang_table(ang, today)}</div>
     <div id="gesch-eingangsre" class="gesch-panel">{_gesch_aktiv_cards(eingang)}</div>
-    <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen)}</div>"""
+    <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>"""
     return html
 
 
 def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats=None):
     """Übersicht-Tab mit KPI-Cards, dringenden Punkten und Statistik."""
-    html = f"""<div class="gesch-summary-grid">
-      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_offen else ''}">
+    vol_cls = ' gesch-sum-alarm' if s_ar_offen else ''
+    html = f"""<div class="gesch-volumen-hero{vol_cls}" onclick="showGeschTab('ausgangsre')" style="cursor:pointer">
+      <div class="gesch-volumen-label">Offenes Volumen (Ausgangsrechnungen)</div>
+      <div class="gesch-volumen-num">{s_ar_offen:,.2f} EUR</div>
+      <div class="gesch-volumen-sub">{len(ar_offen)} offene Rechnungen</div>
+    </div>
+    <div class="gesch-summary-grid">
+      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_offen else ''}" onclick="showGeschTab('ausgangsre')" style="cursor:pointer">
         <div class="gesch-sum-num">{len(ar_offen)}</div>
         <div class="gesch-sum-label">Offene Ausgangsrechnungen</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if s_ar_offen else ''}">
-        <div class="gesch-sum-num">{s_ar_offen:,.2f} EUR</div>
-        <div class="gesch-sum-label">Offenes Volumen (Ausgang)</div>
-      </div>
-      <div class="gesch-sum-card">
+      <div class="gesch-sum-card" onclick="showGeschTab('angebote')" style="cursor:pointer">
         <div class="gesch-sum-num">{len(ang_offen)}</div>
         <div class="gesch-sum-label">Offene Angebote</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if n_nf else ''}">
+      <div class="gesch-sum-card{' gesch-sum-alarm' if n_nf else ''}" onclick="showGeschTab('angebote')" style="cursor:pointer">
         <div class="gesch-sum-num">{n_nf}</div>
         <div class="gesch-sum-label">Nachfass fällig</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if eingang else ''}">
+      <div class="gesch-sum-card{' gesch-sum-alarm' if eingang else ''}" onclick="showGeschTab('eingangsre')" style="cursor:pointer">
         <div class="gesch-sum-num">{len(eingang)}</div>
         <div class="gesch-sum-label">Offene Eingangsrechnungen</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_gemahnt else ''}">
+      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_gemahnt else ''}" onclick="showGeschTab('mahnungen')" style="cursor:pointer">
         <div class="gesch-sum-num">{len(ar_gemahnt)}</div>
         <div class="gesch-sum-label">Gemahnte Rechnungen</div>
       </div>
     </div>"""
+    # Skonto-Hinweise (zeitkritisch!)
+    skonto_dringend = stats.get("skonto_dringend", []) if stats else []
+    if skonto_dringend:
+        html += '<div class="section" style="margin-top:16px"><div class="section-title" style="color:#50c878">Skonto-Fristen</div><div class="section-body">'
+        for sk in sorted(skonto_dringend, key=lambda x: x["skonto_datum"]):
+            tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d") - datetime.now()).days
+            dringend_cls = ' style="color:#e84545"' if tage_rest <= 2 else ""
+            html += f'<div class="gesch-urgent-item"><span class="badge badge-korrekt">{sk["skonto_prozent"]}%</span> {sk["re_nr"]} &middot; <span{dringend_cls}>noch {tage_rest} Tage</span> (bis {format_datum(sk["skonto_datum"])}) &middot; Ersparnis: {sk["skonto_betrag"]:,.2f} EUR</div>'
+        html += '</div></div>'
+
     # Dringende Punkte
     urgent = []
     for r in ar_offen[:3]:
         re_nr = esc(r.get("re_nummer", ""))
         kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-        urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge gesch-typ-eingang">Rechnung</span> {re_nr} &middot; {kunde} &middot; {format_datum(r.get("datum"))}</div>')
+        d = r.get("_detail", {})
+        ziel = d.get("zahlungsziel_datum", "")
+        extra = f' &middot; Fällig: {format_datum(ziel)}' if ziel else ""
+        urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge gesch-typ-eingang">Rechnung</span> {re_nr} &middot; {kunde} &middot; {format_datum(r.get("datum"))}{extra}</div>')
     for r in ang_offen:
         if (r.get("naechster_nachfass") or "") <= today:
             a_nr = esc(r.get("a_nummer", ""))
@@ -391,15 +448,19 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
         ang_angen = s.get("ang_angenommen", 0)
         ang_abgel = s.get("ang_abgelehnt", 0)
         quote = f"{ang_angen / ang_total * 100:.0f}%" if ang_total >= 3 else "–"
-        hinweis = "" if ang_total >= 10 else f'<span class="muted" style="font-size:11px;margin-left:8px">(Datenbasis: {ang_total} Angebote – ab 10 aussagekräftig)</span>'
+        hinweis = "" if ang_total >= 10 else f'<span class="muted" style="font-size:11px;margin-left:8px">(Datenbasis: {ang_total} Angebote)</span>'
+        ar_ges = s.get("ar_gesamt_eur", 0)
+        ar_bez = s.get("ar_bezahlt_eur", 0)
         html += f"""<div class="section" style="margin-top:16px">
-      <div class="section-title">Statistik</div>
+      <div class="section-title">Statistik &amp; Finanzen</div>
       <div class="section-body">
-        <div class="gesch-summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+        <div class="gesch-summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+          <div class="gesch-sum-card"><div class="gesch-sum-num">{ar_ges:,.0f} &euro;</div><div class="gesch-sum-label">Fakturiert gesamt</div></div>
+          <div class="gesch-sum-card"><div class="gesch-sum-num" style="color:#50c878">{ar_bez:,.0f} &euro;</div><div class="gesch-sum-label">Bezahlt</div></div>
+          <div class="gesch-sum-card"><div class="gesch-sum-num">{s.get('ar_bezahlt',0)}/{s.get('ar_total',0)}</div><div class="gesch-sum-label">Rechnungen bezahlt</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{quote}</div><div class="gesch-sum-label">Angebotsquote{hinweis}</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_angen}</div><div class="gesch-sum-label">Angenommen</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_abgel}</div><div class="gesch-sum-label">Abgelehnt</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{s.get('ar_bezahlt',0)}/{s.get('ar_total',0)}</div><div class="gesch-sum-label">Rechnungen bezahlt</div></div>
         </div>
       </div>
     </div>"""
@@ -407,12 +468,21 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
 
 
 def _build_ar_table(rows):
-    """Ausgangsrechnungen-Tab mit Filter und Tabelle."""
+    """Ausgangsrechnungen-Tab mit Filter, Detail-Infos und Tabelle."""
     if not rows:
         return "<p class='empty'>Keine Ausgangsrechnungen vorhanden.</p>"
     years = sorted(set(r.get("datum", "")[:4] for r in rows if r.get("datum")), reverse=True)
     y_opts = "".join(f'<option value="{y}">{y}</option>' for y in years)
-    html = f"""<div class="gesch-filter-bar">
+    # Summary-Bar
+    total = sum(r.get("betrag_brutto") or 0 for r in rows)
+    offen = sum(r.get("betrag_brutto") or 0 for r in rows if r.get("status") == "offen")
+    bezahlt = sum(r.get("betrag_brutto") or 0 for r in rows if r.get("status") == "bezahlt")
+    html = f"""<div class="gesch-ar-summary">
+      <span>Gesamt: <strong>{total:,.2f} &euro;</strong></span>
+      <span style="color:#e84545">Offen: <strong>{offen:,.2f} &euro;</strong></span>
+      <span style="color:#50c878">Bezahlt: <strong>{bezahlt:,.2f} &euro;</strong></span>
+    </div>
+    <div class="gesch-filter-bar">
       <select id="ar-filter-year" onchange="filterAR()"><option value="">Alle Jahre</option>{y_opts}</select>
       <select id="ar-filter-status" onchange="filterAR()">
         <option value="">Alle Status</option><option value="offen">Offen</option>
@@ -424,8 +494,10 @@ def _build_ar_table(rows):
       <div class="gesch-row gesch-header">
         <span class="gc-nr">RE-Nr</span><span class="gc-datum">Datum</span>
         <span class="gc-partner">Kunde</span><span class="gc-betrag">Betrag</span>
+        <span class="gc-detail">Details</span>
         <span class="gc-status">Status</span><span class="gc-actions">Aktionen</span>
       </div>"""
+    today = datetime.now().strftime("%Y-%m-%d")
     for r in rows:
         rid = r.get("id", "")
         re_nr = esc(r.get("re_nummer", ""))
@@ -437,6 +509,25 @@ def _build_ar_table(rows):
         s_cls = {"offen": "tag-alarm", "bezahlt": "tag-zahlung", "streitfall": "tag-rechnung"}.get(status, "tag-muted")
         mc = r.get("mahnung_count") or 0
         m_badge = f' <span class="badge badge-warn">M{mc}</span>' if mc > 0 else ""
+        # Detail-Info aus rechnungen_detail
+        d = r.get("_detail", {})
+        detail_parts = []
+        n_pos = len(json.loads(d.get("positionen_json", "[]"))) if d.get("positionen_json") else 0
+        if n_pos:
+            detail_parts.append(f'{n_pos} Pos.')
+        if d.get("zahlungsziel_tage"):
+            detail_parts.append(f'Ziel: {d["zahlungsziel_tage"]}d')
+        if d.get("skonto_prozent") and status == "offen":
+            sk_datum = d.get("skonto_datum", "")
+            if sk_datum and sk_datum >= today:
+                detail_parts.append(f'<span style="color:#50c878">{d["skonto_prozent"]}% Skonto bis {format_datum(sk_datum)}</span>')
+            elif sk_datum:
+                detail_parts.append(f'<span class="muted" style="text-decoration:line-through">{d["skonto_prozent"]}% Skonto</span>')
+        if d.get("reverse_charge"):
+            detail_parts.append('<span class="muted">RC</span>')
+        if d.get("kunde_ort"):
+            detail_parts.append(f'<span class="muted">{esc(d["kunde_ort"][:20])}</span>')
+        detail_html = " &middot; ".join(detail_parts) if detail_parts else '<span class="muted">-</span>'
         anh = r.get("anhaenge_pfad", "") or ""
         anh_btn = f'<button class="btn btn-xs btn-gold" onclick="openAttachments(\'{urllib.parse.quote(anh, safe="")}\')">PDF</button>' if anh else ""
         mref = r.get("mail_ref", "") or ""
@@ -450,6 +541,7 @@ def _build_ar_table(rows):
         html += f"""<div class="gesch-row ar-row" id="ar-{rid}" data-year="{yr}" data-status="{status}">
           <span class="gc-nr">{re_nr}{m_badge}</span><span class="gc-datum">{format_datum(datum)}</span>
           <span class="gc-partner">{kunde}</span><span class="gc-betrag">{betrag}</span>
+          <span class="gc-detail" style="font-size:11px">{detail_html}</span>
           <span class="gc-status"><span class="tag {s_cls}">{status}</span></span>
           <span class="gc-actions">{anh_btn} {mail_btn} {acts}</span>
         </div>"""
@@ -575,70 +667,128 @@ def _gesch_aktiv_cards(rows):
     return html
 
 
-def _build_mahnung_section(gemahnt, ar_offen):
-    """Mahnungen-Tab: Gemahnte Rechnungen + überfällige offene."""
+def _build_mahnung_section(gemahnt, ar_offen, mahnung_details=None):
+    """Mahnungen-Tab: Echte Mahnung-Timeline aus mahnungen_detail + überfällige offene."""
     html = ""
-    # Überfällige offene ohne Mahnung
+    mahnung_details = mahnung_details or []
     today_dt = datetime.now()
+    today = today_dt.strftime("%Y-%m-%d")
+
+    # Überfällige offene ohne Mahnung
     overdue = []
     for r in ar_offen:
         if (r.get("mahnung_count") or 0) > 0:
             continue
+        d = r.get("_detail", {})
+        ziel = d.get("zahlungsziel_datum", "")
         try:
-            d = datetime.strptime((r.get("datum", "") or "")[:10], "%Y-%m-%d")
-            days = (today_dt - d).days
-            if days > 30:
-                overdue.append((r, days))
+            if ziel:
+                frist = datetime.strptime(ziel, "%Y-%m-%d")
+                days = (today_dt - frist).days
+                if days > 0:
+                    overdue.append((r, days, "fällig"))
+            else:
+                dt = datetime.strptime((r.get("datum", "") or "")[:10], "%Y-%m-%d")
+                days = (today_dt - dt).days
+                if days > 30:
+                    overdue.append((r, days, "gestellt"))
         except:
             continue
     if overdue:
-        html += '<div class="section"><div class="section-title">Überfällige Rechnungen (ohne Mahnung)</div><div class="section-body">'
-        for r, days in sorted(overdue, key=lambda x: -x[1]):
+        html += '<div class="section"><div class="section-title" style="color:#e84545">Überfällige Rechnungen (ohne Mahnung)</div><div class="section-body">'
+        for r, days, label in sorted(overdue, key=lambda x: -x[1]):
             rid = r.get("id", "")
             re_nr = esc(r.get("re_nummer", ""))
             kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-            html += f'<div class="gesch-urgent-item"><span class="badge badge-warn">{days} Tage</span> {re_nr} &middot; {kunde} &middot; {format_datum(r.get("datum"))} <button class="btn btn-xs btn-green" onclick="arSetStatus({rid},\'bezahlt\')" style="margin-left:auto">Bezahlt</button></div>'
+            betrag = f'{r.get("betrag_brutto") or 0:,.2f} EUR' if r.get("betrag_brutto") else ""
+            html += f'<div class="gesch-urgent-item"><span class="badge badge-warn">{days}d überfällig</span> {re_nr} &middot; {kunde} &middot; {betrag} <button class="btn btn-xs btn-green" onclick="arSetStatus({rid},\'bezahlt\')" style="margin-left:auto">Bezahlt</button></div>'
         html += '</div></div>'
 
-    if gemahnt:
+    # Mahnungen aus mahnungen_detail gruppiert nach RE-Nummer
+    re_mahnungen = {}
+    for m in mahnung_details:
+        re_nr = m.get("re_nummer", "")
+        if re_nr not in re_mahnungen:
+            re_mahnungen[re_nr] = []
+        re_mahnungen[re_nr].append(m)
+
+    if gemahnt or re_mahnungen:
         html += '<div class="section"><div class="section-title">Mahnungen &amp; Zahlungserinnerungen</div><div class="section-body">'
+        # Zuerst gemahnte Rechnungen aus tasks.db mit echten Timeline-Daten
+        shown_re = set()
         for r in gemahnt:
             rid = r.get("id", "")
-            re_nr = esc(r.get("re_nummer", ""))
+            re_nr = r.get("re_nummer", "")
+            re_nr_esc = esc(re_nr)
+            shown_re.add(re_nr)
             datum = format_datum(r.get("datum"))
             kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-            mc = r.get("mahnung_count") or 0
-            lm = r.get("letzte_mahnung", "") or ""
             status = r.get("status", "offen")
             betrag = f'{r.get("betrag_brutto") or 0:,.2f} EUR' if r.get("betrag_brutto") else ""
-            timeline = f'<span class="muted" style="font-size:11px">Rechnung: {datum}'
-            if mc >= 1:
-                timeline += ' &#8594; 1. Erinnerung'
-            if mc >= 2:
-                timeline += ' &#8594; 2. Mahnung'
-            if mc >= 3:
-                timeline += ' &#8594; Letzte Mahnung'
-            timeline += f' &middot; Letzte: {format_datum(lm)}</span>'
             s_cls = "tag-zahlung" if status == "bezahlt" else "tag-alarm"
+            # Echte Timeline aus mahnungen_detail
+            m_list = re_mahnungen.get(re_nr, [])
+            timeline = f'<span class="muted" style="font-size:11px">Rechnung: {datum}'
+            for m in sorted(m_list, key=lambda x: x.get("datum", "")):
+                m_typ = m.get("typ", "")
+                m_datum = format_datum(m.get("datum", ""))
+                m_betrag_val = m.get("betrag", 0)
+                m_betrag = f' ({m_betrag_val:,.2f} &euro;)' if m_betrag_val else ""
+                if m_typ == "erinnerung":
+                    timeline += f' &#8594; Erinnerung {m_datum}{m_betrag}'
+                else:
+                    timeline += f' &#8594; <strong>Mahnung</strong> {m_datum}{m_betrag}'
+            if not m_list:
+                mc = r.get("mahnung_count") or 0
+                if mc >= 1: timeline += ' &#8594; 1. Erinnerung'
+                if mc >= 2: timeline += ' &#8594; 2. Mahnung'
+            timeline += '</span>'
             acts = ""
             if status == "offen":
                 acts = f'<button class="btn btn-xs btn-green" onclick="arSetStatus({rid},\'bezahlt\')">Bezahlt</button> <button class="btn btn-xs btn-warn" onclick="arSetStatus({rid},\'streitfall\')">Streitfall</button>'
             html += f"""<div class="gesch-aktiv-card" style="border-color:rgba(232,69,69,.3)">
               <div class="gesch-aktiv-header">
-                <span class="gesch-typ-badge gesch-typ-mahnung">Mahnung x{mc}</span>
+                <span class="gesch-typ-badge gesch-typ-mahnung">Mahnung</span>
                 <span class="tag {s_cls}">{status}</span>
                 <span class="gesch-aktiv-betrag">{betrag}</span>
                 <span class="gesch-aktiv-datum">{datum}</span>
               </div>
               <div class="gesch-aktiv-body">
-                <div class="gesch-aktiv-betreff">{re_nr} &middot; {kunde}</div>
+                <div class="gesch-aktiv-betreff">{re_nr_esc} &middot; {kunde}</div>
                 <div>{timeline}</div>
               </div>
               <div class="gesch-aktiv-actions">{acts}</div>
             </div>"""
+
+        # Mahnungen die nur in mahnungen_detail existieren (z.B. alte/nicht in tasks.db)
+        for re_nr, m_list in re_mahnungen.items():
+            if re_nr in shown_re:
+                continue
+            re_nr_esc = esc(re_nr)
+            m_sorted = sorted(m_list, key=lambda x: x.get("datum", ""))
+            latest = m_sorted[-1]
+            betrag = f'{latest.get("betrag", 0):,.2f} EUR' if latest.get("betrag") else ""
+            timeline = '<span class="muted" style="font-size:11px">'
+            for m in m_sorted:
+                m_typ = m.get("typ", "")
+                m_datum = format_datum(m.get("datum", ""))
+                lbl = "Erinnerung" if m_typ == "erinnerung" else "<strong>Mahnung</strong>"
+                timeline += f'{lbl} {m_datum} &middot; '
+            timeline = timeline.rstrip(' &middot; ') + '</span>'
+            html += f"""<div class="gesch-aktiv-card" style="border-color:rgba(232,69,69,.2);opacity:.7">
+              <div class="gesch-aktiv-header">
+                <span class="gesch-typ-badge gesch-typ-mahnung">Archiv</span>
+                <span class="gesch-aktiv-betrag">{betrag}</span>
+              </div>
+              <div class="gesch-aktiv-body">
+                <div class="gesch-aktiv-betreff">{re_nr_esc}</div>
+                <div>{timeline}</div>
+              </div>
+            </div>"""
+
         html += '</div></div>'
 
-    if not gemahnt and not overdue:
+    if not gemahnt and not re_mahnungen and not overdue:
         html += "<p class='empty'>Keine Mahnungen oder überfälligen Rechnungen.</p>"
 
     html += """<div class="section" style="margin-top:10px">
@@ -941,6 +1091,25 @@ def generate_html() -> str:
   </div>
 </div>
 
+<!-- Kira Interaktions-Modal (Statusänderungen) -->
+<div class="modal-ov" id="kiraInteraktModal">
+  <div class="modal" style="max-width:480px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 id="ki-title" style="margin:0;color:var(--kl)">Kira fragt nach</h3>
+      <button class="btn btn-tiny btn-muted" onclick="closeKiraInterakt()">&times;</button>
+    </div>
+    <div id="ki-context" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px;background:rgba(139,107,170,.06);border-radius:8px"></div>
+    <div id="ki-fields" style="display:flex;flex-direction:column;gap:10px"></div>
+    <input type="hidden" id="ki-type">
+    <input type="hidden" id="ki-id">
+    <input type="hidden" id="ki-action">
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-done" onclick="submitKiraInterakt()">Speichern &amp; Erledigen</button>
+      <button class="btn btn-sm btn-muted" onclick="skipKiraInterakt()">Ohne Angaben fortfahren</button>
+    </div>
+  </div>
+</div>
+
 <!-- Kira FAB -->
 <button class="kira-fab" onclick="toggleKira()" title="Kira öffnen">K</button>
 
@@ -1049,6 +1218,7 @@ function showPanel(name) {{
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('nav-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
+  localStorage.setItem('kira_active_tab', name);
 }}
 
 // KPI click -> jump to Kommunikation with filter
@@ -1081,19 +1251,23 @@ function setStatus(id, status) {{
 function showGeschTab(name) {{
   document.querySelectorAll('.gesch-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.gesch-panel').forEach(p=>p.classList.remove('active'));
-  event.target.classList.add('active');
+  const tabs = document.querySelectorAll('.gesch-tab');
+  const names = ['uebersicht','ausgangsre','angebote','eingangsre','mahnungen'];
+  const idx = names.indexOf(name);
+  if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
   document.getElementById('gesch-'+name)?.classList.add('active');
+  localStorage.setItem('kira_gesch_tab', name);
 }}
 
-// Geschäft: Erledigt
+// Geschäft: Erledigt -> Kira-Interaktion öffnen
 function geschErledigt(id) {{
-  fetch('/api/geschaeft/'+id+'/erledigt',{{method:'POST'}}).then(r=>r.json()).then(d=>{{
-    if(d.ok){{
-      const el=document.getElementById('gesch-'+id);
-      if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),300);}}
-      showToast('Als erledigt markiert');
-    }}
-  }}).catch(()=>showToast('Fehler'));
+  openKiraInterakt('geschaeft', id, 'erledigt', 'Eingangsrechnung erledigt', [
+    {{type:'date', id:'ki-datum', label:'Wann bezahlt?', value:new Date().toISOString().slice(0,10)}},
+    {{type:'select', id:'ki-betrag-voll', label:'Voller Betrag bezahlt?', options:[['ja','Ja'],['nein','Nein, reduzierter Betrag'],['unklar','Unklar']]}},
+    {{type:'number', id:'ki-betrag', label:'Bezahlter Betrag (EUR)', placeholder:'0.00', condition:'ki-betrag-voll=nein'}},
+    {{type:'text', id:'ki-grund', label:'Warum reduziert / warum so lange?', placeholder:'z.B. Skonto, Teilzahlung, Reklamation...', condition:'ki-betrag-voll=nein'}},
+    {{type:'textarea', id:'ki-notiz', label:'Hinweise für Zukunft?', placeholder:'Was würdest du beim nächsten Mal anders machen?'}}
+  ]);
 }}
 
 // Geschäft: Bewertung korrekt (bleibt sichtbar mit Badge)
@@ -1218,35 +1392,139 @@ function filterAng() {{
   document.getElementById('ang-count').textContent = count + ' Angebote';
 }}
 
-// Ausgangsrechnung Status ändern
+// Ausgangsrechnung Status ändern -> Kira-Interaktion
 function arSetStatus(id, status) {{
-  const labels = {{bezahlt:'Als bezahlt markieren?',streitfall:'Als Streitfall markieren?'}};
-  if (!confirm(labels[status] || 'Status ändern?')) return;
-  fetch('/api/ausgangsrechnung/'+id+'/status', {{
-    method:'POST', headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{status}})
-  }}).then(r=>r.json()).then(d=>{{
-    if(d.ok) {{ showToast('Status aktualisiert'); setTimeout(()=>location.reload(), 600); }}
-    else showToast(d.error||'Fehler');
-  }}).catch(()=>showToast('Fehler'));
+  if (status === 'bezahlt') {{
+    openKiraInterakt('ausgangsrechnung', id, 'bezahlt', 'Rechnung als bezahlt markieren', [
+      {{type:'date', id:'ki-datum', label:'Zahlungseingang am:', value:new Date().toISOString().slice(0,10)}},
+      {{type:'select', id:'ki-betrag-voll', label:'Voller Betrag eingegangen?', options:[['ja','Ja, voller Betrag'],['nein','Nein, reduzierter Betrag'],['skonto','Skonto abgezogen']]}},
+      {{type:'number', id:'ki-betrag', label:'Eingegangener Betrag (EUR)', placeholder:'0.00', condition:'ki-betrag-voll!=ja'}},
+      {{type:'text', id:'ki-grund', label:'Grund für Abweichung:', placeholder:'z.B. Skonto, Teilzahlung, Reklamation...', condition:'ki-betrag-voll!=ja'}},
+      {{type:'textarea', id:'ki-notiz', label:'Hinweise für zukünftige Rechnungen an diesen Kunden?', placeholder:'z.B. Zahlungsmoral, Skontonutzung...'}}
+    ]);
+  }} else if (status === 'streitfall') {{
+    openKiraInterakt('ausgangsrechnung', id, 'streitfall', 'Streitfall markieren', [
+      {{type:'text', id:'ki-grund', label:'Was ist das Problem?', placeholder:'z.B. Mängelrüge, Reklamation, Leistung bestritten...'}},
+      {{type:'select', id:'ki-schritt', label:'Nächster Schritt?', options:[['abwarten','Abwarten'],['gespraech','Gespräch suchen'],['mahnung','Mahnung senden'],['anwalt','Rechtliche Schritte']]}},
+      {{type:'textarea', id:'ki-notiz', label:'Details zum Vorgang:', placeholder:'Was ist passiert? Was wurde vereinbart?'}}
+    ]);
+  }}
 }}
 
-// Angebot Status ändern
+// Angebot Status ändern -> Kira-Interaktion
 function angSetStatus(id, status) {{
-  const labels = {{angenommen:'Als angenommen markieren?',abgelehnt:'Als abgelehnt markieren?',keine_antwort:'Als keine Antwort markieren?'}};
-  if (!confirm(labels[status] || 'Status ändern?')) return;
-  let grund = '';
-  if (status === 'abgelehnt') {{
-    grund = prompt('Warum wurde das Angebot abgelehnt?\\n(zu teuer / anderer Anbieter / Projekt abgesagt / Sonstiges)', '') || '';
-  }} else if (status === 'angenommen') {{
-    grund = prompt('Hinweise zum Zustandekommen?\\n(z.B. nach Nachfass, sofort, Verhandlung)', '') || '';
+  if (status === 'angenommen') {{
+    openKiraInterakt('angebot', id, 'angenommen', 'Angebot angenommen', [
+      {{type:'date', id:'ki-datum', label:'Angenommen am:', value:new Date().toISOString().slice(0,10)}},
+      {{type:'select', id:'ki-wie', label:'Wie kam es zum Abschluss?', options:[['direkt','Direkt angenommen'],['nachfass','Nach Nachfass'],['verhandlung','Nach Verhandlung'],['empfehlung','Über Empfehlung'],['sonstig','Sonstiges']]}},
+      {{type:'text', id:'ki-dauer', label:'Wie lange hat die Entscheidung gedauert?', placeholder:'z.B. 3 Tage, 2 Wochen...'}},
+      {{type:'textarea', id:'ki-notiz', label:'Was war ausschlaggebend? Was lief gut?', placeholder:'Erkenntnisse für zukünftige Angebote...'}}
+    ]);
+  }} else if (status === 'abgelehnt') {{
+    openKiraInterakt('angebot', id, 'abgelehnt', 'Angebot abgelehnt', [
+      {{type:'select', id:'ki-grund', label:'Hauptgrund der Ablehnung?', options:[['zu_teuer','Zu teuer'],['konkurrenz','Anderer Anbieter gewählt'],['abgesagt','Projekt abgesagt/verschoben'],['kein_bedarf','Kein Bedarf mehr'],['keine_antwort','Nie geantwortet'],['sonstig','Sonstiges']]}},
+      {{type:'text', id:'ki-detail', label:'Details:', placeholder:'Was genau wurde als Grund genannt?'}},
+      {{type:'number', id:'ki-preis-diff', label:'Preisdifferenz zum Wettbewerb (EUR, falls bekannt):', placeholder:'0'}},
+      {{type:'textarea', id:'ki-notiz', label:'Was hättest du anders machen können?', placeholder:'Erkenntnisse für zukünftige Angebote...'}}
+    ]);
+  }} else if (status === 'keine_antwort') {{
+    openKiraInterakt('angebot', id, 'keine_antwort', 'Keine Antwort erhalten', [
+      {{type:'select', id:'ki-nachfass', label:'Wie oft wurde nachgefasst?', options:[['0','Nicht nachgefasst'],['1','1x nachgefasst'],['2','2x nachgefasst'],['3','3x oder öfter']]}},
+      {{type:'textarea', id:'ki-notiz', label:'Vermutung warum keine Antwort?', placeholder:'z.B. Projekt verschoben, falscher Ansprechpartner...'}}
+    ]);
   }}
-  fetch('/api/angebot/'+id+'/status', {{
+}}
+
+// Kira-Interaktions-Modal: öffnen
+function openKiraInterakt(type, id, action, title, fields) {{
+  document.getElementById('ki-type').value = type;
+  document.getElementById('ki-id').value = id;
+  document.getElementById('ki-action').value = action;
+  document.getElementById('ki-title').textContent = 'Kira: ' + title;
+  document.getElementById('ki-context').innerHTML = '<strong>' + type + ' #' + id + '</strong> &rarr; ' + action;
+  const container = document.getElementById('ki-fields');
+  container.innerHTML = '';
+  fields.forEach(f => {{
+    const wrap = document.createElement('div');
+    wrap.className = 'ki-field';
+    if (f.condition) wrap.dataset.condition = f.condition;
+    let input = '';
+    if (f.type === 'text') {{
+      input = '<input type="text" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+    }} else if (f.type === 'number') {{
+      input = '<input type="number" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" step="0.01" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+    }} else if (f.type === 'date') {{
+      input = '<input type="date" id="'+f.id+'" value="'+(f.value||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+    }} else if (f.type === 'select') {{
+      input = '<select id="'+f.id+'" onchange="updateKiraFields()" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+      f.options.forEach(o => {{ input += '<option value="'+o[0]+'">'+o[1]+'</option>'; }});
+      input += '</select>';
+    }} else if (f.type === 'textarea') {{
+      input = '<textarea id="'+f.id+'" rows="3" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>';
+    }}
+    wrap.innerHTML = '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px">'+f.label+'</label>' + input;
+    container.appendChild(wrap);
+  }});
+  updateKiraFields();
+  document.getElementById('kiraInteraktModal').classList.add('open');
+}}
+
+// Bedingte Felder anzeigen/verstecken
+function updateKiraFields() {{
+  document.querySelectorAll('#ki-fields .ki-field[data-condition]').forEach(wrap => {{
+    const cond = wrap.dataset.condition;
+    const m = cond.match(/^([^!=]+)(!=|=)(.+)$/);
+    if (!m) return;
+    const el = document.getElementById(m[1]);
+    if (!el) return;
+    const match = m[2] === '=' ? el.value === m[3] : el.value !== m[3];
+    wrap.style.display = match ? '' : 'none';
+  }});
+}}
+
+// Modal schließen
+function closeKiraInterakt() {{
+  document.getElementById('kiraInteraktModal').classList.remove('open');
+}}
+
+// Ohne Angaben fortfahren
+function skipKiraInterakt() {{
+  const type = document.getElementById('ki-type').value;
+  const id = document.getElementById('ki-id').value;
+  const action = document.getElementById('ki-action').value;
+  executeStatusChange(type, id, action, {{}});
+}}
+
+// Mit Angaben speichern
+function submitKiraInterakt() {{
+  const type = document.getElementById('ki-type').value;
+  const id = document.getElementById('ki-id').value;
+  const action = document.getElementById('ki-action').value;
+  const data = {{}};
+  document.querySelectorAll('#ki-fields input, #ki-fields select, #ki-fields textarea').forEach(el => {{
+    if (el.id && el.style.display !== 'none' && el.closest('.ki-field')?.style.display !== 'none') {{
+      data[el.id.replace('ki-','')] = el.value;
+    }}
+  }});
+  data.zeitstempel = new Date().toISOString();
+  executeStatusChange(type, id, action, data);
+}}
+
+// Status-Änderung ausführen
+function executeStatusChange(type, id, action, data) {{
+  const url = type === 'geschaeft' ? '/api/geschaeft/'+id+'/erledigt'
+    : type === 'ausgangsrechnung' ? '/api/ausgangsrechnung/'+id+'/status'
+    : '/api/angebot/'+id+'/status';
+  const body = type === 'geschaeft' ? {{...data}} : {{status: action, ...data}};
+  fetch(url, {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{status, grund}})
+    body:JSON.stringify(body)
   }}).then(r=>r.json()).then(d=>{{
-    if(d.ok) {{ showToast('Status aktualisiert'); setTimeout(()=>location.reload(), 600); }}
-    else showToast(d.error||'Fehler');
+    if(d.ok) {{
+      closeKiraInterakt();
+      showToast('Gespeichert');
+      setTimeout(()=>location.reload(), 600);
+    }} else showToast(d.error||'Fehler');
   }}).catch(()=>showToast('Fehler'));
 }}
 
@@ -1495,13 +1773,22 @@ function showToast(msg){{
 }}
 document.addEventListener('keydown',e=>{{
   if(e.key==='Escape'){{
-    if(document.getElementById('mailReadModal').classList.contains('open')) closeMailRead();
+    if(document.getElementById('kiraInteraktModal').classList.contains('open')) closeKiraInterakt();
+    else if(document.getElementById('mailReadModal').classList.contains('open')) closeMailRead();
     else if(document.getElementById('geschBewertModal').classList.contains('open')) closeGeschBewertung();
     else if(document.getElementById('editRegelModal').classList.contains('open')) closeEditRegel();
     else if(document.getElementById('korrModal').classList.contains('open')) closeKorrModal();
     else if(kiraOpen) closeKira();
   }}
 }});
+// Restore active tab on load
+(function(){{
+  const tab = localStorage.getItem('kira_active_tab');
+  if(tab && tab !== 'dashboard') showPanel(tab);
+  const gt = localStorage.getItem('kira_gesch_tab');
+  if(gt && gt !== 'uebersicht') showGeschTab(gt);
+}})();
+// Auto-refresh every 5 min, preserves tab state via localStorage
 setTimeout(()=>location.reload(),300000);
 </script>
 </body>
@@ -1667,7 +1954,11 @@ a{color:var(--gold);text-decoration:none;}
 .gesch-routine-row:hover{opacity:1;}
 .gesch-row-aktiv{border-left:2px solid #e84545;}
 .gesch-row-routine{opacity:.55;}
+.gc-detail{min-width:100px;flex:1;color:var(--muted);}
 .gc-actions{display:flex;gap:4px;min-width:100px;justify-content:flex-end;}
+.gesch-ar-summary{display:flex;gap:20px;padding:10px 14px;margin-bottom:10px;background:rgba(189,162,124,.06);
+  border:1px solid var(--border);border-radius:8px;font-size:13px;flex-wrap:wrap;}
+.gesch-ar-summary span{white-space:nowrap;}
 .btn{border:none;cursor:pointer;border-radius:6px;font-weight:700;font-family:inherit;transition:all .15s;}
 .btn-sm{padding:5px 12px;font-size:12px;}
 .btn-tiny{padding:3px 8px;font-size:11px;}
@@ -1686,6 +1977,16 @@ a{color:var(--gold);text-decoration:none;}
 .att-link:hover{background:rgba(189,162,124,.18);border-color:rgba(189,162,124,.4);}
 .att-icon{font-size:10px;font-weight:800;color:var(--muted);}
 
+/* Geschäft Hero-Volumen */
+.gesch-volumen-hero{background:linear-gradient(135deg,rgba(189,162,124,.08),rgba(189,162,124,.02));border:1px solid rgba(189,162,124,.2);border-radius:12px;padding:18px 24px;margin-bottom:16px;text-align:center;transition:border-color .2s;}
+.gesch-volumen-hero:hover{border-color:rgba(189,162,124,.5);}
+.gesch-volumen-hero.gesch-sum-alarm{border-color:rgba(232,69,69,.3);background:linear-gradient(135deg,rgba(232,69,69,.06),rgba(232,69,69,.02));}
+.gesch-volumen-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.gesch-volumen-num{font-size:28px;font-weight:800;color:var(--gold);letter-spacing:-.5px;}
+.gesch-volumen-hero.gesch-sum-alarm .gesch-volumen-num{color:#e84545;}
+.gesch-volumen-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.gesch-sum-card{cursor:pointer;transition:border-color .2s,transform .1s;}
+.gesch-sum-card:hover{border-color:rgba(189,162,124,.4);transform:translateY(-1px);}
 /* Geschäft Filter & Tabellen */
 .gesch-filter-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
 .gesch-filter-bar select{background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;}
@@ -2092,14 +2393,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 if aktion == 'status':
                     new_status = body.get('status', '')
-                    grund = body.get('grund', '')
-                    now = datetime.now().isoformat()
+                    now = body.get('zeitstempel') or datetime.now().isoformat()
+                    bezahlt_am = body.get('datum', now[:10])
                     if new_status == 'bezahlt':
-                        db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=? WHERE id=?", (now, ar_id))
+                        db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=?, notiz=? WHERE id=?",
+                                   (bezahlt_am, body.get('notiz', ''), ar_id))
                     elif new_status in ('streitfall', 'offen'):
-                        db.execute("UPDATE ausgangsrechnungen SET status=? WHERE id=?", (new_status, ar_id))
+                        db.execute("UPDATE ausgangsrechnungen SET status=?, notiz=? WHERE id=?",
+                                   (new_status, body.get('notiz', ''), ar_id))
+                    # Alle Interaktionsdaten speichern
+                    daten = {k: v for k, v in body.items() if k not in ('status',)}
+                    daten['zeitstempel'] = now
                     db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
-                               ('ausgangsrechnung', ar_id, f'status_{new_status}', json.dumps({"grund": grund}), now))
+                               ('ausgangsrechnung', ar_id, f'status_{new_status}', json.dumps(daten, ensure_ascii=False), now))
+                    # Erkenntnisse in Wissenspeicher
+                    notiz = body.get('notiz', '')
+                    if notiz:
+                        try:
+                            wdb = sqlite3.connect(str(TASKS_DB))
+                            wdb.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                                        ('gelernt', f'Erkenntnis: Rechnung #{ar_id} {new_status}', notiz,
+                                         f'Kira-Interaktion: AR #{ar_id}', now))
+                            wdb.commit(); wdb.close()
+                        except: pass
                     db.commit()
                     self._json({'ok': True})
                 else:
@@ -2119,16 +2435,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 if aktion == 'status':
                     new_status = body.get('status', '')
-                    grund = body.get('grund', '')
-                    now = datetime.now().isoformat()
+                    now = body.get('zeitstempel') or datetime.now().isoformat()
                     if new_status in ('angenommen', 'abgelehnt', 'keine_antwort', 'offen', 'bearbeitet'):
                         db.execute("UPDATE angebote SET status=? WHERE id=?", (new_status, ang_id))
-                        if new_status == 'abgelehnt' and grund:
+                        if new_status == 'abgelehnt':
+                            grund = body.get('grund', '') or body.get('detail', '')
                             db.execute("UPDATE angebote SET grund_abgelehnt=? WHERE id=?", (grund, ang_id))
-                        elif new_status == 'angenommen' and grund:
+                        elif new_status == 'angenommen':
+                            grund = body.get('wie', '') + (' ' + body.get('notiz', '')).strip()
                             db.execute("UPDATE angebote SET grund_angenommen=? WHERE id=?", (grund, ang_id))
+                    # Alle Interaktionsdaten speichern
+                    daten = {k: v for k, v in body.items() if k not in ('status',)}
+                    daten['zeitstempel'] = now
                     db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
-                               ('angebot', ang_id, f'status_{new_status}', json.dumps({"grund": grund}), now))
+                               ('angebot', ang_id, f'status_{new_status}', json.dumps(daten, ensure_ascii=False), now))
+                    # Erkenntnisse in Wissenspeicher
+                    notiz = body.get('notiz', '')
+                    if notiz:
+                        try:
+                            wdb = sqlite3.connect(str(TASKS_DB))
+                            wdb.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                                        ('gelernt', f'Erkenntnis: Angebot #{ang_id} {new_status}', notiz,
+                                         f'Kira-Interaktion: Ang #{ang_id}', now))
+                            wdb.commit(); wdb.close()
+                        except: pass
                     db.commit()
                     self._json({'ok': True})
                 else:
@@ -2245,9 +2575,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _handle_geschaeft_action(self, gid, aktion, body):
         db = get_db()
         try:
-            now = datetime.now().isoformat()
+            now = body.get('zeitstempel') or datetime.now().isoformat()
             if aktion == 'erledigt':
-                db.execute("UPDATE geschaeft SET bewertung='erledigt', bewertung_grund='manuell erledigt' WHERE id=?", (gid,))
+                bezahlt_am = body.get('datum', now[:10])
+                notiz = body.get('notiz', '')
+                db.execute("UPDATE geschaeft SET bewertung='erledigt', bewertung_grund=? WHERE id=?",
+                           (f'bezahlt am {bezahlt_am}. {notiz}'.strip(), gid))
+                # Interaktionsdaten speichern
+                daten = {k: v for k, v in body.items()}
+                daten['zeitstempel'] = now
+                db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
+                           ('geschaeft', gid, 'erledigt', json.dumps(daten, ensure_ascii=False), now))
+                if notiz:
+                    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                               ('gelernt', f'Erkenntnis: Eingangsrechnung #{gid} erledigt', notiz,
+                                f'Kira-Interaktion: Geschaeft #{gid}', now))
                 db.commit()
                 self._json({'ok': True})
             elif aktion == 'bewertung':
@@ -2255,6 +2597,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 grund = body.get('grund','')
                 db.execute("UPDATE geschaeft SET bewertung=?, bewertung_grund=? WHERE id=?",
                            (bew, grund, gid))
+                db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
+                           ('geschaeft', gid, f'bewertung_{bew}', json.dumps({"grund": grund, "zeitstempel": now}, ensure_ascii=False), now))
                 db.commit()
                 self._json({'ok': True})
             else:
