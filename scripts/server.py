@@ -348,14 +348,22 @@ def build_geschaeft(db):
                                     "skonto_prozent": d.get("skonto_prozent", 0),
                                     "skonto_betrag": d.get("skonto_betrag", 0)})
 
-    # Statistik-Daten
+    # Statistik-Daten + Muster aus geschaeft_statistik
     ang_angenommen = [r for r in ang if r.get("status") == "angenommen"]
     ang_abgelehnt = [r for r in ang if r.get("status") == "abgelehnt"]
     ar_bezahlt = [r for r in ar if r.get("status") == "bezahlt"]
+    # Zahlungsdauern aus geschaeft_statistik lesen
+    zahlungsdauern = []
+    try:
+        for s in db.execute("SELECT daten_json FROM geschaeft_statistik WHERE ereignis='status_bezahlt' AND daten_json IS NOT NULL"):
+            d = json.loads(s[0]) if s[0] else {}
+            if d.get('zahlungsdauer_tage'):
+                zahlungsdauern.append(d['zahlungsdauer_tage'])
+    except: pass
     stats = {"ang_total": len(ang), "ang_angenommen": len(ang_angenommen),
              "ang_abgelehnt": len(ang_abgelehnt), "ar_bezahlt": len(ar_bezahlt), "ar_total": len(ar),
              "ar_gesamt_eur": s_ar_gesamt, "ar_bezahlt_eur": s_ar_bezahlt,
-             "skonto_dringend": skonto_dringend}
+             "skonto_dringend": skonto_dringend, "zahlungsdauern": zahlungsdauern}
 
     n_mahnungen = len(ar_gemahnt) + len([m for m in mahnung_details if not any(r.get("re_nummer") == m.get("re_nummer") for r in ar_gemahnt)])
 
@@ -410,7 +418,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
     if skonto_dringend:
         html += '<div class="section" style="margin-top:16px"><div class="section-title" style="color:#50c878">Skonto-Fristen</div><div class="section-body">'
         for sk in sorted(skonto_dringend, key=lambda x: x["skonto_datum"]):
-            tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d") - datetime.now()).days
+            tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d").date() - datetime.now().date()).days
             dringend_cls = ' style="color:#e84545"' if tage_rest <= 2 else ""
             html += f'<div class="gesch-urgent-item"><span class="badge badge-korrekt">{sk["skonto_prozent"]}%</span> {sk["re_nr"]} &middot; <span{dringend_cls}>noch {tage_rest} Tage</span> (bis {format_datum(sk["skonto_datum"])}) &middot; Ersparnis: {sk["skonto_betrag"]:,.2f} EUR</div>'
         html += '</div></div>'
@@ -451,6 +459,9 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
         hinweis = "" if ang_total >= 10 else f'<span class="muted" style="font-size:11px;margin-left:8px">(Datenbasis: {ang_total} Angebote)</span>'
         ar_ges = s.get("ar_gesamt_eur", 0)
         ar_bez = s.get("ar_bezahlt_eur", 0)
+        zdauern = s.get("zahlungsdauern", [])
+        zd_avg = f'{sum(zdauern)/len(zdauern):.0f}d' if zdauern else "–"
+        zd_hinweis = "" if len(zdauern) >= 5 else f' <span class="muted" style="font-size:10px">({len(zdauern)} Werte)</span>'
         html += f"""<div class="section" style="margin-top:16px">
       <div class="section-title">Statistik &amp; Finanzen</div>
       <div class="section-body">
@@ -458,6 +469,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
           <div class="gesch-sum-card"><div class="gesch-sum-num">{ar_ges:,.0f} &euro;</div><div class="gesch-sum-label">Fakturiert gesamt</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num" style="color:#50c878">{ar_bez:,.0f} &euro;</div><div class="gesch-sum-label">Bezahlt</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{s.get('ar_bezahlt',0)}/{s.get('ar_total',0)}</div><div class="gesch-sum-label">Rechnungen bezahlt</div></div>
+          <div class="gesch-sum-card"><div class="gesch-sum-num">{zd_avg}</div><div class="gesch-sum-label">&Oslash; Zahlungsdauer{zd_hinweis}</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{quote}</div><div class="gesch-sum-label">Angebotsquote{hinweis}</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_angen}</div><div class="gesch-sum-label">Angenommen</div></div>
           <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_abgel}</div><div class="gesch-sum-label">Abgelehnt</div></div>
@@ -1121,33 +1133,23 @@ def generate_html() -> str:
   </div>
   <div class="kira-tabs">
     <div class="kira-tab active" id="ktab-home"    onclick="showKTab('home')">Home</div>
-    <div class="kira-tab" id="ktab-chat"           onclick="showKTab('chat')">Chat</div>
     <div class="kira-tab" id="ktab-aufgaben"       onclick="showKTab('aufgaben')">Aufgaben</div>
-    <div class="kira-tab" id="ktab-kwissen"        onclick="showKTab('kwissen')">Wissen</div>
+    <div class="kira-tab" id="ktab-muster"         onclick="showKTab('muster')">Muster</div>
+    <div class="kira-tab" id="ktab-kwissen"        onclick="showKTab('kwissen')">Gelernt</div>
   </div>
   <div class="kira-content">
     <div id="kc-home">
-      <div class="kira-sec"><div class="kira-sec-title">Status</div>
-        <div class="kira-card"><div class="kira-card-meta" style="color:{'#e84545' if n_antwort>0 else 'var(--muted)'}">
-          {'Achtung: ' + str(n_antwort) + ' Antworten ausstehend' if n_antwort>0 else 'Keine dringenden Antworten'}
-        </div></div>
-      </div>
-      <div class="kira-sec"><div class="kira-sec-title">Hinweis</div>
-        <div class="kira-card"><div class="kira-card-meta">Klicke auf einer Aufgabenkarte auf <strong style="color:var(--kl)">Mit Kira besprechen</strong>, um das Kommunikationsfenster zu öffnen.</div></div>
-      </div>
-    </div>
-    <div id="kc-chat" style="display:none">
-      <div id="komm-container"><div style="color:var(--muted);font-size:13px;padding:6px 0;">Wähle eine Aufgabe und klicke &bdquo;Mit Kira besprechen&ldquo;.</div></div>
+      <div id="kira-home-loading" style="color:var(--muted);font-size:13px;padding:10px">Lade Insights&hellip;</div>
+      <div id="kira-home-content" style="display:none"></div>
     </div>
     <div id="kc-aufgaben" style="display:none">
-      <div id="kira-tasks-list"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
+      <div id="kira-aufgaben-list"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
+    </div>
+    <div id="kc-muster" style="display:none">
+      <div id="kira-muster-content"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
     </div>
     <div id="kc-kwissen" style="display:none">
-      <div class="kira-sec"><div class="kira-sec-title">Feste Regeln</div>
-        <div class="kira-card"><div class="kira-card-meta">Keine Preise in der Erstantwort. Anrede nach Kundensprache (Du/Sie). Kein KI-Sound.</div></div>
-        <div class="kira-card"><div class="kira-card-meta">Erst Einordnung + Infos einsammeln. Entwurf erst nach Kai-Input.</div></div>
-        <div class="kira-card"><div class="kira-card-meta">Fotos immer anfordern. Max 3-7 Rückfragen.</div></div>
-      </div>
+      <div id="kira-lernen-list"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
     </div>
   </div>
 </div>
@@ -1626,7 +1628,7 @@ function neueRegel() {{
 // Kira panel
 function toggleKira(){{ kiraOpen ? closeKira() : openKiraNaked(); }}
 function openKiraNaked(){{ kiraOpen=true; document.getElementById('kiraPanel').classList.add('open'); }}
-function closeKira(){{ kiraOpen=false; document.getElementById('kiraPanel').classList.remove('open'); }}
+function closeKira(){{ kiraOpen=false; document.getElementById('kiraPanel').classList.remove('open'); localStorage.setItem('kira_dismissed', Date.now()); }}
 
 // Kira tabs
 function showKTab(name){{
@@ -1634,7 +1636,141 @@ function showKTab(name){{
   document.querySelectorAll('[id^=kc-]').forEach(c=>c.style.display='none');
   document.getElementById('ktab-'+name)?.classList.add('active');
   document.getElementById('kc-'+name).style.display='block';
-  if(name==='aufgaben') loadKiraTasks();
+  if(name==='aufgaben') loadKiraInsights('aufgaben');
+  if(name==='muster') loadKiraInsights('muster');
+  if(name==='kwissen') loadKiraInsights('kwissen');
+}}
+
+// Kira Insights laden und rendern
+let kiraInsightsCache = null;
+function loadKiraInsights(tab) {{
+  const render = (data) => {{
+    if(tab==='aufgaben' || !tab) renderKiraAufgaben(data);
+    if(tab==='muster' || !tab) renderKiraMuster(data);
+    if(tab==='kwissen' || !tab) renderKiraLernen(data);
+    if(!tab) renderKiraHome(data);
+  }};
+  if(kiraInsightsCache) {{ render(kiraInsightsCache); return; }}
+  fetch('/api/kira/insights').then(r=>r.json()).then(data=>{{
+    kiraInsightsCache = data;
+    render(data);
+  }}).catch(()=>{{}});
+}}
+
+function renderKiraHome(data) {{
+  const el = document.getElementById('kira-home-content');
+  const loading = document.getElementById('kira-home-loading');
+  if(!el) return;
+  const aufgaben = data.aufgaben || [];
+  let html = '';
+  if(aufgaben.length > 0) {{
+    html += '<div class="kira-sec"><div class="kira-sec-title" style="color:#e84545">Hallo Kai, ich habe '+aufgaben.length+' wichtige Punkte</div>';
+    aufgaben.slice(0,5).forEach(a => {{
+      const pcls = a.prio >= 3 ? 'kira-prio-high' : a.prio >= 2 ? 'kira-prio-med' : 'kira-prio-low';
+      html += '<div class="kira-card kira-task-card '+pcls+'" onclick="'+a.action+';closeKira()" style="cursor:pointer"><div class="kira-card-meta">'+a.text+'</div></div>';
+    }});
+    html += '</div>';
+  }} else {{
+    html += '<div class="kira-sec"><div class="kira-sec-title" style="color:#50c878">Alles im Griff</div><div class="kira-card"><div class="kira-card-meta">Keine dringenden Aufgaben. Gut gemacht!</div></div></div>';
+  }}
+  // Muster-Teaser
+  const m = data.muster || {{}};
+  if(m.zahlungsdauer_avg || m.angebotsquote) {{
+    html += '<div class="kira-sec"><div class="kira-sec-title">Erkenntnisse</div>';
+    if(m.zahlungsdauer_avg) html += '<div class="kira-card"><div class="kira-card-meta">Zahlungsdauer: \u00D8 '+m.zahlungsdauer_avg+' Tage ('+m.zahlungsdauer_n+' Rechnungen)</div></div>';
+    if(m.angebotsquote) html += '<div class="kira-card"><div class="kira-card-meta">Angebotsquote: '+m.angebotsquote+'% ('+m.angebote_angenommen+'/'+m.angebote_total+')</div></div>';
+    html += '</div>';
+  }}
+  // Letzte Erkenntnisse
+  const lernen = data.lernen || [];
+  if(lernen.length > 0) {{
+    html += '<div class="kira-sec"><div class="kira-sec-title">Zuletzt gelernt</div>';
+    lernen.slice(0,3).forEach(l => {{
+      html += '<div class="kira-card"><div class="kira-card-meta" style="font-size:11px"><strong>'+escH(l.titel)+'</strong><br>'+escH(l.inhalt).substring(0,100)+'</div></div>';
+    }});
+    html += '</div>';
+  }}
+  el.innerHTML = html;
+  if(loading) loading.style.display = 'none';
+  el.style.display = 'block';
+}}
+
+function renderKiraAufgaben(data) {{
+  const el = document.getElementById('kira-aufgaben-list');
+  if(!el) return;
+  const aufgaben = data.aufgaben || [];
+  if(aufgaben.length === 0) {{ el.innerHTML = '<div style="color:#50c878;padding:10px">Keine offenen Aufgaben.</div>'; return; }}
+  let html = '';
+  aufgaben.forEach(a => {{
+    const pcls = a.prio >= 3 ? 'kira-prio-high' : a.prio >= 2 ? 'kira-prio-med' : 'kira-prio-low';
+    html += '<div class="kira-card kira-task-card '+pcls+'" onclick="'+a.action+';closeKira()" style="cursor:pointer"><div class="kira-card-meta">'+a.text+'</div></div>';
+  }});
+  el.innerHTML = html;
+}}
+
+function renderKiraMuster(data) {{
+  const el = document.getElementById('kira-muster-content');
+  if(!el) return;
+  const m = data.muster || {{}};
+  let html = '<div class="kira-sec"><div class="kira-sec-title">Aus deinen Daten gelernt</div>';
+  if(m.zahlungsdauer_avg) {{
+    html += '<div class="kira-card"><div class="kira-card-meta"><strong>Zahlungsdauer</strong><br>\u00D8 '+m.zahlungsdauer_avg+' Tage &middot; Min: '+m.zahlungsdauer_min+' &middot; Max: '+m.zahlungsdauer_max+' &middot; Basis: '+m.zahlungsdauer_n+' Rechnungen</div></div>';
+  }}
+  if(m.angebotsquote !== undefined) {{
+    html += '<div class="kira-card"><div class="kira-card-meta"><strong>Angebotsquote</strong><br>'+m.angebotsquote+'% angenommen ('+m.angebote_angenommen+' von '+m.angebote_total+')</div></div>';
+  }}
+  if(m.ablehngruende) {{
+    html += '<div class="kira-card"><div class="kira-card-meta"><strong>Ablehnungsgründe</strong><br>';
+    Object.entries(m.ablehngruende).forEach(([g,n]) => {{ html += n+'x '+escH(g)+'<br>'; }});
+    html += '</div></div>';
+  }}
+  if(m.annahmegruende) {{
+    html += '<div class="kira-card"><div class="kira-card-meta"><strong>Annahmegründe</strong><br>';
+    Object.entries(m.annahmegruende).forEach(([g,n]) => {{ html += n+'x '+escH(g)+'<br>'; }});
+    html += '</div></div>';
+  }}
+  if(!m.zahlungsdauer_avg && !m.angebotsquote) {{
+    html += '<div class="kira-card"><div class="kira-card-meta" style="color:var(--muted)">Noch nicht genug Daten. Muster werden erkannt, sobald du mehr Rechnungen und Angebote bearbeitest.</div></div>';
+  }}
+  html += '</div>';
+  el.innerHTML = html;
+}}
+
+function renderKiraLernen(data) {{
+  const el = document.getElementById('kira-lernen-list');
+  if(!el) return;
+  const lernen = data.lernen || [];
+  if(lernen.length === 0) {{ el.innerHTML = '<div style="color:var(--muted);padding:10px">Noch keine Erkenntnisse gespeichert. Bearbeite Rechnungen und Angebote mit dem Kira-Dialog, um Wissen aufzubauen.</div>'; return; }}
+  let html = '<div class="kira-sec"><div class="kira-sec-title">Erkenntnisse aus deiner Arbeit</div>';
+  lernen.forEach(l => {{
+    html += '<div class="kira-card"><div class="kira-card-meta"><strong>'+escH(l.titel)+'</strong><br><span style="color:rgba(255,255,255,.7)">'+escH(l.inhalt)+'</span><br><span style="color:var(--muted);font-size:10px">'+escH(l.datum||'')+'</span></div></div>';
+  }});
+  html += '</div>';
+  el.innerHTML = html;
+}}
+
+// Kira proaktiv öffnen wenn wichtige Aufgaben da sind
+function kiraProaktivCheck() {{
+  const dismissed = parseInt(localStorage.getItem('kira_dismissed')||'0');
+  const cooldown = 30 * 60 * 1000; // 30 Minuten Cooldown nach Dismiss
+  if(Date.now() - dismissed < cooldown) return;
+  fetch('/api/kira/insights').then(r=>r.json()).then(data=>{{
+    kiraInsightsCache = data;
+    const hochprio = (data.aufgaben||[]).filter(a => a.prio >= 2);
+    if(hochprio.length > 0 && !kiraOpen) {{
+      renderKiraHome(data);
+      // Sanftes Aufpoppen nach 2 Sekunden
+      setTimeout(()=>{{
+        if(!kiraOpen) {{
+          openKiraNaked();
+          const fab = document.querySelector('.kira-fab');
+          if(fab) fab.classList.add('kira-fab-pulse');
+        }}
+      }}, 2000);
+    }} else {{
+      renderKiraHome(data);
+    }}
+  }}).catch(()=>{{}});
 }}
 
 // Mit Kira besprechen – Kommunikationsfenster
@@ -1788,6 +1924,8 @@ document.addEventListener('keydown',e=>{{
   const gt = localStorage.getItem('kira_gesch_tab');
   if(gt && gt !== 'uebersicht') showGeschTab(gt);
 }})();
+// Kira proaktiv: Insights laden + ggf. Panel öffnen
+setTimeout(()=>kiraProaktivCheck(), 1500);
 // Auto-refresh every 5 min, preserves tab state via localStorage
 setTimeout(()=>location.reload(),300000);
 </script>
@@ -2053,6 +2191,13 @@ a{color:var(--gold);text-decoration:none;}
 .kira-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 11px;margin-bottom:7px;cursor:default;}
 .kira-card.clickable{cursor:pointer;}
 .kira-card.clickable:hover{border-color:rgba(139,107,170,.35);background:rgba(139,107,170,.08);}
+.kira-task-card{cursor:pointer;transition:all .2s;}
+.kira-task-card:hover{border-color:rgba(139,107,170,.4);background:rgba(139,107,170,.1);transform:translateX(-2px);}
+.kira-prio-high{border-left:3px solid #e84545;}
+.kira-prio-med{border-left:3px solid #f0ad4e;}
+.kira-prio-low{border-left:3px solid rgba(189,162,124,.4);}
+.kira-fab-pulse{animation:kiraPulse 2s ease-in-out infinite;}
+@keyframes kiraPulse{0%,100%{box-shadow:0 3px 15px rgba(93,63,122,.4);}50%{box-shadow:0 3px 25px rgba(232,69,69,.6);}}
 .kira-card-title{font-size:13px;font-weight:700;margin-bottom:3px;}
 .kira-card-meta{font-size:12px;color:var(--muted);}
 
@@ -2170,8 +2315,143 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/angebote'):
             self._api_angebote()
 
+        elif self.path == '/api/kira/insights':
+            self._api_kira_insights()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
+
+    def _api_kira_insights(self):
+        """GET /api/kira/insights — Muster-Analyse aus allen gesammelten Daten."""
+        db = get_db()
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            today_dt = datetime.now()
+            insights = {"aufgaben": [], "muster": {}, "lernen": []}
+
+            # 1. DRINGENDE AUFGABEN sammeln
+            # Offene Ausgangsrechnungen > 30 Tage
+            try:
+                for r in db.execute("SELECT id, re_nummer, kunde_name, datum, betrag_brutto FROM ausgangsrechnungen WHERE status='offen'"):
+                    try:
+                        d = datetime.strptime(str(r['datum'])[:10], "%Y-%m-%d")
+                        tage = (today_dt - d).days
+                        if tage > 14:
+                            insights["aufgaben"].append({
+                                "typ": "rechnung_offen", "prio": 2 if tage > 30 else 1,
+                                "text": f"Rechnung {r['re_nummer']} ({r['kunde_name'] or 'Unbekannt'}) seit {tage} Tagen offen — {r['betrag_brutto'] or 0:,.2f} EUR",
+                                "action": f"showGeschTab('ausgangsre')"
+                            })
+                    except: pass
+            except: pass
+
+            # Nachfass fällig
+            try:
+                for r in db.execute("SELECT id, a_nummer, kunde_name, naechster_nachfass FROM angebote WHERE status='offen' AND naechster_nachfass IS NOT NULL AND naechster_nachfass <= ?", (today,)):
+                    insights["aufgaben"].append({
+                        "typ": "nachfass_faellig", "prio": 2,
+                        "text": f"Nachfass fällig: {r['a_nummer']} ({r['kunde_name'] or 'Unbekannt'})",
+                        "action": f"showGeschTab('angebote')"
+                    })
+            except: pass
+
+            # Offene Eingangsrechnungen
+            try:
+                n_eingang = db.execute("SELECT COUNT(*) FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt')").fetchone()[0]
+                if n_eingang > 0:
+                    insights["aufgaben"].append({
+                        "typ": "eingang_offen", "prio": 1,
+                        "text": f"{n_eingang} offene Eingangsrechnungen zu bearbeiten",
+                        "action": "showGeschTab('eingangsre')"
+                    })
+            except: pass
+
+            # Skonto-Fristen
+            try:
+                ddb = sqlite3.connect(str(DETAIL_DB))
+                ddb.row_factory = sqlite3.Row
+                for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent, skonto_betrag FROM rechnungen_detail WHERE skonto_datum >= ? AND skonto_datum IS NOT NULL", (today,)):
+                    try:
+                        tage_rest = (datetime.strptime(r['skonto_datum'], "%Y-%m-%d").date() - today_dt.date()).days
+                        if tage_rest >= 0 and tage_rest <= 3:
+                            insights["aufgaben"].append({
+                                "typ": "skonto_dringend", "prio": 3,
+                                "text": f"Skonto {r['skonto_prozent']}% für {r['re_nummer']} läuft in {tage_rest} Tagen ab! Ersparnis: {r['skonto_betrag'] or 0:,.2f} EUR",
+                                "action": "showGeschTab('ausgangsre')"
+                            })
+                    except: pass
+                ddb.close()
+            except: pass
+
+            # Antworten nötig
+            try:
+                n_antwort = db.execute("SELECT COUNT(*) FROM tasks WHERE kategorie='Antwort erforderlich'").fetchone()[0]
+                if n_antwort > 0:
+                    insights["aufgaben"].append({
+                        "typ": "antwort_noetig", "prio": 2,
+                        "text": f"{n_antwort} Anfragen warten auf deine Antwort",
+                        "action": "filterKomm('Antwort erforderlich')"
+                    })
+            except: pass
+
+            # 2. MUSTER aus geschaeft_statistik
+            try:
+                stats = db.execute("SELECT * FROM geschaeft_statistik ORDER BY erstellt_am DESC").fetchall()
+                zahlungsdauern = []
+                ablehngruende = {}
+                annahmegruende = {}
+                for s in stats:
+                    try:
+                        daten = json.loads(s['daten_json']) if s['daten_json'] else {}
+                    except: daten = {}
+                    if s['ereignis'] == 'status_bezahlt' and daten.get('zahlungsdauer_tage'):
+                        zahlungsdauern.append(daten['zahlungsdauer_tage'])
+                    if s['ereignis'] == 'status_abgelehnt':
+                        g = daten.get('grund', 'Unbekannt') or 'Unbekannt'
+                        ablehngruende[g] = ablehngruende.get(g, 0) + 1
+                    if s['ereignis'] == 'status_angenommen':
+                        g = daten.get('wie', 'Unbekannt') or 'Unbekannt'
+                        annahmegruende[g] = annahmegruende.get(g, 0) + 1
+
+                if zahlungsdauern:
+                    avg = sum(zahlungsdauern) / len(zahlungsdauern)
+                    insights["muster"]["zahlungsdauer_avg"] = round(avg, 1)
+                    insights["muster"]["zahlungsdauer_min"] = min(zahlungsdauern)
+                    insights["muster"]["zahlungsdauer_max"] = max(zahlungsdauern)
+                    insights["muster"]["zahlungsdauer_n"] = len(zahlungsdauern)
+                if ablehngruende:
+                    insights["muster"]["ablehngruende"] = dict(sorted(ablehngruende.items(), key=lambda x: -x[1]))
+                if annahmegruende:
+                    insights["muster"]["annahmegruende"] = dict(sorted(annahmegruende.items(), key=lambda x: -x[1]))
+
+                # Angebotsquote
+                try:
+                    ang_total = db.execute("SELECT COUNT(*) FROM angebote").fetchone()[0]
+                    ang_angen = db.execute("SELECT COUNT(*) FROM angebote WHERE status='angenommen'").fetchone()[0]
+                    ang_abgel = db.execute("SELECT COUNT(*) FROM angebote WHERE status='abgelehnt'").fetchone()[0]
+                    if ang_total >= 3:
+                        insights["muster"]["angebotsquote"] = round(ang_angen / ang_total * 100, 1)
+                    insights["muster"]["angebote_total"] = ang_total
+                    insights["muster"]["angebote_angenommen"] = ang_angen
+                    insights["muster"]["angebote_abgelehnt"] = ang_abgel
+                except: pass
+
+            except: pass
+
+            # 3. LETZTE ERKENNTNISSE aus wissen_regeln
+            try:
+                for r in db.execute("SELECT id, titel, inhalt, erstellt_am FROM wissen_regeln WHERE kategorie='gelernt' ORDER BY id DESC LIMIT 10"):
+                    insights["lernen"].append({"titel": r['titel'], "inhalt": r['inhalt'], "datum": r['erstellt_am']})
+            except: pass
+
+            # Aufgaben nach Priorität sortieren
+            insights["aufgaben"].sort(key=lambda x: -x.get("prio", 0))
+
+            self._json(insights)
+        except Exception as e:
+            self._json({"error": str(e)})
+        finally:
+            db.close()
 
     def _is_safe_path(self, path_str):
         """Sicherheitscheck: Pfad muss in erlaubtem Root liegen."""
@@ -2395,27 +2675,58 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     new_status = body.get('status', '')
                     now = body.get('zeitstempel') or datetime.now().isoformat()
                     bezahlt_am = body.get('datum', now[:10])
+                    betrag_bezahlt = body.get('betrag', '')
+                    betrag_voll = body.get('betrag-voll', 'ja')
+                    grund = body.get('grund', '')
+                    notiz = body.get('notiz', '')
+                    # Hole RE-Nummer für Wissenseintrag
+                    ar_row = db.execute("SELECT re_nummer, kunde_name, kunde_email, betrag_brutto FROM ausgangsrechnungen WHERE id=?", (ar_id,)).fetchone()
+                    re_nr = ar_row['re_nummer'] if ar_row else f'#{ar_id}'
+                    kunde = (ar_row['kunde_name'] or ar_row['kunde_email'] or 'Unbekannt') if ar_row else 'Unbekannt'
+                    betrag_orig = ar_row['betrag_brutto'] if ar_row else 0
                     if new_status == 'bezahlt':
                         db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=?, notiz=? WHERE id=?",
-                                   (bezahlt_am, body.get('notiz', ''), ar_id))
+                                   (bezahlt_am, notiz, ar_id))
                     elif new_status in ('streitfall', 'offen'):
                         db.execute("UPDATE ausgangsrechnungen SET status=?, notiz=? WHERE id=?",
-                                   (new_status, body.get('notiz', ''), ar_id))
-                    # Alle Interaktionsdaten speichern
+                                   (new_status, notiz, ar_id))
+                    # ALLE Interaktionsdaten strukturiert speichern
                     daten = {k: v for k, v in body.items() if k not in ('status',)}
                     daten['zeitstempel'] = now
+                    daten['re_nummer'] = re_nr
+                    daten['kunde'] = kunde
                     db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
                                ('ausgangsrechnung', ar_id, f'status_{new_status}', json.dumps(daten, ensure_ascii=False), now))
-                    # Erkenntnisse in Wissenspeicher
-                    notiz = body.get('notiz', '')
-                    if notiz:
+                    # Strukturierte Erkenntnisse in Wissenspeicher
+                    wissen_parts = []
+                    if new_status == 'bezahlt':
+                        wissen_parts.append(f'Rechnung {re_nr} ({kunde}) am {bezahlt_am} bezahlt.')
+                        if betrag_voll == 'nein' and betrag_bezahlt:
+                            wissen_parts.append(f'Nur {betrag_bezahlt} EUR statt {betrag_orig} EUR.')
+                        if grund:
+                            wissen_parts.append(f'Grund: {grund}')
+                        # Zahlungsdauer berechnen
                         try:
-                            wdb = sqlite3.connect(str(TASKS_DB))
-                            wdb.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
-                                        ('gelernt', f'Erkenntnis: Rechnung #{ar_id} {new_status}', notiz,
-                                         f'Kira-Interaktion: AR #{ar_id}', now))
-                            wdb.commit(); wdb.close()
+                            r_datum = ar_row['datum'] if ar_row else None
+                            if r_datum:
+                                from datetime import timedelta
+                                d1 = datetime.strptime(str(r_datum)[:10], "%Y-%m-%d")
+                                d2 = datetime.strptime(bezahlt_am[:10], "%Y-%m-%d")
+                                tage = (d2 - d1).days
+                                wissen_parts.append(f'Zahlungsdauer: {tage} Tage.')
+                                daten['zahlungsdauer_tage'] = tage
                         except: pass
+                    elif new_status == 'streitfall':
+                        wissen_parts.append(f'Rechnung {re_nr} ({kunde}) als Streitfall markiert.')
+                        if grund:
+                            wissen_parts.append(f'Grund: {grund}')
+                    if notiz:
+                        wissen_parts.append(f'Notiz: {notiz}')
+                    if wissen_parts:
+                        titel = f'{re_nr} ({kunde}): {new_status}'
+                        inhalt = ' '.join(wissen_parts)
+                        db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                                   ('gelernt', titel, inhalt, f'Kira-Interaktion: {re_nr}', now))
                     db.commit()
                     self._json({'ok': True})
                 else:
@@ -2436,29 +2747,49 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if aktion == 'status':
                     new_status = body.get('status', '')
                     now = body.get('zeitstempel') or datetime.now().isoformat()
+                    grund = body.get('grund', '') or body.get('detail', '')
+                    wie = body.get('wie', '')
+                    notiz = body.get('notiz', '')
+                    nachfass_count = body.get('nachfass', '')
+                    # Hole Angebot-Daten für Wissenseintrag
+                    ang_row = db.execute("SELECT a_nummer, kunde_name, kunde_email, betrag_geschaetzt FROM angebote WHERE id=?", (ang_id,)).fetchone()
+                    a_nr = ang_row['a_nummer'] if ang_row else f'#{ang_id}'
+                    kunde = (ang_row['kunde_name'] or ang_row['kunde_email'] or 'Unbekannt') if ang_row else 'Unbekannt'
                     if new_status in ('angenommen', 'abgelehnt', 'keine_antwort', 'offen', 'bearbeitet'):
                         db.execute("UPDATE angebote SET status=? WHERE id=?", (new_status, ang_id))
                         if new_status == 'abgelehnt':
-                            grund = body.get('grund', '') or body.get('detail', '')
                             db.execute("UPDATE angebote SET grund_abgelehnt=? WHERE id=?", (grund, ang_id))
                         elif new_status == 'angenommen':
-                            grund = body.get('wie', '') + (' ' + body.get('notiz', '')).strip()
-                            db.execute("UPDATE angebote SET grund_angenommen=? WHERE id=?", (grund, ang_id))
-                    # Alle Interaktionsdaten speichern
+                            full_grund = (wie + ' ' + notiz).strip()
+                            db.execute("UPDATE angebote SET grund_angenommen=? WHERE id=?", (full_grund, ang_id))
+                    # ALLE Interaktionsdaten strukturiert speichern
                     daten = {k: v for k, v in body.items() if k not in ('status',)}
                     daten['zeitstempel'] = now
+                    daten['a_nummer'] = a_nr
+                    daten['kunde'] = kunde
                     db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
                                ('angebot', ang_id, f'status_{new_status}', json.dumps(daten, ensure_ascii=False), now))
-                    # Erkenntnisse in Wissenspeicher
-                    notiz = body.get('notiz', '')
+                    # Strukturierte Erkenntnisse in Wissenspeicher
+                    wissen_parts = []
+                    if new_status == 'angenommen':
+                        wissen_parts.append(f'Angebot {a_nr} ({kunde}) angenommen.')
+                        if wie:
+                            wissen_parts.append(f'Wie kam es dazu: {wie}')
+                    elif new_status == 'abgelehnt':
+                        wissen_parts.append(f'Angebot {a_nr} ({kunde}) abgelehnt.')
+                        if grund:
+                            wissen_parts.append(f'Hauptgrund: {grund}')
+                    elif new_status == 'keine_antwort':
+                        wissen_parts.append(f'Angebot {a_nr} ({kunde}): Keine Antwort erhalten.')
+                        if nachfass_count:
+                            wissen_parts.append(f'Nachgefasst: {nachfass_count}x')
                     if notiz:
-                        try:
-                            wdb = sqlite3.connect(str(TASKS_DB))
-                            wdb.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
-                                        ('gelernt', f'Erkenntnis: Angebot #{ang_id} {new_status}', notiz,
-                                         f'Kira-Interaktion: Ang #{ang_id}', now))
-                            wdb.commit(); wdb.close()
-                        except: pass
+                        wissen_parts.append(f'Notiz: {notiz}')
+                    if wissen_parts:
+                        titel = f'{a_nr} ({kunde}): {new_status}'
+                        inhalt = ' '.join(wissen_parts)
+                        db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                                   ('gelernt', titel, inhalt, f'Kira-Interaktion: {a_nr}', now))
                     db.commit()
                     self._json({'ok': True})
                 else:
@@ -2579,17 +2910,39 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if aktion == 'erledigt':
                 bezahlt_am = body.get('datum', now[:10])
                 notiz = body.get('notiz', '')
+                betrag_voll = body.get('betrag-voll', 'ja')
+                betrag_bezahlt = body.get('betrag', '')
+                grund = body.get('grund', '')
+                # Hole Eingangsrechnung-Daten
+                g_row = db.execute("SELECT betreff, gegenpartei, gegenpartei_email, rechnungsnummer, betrag FROM geschaeft WHERE id=?", (gid,)).fetchone()
+                partner = (g_row['gegenpartei'] or g_row['gegenpartei_email'] or 'Unbekannt') if g_row else 'Unbekannt'
+                re_nr = (g_row['rechnungsnummer'] or '') if g_row else ''
+                betreff = (g_row['betreff'] or '') if g_row else ''
                 db.execute("UPDATE geschaeft SET bewertung='erledigt', bewertung_grund=? WHERE id=?",
                            (f'bezahlt am {bezahlt_am}. {notiz}'.strip(), gid))
-                # Interaktionsdaten speichern
+                # Strukturierte Interaktionsdaten
                 daten = {k: v for k, v in body.items()}
                 daten['zeitstempel'] = now
+                daten['partner'] = partner
+                daten['re_nummer'] = re_nr
                 db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
                            ('geschaeft', gid, 'erledigt', json.dumps(daten, ensure_ascii=False), now))
+                # Strukturierte Erkenntnisse
+                wissen_parts = [f'Eingangsrechnung von {partner} erledigt.']
+                if re_nr:
+                    wissen_parts.append(f'Re-Nr: {re_nr}.')
+                wissen_parts.append(f'Bezahlt am: {bezahlt_am}.')
+                if betrag_voll == 'nein' and betrag_bezahlt:
+                    wissen_parts.append(f'Reduzierter Betrag: {betrag_bezahlt} EUR.')
+                if grund:
+                    wissen_parts.append(f'Grund: {grund}')
                 if notiz:
-                    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
-                               ('gelernt', f'Erkenntnis: Eingangsrechnung #{gid} erledigt', notiz,
-                                f'Kira-Interaktion: Geschaeft #{gid}', now))
+                    wissen_parts.append(f'Notiz: {notiz}')
+                titel = f'Eingangsrechnung {partner}: erledigt'
+                if re_nr:
+                    titel = f'{re_nr} ({partner}): erledigt'
+                db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                           ('gelernt', titel, ' '.join(wissen_parts), f'Kira-Interaktion: Geschaeft #{gid}', now))
                 db.commit()
                 self._json({'ok': True})
             elif aktion == 'bewertung':

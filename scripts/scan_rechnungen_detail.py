@@ -358,15 +358,18 @@ def scan_ausgangsrechnungen(db):
     db.commit()
     print(f"   {count_new} neue Rechnungen extrahiert, {count_skip} bereits vorhanden")
 
-    # Update ausgangsrechnungen in tasks.db mit Beträgen
+    # Update ausgangsrechnungen in tasks.db mit Beträgen + Kundennamen
     try:
         tdb = sqlite3.connect(str(TASKS_DB))
-        for r in db.execute("SELECT re_nummer, gesamtbetrag FROM rechnungen_detail WHERE gesamtbetrag > 0"):
+        for r in db.execute("SELECT re_nummer, gesamtbetrag, kunde_firma FROM rechnungen_detail WHERE gesamtbetrag > 0"):
             tdb.execute("UPDATE ausgangsrechnungen SET betrag_brutto=? WHERE re_nummer=? AND (betrag_brutto IS NULL OR betrag_brutto=0)",
                         (r[1], r[0]))
+            if r[2]:
+                tdb.execute("UPDATE ausgangsrechnungen SET kunde_name=? WHERE re_nummer=? AND (kunde_name IS NULL OR kunde_name='')",
+                            (r[2], r[0]))
         tdb.commit()
         tdb.close()
-        print("   Beträge in tasks.db aktualisiert")
+        print("   Beträge + Kundennamen in tasks.db aktualisiert")
     except Exception as e:
         print(f"   Warnung tasks.db: {e}")
 
