@@ -1631,49 +1631,49 @@ def generate_html() -> str:
   <div class="sb-resize-handle" id="sidebarResizeHandle"></div>
   <nav class="sidebar-nav">
     <div class="sidebar-group">
-      <div class="sidebar-item active" id="nav-dashboard" onclick="showPanel('dashboard')">
+      <div class="sidebar-item active" id="nav-dashboard" onclick="showPanel('dashboard')" data-label="Start">
         <span class="si-icon">&#x2302;</span><span class="si-label">Start</span>
         {"<span class='si-badge' style='background:rgba(220,74,74,.12);color:var(--danger);border-color:rgba(220,74,74,.25)'>" + str(n_antwort) + "</span>" if n_antwort > 0 else ""}
       </div>
-      <div class="sidebar-item" id="nav-kommunikation" onclick="showPanel('kommunikation')">
+      <div class="sidebar-item" id="nav-kommunikation" onclick="showPanel('kommunikation')" data-label="Kommunikation">
         <span class="si-icon">&#x2709;</span><span class="si-label">Kommunikation</span>
       </div>
-      <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')">
+      <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')" data-label="Organisation">
         <span class="si-icon">&#x1F4C5;</span><span class="si-label">Organisation</span>
       </div>
-      <div class="sidebar-item" id="nav-geschaeft" onclick="showPanel('geschaeft')">
+      <div class="sidebar-item" id="nav-geschaeft" onclick="showPanel('geschaeft')" data-label="Gesch&#228;ft">
         <span class="si-icon">&#x1F4B0;</span><span class="si-label">Gesch&auml;ft</span>
       </div>
     </div>
     <div class="sidebar-group">
       <div class="sidebar-group-label">Module</div>
-      <div class="sidebar-item planned" id="nav-kunden" onclick="showPanel('kunden')">
+      <div class="sidebar-item planned" id="nav-kunden" onclick="showPanel('kunden')" data-label="Kunden">
         <span class="si-icon">&#x1F465;</span><span class="si-label">Kunden</span>
         <span class="si-badge planned">Geplant</span>
       </div>
-      <div class="sidebar-item planned" id="nav-marketing" onclick="showPanel('marketing')">
+      <div class="sidebar-item planned" id="nav-marketing" onclick="showPanel('marketing')" data-label="Marketing">
         <span class="si-icon">&#x1F4E3;</span><span class="si-label">Marketing</span>
         <span class="si-badge planned">Geplant</span>
       </div>
-      <div class="sidebar-item planned" id="nav-social" onclick="showPanel('social')">
+      <div class="sidebar-item planned" id="nav-social" onclick="showPanel('social')" data-label="Social / DMs">
         <span class="si-icon">&#x1F4AC;</span><span class="si-label">Social / DMs</span>
         <span class="si-badge planned">Geplant</span>
       </div>
-      <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')">
+      <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')" data-label="Wissen">
         <span class="si-icon">&#x1F4DA;</span><span class="si-label">Wissen</span>
       </div>
-      <div class="sidebar-item planned" id="nav-automationen" onclick="showPanel('automationen')">
+      <div class="sidebar-item planned" id="nav-automationen" onclick="showPanel('automationen')" data-label="Automationen">
         <span class="si-icon">&#x26A1;</span><span class="si-label">Automationen</span>
         <span class="si-badge planned">Geplant</span>
       </div>
-      <div class="sidebar-item planned" id="nav-analysen" onclick="showPanel('analysen')">
+      <div class="sidebar-item planned" id="nav-analysen" onclick="showPanel('analysen')" data-label="Analysen">
         <span class="si-icon">&#x1F4CA;</span><span class="si-label">Analysen</span>
         <span class="si-badge planned">Geplant</span>
       </div>
     </div>
   </nav>
   <div class="sidebar-bottom">
-    <div class="sidebar-item" id="nav-einstellungen" onclick="showPanel('einstellungen')">
+    <div class="sidebar-item" id="nav-einstellungen" onclick="showPanel('einstellungen')" data-label="Einstellungen">
       <span class="si-icon">&#x2699;</span><span class="si-label">Einstellungen</span>
     </div>
   </div>
@@ -3307,10 +3307,15 @@ a:hover{text-decoration:underline;}
   cursor:pointer;color:#888780;font-size:13px;font-weight:600;display:flex;align-items:center;
   justify-content:center;flex-shrink:0;transition:background .12s,color .12s;margin-left:auto;}
 .sb-toggle-btn:hover{background:rgba(0,0,0,.07);color:#1C1C1A;}
-.sidebar.collapsed .sb-toggle-btn{margin-left:0;}
-.sidebar.collapsed .sidebar-brand{justify-content:center;padding:13px 0;}
+.sidebar.collapsed .sidebar-brand{padding:0;border-bottom:0.5px solid rgba(0,0,0,.08);}
 .sidebar.collapsed .sidebar-logo{display:none;}
+.sidebar.collapsed .sb-toggle-btn{margin:0;width:56px;height:56px;border-radius:0;}
 .sidebar.collapsed .sb-toggle-btn svg{transform:scaleX(-1);}
+/* Collapsed: größere Icons, zentriert, Hover-Tooltips */
+.sidebar.collapsed .sidebar-item{justify-content:center;padding:11px 0;}
+.sidebar.collapsed .si-icon{font-size:22px;width:auto;}
+.sidebar.collapsed .sidebar-item::after{content:attr(data-label);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#1C1C1A;color:#fff;font-size:12px;font-weight:600;padding:5px 11px;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.18);}
+.sidebar.collapsed .sidebar-item:hover::after{opacity:1;}
 
 /* Drag-resize handle — right edge of sidebar */
 .sb-resize-handle{position:absolute;top:0;right:0;width:5px;height:100%;cursor:col-resize;z-index:10;
