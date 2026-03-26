@@ -2985,13 +2985,7 @@ setInterval(checkMonitorStatus, 30000);
 setTimeout(checkMonitorStatus, 2000);
 
 // Server-Shutdown Bestätigung beim Tab-Schließen
-window.addEventListener('beforeunload', function(e) {{
-  // Nur fragen wenn Server läuft (nicht bei Navigation innerhalb der Seite)
-  if(document.visibilityState === 'visible') {{
-    e.preventDefault();
-    e.returnValue = 'Kira Dashboard schließen? Der Server wird weiter laufen.';
-  }}
-}});
+// Kein beforeunload-Dialog mehr — Server läuft im Hintergrund weiter
 
 // Server stoppen wenn Fenster geschlossen wird (optional über Button)
 function shutdownServer() {{
@@ -3046,14 +3040,11 @@ function kiraProaktivCheck() {{
   fetch('/api/kira/insights').then(r=>r.json()).then(data=>{{
     kiraInsightsCache = data;
     const hochprio = (data.aufgaben||[]).filter(a => a.prio >= 2);
-    if(hochprio.length > 0 && !kiraOpen) {{
-      // Show pulse on FAB and pre-fill chat hint
+    if(hochprio.length > 0) {{
+      // Only pulse the FAB, never auto-open the panel
       const fab = document.querySelector('.kira-fab');
       if(fab) fab.classList.add('kira-fab-pulse');
       renderKiraHome(data);
-      setTimeout(()=>{{
-        if(!kiraOpen) toggleKiraQuick();
-      }}, 2000);
     }}
   }}).catch(()=>{{}});
 }}
@@ -3178,8 +3169,17 @@ document.addEventListener('keydown',e=>{{
 }})();
 // Kira proaktiv: Insights laden + ggf. Panel öffnen
 setTimeout(()=>kiraProaktivCheck(), 1500);
-// Auto-refresh every 5 min (only if no active chat)
-setTimeout(()=>{{ if(!kiraSending) location.reload(); }},300000);
+// Silent auto-refresh alle 5 Minuten: nur Dashboard-Daten nachladen, kein location.reload()
+function silentRefreshDashboard() {{
+  if(kiraSending) return; // nie unterbrechen wenn Chat aktiv
+  const active = document.querySelector('.panel.active');
+  if(!active || active.id !== 'panel-dashboard') return; // nur wenn Dashboard sichtbar
+  fetch('/api/tasks').then(r=>r.json()).then(data=>{{
+    const badge = document.getElementById('headerBadgeCount');
+    if(badge && data.tasks) badge.textContent = data.tasks.length;
+  }}).catch(()=>{{}});
+}}
+setInterval(silentRefreshDashboard, 300000);
 </script>
 </body>
 </html>"""
@@ -3201,7 +3201,7 @@ CSS = """
   /* Text */
   --text:#e4e4e7;--text-secondary:rgba(255,255,255,.58);--muted:rgba(255,255,255,.42);
   /* Sizing */
-  --fs-xs:11px;--fs-sm:12.5px;--fs-base:14px;--fs-md:15px;--fs-lg:17px;--fs-xl:22px;--fs-xxl:28px;
+  --fs-xs:12px;--fs-sm:13px;--fs-base:15px;--fs-md:16px;--fs-lg:18px;--fs-xl:24px;--fs-xxl:30px;
   --radius:8px;--radius-lg:12px;
   /* Configurable design tokens */
   --card-radius:var(--radius-lg);--shadow-strength:0.12;--transition-speed:0.2s;
@@ -3244,45 +3244,45 @@ a:hover{text-decoration:underline;}
 /* ═══ APP SHELL — Sidebar + Main ═══ */
 .app-shell{display:flex;flex:1;min-height:100vh;}
 
-/* Sidebar — always dark, independent from page theme */
-.sidebar{width:var(--sidebar-w);background:#1C1C1A;border-right:0.5px solid #2C2C2A;
+/* Sidebar — warm light grey, matches light UI theme */
+.sidebar{width:var(--sidebar-w);background:#EDECE8;border-right:0.5px solid rgba(0,0,0,.08);
   display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:90;
   transition:width .22s cubic-bezier(.4,0,.2,1);overflow:hidden;flex-shrink:0;}
 .sidebar.collapsed{width:var(--sidebar-collapsed-w);}
-.sidebar-brand{padding:16px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid #2C2C2A;min-height:56px;}
+.sidebar-brand{padding:16px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid rgba(0,0,0,.08);min-height:56px;}
 .sidebar-logo{width:28px;height:28px;border-radius:6px;background:var(--accent);color:#fff;display:flex;
   align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;}
 .sidebar-logo img{width:28px;height:28px;border-radius:6px;object-fit:cover;}
 .sidebar-brand-text{display:flex;flex-direction:column;overflow:hidden;white-space:nowrap;}
-.sidebar-brand-name{font-size:var(--fs-md);font-weight:600;color:#fff;line-height:1.2;}
-.sidebar-brand-sub{font-size:var(--fs-xs);color:#5F5E5A;line-height:1.2;}
+.sidebar-brand-name{font-size:var(--fs-md);font-weight:600;color:#1C1C1A;line-height:1.2;}
+.sidebar-brand-sub{font-size:var(--fs-xs);color:#888780;line-height:1.2;}
 .sidebar.collapsed .sidebar-brand-text{display:none;}
 
 .sidebar-nav{flex:1;overflow-y:auto;padding:10px 8px;}
 .sidebar-group{margin-bottom:4px;}
-.sidebar-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#5F5E5A;
+.sidebar-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888780;
   padding:10px 8px 4px;user-select:none;}
 .sidebar.collapsed .sidebar-group-label{display:none;}
 .sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius);
-  cursor:pointer;color:#B4B2A9;font-size:13px;font-weight:500;
+  cursor:pointer;color:#5F5E5A;font-size:13px;font-weight:500;
   transition:all .12s;user-select:none;position:relative;white-space:nowrap;margin-bottom:1px;}
-.sidebar-item:hover{background:#252523;color:#fff;}
-.sidebar-item.active{background:#2C2C2A;color:#fff;border:none;}
+.sidebar-item:hover{background:rgba(0,0,0,.05);color:#1C1C1A;}
+.sidebar-item.active{background:#fff;color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.08);border:none;}
 .sidebar-item .si-icon{width:20px;text-align:center;font-size:14px;flex-shrink:0;opacity:.6;}
 .sidebar-item.active .si-icon{opacity:1;}
 .sidebar-item .si-label{overflow:hidden;text-overflow:ellipsis;}
 .sidebar.collapsed .si-label{display:none;}
 .sidebar-item .si-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto;
-  background:rgba(220,74,74,.15);color:#ff7a7a;border:none;}
-.sidebar-item .si-badge.planned{background:#222;color:#666;border:none;font-weight:500;}
+  background:rgba(220,74,74,.1);color:#C0392B;border:none;}
+.sidebar-item .si-badge.planned{background:rgba(0,0,0,.06);color:#888780;border:none;font-weight:500;}
 .sidebar.collapsed .si-badge{display:none;}
-.sidebar-item.planned{opacity:.45;}
-.sidebar-item.planned:hover{opacity:.75;}
+.sidebar-item.planned{opacity:.55;}
+.sidebar-item.planned:hover{opacity:.85;}
 
-.sidebar-bottom{border-top:0.5px solid #2C2C2A;padding:8px;}
+.sidebar-bottom{border-top:0.5px solid rgba(0,0,0,.08);padding:8px;}
 .sidebar-toggle{display:flex;align-items:center;justify-content:center;padding:8px;cursor:pointer;
-  color:#5F5E5A;border-radius:var(--radius);transition:all .12s;}
-.sidebar-toggle:hover{background:#252523;color:#B4B2A9;}
+  color:#888780;border-radius:var(--radius);transition:all .12s;}
+.sidebar-toggle:hover{background:rgba(0,0,0,.05);color:#1C1C1A;}
 
 /* Main content */
 .main-area{flex:1;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
