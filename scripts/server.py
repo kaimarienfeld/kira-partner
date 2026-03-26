@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Kira – rauMKult® Dashboard (v3)
+Kira – Assistenz Dashboard (v4)
 http://localhost:8765
 Komplett neu aufgebaut: neues DB-Schema, echtes Dashboard, funktionale Kira,
 strukturiertes Geschäft, interaktives Wissen.
 """
-import json, sys, webbrowser, threading, urllib.parse, sqlite3, re, mimetypes
+import json, sys, os, webbrowser, threading, urllib.parse, sqlite3, re, mimetypes
 from pathlib import Path
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
@@ -20,9 +21,18 @@ ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_r
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from response_gen import generate_draft
+from llm_response_gen import generate_draft
+from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversations,
+                       get_conversation_messages as kira_get_messages,
+                       get_api_key as kira_get_api_key, get_config as get_llm_config,
+                       get_all_providers, save_provider_key, check_provider_status,
+                       PROVIDER_TYPES, generate_daily_briefing)
+from mail_monitor import start_monitor_thread, get_monitor_status, stop_monitor
 
 PORT = 8765
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 # ── DB Helpers ────────────────────────────────────────────────────────────────
 def get_db():
@@ -147,91 +157,326 @@ def build_dashboard(tasks, db):
     n_antwort = sum(1 for t in tasks if t.get("kategorie") == "Antwort erforderlich")
     n_leads   = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
     n_angebot = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung")
-    n_rechn   = sum(1 for t in tasks if t.get("kategorie") == "Rechnung / Beleg")
     n_ges     = len(tasks)
+    today     = datetime.now().strftime("%Y-%m-%d")
 
     # Organisation-Daten
-    try:
-        n_org = db.execute("SELECT COUNT(*) FROM organisation").fetchone()[0]
+    try: n_org = db.execute("SELECT COUNT(*) FROM organisation").fetchone()[0]
     except: n_org = 0
 
-    # Geschäft-Zusammenfassung
+    # Ausgangsrechnungen offen
     try:
-        row = db.execute("SELECT COUNT(*) c, COALESCE(SUM(betrag),0) s FROM geschaeft WHERE datum >= date('now','-30 days')").fetchone()
-        n_gesch_30 = row[0]
-        s_gesch_30 = row[1]
-    except:
-        n_gesch_30 = 0; s_gesch_30 = 0
+        ar_row = db.execute("SELECT COUNT(*) c, COALESCE(SUM(betrag_brutto),0) s FROM ausgangsrechnungen WHERE status='offen'").fetchone()
+        n_ar_offen = ar_row[0]; s_ar_offen = ar_row[1]
+    except: n_ar_offen = 0; s_ar_offen = 0
 
-    # Dringende Tasks (max 5)
-    urgent = [t for t in tasks if t.get("kategorie") in ("Antwort erforderlich","Neue Lead-Anfrage","Angebotsrückmeldung")][:5]
-    urgent_html = "\n".join(task_card(t) for t in urgent) if urgent else "<p class='empty'>Keine dringenden Aufgaben.</p>"
+    # Eingangsrechnungen offen
+    try: n_eingang = db.execute("SELECT COUNT(*) FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt')").fetchone()[0]
+    except: n_eingang = 0
 
-    # Letzte Geschäftsvorgänge (max 5)
+    # Nachfass fällig
+    try: n_nachfass = db.execute("SELECT COUNT(*) FROM angebote WHERE status='offen' AND naechster_nachfass IS NOT NULL AND naechster_nachfass <= ?", (today,)).fetchone()[0]
+    except: n_nachfass = 0
+
+    # ── Zone A: Tagesbriefing (horizontale Leiste) ──
+    briefing_items = []
+    if n_antwort > 0:
+        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#E24B4A"></span>{n_antwort} Antwort{"en" if n_antwort>1 else ""} n&ouml;tig</div>')
+    if n_nachfass > 0:
+        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#EF9F27"></span>{n_nachfass} Nachfass f&auml;llig</div>')
+    if n_leads > 0:
+        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#378ADD"></span>{n_leads} neue{"r" if n_leads==1 else ""} Lead{"s" if n_leads>1 else ""}</div>')
+    if s_ar_offen > 0:
+        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#1D9E75"></span>&euro;&nbsp;{s_ar_offen:,.0f} offenes Volumen</div>')
+
+    # LLM-Briefing (falls verfügbar)
+    llm_summary = ""
     try:
-        gesch_rows = db.execute("SELECT typ,datum,betrag,gegenpartei,gegenpartei_email,betreff FROM geschaeft ORDER BY datum DESC LIMIT 5").fetchall()
-        gesch_html = ""
-        for r in gesch_rows:
-            betrag = f"{r['betrag']:.2f} EUR" if r['betrag'] else ""
-            gesch_html += f"""<div class="dash-row">
-              <span class="dash-typ">{esc(r['typ'] or '')}</span>
-              <span class="dash-datum">{format_datum(r['datum'])}</span>
-              <span class="dash-betrag">{betrag}</span>
-              <span class="dash-name">{esc((r['gegenpartei'] or r['gegenpartei_email'] or '')[:30])}</span>
-            </div>"""
-    except:
-        gesch_html = ""
+        briefing = generate_daily_briefing()
+        bz = (briefing.get("zusammenfassung","") or "").strip()
+        if bz:
+            llm_summary = f'<div class="dash-b-item" style="color:var(--text);font-style:italic;font-size:11px">{esc(bz[:120])}{"&hellip;" if len(bz)>120 else ""}</div>'
+    except: pass
 
-    # Organisation (nächste Termine/Fristen)
-    try:
-        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation ORDER BY datum_erkannt DESC LIMIT 5").fetchall()
-        org_html = ""
-        for r in org_rows:
-            org_html += f"""<div class="dash-row">
-              <span class="dash-typ">{esc(r['typ'] or '')}</span>
-              <span class="dash-datum">{esc(r['datum_erkannt'] or '')}</span>
-              <span class="dash-name">{esc((r['beschreibung'] or '')[:50])}</span>
-            </div>"""
-    except:
-        org_html = ""
+    if not briefing_items and not llm_summary:
+        briefing_items = ['<div class="dash-b-item" style="color:var(--success)"><span class="dash-b-dot" style="background:var(--success)"></span>Alles im gr&uuml;nen Bereich</div>']
 
-    return f"""
-<div class="summary" id="kpi-bar">
-  <div class="sum-item {'sum-alarm' if n_antwort>0 else ''} clickable-kpi" onclick="filterKomm('Antwort erforderlich')">
-    <div class="sum-num">{n_antwort}</div><div class="sum-label">Antworten nötig</div>
+    briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
+  <div class="dash-briefing-title">Tagesbriefing</div>
+  <div class="dash-briefing-items">
+    {"".join(briefing_items)}
+    {llm_summary}
   </div>
-  <div class="sum-item clickable-kpi" onclick="filterKomm('Neue Lead-Anfrage')">
-    <div class="sum-num">{n_leads}</div><div class="sum-label">Neue Leads</div>
-  </div>
-  <div class="sum-item clickable-kpi" onclick="filterKomm('Angebotsrückmeldung')">
-    <div class="sum-num">{n_angebot}</div><div class="sum-label">Angebotsrückmeldungen</div>
-  </div>
-  <div class="sum-item clickable-kpi" onclick="showPanel('organisation')">
-    <div class="sum-num">{n_org}</div><div class="sum-label">Termine / Fristen</div>
-  </div>
-  <div class="sum-item clickable-kpi" onclick="showPanel('geschaeft')">
-    <div class="sum-num">{n_gesch_30}</div><div class="sum-label">Geschäft (30 Tage)</div>
-  </div>
-  <div class="sum-item clickable-kpi" onclick="filterKomm('Rechnung / Beleg')">
-    <div class="sum-num">{n_rechn}</div><div class="sum-label">Rechnungen</div>
-  </div>
-  <div class="sum-item"><div class="sum-num">{n_ges}</div><div class="sum-label">Gesamt offen</div></div>
-</div>
+  <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
+</div>'''
 
-<div class="dash-grid">
-  <div class="dash-block">
-    <div class="section-title">Heute wichtig</div>
-    {urgent_html}
+    # ── Zone B: KPI-Karten mit Sparklines ──
+    def spark_line(color, pts):
+        return f'<div class="dash-kpi-spark"><svg viewBox="0 0 200 34"><polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.5" opacity="0.5"/></svg></div>'
+    def spark_bars(color, rects):
+        return f'<div class="dash-kpi-spark"><svg viewBox="0 0 200 34">{rects}</svg></div>'
+
+    kpi_html = f"""<div class="dash-kpi-grid" id="kpi-bar">
+  <div class="dash-kpi {'kpi-danger' if n_antwort>0 else ''}" onclick="filterKomm('Antwort erforderlich')">
+    <div class="dash-kpi-label">Antworten n&ouml;tig</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_antwort}</span>{'<span class="dash-kpi-change danger">dringend</span>' if n_antwort>0 else '<span class="dash-kpi-change info">aktuell</span>'}</div>
+    {spark_line('#E24B4A','0,30 30,26 60,22 90,28 120,18 150,12 170,8 200,14')}
   </div>
-  <div class="dash-side">
-    {"<div class='dash-mini-block'><div class='section-title'>Termine / Fristen</div>" + org_html + "</div>" if org_html else ""}
-    {"<div class='dash-mini-block'><div class='section-title'>Letzte Geschäftsvorgänge</div>" + gesch_html + "</div>" if gesch_html else ""}
-    {f"<div class='dash-mini-block'><div class='section-title'>Geschäft (30 Tage)</div><div class='dash-summary-num'>{s_gesch_30:,.2f} EUR</div><div class='muted' style='font-size:12px'>{n_gesch_30} Vorgänge</div></div>" if n_gesch_30 > 0 else ""}
+  <div class="dash-kpi {'kpi-accent' if n_leads>0 else ''}" onclick="filterKomm('Neue Lead-Anfrage')">
+    <div class="dash-kpi-label">Neue Leads</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_leads}</span><span class="dash-kpi-change info">diese Woche</span></div>
+    {spark_line('#378ADD','0,32 30,28 60,30 90,24 120,20 150,16 170,18 200,10')}
+  </div>
+  <div class="dash-kpi {'kpi-warn' if s_ar_offen>0 else ''}" onclick="showPanel('geschaeft')">
+    <div class="dash-kpi-label">Offenes Rechnungsvolumen</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">&euro;&nbsp;{s_ar_offen:,.0f}</span>{'<span class="dash-kpi-change warn">' + str(n_ar_offen) + ' offen</span>' if n_ar_offen>0 else ''}</div>
+    {spark_bars('#EF9F27','<rect x="10" y="20" width="22" height="14" rx="2" fill="#EF9F27" opacity="0.3"/><rect x="42" y="14" width="22" height="20" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="74" y="8" width="22" height="26" rx="2" fill="#EF9F27" opacity="0.5"/><rect x="106" y="12" width="22" height="22" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="138" y="6" width="22" height="28" rx="2" fill="#EF9F27" opacity="0.6"/><rect x="170" y="10" width="22" height="24" rx="2" fill="#EF9F27" opacity="0.5"/>')}
+  </div>
+  <div class="dash-kpi {'kpi-warn' if n_nachfass>0 else ''}" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)">
+    <div class="dash-kpi-label">Nachfass f&auml;llig</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_nachfass}</span>{'<span class="dash-kpi-change warn">!! Angebote</span>' if n_nachfass>0 else ''}</div>
+    {spark_line('#BA7517','0,20 40,24 80,18 120,26 160,14 200,22')}
+  </div>
+  <div class="dash-kpi" onclick="filterKomm('Angebotsrückmeldung')">
+    <div class="dash-kpi-label">Angebotsrückmeldungen</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_angebot}</span>{'<span class="dash-kpi-change up">offen</span>' if n_angebot>0 else ''}</div>
+    {spark_line('#639922','0,28 40,24 80,20 120,16 160,18 200,12')}
+  </div>
+  <div class="dash-kpi {'kpi-danger' if n_org>0 else ''}" onclick="showPanel('organisation')">
+    <div class="dash-kpi-label">Termine / Fristen</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_org}</span>{'<span class="dash-kpi-change danger">heute</span>' if n_org>0 else ''}</div>
+  </div>
+  <div class="dash-kpi" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('eingangsre'),100)">
+    <div class="dash-kpi-label">Eingangsrechnungen offen</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_eingang}</span>{'<span class="dash-kpi-change warn">prüfen</span>' if n_eingang>0 else ''}</div>
+  </div>
+  <div class="dash-kpi" onclick="showPanel('kommunikation')">
+    <div class="dash-kpi-label">Gesamt offen</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_ges}</span></div>
+    {spark_line('#888780','0,10 40,14 80,18 120,16 160,20 200,22')}
   </div>
 </div>"""
 
+    # ── Zone C1: Heute priorisiert (max 5) ──
+    urgent = [t for t in tasks if t.get("kategorie") in ("Antwort erforderlich","Neue Lead-Anfrage","Angebotsrückmeldung")][:5]
+
+    def prio_color(kat):
+        if kat == "Antwort erforderlich": return "prio-red"
+        if kat == "Neue Lead-Anfrage": return "prio-blue"
+        if kat == "Angebotsrückmeldung": return "prio-amber"
+        return "prio-gray"
+
+    def prio_tag(kat):
+        if kat == "Antwort erforderlich": return '<span class="dash-tag dash-tag-red">dringend</span>'
+        if kat == "Neue Lead-Anfrage": return '<span class="dash-tag dash-tag-blue">neuer Lead</span>'
+        if kat == "Angebotsrückmeldung": return '<span class="dash-tag dash-tag-amber">Angebot</span>'
+        return '<span class="dash-tag dash-tag-gray">offen</span>'
+
+    prio_items_html = ""
+    for t in urgent:
+        kat = t.get("kategorie","")
+        title = esc((t.get("titel") or t.get("betreff") or "Vorgang")[:70])
+        meta_parts = []
+        if kat: meta_parts.append(kat)
+        if t.get("kunden_name"): meta_parts.append(esc(t["kunden_name"][:30]))
+        if t.get("datum_mail"): meta_parts.append(format_datum(t["datum_mail"]))
+        meta = " · ".join(meta_parts)
+        aktion = esc((t.get("empfohlene_aktion","") or "")[:60])
+        next_hint = f'<span class="dash-prio-next">{aktion}</span>' if aktion else ""
+        tid = t.get("id","")
+        prio_items_html += f'''<div class="dash-prio-item {prio_color(kat)}">
+  <div class="dash-prio-body">
+    <div class="dash-prio-title">{title}</div>
+    <div class="dash-prio-meta">{meta}</div>
+    <div class="dash-prio-tags">{prio_tag(kat)}{next_hint}</div>
+  </div>
+  <div class="dash-prio-actions">
+    <button class="dash-btn" onclick="filterKomm('{esc(kat)}')">&#x2192; &Ouml;ffnen</button>
+    <button class="dash-btn dash-btn-kira" onclick="openKiraWorkspace('aufgabe')">Mit Kira</button>
+  </div>
+</div>'''
+
+    if not prio_items_html:
+        prio_items_html = '<div style="text-align:center;padding:28px 0;color:var(--muted);font-size:13px">&#x2713; Keine priorisierten Aufgaben heute</div>'
+
+    # ── Zone C2: Nächste Termine & Fristen ──
+    try:
+        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
+        term_html = ""
+        for r in org_rows:
+            dat = esc(r['datum_erkannt'] or '')
+            desc = esc((r['beschreibung'] or '')[:45])
+            typ = esc(r['typ'] or '')
+            # Urgency color based on date
+            urgency = "normal"
+            try:
+                d = datetime.strptime(dat[:10], "%Y-%m-%d")
+                diff = (d.date() - datetime.now().date()).days
+                if diff <= 0: urgency = "urgent"
+                elif diff <= 2: urgency = "soon"
+            except: pass
+            dat_display = dat[:10] if dat else "–"
+            badge = ""
+            if urgency == "urgent": badge = f'<span class="dash-term-badge dash-tag-red">heute</span>'
+            elif urgency == "soon": badge = f'<span class="dash-term-badge dash-tag-amber">bald</span>'
+            term_html += f'''<div class="dash-term-item">
+  <span class="dash-term-date {urgency}">{dat_display}</span>
+  <span class="dash-term-text">{desc or typ}</span>
+  {badge}
+</div>'''
+    except: term_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Termine erfasst</div>'
+
+    # ── Zone C3: Geschäft aktuell ──
+    try:
+        gesch_rows = db.execute("SELECT typ,datum,betrag,gegenpartei,gegenpartei_email FROM geschaeft ORDER BY datum DESC LIMIT 5").fetchall()
+        biz_html = ""
+        for r in gesch_rows:
+            typ = esc(r['typ'] or '')
+            betrag = r['betrag'] or 0
+            name = esc((r['gegenpartei'] or r['gegenpartei_email'] or '')[:30])
+            # Color by type
+            if "Zahlung" in typ or "Eingang" in typ:
+                dot_color = "#1D9E75"; val_color = "#1D9E75"; prefix = "+"
+            elif "überfällig" in typ.lower() or "Mahnung" in typ:
+                dot_color = "#E24B4A"; val_color = "#E24B4A"; prefix = ""
+            elif "Nachfass" in typ:
+                dot_color = "#EF9F27"; val_color = "#BA7517"; prefix = ""
+            else:
+                dot_color = "#888780"; val_color = "var(--text-secondary)"; prefix = ""
+            betrag_str = f'{prefix}&euro;&nbsp;{betrag:,.0f}' if betrag else ""
+            biz_html += f'''<div class="dash-biz-item">
+  <span class="dash-biz-dot" style="background:{dot_color}"></span>
+  <span class="dash-biz-text">{typ}{": " if typ and name else ""}{name}</span>
+  <span class="dash-biz-val" style="color:{val_color}">{betrag_str}</span>
+</div>'''
+    except: biz_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Geschäftsbewegungen</div>'
+
+    work_html = f"""<div class="dash-work-grid">
+  <div class="dash-panel">
+    <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div>
+    <div class="dash-panel-sub">Top 5 &mdash; modulübergreifend kuratiert</div>
+    {prio_items_html}
+  </div>
+  <div class="dash-right-col">
+    <div class="dash-panel">
+      <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('organisation')">N&auml;chste Termine &amp; Fristen</div>
+      <div class="dash-panel-sub">Kommende 7 Tage</div>
+      {term_html}
+    </div>
+    <div class="dash-panel">
+      <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('geschaeft')">Gesch&auml;ft aktuell</div>
+      <div class="dash-panel-sub">Letzte Bewegungen</div>
+      {biz_html}
+    </div>
+  </div>
+</div>"""
+
+    # ── Zone D: Signale / Auffälligkeiten ──
+    signals = []
+
+    # Überfällige Rechnungen (> 30 Tage)
+    try:
+        for r in db.execute("SELECT re_nummer, kunde_name, datum FROM ausgangsrechnungen WHERE status='offen'"):
+            try:
+                d = datetime.strptime(str(r['datum'])[:10], "%Y-%m-%d")
+                tage = (datetime.now() - d).days
+                if tage > 30:
+                    signals.append(('s-red', '#E24B4A',
+                        f'RE {esc(r["re_nummer"])} ({esc((r["kunde_name"] or "")[:20])}) seit {tage} Tagen offen',
+                        "showPanel('geschaeft')"))
+            except: pass
+    except: pass
+
+    # Skonto-Fristen
+    try:
+        ddb = sqlite3.connect(str(DETAIL_DB))
+        ddb.row_factory = sqlite3.Row
+        for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent FROM rechnungen_detail WHERE skonto_datum >= ? AND skonto_datum IS NOT NULL", (today,)):
+            try:
+                tage_rest = (datetime.strptime(r['skonto_datum'], "%Y-%m-%d").date() - datetime.now().date()).days
+                if tage_rest <= 3:
+                    signals.append(('s-amber', '#EF9F27',
+                        f'Skonto {r["skonto_prozent"]}% für {esc(r["re_nummer"])} läuft in {tage_rest} Tagen ab',
+                        "showPanel('geschaeft')"))
+            except: pass
+        ddb.close()
+    except: pass
+
+    # Gemahnte Rechnungen
+    try:
+        mc = db.execute("SELECT COUNT(*) FROM ausgangsrechnungen WHERE (mahnung_count > 0) AND status='offen'").fetchone()[0]
+        if mc > 0:
+            signals.append(('s-red', '#E24B4A',
+                f'{mc} gemahnte Rechnung{"en" if mc>1 else ""} noch offen &mdash; Mahnstufe pr&uuml;fen',
+                "showPanel('geschaeft')"))
+    except: pass
+
+    # Angebote ohne Rückmeldung > 14 Tage
+    try:
+        for r in db.execute("SELECT angebots_nr, kunde, erstellt FROM angebote WHERE status='offen' AND erstellt IS NOT NULL"):
+            try:
+                d = datetime.strptime(str(r['erstellt'])[:10], "%Y-%m-%d")
+                tage = (datetime.now() - d).days
+                if tage > 14:
+                    signals.append(('s-blue', '#378ADD',
+                        f'Angebot {esc(r["angebots_nr"] or "")} ({esc((r["kunde"] or "")[:20])}): {tage} Tage ohne Rückmeldung',
+                        "showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)"))
+            except: pass
+    except: pass
+
+    signals_html = ""
+    if signals:
+        sig_items = ""
+        for cls, dot_color, text, action in signals[:6]:
+            sig_items += f'<div class="dash-sig {cls}" onclick="{action}"><span class="sig-dot" style="background:{dot_color}"></span><span class="sig-text">{text}</span><span class="sig-arr">&#x2192;</span></div>'
+        signals_html = f"""<div class="dash-signals">
+  <div class="dash-panel-title">Signale &amp; Auff&auml;lligkeiten</div>
+  <div class="dash-panel-sub">Automatisch erkannte Ausrei&szlig;er und Pr&uuml;fbedarf</div>
+  <div class="dash-sig-grid">{sig_items}</div>
+</div>"""
+
+    return f"""{briefing_html}
+{kpi_html}
+{work_html}
+{signals_html}"""
+
 # ── KOMMUNIKATION Panel ──────────────────────────────────────────────────────
 def build_kommunikation(tasks):
+    # Ansichten / Sub-Tabs
+    view_tabs = [
+        ("alle", "Alle"),
+        ("Antwort erforderlich", "Antwort erforderlich"),
+        ("Neue Lead-Anfrage", "Neue Leads"),
+        ("Angebotsrückmeldung", "Angebotsrückmeldungen"),
+        ("Zur Kenntnis", "Zur Kenntnis"),
+        ("Shop / System", "Newsletter / System"),
+        ("erledigt", "Abgeschlossen"),
+    ]
+    tabs_html = '<div class="komm-view-tabs">'
+    for key, label in view_tabs:
+        active = " active" if key == "alle" else ""
+        tabs_html += f'<div class="komm-view-tab{active}" onclick="filterKommView(this,\'{key}\')">{label}</div>'
+    tabs_html += '</div>'
+
+    # Filter-Bar
+    konten = sorted(set(t.get("konto","") or "" for t in tasks if t.get("konto")))
+    konto_opts = "".join(f'<option value="{esc(k)}">{esc(k)}</option>' for k in konten)
+    filter_html = f"""<div class="komm-filter-bar">
+      <select id="komm-filter-quelle" onchange="applyKommFilters()">
+        <option value="">Alle Quellen</option>{konto_opts}
+      </select>
+      <select id="komm-filter-dringlichkeit" onchange="applyKommFilters()">
+        <option value="">Alle Priorit&auml;ten</option>
+        <option value="hoch">Hoch</option>
+        <option value="mittel">Mittel</option>
+        <option value="niedrig">Niedrig</option>
+      </select>
+      <label class="komm-filter-check"><input type="checkbox" id="komm-filter-antwort" onchange="applyKommFilters()"> Offene Frage</label>
+      <label class="komm-filter-check"><input type="checkbox" id="komm-filter-anhang" onchange="applyKommFilters()"> Mit Anh&auml;ngen</label>
+      <span id="komm-filter-count" class="komm-filter-count">{len(tasks)} Vorg&auml;nge</span>
+    </div>"""
+
+    # Task cards with data attributes for filtering
     groups = [
         ("Antwort erforderlich",  "Antwort erforderlich", []),
         ("Neue Lead-Anfrage",     "Neue Leads",           []),
@@ -251,12 +496,17 @@ def build_kommunikation(tasks):
         if not placed:
             rest.append(t)
 
-    html = ""
+    cards_html = ""
     for key, label, lst in groups:
-        html += build_section(label, lst)
+        cards_html += build_section(label, lst)
     if rest:
-        html += build_section("Sonstige", rest, collapsed=True)
-    return html or "<p class='empty'>Keine offenen Kommunikationsaufgaben.</p>"
+        cards_html += build_section("Sonstige", rest, collapsed=True)
+    if not cards_html:
+        cards_html = "<p class='empty'>Keine offenen Kommunikationsaufgaben.</p>"
+
+    return f"""{tabs_html}
+{filter_html}
+<div id="komm-cards-container">{cards_html}</div>"""
 
 # ── ORGANISATION Panel ────────────────────────────────────────────────────────
 def build_organisation(db):
@@ -265,33 +515,58 @@ def build_organisation(db):
     except:
         rows = []
 
-    if not rows:
-        return "<p class='empty'>Keine Organisations-Einträge. Termine, Fristen und Rückrufbitten werden hier angezeigt, sobald sie aus Mails erkannt werden.</p>"
-
     groups = {"termin": [], "frist": [], "rueckruf": [], "sonstige": []}
     for r in rows:
-        typ = r["typ"] or "sonstige"
+        typ = (r["typ"] or "sonstige").lower()
         if typ in groups:
             groups[typ].append(dict(r))
         else:
             groups["sonstige"].append(dict(r))
 
-    labels = {"termin": "Termine", "frist": "Fristen", "rueckruf": "Rückrufbitten", "sonstige": "Sonstiges"}
-    html = ""
-    for key, label in labels.items():
-        items = groups.get(key, [])
-        if not items: continue
-        rows_html = ""
-        for o in items:
-            rows_html += f"""<div class="org-row">
-              <span class="org-typ-badge">{esc(key)}</span>
-              <span class="org-datum">{esc(o.get('datum_erkannt','') or '')}</span>
-              <span class="org-betreff">{esc((o.get('beschreibung','') or o.get('betreff','') or '')[:70])}</span>
-              <span class="org-email muted">{esc(o.get('kunden_email','') or '')}</span>
-              <span class="org-konto muted">{esc(o.get('konto','') or '')}</span>
-            </div>"""
-        html += f'<div class="section"><div class="section-title">{label} <span class="count-badge">{len(items)}</span></div><div class="section-body">{rows_html}</div></div>'
-    return html
+    n_total = len(rows)
+    badge_labels = {"termin": "Termine", "frist": "Fristen", "rueckruf": "Rückrufe"}
+
+    # Sub-Tabs
+    tabs_html = f"""<div class="org-view-tabs">
+      <div class="komm-view-tab active" onclick="showOrgView(this,'timeline')">Timeline ({n_total})</div>
+      <div class="komm-view-tab" onclick="showOrgView(this,'fristen')">Fristen ({len(groups['frist'])})</div>
+      <div class="komm-view-tab" onclick="showOrgView(this,'rueckrufe')">R&uuml;ckrufe ({len(groups['rueckruf'])})</div>
+      <div class="komm-view-tab" onclick="showOrgView(this,'kalender')">Kalender <span class="si-badge planned" style="font-size:9px;padding:1px 5px">In Planung</span></div>
+    </div>"""
+
+    def _org_row(o, show_badge=True):
+        typ = o.get('typ','') or ''
+        badge_cls = 'org-badge-mail' if True else ''
+        return f"""<div class="org-row">
+          <span class="org-typ-badge">{esc(typ)}</span>
+          <span class="org-datum">{esc(o.get('datum_erkannt','') or '')}</span>
+          <span class="org-betreff">{esc((o.get('beschreibung','') or o.get('betreff','') or '')[:70])}</span>
+          <span class="org-email muted">{esc(o.get('kunden_email','') or '')}</span>
+          <span class="badge" style="font-size:9px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border)">aus Mail erkannt</span>
+        </div>"""
+
+    # Timeline view (all items chronological)
+    timeline_items = "".join(_org_row(dict(r)) for r in rows) if rows else "<p class='empty'>Keine Eintr&auml;ge. Termine, Fristen und R&uuml;ckrufbitten erscheinen hier automatisch, sobald sie aus Mails erkannt werden.</p>"
+
+    # Fristen view
+    fristen_items = "".join(_org_row(o) for o in groups["frist"]) if groups["frist"] else "<p class='empty'>Keine Fristen erkannt.</p>"
+
+    # Rückrufe view
+    rueckruf_items = "".join(_org_row(o) for o in groups["rueckruf"]) if groups["rueckruf"] else "<p class='empty'>Keine R&uuml;ckrufbitten erkannt.</p>"
+
+    # Kalender (geplant)
+    kalender_html = """<div class="planned-shell" style="min-height:200px;padding:40px 20px">
+      <div class="planned-shell-icon" style="font-size:32px">&#x1F4C5;</div>
+      <div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalender-Ansicht</div>
+      <div class="planned-shell-desc" style="font-size:var(--fs-sm)">Kalender-Sync mit Outlook, Google Calendar und manuellen Eintr&auml;gen.</div>
+      <div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung: Kalender-Sync</div>
+    </div>"""
+
+    return f"""{tabs_html}
+<div id="org-view-timeline" class="org-view active">{timeline_items}</div>
+<div id="org-view-fristen" class="org-view">{fristen_items}</div>
+<div id="org-view-rueckrufe" class="org-view">{rueckruf_items}</div>
+<div id="org-view-kalender" class="org-view">{kalender_html}</div>"""
 
 # ── GESCHÄFT Panel ────────────────────────────────────────────────────────────
 def _load_rechnungen_detail():
@@ -367,19 +642,53 @@ def build_geschaeft(db):
 
     n_mahnungen = len(ar_gemahnt) + len([m for m in mahnung_details if not any(r.get("re_nummer") == m.get("re_nummer") for r in ar_gemahnt)])
 
+    # Bezahlte Rechnungen für Zahlungen-Tab
+    ar_bezahlt = [r for r in ar if r.get("status") == "bezahlt"]
+
     html = f"""
     <div class="gesch-tabs">
       <div class="gesch-tab active" onclick="showGeschTab('uebersicht')">Übersicht</div>
       <div class="gesch-tab" onclick="showGeschTab('ausgangsre')">Ausgangsrechnungen ({len(ar)})</div>
       <div class="gesch-tab" onclick="showGeschTab('angebote')">Angebote ({len(ang)})</div>
       <div class="gesch-tab" onclick="showGeschTab('eingangsre')">Eingangsrechnungen ({len(eingang)})</div>
+      <div class="gesch-tab" onclick="showGeschTab('zahlungen')">Zahlungen ({len(ar_bezahlt)})</div>
       <div class="gesch-tab" onclick="showGeschTab('mahnungen')">Mahnungen ({n_mahnungen})</div>
+      <div class="gesch-tab" onclick="showGeschTab('auswertung')">Auswertung</div>
+      <div class="gesch-tab" onclick="showGeschTab('kalkulation')" style="opacity:.5">Kalkulation <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
+      <div class="gesch-tab" onclick="showGeschTab('preispositionen')" style="opacity:.5">Preispositionen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
+      <div class="gesch-tab" onclick="showGeschTab('cashflow')" style="opacity:.5">Cashflow <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
     </div>
     <div id="gesch-uebersicht" class="gesch-panel active">{_build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats)}</div>
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
     <div id="gesch-angebote" class="gesch-panel">{_build_ang_table(ang, today)}</div>
     <div id="gesch-eingangsre" class="gesch-panel">{_gesch_aktiv_cards(eingang)}</div>
-    <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>"""
+    <div id="gesch-zahlungen" class="gesch-panel">{_build_ar_table(ar_bezahlt) if ar_bezahlt else "<p class='empty'>Keine bezahlten Rechnungen.</p>"}</div>
+    <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>
+    <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
+    <div id="gesch-kalkulation" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4D0;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalkulation</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Projekt- und Leistungskalkulation mit Materialkosten, Arbeitszeit und Gewinnmarge.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
+    <div id="gesch-preispositionen" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4CB;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Preispositionen</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Leistungskatalog mit Einzelpreisen, Staffeln und Erfahrungswerten.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
+    <div id="gesch-cashflow" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4B8;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Cashflow</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Liquidit&auml;ts&uuml;bersicht mit Ein- und Auszahlungen, Prognose und Warnungen.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>"""
+    return html
+
+
+def _build_gesch_auswertung(stats):
+    """Auswertung-Tab mit Kennzahlen und Trends."""
+    if not stats:
+        return "<p class='empty'>Noch keine ausreichende Datenbasis f&uuml;r Auswertungen.</p>"
+    s = stats
+    html = '<div class="gesch-summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">'
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{s.get("ar_gesamt_eur",0):,.0f} &euro;</div><div class="gesch-sum-label">Fakturiert gesamt</div></div>'
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num" style="color:var(--success)">{s.get("ar_bezahlt_eur",0):,.0f} &euro;</div><div class="gesch-sum-label">Bezahlt</div></div>'
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{s.get("ar_bezahlt",0)}/{s.get("ar_total",0)}</div><div class="gesch-sum-label">Rechnungen bezahlt</div></div>'
+    zd = s.get("zahlungsdauern", [])
+    zd_avg = f'{sum(zd)/len(zd):.0f}d' if zd else "&ndash;"
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{zd_avg}</div><div class="gesch-sum-label">&Oslash; Zahlungsdauer</div></div>'
+    ang_t = s.get("ang_total",0)
+    quote = f'{s.get("ang_angenommen",0)/ang_t*100:.0f}%' if ang_t >= 3 else "&ndash;"
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{quote}</div><div class="gesch-sum-label">Angebotsquote</div></div>'
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{s.get("ang_angenommen",0)}</div><div class="gesch-sum-label">Angenommen</div></div>'
+    html += f'<div class="gesch-sum-card"><div class="gesch-sum-num">{s.get("ang_abgelehnt",0)}</div><div class="gesch-sum-label">Abgelehnt</div></div>'
+    html += '</div>'
     return html
 
 
@@ -436,7 +745,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
         if (r.get("naechster_nachfass") or "") <= today:
             a_nr = esc(r.get("a_nummer", ""))
             kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-            urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge" style="color:var(--kl);background:rgba(139,107,170,.12)">Nachfass</span> {a_nr} &middot; {kunde} &middot; Fällig: {r.get("naechster_nachfass","")}</div>')
+            urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge" style="color:var(--kl);background:var(--accent-bg)">Nachfass</span> {a_nr} &middot; {kunde} &middot; Fällig: {r.get("naechster_nachfass","")}</div>')
     for r in ar_gemahnt[:2]:
         re_nr = esc(r.get("re_nummer", ""))
         kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
@@ -827,9 +1136,166 @@ def build_einstellungen():
     aufg = config.get("aufgaben", {})
     srv  = config.get("server", {})
     nf   = config.get("nachfass", {})
+    llm  = get_llm_config()
 
+    # Multi-Provider Karten generieren
+    providers = get_all_providers()
+    provider_cards = ""
+    for i, prov in enumerate(providers):
+        pid = prov.get("id", "")
+        pname = esc(prov.get("name", prov.get("typ", "?")))
+        ptyp = prov.get("typ", "")
+        pmodel = prov.get("model", "")
+        paktiv = prov.get("aktiv", True)
+        pprio = prov.get("prioritaet", i + 1)
+        ptype_info = PROVIDER_TYPES.get(ptyp, {})
+        pstatus = check_provider_status(prov)
+        status_icon = "🟢" if pstatus["status"] == "ok" else ("🔑" if pstatus["status"] == "no_key" else "📦")
+        status_text = esc(pstatus["message"])
+        needs_key = ptype_info.get("needs_key", True)
+
+        # Model-Options für diesen Provider-Typ
+        model_options = ""
+        for mid, mname in ptype_info.get("models", []):
+            sel = "selected" if mid == pmodel else ""
+            model_options += f'<option value="{esc(mid)}" {sel}>{esc(mname)}</option>'
+        if ptyp == "custom":
+            custom_sel = f'<option value="{esc(pmodel)}" selected>{esc(pmodel or "Modell-ID eingeben")}</option>'
+            model_options = custom_sel
+
+        aktiv_checked = "checked" if paktiv else ""
+        opacity = "" if paktiv else "opacity:.5;"
+
+        key_row = ""
+        if needs_key:
+            key_row = f'''<div class="settings-row" style="margin-top:4px">
+              <label style="font-size:11px">API Key</label>
+              <div style="display:flex;gap:4px;align-items:center">
+                <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Key eingeben..." style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+                <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--kl);color:#000;border:none;border-radius:4px;cursor:pointer" onclick="saveProviderKey('{js_esc(pid)}')">Speichern</button>
+              </div>
+            </div>'''
+
+        base_url_row = ""
+        if ptyp == "custom":
+            base_url_val = esc(prov.get("base_url", ""))
+            base_url_row = f'''<div class="settings-row" style="margin-top:4px">
+              <label style="font-size:11px">Base URL</label>
+              <input type="text" id="purl-{esc(pid)}" value="{base_url_val}" placeholder="https://api.example.com/v1" style="width:220px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+            </div>'''
+        if ptyp == "custom":
+            model_row = f'''<div class="settings-row" style="margin-top:4px">
+              <label style="font-size:11px">Modell-ID</label>
+              <input type="text" id="pmodel-{esc(pid)}" value="{esc(pmodel)}" placeholder="model-name" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+            </div>'''
+        else:
+            model_row = f'''<div class="settings-row" style="margin-top:4px">
+              <label style="font-size:11px">Modell</label>
+              <select id="pmodel-{esc(pid)}" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+                {model_options}
+              </select>
+            </div>'''
+
+        provider_cards += f'''<div class="provider-card" id="pcard-{esc(pid)}" style="{opacity}border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:#111;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:14px">{status_icon}</span>
+              <span style="font-weight:700;font-size:13px;color:var(--kl)">{pname}</span>
+              <span style="font-size:10px;color:var(--muted)">{esc(ptype_info.get("name",""))}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;color:var(--muted)">Prio {pprio}</span>
+              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',-1)" title="Höhere Priorität">▲</button>
+              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',1)" title="Niedrigere Priorität">▼</button>
+              <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="paktiv-{esc(pid)}" {aktiv_checked} onchange="toggleProvider('{js_esc(pid)}',this.checked)"> Aktiv</label>
+              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#e84545;border:1px solid #e84545;border-radius:4px;cursor:pointer" onclick="deleteProvider('{js_esc(pid)}')" title="Entfernen">✕</button>
+            </div>
+          </div>
+          <div style="font-size:11px;margin-bottom:4px;{'color:#5cb85c;font-weight:700' if pstatus['status']=='ok' else 'color:var(--muted)'}">{'API Key aktiv — Chat bereit' if pstatus['status']=='ok' else status_text}</div>
+          {model_row}
+          {key_row}
+          {base_url_row}
+        </div>'''
+
+    # Provider-Typ-Optionen für "Hinzufügen"
+    add_type_options = ""
+    for tkey, tval in PROVIDER_TYPES.items():
+        add_type_options += f'<option value="{esc(tkey)}">{esc(tval["name"])}</option>'
 
     html = f"""
+    <div class="section">
+      <div class="section-title">Erscheinungsbild</div>
+      <div class="section-body">
+        <div class="settings-row">
+          <label>Farbschema</label>
+          <select id="cfg-theme" onchange="applyTheme(this.value)">
+            <option value="dark">Dunkel</option>
+            <option value="light">Hell</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Akzentfarbe</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="color" id="cfg-accent" value="#4f7df9" onchange="applyAccent(this.value)">
+            <span id="cfg-accent-hex" style="font-size:var(--fs-sm);color:var(--muted)">#4f7df9</span>
+            <button class="btn btn-xs btn-muted" onclick="resetAccent()">Zur&uuml;cksetzen</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label>Schriftgr&ouml;&szlig;e</label>
+          <select id="cfg-fontsize" onchange="applyFontSize(this.value)">
+            <option value="">Normal</option>
+            <option value="small">Klein</option>
+            <option value="large">Gro&szlig;</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Dichte</label>
+          <select id="cfg-density" onchange="applyDensity(this.value)">
+            <option value="">Normal</option>
+            <option value="compact">Kompakt</option>
+            <option value="comfortable">Komfortabel</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Firmenname</label>
+          <input type="text" id="cfg-company-name" placeholder="z.B. Meine Firma" oninput="applyCompanyName(this.value)">
+        </div>
+        <div class="settings-row">
+          <label>Logo (URL oder Emoji)</label>
+          <input type="text" id="cfg-logo" placeholder="z.B. https://... oder K" oninput="applyLogo(this.value)">
+        </div>
+        <div class="settings-row">
+          <label>Kartenradius</label>
+          <select id="cfg-card-radius" onchange="applyCardRadius(this.value)">
+            <option value="">Normal (12px)</option>
+            <option value="4px">Eckig (4px)</option>
+            <option value="8px">Leicht (8px)</option>
+            <option value="16px">Rund (16px)</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Schatten</label>
+          <select id="cfg-shadow" onchange="applyShadow(this.value)">
+            <option value="">Normal</option>
+            <option value="none">Keine Schatten</option>
+            <option value="strong">Stark</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Animationen reduzieren</label>
+          <input type="checkbox" id="cfg-reduce-motion" onchange="applyReduceMotion(this.checked)">
+        </div>
+        <div class="settings-row">
+          <label>Hoher Kontrast</label>
+          <input type="checkbox" id="cfg-high-contrast" onchange="applyHighContrast(this.checked)">
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-sm btn-gold" onclick="saveDesignSettings()">Design speichern</button>
+          <span id="design-status" style="margin-left:10px;color:var(--muted);font-size:var(--fs-sm)"></span>
+        </div>
+      </div>
+    </div>
     <div class="section">
       <div class="section-title">Push-Benachrichtigungen (ntfy.sh)</div>
       <div class="section-body">
@@ -890,6 +1356,48 @@ def build_einstellungen():
         </div>
       </div>
     </div>
+    <div class="section">
+      <div class="section-title">KI-Assistent (Kira Multi-LLM)</div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Provider werden in Priorit&auml;tsreihenfolge durchlaufen. F&auml;llt einer aus, springt Kira automatisch auf den n&auml;chsten.
+        </div>
+        <div id="provider-list">
+          {provider_cards}
+        </div>
+        <div style="margin-top:8px;padding:10px 14px;border:1px dashed var(--border);border-radius:8px;background:#0a0a0a">
+          <div style="font-size:12px;font-weight:700;color:var(--kl);margin-bottom:6px">+ Provider hinzuf&uuml;gen</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="add-provider-typ" style="width:200px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+              {add_type_options}
+            </select>
+            <input type="text" id="add-provider-name" placeholder="Name (z.B. &quot;OpenAI Backup&quot;)" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+            <button class="btn btn-sm btn-gold" onclick="addProvider()">Hinzuf&uuml;gen</button>
+          </div>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:12px;font-weight:700;margin-bottom:6px">Allgemeine KI-Einstellungen</div>
+          <div class="settings-row">
+            <label>Internet-Recherche erlauben</label>
+            <input type="checkbox" id="cfg-llm-internet" {'checked' if llm.get('internet_recherche') else ''}>
+          </div>
+          <div class="settings-row">
+            <label>Gesch&auml;ftsdaten im Kontext teilen</label>
+            <input type="checkbox" id="cfg-llm-geschaeft" {'checked' if llm.get('geschaeftsdaten_teilen', True) else ''}>
+          </div>
+          <div class="settings-row">
+            <label>Konversationen speichern</label>
+            <input type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konversationen_speichern', True) else ''}>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px">
+          API Keys: <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--kl)">Anthropic</a>
+          &middot; <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--kl)">OpenAI</a>
+          &middot; <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--kl)">OpenRouter</a>
+          &middot; <a href="https://ollama.com" target="_blank" style="color:var(--kl)">Ollama</a>
+        </div>
+      </div>
+    </div>
     <div style="margin-top:14px">
       <button class="btn btn-sm btn-gold" onclick="saveSettings()">Einstellungen speichern</button>
       <span id="settings-status" style="margin-left:10px;color:var(--muted);font-size:12px"></span>
@@ -903,19 +1411,7 @@ def build_wissen(db):
         rows = db.execute("SELECT * FROM wissen_regeln ORDER BY kategorie, id").fetchall()
     except:
         rows = []
-
     regeln = [dict(r) for r in rows]
-
-    # Kategorien mit Labels
-    KAT_LABELS = [
-        ("fest",      "Feste Regeln"),
-        ("stil",      "Stil & Tonalität"),
-        ("preis",     "Preise & Kalkulation"),
-        ("technik",   "Technik & Fachwissen"),
-        ("prozess",   "Prozess & Abläufe"),
-        ("gelernt",   "Gelernt"),
-        ("vorschlag", "Vorschläge"),
-    ]
 
     grouped = {}
     for r in regeln:
@@ -929,84 +1425,147 @@ def build_wissen(db):
     except:
         korr_list = []
 
-    # Tabs bauen
-    tabs_html = ""
-    panels_html = ""
+    # ── Ebene A: Bibliothek ──
+    BIBLIO_CATS = [
+        ("stil",     "Stil &amp; Ton"),
+        ("preis",    "Preise &amp; Kalkulation"),
+        ("technik",  "Technik"),
+        ("prozess",  "Prozess"),
+        ("fest",     "Gesch&auml;ftsregeln"),
+    ]
+
+    def _wissen_card(r, editable=True):
+        rid = r['id']
+        edit_btn = f"""<button class="btn btn-korr" style="margin-left:8px;font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(r.get('kategorie',''))}')">Bearbeiten</button>""" if editable else ""
+        del_btn = f"""<button class="btn btn-ignore" style="margin-left:4px;font-size:11px;padding:2px 8px;" onclick="wissenAction({rid},'loeschen')">Entfernen</button>""" if editable else ""
+        return f"""<div class="wissen-card" id="wr-{rid}">
+          <div class="wissen-titel">{esc(r['titel'])}</div>
+          <div class="wissen-inhalt" id="wi-{rid}">{esc(r['inhalt'])}</div>
+          <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{edit_btn}{del_btn}</div>
+        </div>"""
+
+    def _wissen_card_review(r, kat_key):
+        rid = r['id']
+        label = 'Freigeben' if kat_key=='vorschlag' else 'Best&auml;tigen'
+        return f"""<div class="wissen-card {'wissen-vorschlag' if kat_key=='vorschlag' else ''}" id="wr-{rid}">
+          <div class="wissen-titel">{esc(r['titel'])}</div>
+          <div class="wissen-inhalt" id="wi-{rid}">{esc(r['inhalt'])}</div>
+          <div class="wissen-actions">
+            <button class="btn btn-done" onclick="wissenAction({rid},'bestaetigen')">{label}</button>
+            <button class="btn btn-korr" style="font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(kat_key)}')">Bearbeiten</button>
+            <button class="btn btn-ignore" onclick="wissenAction({rid},'ablehnen')">Ablehnen</button>
+          </div>
+        </div>"""
+
+    # Zwei Haupt-Ebenen als Tabs
+    n_biblio = sum(len(grouped.get(k, [])) for k, _ in BIBLIO_CATS)
+    n_regeln = len(grouped.get("fest", [])) + len(grouped.get("gelernt", [])) + len(grouped.get("vorschlag", [])) + len(korr_list)
+
+    top_tabs = f"""<div class="wissen-level-tabs">
+      <div class="wissen-level-tab active" onclick="showWissenLevel(this,'bibliothek')">Bibliothek ({n_biblio})</div>
+      <div class="wissen-level-tab" onclick="showWissenLevel(this,'regelsteuerung')">Regelsteuerung ({n_regeln})</div>
+      <div class="wissen-level-tab" onclick="showWissenLevel(this,'neu')">+ Neue Regel</div>
+    </div>"""
+
+    # ── Bibliothek-Panel ──
+    biblio_tabs = ""
+    biblio_panels = ""
     first = True
-    for kat_key, kat_label in KAT_LABELS:
+    for kat_key, kat_label in BIBLIO_CATS:
         items = grouped.get(kat_key, [])
-        if not items and kat_key not in ("gelernt", "vorschlag"): continue
+        if not items: continue
         active = " active" if first else ""
-        tabs_html += f'<div class="wissen-tab{active}" onclick="showWissenTab(\'{kat_key}\')">{kat_label} ({len(items)})</div>'
+        biblio_tabs += f'<div class="wissen-tab{active}" onclick="showWissenTab(\'{kat_key}\')">{kat_label} ({len(items)})</div>'
+        cards = "".join(_wissen_card(r) for r in items)
+        biblio_panels += f'<div id="wissen-{kat_key}" class="wissen-panel{active}">{cards}</div>'
+        first = False
+    # FAQ und Projektwissen als geplant
+    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'faq\')" style="opacity:.55">FAQ <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
+    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'projektwissen\')" style="opacity:.55">Projektwissen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
+    biblio_panels += '<div id="wissen-faq" class="wissen-panel"><p class="empty">FAQ-Eintr&auml;ge werden hier angezeigt, sobald sie erstellt werden.</p></div>'
+    biblio_panels += '<div id="wissen-projektwissen" class="wissen-panel"><p class="empty">Projektwissen wird hier gesammelt &ndash; aus abgeschlossenen Auftr&auml;gen und Erkenntnissen.</p></div>'
+    if not biblio_tabs:
+        biblio_tabs = ""
+        biblio_panels = "<p class='empty'>Noch keine Bibliotheks-Eintr&auml;ge.</p>"
 
-        cards = ""
-        for r in items:
-            rid = r['id']
-            status = r.get('status','aktiv')
-            # Feste/Stil/Preis/Technik/Prozess: anzeigen + bearbeiten + löschen
-            if kat_key in ("fest","stil","preis","technik","prozess"):
-                cards += f"""<div class="wissen-card" id="wr-{rid}">
-                  <div class="wissen-titel">{esc(r['titel'])}</div>
-                  <div class="wissen-inhalt" id="wi-{rid}">{esc(r['inhalt'])}</div>
-                  <div class="wissen-meta"><span class="muted">{esc(kat_key)}</span>
-                    <button class="btn btn-korr" style="margin-left:8px;font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(kat_key)}')">Bearbeiten</button>
-                    <button class="btn btn-ignore" style="margin-left:4px;font-size:11px;padding:2px 8px;" onclick="wissenAction({rid},'loeschen')">Entfernen</button>
-                  </div>
-                </div>"""
-            else:
-                # Gelernt / Vorschlag: mit Bestätigen/Ablehnen + Bearbeiten
-                cards += f"""<div class="wissen-card {'wissen-vorschlag' if kat_key=='vorschlag' else ''}" id="wr-{rid}">
-                  <div class="wissen-titel">{esc(r['titel'])}</div>
-                  <div class="wissen-inhalt" id="wi-{rid}">{esc(r['inhalt'])}</div>
-                  <div class="wissen-actions">
-                    <button class="btn btn-done" onclick="wissenAction({rid},'bestaetigen')">{'Freigeben' if kat_key=='vorschlag' else 'Bestätigen'}</button>
-                    <button class="btn btn-korr" style="font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(kat_key)}')">Bearbeiten</button>
-                    <button class="btn btn-ignore" onclick="wissenAction({rid},'ablehnen')">Ablehnen</button>
-                  </div>
-                </div>"""
+    bibliothek_html = f'<div class="wissen-tabs">{biblio_tabs}</div>{biblio_panels}'
 
-        panels_html += f'<div id="wissen-{kat_key}" class="wissen-panel{active}">{cards or "<p class=\\'empty\\'>Keine Einträge.</p>"}</div>'
+    # ── Regelsteuerung-Panel ──
+    regel_tabs = ""
+    regel_panels = ""
+    regel_cats = [
+        ("fest", "Feste Regeln"),
+        ("gelernt", "Gelernt"),
+        ("vorschlag", "Vorschl&auml;ge"),
+        ("korrekturen", "Korrekturen"),
+        ("freigaben", "Freigaben"),
+    ]
+    first = True
+    for kat_key, kat_label in regel_cats:
+        if kat_key == "korrekturen":
+            items = korr_list
+            cnt = len(items)
+        elif kat_key == "freigaben":
+            items = [r for r in regeln if r.get("status") == "aktiv" and r.get("bestaetigt_am")]
+            cnt = len(items)
+        else:
+            items = grouped.get(kat_key, [])
+            cnt = len(items)
+        active = " active" if first else ""
+        regel_tabs += f'<div class="wissen-tab{active}" onclick="showWissenTab(\'{kat_key}\')">{kat_label} ({cnt})</div>'
+
+        if kat_key == "korrekturen":
+            cards = ""
+            for c in items:
+                cards += f"""<div class="wissen-card wissen-korr">
+                  <div class="wissen-titel">Korrektur: {esc(c.get('alter_typ',''))} &rarr; {esc(c.get('neuer_typ',''))}</div>
+                  <div class="wissen-inhalt">{esc(c.get('notiz',''))}</div>
+                  <div class="wissen-status muted">{esc((c.get('erstellt_am','') or '')[:10])}</div>
+                </div>"""
+            regel_panels += f'<div id="wissen-korrekturen" class="wissen-panel{active}">{cards or "<p class=\'empty\'>Noch keine Korrekturen.</p>"}</div>'
+        elif kat_key == "freigaben":
+            cards = "".join(_wissen_card(r, editable=False) for r in items) if items else "<p class='empty'>Noch keine freigegebenen Regeln.</p>"
+            regel_panels += f'<div id="wissen-freigaben" class="wissen-panel{active}">{cards}</div>'
+        elif kat_key in ("gelernt", "vorschlag"):
+            cards = "".join(_wissen_card_review(r, kat_key) for r in items) if items else "<p class='empty'>Keine Eintr&auml;ge.</p>"
+            regel_panels += f'<div id="wissen-{kat_key}" class="wissen-panel{active}">{cards}</div>'
+        else:
+            cards = "".join(_wissen_card(r) for r in items) if items else "<p class='empty'>Keine Eintr&auml;ge.</p>"
+            regel_panels += f'<div id="wissen-{kat_key}" class="wissen-panel{active}">{cards}</div>'
         first = False
 
-    # Korrekturen-Tab
-    tabs_html += f'<div class="wissen-tab" onclick="showWissenTab(\'korrekturen\')">Korrekturen ({len(korr_list)})</div>'
-    korr_html = ""
-    for c in korr_list:
-        korr_html += f"""<div class="wissen-card wissen-korr">
-          <div class="wissen-titel">Korrektur: {esc(c.get('alter_typ',''))} &rarr; {esc(c.get('neuer_typ',''))}</div>
-          <div class="wissen-inhalt">{esc(c.get('notiz',''))}</div>
-          <div class="wissen-status muted">{esc((c.get('erstellt_am','') or '')[:10])}</div>
-        </div>"""
-    panels_html += f'<div id="wissen-korrekturen" class="wissen-panel">{korr_html or "<p class=\\'empty\\'>Noch keine Korrekturen.</p>"}</div>'
+    regelsteuerung_html = f"""<div style="margin-bottom:8px;font-size:var(--fs-sm);color:var(--muted)">
+      <strong>Verbindlich</strong> = Feste Regeln &amp; Freigaben &nbsp;&middot;&nbsp; <strong>Offen</strong> = Gelernt &amp; Vorschl&auml;ge (zur Pr&uuml;fung)
+    </div>
+    <div class="wissen-tabs">{regel_tabs}</div>{regel_panels}"""
 
-    # Neue-Regel-Tab
-    tabs_html += '<div class="wissen-tab" onclick="showWissenTab(\'neu\')">+ Neue Regel</div>'
-    panels_html += """<div id="wissen-neu" class="wissen-panel">
-      <div class="wissen-card" style="max-width:560px">
-        <div class="wissen-titel" style="margin-bottom:10px">Neue Regel hinzufügen</div>
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Kategorie:</label>
-        <select id="nr-kat" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
+    # ── Neue Regel ──
+    neue_html = f"""<div class="wissen-card" style="max-width:560px">
+        <div class="wissen-titel" style="margin-bottom:10px">Neue Regel hinzuf&uuml;gen</div>
+        <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px;">Kategorie:</label>
+        <select id="nr-kat" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:var(--fs-base);margin-bottom:9px;">
           <option value="fest">Feste Regel</option>
-          <option value="stil">Stil &amp; Tonalität</option>
+          <option value="stil">Stil &amp; Tonalit&auml;t</option>
           <option value="preis">Preise &amp; Kalkulation</option>
           <option value="technik">Technik &amp; Fachwissen</option>
-          <option value="prozess">Prozess &amp; Abläufe</option>
+          <option value="prozess">Prozess &amp; Abl&auml;ufe</option>
           <option value="gelernt">Gelernt</option>
           <option value="vorschlag">Vorschlag</option>
         </select>
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Titel:</label>
-        <input type="text" id="nr-titel" placeholder="Kurzer Regeltitel" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Inhalt / Beschreibung:</label>
-        <textarea id="nr-inhalt" rows="4" placeholder="Die vollständige Regel oder Anweisung..." style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:9px;"></textarea>
+        <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px;">Titel:</label>
+        <input type="text" id="nr-titel" placeholder="Kurzer Regeltitel" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:var(--fs-base);margin-bottom:9px;">
+        <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px;">Inhalt / Beschreibung:</label>
+        <textarea id="nr-inhalt" rows="4" placeholder="Die vollst&auml;ndige Regel oder Anweisung..." style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:var(--fs-base);font-family:inherit;resize:vertical;margin-bottom:9px;"></textarea>
         <button class="btn btn-done" onclick="neueRegel()">Regel speichern</button>
-      </div>
-    </div>"""
+      </div>"""
 
     total = len(regeln)
     return f"""
-    <div style="margin-bottom:10px;font-size:12px;color:var(--muted)">{total} Regeln gesamt</div>
-    <div class="wissen-tabs">{tabs_html}</div>
-    {panels_html}"""
+    <div style="margin-bottom:12px;font-size:var(--fs-sm);color:var(--muted)">{total} Regeln gesamt</div>
+    {top_tabs}
+    <div id="wissen-level-bibliothek" class="wissen-level active">{bibliothek_html}</div>
+    <div id="wissen-level-regelsteuerung" class="wissen-level">{regelsteuerung_html}</div>
+    <div id="wissen-level-neu" class="wissen-level">{neue_html}</div>"""
 
 # ── HAUPT-HTML ────────────────────────────────────────────────────────────────
 def generate_html() -> str:
@@ -1045,36 +1604,180 @@ def generate_html() -> str:
     db.close()
 
     return f"""<!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="light">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kira – rauMKult® Assistenz</title>
+<title>Kira – Assistenz</title>
 <style>
 {CSS}
 </style>
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+<div class="app-shell" id="appShell">
 
-<div class="header">
-  <div class="header-logo">rauMKult<span>&reg;</span><span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">Kira Assistenz</span></div>
-  <div class="header-meta"><strong>{n_ges} offene Aufgaben</strong>{heute}</div>
-</div>
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-logo" id="sidebarLogo">K</div>
+    <div class="sidebar-brand-text">
+      <span class="sidebar-brand-name" id="brandName">Kira</span>
+      <span class="sidebar-brand-sub" id="brandSub">Assistenz</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-group">
+      <div class="sidebar-item active" id="nav-dashboard" onclick="showPanel('dashboard')">
+        <span class="si-icon">&#x2302;</span><span class="si-label">Start</span>
+        {"<span class='si-badge' style='background:rgba(220,74,74,.12);color:var(--danger);border-color:rgba(220,74,74,.25)'>" + str(n_antwort) + "</span>" if n_antwort > 0 else ""}
+      </div>
+      <div class="sidebar-item" id="nav-kommunikation" onclick="showPanel('kommunikation')">
+        <span class="si-icon">&#x2709;</span><span class="si-label">Kommunikation</span>
+      </div>
+      <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')">
+        <span class="si-icon">&#x1F4C5;</span><span class="si-label">Organisation</span>
+      </div>
+      <div class="sidebar-item" id="nav-geschaeft" onclick="showPanel('geschaeft')">
+        <span class="si-icon">&#x1F4B0;</span><span class="si-label">Gesch&auml;ft</span>
+      </div>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Module</div>
+      <div class="sidebar-item planned" id="nav-kunden" onclick="showPanel('kunden')">
+        <span class="si-icon">&#x1F465;</span><span class="si-label">Kunden</span>
+        <span class="si-badge planned">Geplant</span>
+      </div>
+      <div class="sidebar-item planned" id="nav-marketing" onclick="showPanel('marketing')">
+        <span class="si-icon">&#x1F4E3;</span><span class="si-label">Marketing</span>
+        <span class="si-badge planned">Geplant</span>
+      </div>
+      <div class="sidebar-item planned" id="nav-social" onclick="showPanel('social')">
+        <span class="si-icon">&#x1F4AC;</span><span class="si-label">Social / DMs</span>
+        <span class="si-badge planned">Geplant</span>
+      </div>
+      <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')">
+        <span class="si-icon">&#x1F4DA;</span><span class="si-label">Wissen</span>
+      </div>
+      <div class="sidebar-item planned" id="nav-automationen" onclick="showPanel('automationen')">
+        <span class="si-icon">&#x26A1;</span><span class="si-label">Automationen</span>
+        <span class="si-badge planned">Geplant</span>
+      </div>
+      <div class="sidebar-item planned" id="nav-analysen" onclick="showPanel('analysen')">
+        <span class="si-icon">&#x1F4CA;</span><span class="si-label">Analysen</span>
+        <span class="si-badge planned">Geplant</span>
+      </div>
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="sidebar-item" id="nav-einstellungen" onclick="showPanel('einstellungen')">
+      <span class="si-icon">&#x2699;</span><span class="si-label">Einstellungen</span>
+    </div>
+    <div class="sidebar-toggle" onclick="toggleSidebar()" title="Sidebar ein-/ausklappen">
+      <span id="sidebarToggleIcon">&#x276E;</span>
+    </div>
+  </div>
+</aside>
 
-<nav class="nav">
-  <div class="nav-item active" id="nav-dashboard"     onclick="showPanel('dashboard')">Dashboard {alarm_dot}</div>
-  <div class="nav-item"        id="nav-kommunikation" onclick="showPanel('kommunikation')">Kommunikation</div>
-  <div class="nav-item"        id="nav-organisation"  onclick="showPanel('organisation')">Organisation</div>
-  <div class="nav-item"        id="nav-geschaeft"     onclick="showPanel('geschaeft')">Geschäft</div>
-  <div class="nav-item"        id="nav-wissen"        onclick="showPanel('wissen')">Wissen</div>
-  <div class="nav-item"        id="nav-einstellungen" onclick="showPanel('einstellungen')">Einstellungen</div>
-</nav>
+<!-- Main -->
+<div class="main-area">
+  <div class="header">
+    <div class="header-left">
+      <button class="mobile-burger" onclick="openMobileSidebar()">&#x2630;</button>
+      <input class="header-search" placeholder="&#x2315; Suche in allen Modulen&hellip;" onfocus="this.select()" id="globalSearch" autocomplete="off">
+    </div>
+    <div class="header-right">
+      <div class="top-chip" onclick="toggleKiraQuick()" title="Kira Quick Actions">&#x26A1; Quick Actions</div>
+      <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
+      <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
+      <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
+      <button class="btn btn-muted btn-xs" onclick="hardReload()" title="Neu laden" style="border-radius:6px">&#x21BB;</button>
+    </div>
+  </div>
 
-<div class="panel active" id="panel-dashboard">{dashboard_html}</div>
-<div class="panel" id="panel-kommunikation">{komm_html}</div>
-<div class="panel" id="panel-organisation">{org_html}</div>
-<div class="panel" id="panel-geschaeft">{gesch_html}</div>
-<div class="panel" id="panel-wissen">{wissen_html}</div>
-<div class="panel" id="panel-einstellungen">{einstell_html}</div>
+  <div class="panel active" id="panel-dashboard">{dashboard_html}</div>
+  <div class="panel" id="panel-kommunikation">{komm_html}</div>
+  <div class="panel" id="panel-organisation">{org_html}</div>
+  <div class="panel" id="panel-geschaeft">{gesch_html}</div>
+  <div class="panel" id="panel-wissen">{wissen_html}</div>
+  <div class="panel" id="panel-einstellungen">{einstell_html}</div>
+
+  <!-- Geplante Module gem&auml;&szlig; Prompt_04 -->
+  <div class="panel" id="panel-kunden">
+    <div class="planned-shell">
+      <div class="planned-shell-icon">&#x1F465;</div>
+      <div class="planned-shell-title">Kunden</div>
+      <div class="planned-shell-desc">Zentrale Kundenverwaltung mit 360&deg;-Sicht auf jeden Kontakt.</div>
+      <div class="planned-badge">&#x1F6A7; In Planung</div>
+      <div class="planned-features">
+        <div class="planned-feature-item">&#x2192; Timeline &ndash; Chronologischer Verlauf aller Interaktionen</div>
+        <div class="planned-feature-item">&#x2192; Pipeline &ndash; Leads und Anfragen im Prozess verfolgen</div>
+        <div class="planned-feature-item">&#x2192; Potenzial &ndash; Gesch&auml;ftspotenzial je Kunde bewerten</div>
+        <div class="planned-feature-item">&#x2192; Zahlungsverhalten &ndash; Zahlungsmoral und -muster</div>
+        <div class="planned-feature-item">&#x2192; Offene Themen &ndash; Unbeantwortete Fragen, laufende Vorg&auml;nge</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-marketing">
+    <div class="planned-shell">
+      <div class="planned-shell-icon">&#x1F4E3;</div>
+      <div class="planned-shell-title">Marketing</div>
+      <div class="planned-shell-desc">Content-Planung, Kampagnen und Reichweite &ndash; mit KI-Unterst&uuml;tzung durch Kira.</div>
+      <div class="planned-badge">&#x1F6A7; In Planung</div>
+      <div class="planned-features">
+        <div class="planned-feature-item">&#x2192; Content-Pipeline &ndash; Ideen, Entw&uuml;rfe, Ver&ouml;ffentlichungen</div>
+        <div class="planned-feature-item">&#x2192; Themenideen aus Projekten &ndash; Automatisch aus laufenden Auftr&auml;gen</div>
+        <div class="planned-feature-item">&#x2192; Kampagnen &ndash; Planung und Auswertung</div>
+        <div class="planned-feature-item">&#x2192; Newsletter &ndash; Versand und Performance</div>
+        <div class="planned-feature-item">&#x2192; Redaktionsplanung &ndash; Kalender f&uuml;r Social und Blog</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-social">
+    <div class="planned-shell">
+      <div class="planned-shell-icon">&#x1F4AC;</div>
+      <div class="planned-shell-title">Social / DMs</div>
+      <div class="planned-shell-desc">Direktnachrichten aus sozialen Kan&auml;len zentral verwalten und mit Kira besprechen.</div>
+      <div class="planned-badge">&#x1F6A7; In Planung</div>
+      <div class="planned-features">
+        <div class="planned-feature-item">&#x2192; DM-Eingang &ndash; WhatsApp, Instagram, Telegram an einem Ort</div>
+        <div class="planned-feature-item">&#x2192; Schnellantworten &ndash; Vorlagen und KI-Vorschl&auml;ge</div>
+        <div class="planned-feature-item">&#x2192; Lead-Zuordnung &ndash; DMs automatisch Kunden zuweisen</div>
+        <div class="planned-feature-item">&#x2192; Terminbezug &ndash; Termine direkt aus Nachrichten erkennen</div>
+        <div class="planned-feature-item">&#x2192; Plattformbezug &ndash; Quelle und Kanal sichtbar</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-automationen">
+    <div class="planned-shell">
+      <div class="planned-shell-icon">&#x26A1;</div>
+      <div class="planned-shell-title">Automationen</div>
+      <div class="planned-shell-desc">Wiederkehrende Abl&auml;ufe automatisieren &ndash; von Follow-ups bis Eskalationen.</div>
+      <div class="planned-badge">&#x1F6A7; In Planung</div>
+      <div class="planned-features">
+        <div class="planned-feature-item">&#x2192; Mail-Follow-up &ndash; Automatische Nachfass-Erinnerungen</div>
+        <div class="planned-feature-item">&#x2192; Erinnerungsregeln &ndash; Zeitbasierte Wiedervorlagen</div>
+        <div class="planned-feature-item">&#x2192; Eskalationen &ndash; Automatisch bei &Uuml;berf&auml;lligkeit</div>
+        <div class="planned-feature-item">&#x2192; Workflow-Bausteine &ndash; Wiederverwendbare Abl&auml;ufe</div>
+        <div class="planned-feature-item">&#x2192; Trigger / Bedingungen &ndash; Wenn-Dann-Regeln konfigurieren</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-analysen">
+    <div class="planned-shell">
+      <div class="planned-shell-icon">&#x1F4CA;</div>
+      <div class="planned-shell-title">Analysen</div>
+      <div class="planned-shell-desc">Gesch&auml;ftsdaten auswerten, Muster erkennen und Entscheidungen datenbasiert treffen.</div>
+      <div class="planned-badge">&#x1F6A7; In Planung</div>
+      <div class="planned-features">
+        <div class="planned-feature-item">&#x2192; Umsatzfragen &ndash; Volumen, Entwicklung, Vergleiche</div>
+        <div class="planned-feature-item">&#x2192; Angebotsquote &ndash; Annahme-/Ablehnungsrate</div>
+        <div class="planned-feature-item">&#x2192; Lead-Scoring &ndash; Qualit&auml;t und Konversion</div>
+        <div class="planned-feature-item">&#x2192; Kanalwirkung &ndash; Welcher Kanal bringt Auftr&auml;ge</div>
+        <div class="planned-feature-item">&#x2192; Preisentwicklung &ndash; Trends bei Leistungen</div>
+        <div class="planned-feature-item">&#x2192; Performance-Reporting &ndash; Automatische KI-Reports</div>
+      </div>
+    </div>
+  </div>
 
 <!-- Bewertung Modal -->
 <div class="modal-ov" id="geschBewertModal">
@@ -1110,7 +1813,7 @@ def generate_html() -> str:
       <h3 id="ki-title" style="margin:0;color:var(--kl)">Kira fragt nach</h3>
       <button class="btn btn-tiny btn-muted" onclick="closeKiraInterakt()">&times;</button>
     </div>
-    <div id="ki-context" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px;background:rgba(139,107,170,.06);border-radius:8px"></div>
+    <div id="ki-context" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px;background:var(--accent-bg);border-radius:8px"></div>
     <div id="ki-fields" style="display:flex;flex-direction:column;gap:10px"></div>
     <input type="hidden" id="ki-type">
     <input type="hidden" id="ki-id">
@@ -1122,34 +1825,115 @@ def generate_html() -> str:
   </div>
 </div>
 
-<!-- Kira FAB -->
-<button class="kira-fab" onclick="toggleKira()" title="Kira öffnen">K</button>
+<!-- Kira Launcher (Modus A) -->
+<button class="kira-fab" onclick="toggleKiraQuick()" title="Kira Assistenz">
+  <span class="kira-fab-k">K</span>
+  <span class="kira-fab-label">Kira</span>
+  <span class="kira-fab-status" id="kiraFabStatus"></span>
+</button>
 
-<!-- Kira Panel -->
-<div class="kira-panel" id="kiraPanel">
-  <div class="kira-ph">
-    <div><div class="kira-ph-title">Kira</div><div class="kira-ph-sub">rauMKult® Assistenz</div></div>
-    <button class="kira-close" onclick="closeKira()">&#x2715;</button>
+<!-- Kira Quick Panel (Modus B) -->
+<div class="kira-quick" id="kiraQuick">
+  <div class="kira-quick-header">
+    <span style="font-weight:800;color:var(--accent)">Kira</span>
+    <button class="kira-close" onclick="closeKiraQuick()">&times;</button>
   </div>
-  <div class="kira-tabs">
-    <div class="kira-tab active" id="ktab-home"    onclick="showKTab('home')">Home</div>
-    <div class="kira-tab" id="ktab-aufgaben"       onclick="showKTab('aufgaben')">Aufgaben</div>
-    <div class="kira-tab" id="ktab-muster"         onclick="showKTab('muster')">Muster</div>
-    <div class="kira-tab" id="ktab-kwissen"        onclick="showKTab('kwissen')">Gelernt</div>
+  <div class="kira-quick-actions">
+    <div class="kira-quick-item" onclick="openKiraWorkspace('chat')">
+      <span class="kira-quick-icon">&#x1F4AC;</span>
+      <div><strong>Frage stellen</strong><br><span class="muted">Kira direkt etwas fragen</span></div>
+    </div>
+    <div class="kira-quick-item" onclick="openKiraWorkspace('aufgabe')">
+      <span class="kira-quick-icon">&#x2709;</span>
+      <div><strong>Aufgabe besprechen</strong><br><span class="muted">Offene Vorg&auml;nge mit Kira kl&auml;ren</span></div>
+    </div>
+    <div class="kira-quick-item" onclick="showPanel('geschaeft');closeKiraQuick()">
+      <span class="kira-quick-icon">&#x1F4B0;</span>
+      <div><strong>Rechnung pr&uuml;fen</strong><br><span class="muted">Rechnungen und Zahlungen</span></div>
+    </div>
+    <div class="kira-quick-item" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100);closeKiraQuick()">
+      <span class="kira-quick-icon">&#x1F4C4;</span>
+      <div><strong>Angebot pr&uuml;fen</strong><br><span class="muted">Offene Angebote und Nachfass</span></div>
+    </div>
+    <div class="kira-quick-item" onclick="showPanel('kunden');closeKiraQuick()">
+      <span class="kira-quick-icon">&#x1F465;</span>
+      <div><strong>Kunde &ouml;ffnen</strong><br><span class="muted">Kunden-Informationen</span></div>
+    </div>
+    <div class="kira-quick-item" onclick="openKiraWorkspace('chat');closeKiraQuick()">
+      <span class="kira-quick-icon">&#x1F50D;</span>
+      <div><strong>Suche</strong><br><span class="muted">Kira nach Informationen fragen</span></div>
+    </div>
   </div>
-  <div class="kira-content">
-    <div id="kc-home">
-      <div id="kira-home-loading" style="color:var(--muted);font-size:13px;padding:10px">Lade Insights&hellip;</div>
-      <div id="kira-home-content" style="display:none"></div>
+</div>
+
+<!-- Kira Workspace (Modus C) — voller Assistenz-Arbeitsbereich -->
+<div class="kira-workspace-overlay" id="kiraWorkspace">
+  <div class="kira-workspace">
+    <div class="kira-ws-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="briefing-icon">K</span>
+        <div>
+          <div class="kira-ph-title">Kira Workspace</div>
+          <div class="kira-ph-sub">KI-Assistenz</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-xs btn-muted" onclick="newKiraChat()">Neuer Chat</button>
+        <button class="kira-close" onclick="closeKiraWorkspace()">&times;</button>
+      </div>
     </div>
-    <div id="kc-aufgaben" style="display:none">
-      <div id="kira-aufgaben-list"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
-    </div>
-    <div id="kc-muster" style="display:none">
-      <div id="kira-muster-content"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
-    </div>
-    <div id="kc-kwissen" style="display:none">
-      <div id="kira-lernen-list"><div style="color:var(--muted);font-size:13px;">Lade&hellip;</div></div>
+    <div class="kira-ws-body">
+      <!-- Links: Kontexte / Threads -->
+      <div class="kira-ws-sidebar">
+        <div class="kira-ws-sidebar-title">Kontexte</div>
+        <div class="kira-ws-ctx-list">
+          <div class="kira-ws-ctx active" onclick="showKTab('chat')">&#x1F4AC; Chat</div>
+          <div class="kira-ws-ctx" onclick="showKTab('aufgaben')">&#x2709; Aufgaben</div>
+          <div class="kira-ws-ctx" onclick="showKTab('muster')">&#x1F4CA; Muster</div>
+          <div class="kira-ws-ctx" onclick="showKTab('kwissen')">&#x1F4DA; Gelernt</div>
+          <div class="kira-ws-ctx" onclick="showKTab('historie')">&#x1F4C2; Historie</div>
+        </div>
+        <div class="kira-ws-sidebar-title" style="margin-top:14px">Vorbereitet</div>
+        <div class="kira-ws-ctx-list">
+          <div class="kira-ws-ctx planned-ctx">&#x1F465; Kunde</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F4C4; Angebot</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F4B0; Rechnung</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F4C1; Dokument</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F50D; Recherche</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F4E3; Marketing</div>
+          <div class="kira-ws-ctx planned-ctx">&#x1F4AC; Social</div>
+        </div>
+      </div>
+      <!-- Mitte: Chat / Hauptinhalt -->
+      <div class="kira-ws-main" id="kiraContent">
+        <div id="kc-chat" class="kira-chat-wrap" style="display:flex">
+          <div class="kira-chat-area" id="kiraChatArea">
+            <div class="kira-welcome">
+              <div class="kira-welcome-icon">K</div>
+              <div class="kira-welcome-text">Hallo! Ich bin Kira, deine KI-Assistentin.<br>
+              Frag mich zu Rechnungen, Angeboten, Kunden &mdash; oder lass uns offene Aufgaben besprechen.</div>
+            </div>
+          </div>
+          <div class="kira-input-bar">
+            <textarea id="kiraInput" class="kira-input" placeholder="Nachricht an Kira..." rows="1"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendKiraMsg()}}"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+            <button class="kira-send-btn" onclick="sendKiraMsg()" id="kiraSendBtn">&#x27A4;</button>
+          </div>
+        </div>
+        <div id="kc-aufgaben" style="display:none">
+          <div id="kira-aufgaben-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        </div>
+        <div id="kc-muster" style="display:none">
+          <div id="kira-muster-content"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        </div>
+        <div id="kc-kwissen" style="display:none">
+          <div id="kira-lernen-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        </div>
+        <div id="kc-historie" style="display:none">
+          <div id="kira-historie-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1207,20 +1991,162 @@ def generate_html() -> str:
 </div>
 
 <div class="status-toast" id="toast"></div>
-<footer>Kira – rauMKult® Assistenz &middot; <a href="javascript:location.reload()">Aktualisieren</a></footer>
+<footer>Kira Assistenz &middot; <a href="javascript:location.reload()">Aktualisieren</a></footer>
+</div><!-- /main-area -->
+</div><!-- /app-shell -->
 
 <script>
 const KIRA_CTX = {json.dumps(kira_ctx, ensure_ascii=False)};
 const PROMPTS  = {json.dumps(prompts_json, ensure_ascii=False)};
 let kiraOpen = false;
 
-// Nav panels
+// ═══ SIDEBAR & NAV ═══
+const PANEL_TITLES = {{
+  dashboard:'Start', kommunikation:'Kommunikation', organisation:'Organisation',
+  geschaeft:'Gesch\u00e4ft', wissen:'Wissen', einstellungen:'Einstellungen',
+  kunden:'Kunden', marketing:'Marketing',
+  social:'Social / DMs', automationen:'Automationen', analysen:'Analysen'
+}};
+
 function showPanel(name) {{
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('nav-'+name).classList.add('active');
-  document.getElementById('panel-'+name).classList.add('active');
+  const nav = document.getElementById('nav-'+name);
+  if(nav) nav.classList.add('active');
+  const panel = document.getElementById('panel-'+name);
+  if(panel) panel.classList.add('active');
+  const ht = document.getElementById('headerTitle');
+  if(ht) ht.textContent = PANEL_TITLES[name] || name;
   localStorage.setItem('kira_active_tab', name);
+  closeMobileSidebar();
+}}
+
+function toggleSidebar() {{
+  const sb = document.getElementById('sidebar');
+  const icon = document.getElementById('sidebarToggleIcon');
+  sb.classList.toggle('collapsed');
+  const collapsed = sb.classList.contains('collapsed');
+  icon.innerHTML = collapsed ? '&#x276F;' : '&#x276E;';
+  localStorage.setItem('kira_sidebar_collapsed', collapsed ? '1' : '0');
+  document.getElementById('appShell').classList.toggle('sb-collapsed', collapsed);
+}}
+
+function openMobileSidebar() {{
+  document.getElementById('sidebar').classList.add('mobile-open');
+  document.getElementById('sidebarOverlay').classList.add('active');
+}}
+function closeMobileSidebar() {{
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
+}}
+
+// ═══ DESIGN / THEME ═══
+function applyTheme(theme) {{
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('kira_theme', theme);
+}}
+function applyAccent(hex) {{
+  document.documentElement.style.setProperty('--accent', hex);
+  // Generate lighter variant
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const lr=Math.min(255,r+30),lg=Math.min(255,g+30),lb=Math.min(255,b+30);
+  document.documentElement.style.setProperty('--accent-l','#'+[lr,lg,lb].map(x=>x.toString(16).padStart(2,'0')).join(''));
+  document.documentElement.style.setProperty('--accent-bg',`rgba(${{r}},${{g}},${{b}},.08)`);
+  document.documentElement.style.setProperty('--accent-border',`rgba(${{r}},${{g}},${{b}},.25)`);
+  const hexEl = document.getElementById('cfg-accent-hex');
+  if(hexEl) hexEl.textContent = hex;
+  localStorage.setItem('kira_accent', hex);
+}}
+function resetAccent() {{
+  const def = '#4f7df9';
+  document.getElementById('cfg-accent').value = def;
+  applyAccent(def);
+}}
+function applyFontSize(size) {{
+  if(size) document.documentElement.dataset.fontsize = size;
+  else delete document.documentElement.dataset.fontsize;
+  localStorage.setItem('kira_fontsize', size);
+}}
+function applyDensity(density) {{
+  if(density) document.documentElement.dataset.density = density;
+  else delete document.documentElement.dataset.density;
+  localStorage.setItem('kira_density', density);
+}}
+function applyCompanyName(name) {{
+  const el = document.getElementById('brandName');
+  if(el) el.textContent = name || 'Kira';
+  localStorage.setItem('kira_company_name', name);
+}}
+function applyLogo(val) {{
+  const el = document.getElementById('sidebarLogo');
+  if(!el) return;
+  if(val && (val.startsWith('http')||val.startsWith('data:'))) {{
+    el.innerHTML = '<img src="'+val+'" alt="">';
+  }} else {{
+    el.textContent = val || 'K';
+    const img = el.querySelector('img');
+    if(img) img.remove();
+  }}
+  localStorage.setItem('kira_logo', val);
+}}
+function applyCardRadius(val) {{
+  if(val) document.documentElement.style.setProperty('--card-radius', val);
+  else document.documentElement.style.removeProperty('--card-radius');
+  localStorage.setItem('kira_card_radius', val);
+}}
+function applyShadow(val) {{
+  document.documentElement.dataset.shadow = val || '';
+  localStorage.setItem('kira_shadow', val);
+}}
+function applyReduceMotion(checked) {{
+  document.documentElement.dataset.reduceMotion = checked ? 'true' : '';
+  localStorage.setItem('kira_reduce_motion', checked ? '1' : '0');
+}}
+function applyHighContrast(checked) {{
+  document.documentElement.dataset.highContrast = checked ? 'true' : '';
+  localStorage.setItem('kira_high_contrast', checked ? '1' : '0');
+}}
+function saveDesignSettings() {{
+  showToast('Design gespeichert');
+  const st = document.getElementById('design-status');
+  if(st) {{ st.textContent='Gespeichert'; setTimeout(()=>st.textContent='',2000); }}
+}}
+
+// Restore design settings on load
+function restoreDesign() {{
+  const theme = localStorage.getItem('kira_theme');
+  if(theme) {{ applyTheme(theme); const sel=document.getElementById('cfg-theme'); if(sel) sel.value=theme; }}
+  const accent = localStorage.getItem('kira_accent');
+  if(accent) {{ applyAccent(accent); const inp=document.getElementById('cfg-accent'); if(inp) inp.value=accent; }}
+  const fs = localStorage.getItem('kira_fontsize') || '';
+  if(fs) {{ applyFontSize(fs); const sel=document.getElementById('cfg-fontsize'); if(sel) sel.value=fs; }}
+  const dens = localStorage.getItem('kira_density') || '';
+  if(dens) {{ applyDensity(dens); const sel=document.getElementById('cfg-density'); if(sel) sel.value=dens; }}
+  const cn = localStorage.getItem('kira_company_name');
+  if(cn) {{ applyCompanyName(cn); const inp=document.getElementById('cfg-company-name'); if(inp) inp.value=cn; }}
+  const logo = localStorage.getItem('kira_logo');
+  if(logo) {{ applyLogo(logo); const inp=document.getElementById('cfg-logo'); if(inp) inp.value=logo; }}
+  // Card radius
+  const cr = localStorage.getItem('kira_card_radius') || '';
+  if(cr) {{ applyCardRadius(cr); const sel=document.getElementById('cfg-card-radius'); if(sel) sel.value=cr; }}
+  // Shadow
+  const sh = localStorage.getItem('kira_shadow') || '';
+  if(sh) {{ applyShadow(sh); const sel=document.getElementById('cfg-shadow'); if(sel) sel.value=sh; }}
+  // Reduce motion
+  if(localStorage.getItem('kira_reduce_motion')==='1') {{
+    applyReduceMotion(true); const cb=document.getElementById('cfg-reduce-motion'); if(cb) cb.checked=true;
+  }}
+  // High contrast
+  if(localStorage.getItem('kira_high_contrast')==='1') {{
+    applyHighContrast(true); const cb=document.getElementById('cfg-high-contrast'); if(cb) cb.checked=true;
+  }}
+  // Sidebar collapsed state
+  if(localStorage.getItem('kira_sidebar_collapsed')==='1') {{
+    const sb=document.getElementById('sidebar');
+    sb.classList.add('collapsed');
+    document.getElementById('appShell').classList.add('sb-collapsed');
+    document.getElementById('sidebarToggleIcon').innerHTML='&#x276F;';
+  }}
 }}
 
 // KPI click -> jump to Kommunikation with filter
@@ -1235,6 +2161,72 @@ function filterKomm(kat) {{
     else if (kat === 'Rechnung / Beleg' && title.includes('Rechnungen')) sec.classList.remove('collapsed');
     else sec.classList.add('collapsed');
   }});
+}}
+
+// Kommunikation View-Tabs
+function filterKommView(el, kat) {{
+  document.querySelectorAll('.komm-view-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const container = document.getElementById('komm-cards-container');
+  if(!container) return;
+  if(kat === 'alle') {{
+    container.querySelectorAll('.section').forEach(s=>s.style.display='');
+    container.querySelectorAll('.task-card').forEach(c=>c.style.display='');
+  }} else if(kat === 'erledigt') {{
+    container.querySelectorAll('.section').forEach(s=>s.style.display='none');
+  }} else {{
+    container.querySelectorAll('.section').forEach(s=>{{
+      const title = s.querySelector('.section-title')?.textContent||'';
+      const match = kat==='Antwort erforderlich' && title.includes('Antwort') ||
+        kat==='Neue Lead-Anfrage' && title.includes('Leads') ||
+        kat==='Angebotsrückmeldung' && title.includes('Angebots') ||
+        kat==='Zur Kenntnis' && title.includes('Kenntnis') ||
+        kat==='Shop / System' && (title.includes('Shop')||title.includes('Newsletter'));
+      s.style.display = match ? '' : 'none';
+      if(match) s.classList.remove('collapsed');
+    }});
+  }}
+  applyKommFilters();
+}}
+
+// Kommunikation Filter
+function applyKommFilters() {{
+  const quelle = document.getElementById('komm-filter-quelle')?.value||'';
+  const prio = document.getElementById('komm-filter-dringlichkeit')?.value||'';
+  const nurAntwort = document.getElementById('komm-filter-antwort')?.checked||false;
+  const nurAnhang = document.getElementById('komm-filter-anhang')?.checked||false;
+  let count = 0;
+  document.querySelectorAll('#komm-cards-container .task-card').forEach(card=>{{
+    let show = true;
+    if(quelle) {{
+      const kb = card.querySelector('.konto-badge');
+      if(!kb || !kb.textContent.includes(quelle)) show = false;
+    }}
+    if(prio) {{
+      if(!card.classList.contains('prio-'+prio)) show = false;
+    }}
+    if(nurAntwort) {{
+      if(!card.querySelector('.btn-kira')) show = false;
+    }}
+    if(nurAnhang) {{
+      const btns = card.querySelectorAll('.btn');
+      const hasAnh = Array.from(btns).some(b=>b.textContent.includes('Anh'));
+      if(!hasAnh) show = false;
+    }}
+    card.style.display = show ? '' : 'none';
+    if(show) count++;
+  }});
+  const ce = document.getElementById('komm-filter-count');
+  if(ce) ce.textContent = count + ' Vorg\u00e4nge';
+}}
+
+// Organisation View-Switching
+function showOrgView(el, view) {{
+  document.querySelectorAll('.org-view-tabs .komm-view-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.org-view').forEach(v=>v.classList.remove('active'));
+  const target = document.getElementById('org-view-'+view);
+  if(target) target.classList.add('active');
 }}
 
 // Task status
@@ -1253,10 +2245,10 @@ function setStatus(id, status) {{
 function showGeschTab(name) {{
   document.querySelectorAll('.gesch-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.gesch-panel').forEach(p=>p.classList.remove('active'));
-  const tabs = document.querySelectorAll('.gesch-tab');
-  const names = ['uebersicht','ausgangsre','angebote','eingangsre','mahnungen'];
-  const idx = names.indexOf(name);
-  if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+  // Find matching tab by checking each tab's onclick text
+  document.querySelectorAll('.gesch-tab').forEach(t=>{{
+    if(t.getAttribute('onclick')?.includes("'"+name+"'")) t.classList.add('active');
+  }});
   document.getElementById('gesch-'+name)?.classList.add('active');
   localStorage.setItem('kira_gesch_tab', name);
 }}
@@ -1532,6 +2524,15 @@ function executeStatusChange(type, id, action, data) {{
 
 // Einstellungen speichern
 function saveSettings() {{
+  // Provider-Modelle aus den aktuellen UI-Werten sammeln
+  const providerUpdates = [];
+  document.querySelectorAll('[id^="pmodel-"]').forEach(el=>{{
+    const pid = el.id.replace('pmodel-','');
+    const model = el.tagName==='SELECT' ? el.value : el.value.trim();
+    const urlEl = document.getElementById('purl-'+pid);
+    providerUpdates.push({{id:pid, model:model, base_url: urlEl ? urlEl.value.trim() : undefined}});
+  }});
+
   const cfg = {{
     ntfy: {{
       aktiv: document.getElementById('cfg-ntfy-aktiv').checked,
@@ -1550,6 +2551,12 @@ function saveSettings() {{
     server: {{
       port: parseInt(document.getElementById('cfg-server-port').value)||8765,
       auto_open_browser: document.getElementById('cfg-auto-browser').checked
+    }},
+    llm: {{
+      internet_recherche: document.getElementById('cfg-llm-internet')?.checked || false,
+      geschaeftsdaten_teilen: document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
+      konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
+      _provider_updates: providerUpdates
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -1559,6 +2566,81 @@ function saveSettings() {{
     if(d.ok) showToast('Einstellungen gespeichert');
     else showToast(d.error||'Fehler');
   }}).catch(()=>showToast('Fehler'));
+}}
+
+// Provider Key speichern
+function saveProviderKey(providerId) {{
+  const key = document.getElementById('pkey-'+providerId)?.value.trim();
+  if(!key) {{ showToast('Bitte API Key eingeben'); return; }}
+  fetch('/api/kira/provider/save-key',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:providerId, api_key:key}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{
+      showToast('API Key gespeichert');
+      document.getElementById('pkey-'+providerId).value='';
+      setTimeout(()=>location.reload(),800);
+    }} else showToast(d.error||'Fehler');
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Provider hinzufügen
+function addProvider() {{
+  const typ = document.getElementById('add-provider-typ').value;
+  const name = document.getElementById('add-provider-name').value.trim();
+  if(!typ) {{ showToast('Bitte Provider-Typ wählen'); return; }}
+  fetch('/api/kira/provider/add',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{typ:typ, name:name}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Provider hinzugefügt'); setTimeout(()=>location.reload(),600); }}
+    else showToast(d.error||'Fehler');
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Provider aktivieren/deaktivieren
+function toggleProvider(pid, aktiv) {{
+  fetch('/api/kira/provider/toggle',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:pid, aktiv:aktiv}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{
+      const card = document.getElementById('pcard-'+pid);
+      if(card) card.style.opacity = aktiv ? '1' : '.5';
+      showToast(aktiv ? 'Provider aktiviert' : 'Provider deaktiviert');
+    }}
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Provider Priorität ändern
+function moveProvider(pid, direction) {{
+  fetch('/api/kira/provider/move',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:pid, direction:direction}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) setTimeout(()=>location.reload(),400);
+    else showToast(d.error||'Fehler');
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Provider löschen
+function deleteProvider(pid) {{
+  if(!confirm('Provider wirklich entfernen?')) return;
+  fetch('/api/kira/provider/delete',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:pid}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Provider entfernt'); setTimeout(()=>location.reload(),400); }}
+    else showToast(d.error||'Fehler');
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Wissen level switching (Bibliothek / Regelsteuerung / Neu)
+function showWissenLevel(el, level) {{
+  document.querySelectorAll('.wissen-level-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.wissen-level').forEach(l=>l.classList.remove('active'));
+  document.getElementById('wissen-level-'+level)?.classList.add('active');
 }}
 
 // Wissen sub-tabs
@@ -1625,30 +2707,57 @@ function neueRegel() {{
   }}).catch(()=>showToast('Fehler'));
 }}
 
-// Kira panel
-function toggleKira(){{ kiraOpen ? closeKira() : openKiraNaked(); }}
-function openKiraNaked(){{ kiraOpen=true; document.getElementById('kiraPanel').classList.add('open'); }}
-function closeKira(){{ kiraOpen=false; document.getElementById('kiraPanel').classList.remove('open'); localStorage.setItem('kira_dismissed', Date.now()); }}
+// Kira 3-Modi
+function toggleKiraQuick() {{
+  const qp = document.getElementById('kiraQuick');
+  if(qp.classList.contains('open')) closeKiraQuick();
+  else {{ qp.classList.add('open'); kiraOpen=true; }}
+}}
+function closeKiraQuick() {{
+  document.getElementById('kiraQuick').classList.remove('open');
+  kiraOpen=false;
+}}
+function openKiraWorkspace(context) {{
+  closeKiraQuick();
+  document.getElementById('kiraWorkspace').classList.add('open');
+  kiraOpen=true;
+  if(context==='chat') showKTab('chat');
+  else if(context==='aufgabe') showKTab('aufgaben');
+}}
+function closeKiraWorkspace() {{
+  document.getElementById('kiraWorkspace').classList.remove('open');
+  kiraOpen=false;
+  localStorage.setItem('kira_dismissed', Date.now());
+}}
+// Legacy compat
+function toggleKira(){{ toggleKiraQuick(); }}
+function openKiraNaked(){{ openKiraWorkspace('chat'); }}
+function closeKira(){{ closeKiraWorkspace(); closeKiraQuick(); }}
 
-// Kira tabs
+// Kira tabs / context switching
 function showKTab(name){{
-  document.querySelectorAll('.kira-tab').forEach(t=>t.classList.remove('active'));
+  // Update workspace sidebar active state
+  document.querySelectorAll('.kira-ws-ctx').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.kira-ws-ctx').forEach(c=>{{
+    if(c.textContent.toLowerCase().includes(name==='kwissen'?'gelernt':name==='muster'?'muster':name)) c.classList.add('active');
+  }});
   document.querySelectorAll('[id^=kc-]').forEach(c=>c.style.display='none');
-  document.getElementById('ktab-'+name)?.classList.add('active');
-  document.getElementById('kc-'+name).style.display='block';
+  const content = document.getElementById('kc-'+name);
+  if(content) content.style.display = name==='chat' ? 'flex' : 'block';
+  document.getElementById('kiraContent')?.classList.toggle('kira-chat-mode', name==='chat');
   if(name==='aufgaben') loadKiraInsights('aufgaben');
   if(name==='muster') loadKiraInsights('muster');
   if(name==='kwissen') loadKiraInsights('kwissen');
+  if(name==='historie') loadKiraHistorie();
 }}
 
 // Kira Insights laden und rendern
 let kiraInsightsCache = null;
 function loadKiraInsights(tab) {{
   const render = (data) => {{
-    if(tab==='aufgaben' || !tab) renderKiraAufgaben(data);
-    if(tab==='muster' || !tab) renderKiraMuster(data);
-    if(tab==='kwissen' || !tab) renderKiraLernen(data);
-    if(!tab) renderKiraHome(data);
+    if(tab==='aufgaben') renderKiraAufgaben(data);
+    if(tab==='muster') renderKiraMuster(data);
+    if(tab==='kwissen') renderKiraLernen(data);
   }};
   if(kiraInsightsCache) {{ render(kiraInsightsCache); return; }}
   fetch('/api/kira/insights').then(r=>r.json()).then(data=>{{
@@ -1658,41 +2767,16 @@ function loadKiraInsights(tab) {{
 }}
 
 function renderKiraHome(data) {{
-  const el = document.getElementById('kira-home-content');
-  const loading = document.getElementById('kira-home-loading');
-  if(!el) return;
+  // With LLM chat, proactive check pre-fills a message
   const aufgaben = data.aufgaben || [];
-  let html = '';
-  if(aufgaben.length > 0) {{
-    html += '<div class="kira-sec"><div class="kira-sec-title" style="color:#e84545">Hallo Kai, ich habe '+aufgaben.length+' wichtige Punkte</div>';
-    aufgaben.slice(0,5).forEach(a => {{
-      const pcls = a.prio >= 3 ? 'kira-prio-high' : a.prio >= 2 ? 'kira-prio-med' : 'kira-prio-low';
-      html += '<div class="kira-card kira-task-card '+pcls+'" onclick="'+a.action+';closeKira()" style="cursor:pointer"><div class="kira-card-meta">'+a.text+'</div></div>';
-    }});
-    html += '</div>';
-  }} else {{
-    html += '<div class="kira-sec"><div class="kira-sec-title" style="color:#50c878">Alles im Griff</div><div class="kira-card"><div class="kira-card-meta">Keine dringenden Aufgaben. Gut gemacht!</div></div></div>';
+  if(aufgaben.length > 0 && !kiraSessionId) {{
+    // Auto-suggest in chat
+    const input = document.getElementById('kiraInput');
+    if(input && !input.value) {{
+      const top = aufgaben[0];
+      input.placeholder = 'z.B. "' + (top.text||'').substring(0,40) + '..."';
+    }}
   }}
-  // Muster-Teaser
-  const m = data.muster || {{}};
-  if(m.zahlungsdauer_avg || m.angebotsquote) {{
-    html += '<div class="kira-sec"><div class="kira-sec-title">Erkenntnisse</div>';
-    if(m.zahlungsdauer_avg) html += '<div class="kira-card"><div class="kira-card-meta">Zahlungsdauer: \u00D8 '+m.zahlungsdauer_avg+' Tage ('+m.zahlungsdauer_n+' Rechnungen)</div></div>';
-    if(m.angebotsquote) html += '<div class="kira-card"><div class="kira-card-meta">Angebotsquote: '+m.angebotsquote+'% ('+m.angebote_angenommen+'/'+m.angebote_total+')</div></div>';
-    html += '</div>';
-  }}
-  // Letzte Erkenntnisse
-  const lernen = data.lernen || [];
-  if(lernen.length > 0) {{
-    html += '<div class="kira-sec"><div class="kira-sec-title">Zuletzt gelernt</div>';
-    lernen.slice(0,3).forEach(l => {{
-      html += '<div class="kira-card"><div class="kira-card-meta" style="font-size:11px"><strong>'+escH(l.titel)+'</strong><br>'+escH(l.inhalt).substring(0,100)+'</div></div>';
-    }});
-    html += '</div>';
-  }}
-  el.innerHTML = html;
-  if(loading) loading.style.display = 'none';
-  el.style.display = 'block';
 }}
 
 function renderKiraAufgaben(data) {{
@@ -1749,83 +2833,249 @@ function renderKiraLernen(data) {{
   el.innerHTML = html;
 }}
 
+// ── Kira Chat ────────────────────────────────────────────────
+let kiraSessionId = null;
+let kiraSending = false;
+
+function sendKiraMsg() {{
+  const input = document.getElementById('kiraInput');
+  const msg = input.value.trim();
+  if(!msg || kiraSending) return;
+  kiraSending = true;
+  input.value = '';
+  input.style.height = 'auto';
+  appendKiraMsg('user', msg);
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'kira-typing';
+  typing.id = 'kira-typing';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  document.getElementById('kiraChatArea').appendChild(typing);
+  scrollKiraChat();
+  const btn = document.getElementById('kiraSendBtn');
+  btn.disabled = true;
+  btn.style.opacity = '.4';
+  fetch('/api/kira/chat', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{nachricht: msg, session_id: kiraSessionId}})
+  }}).then(r=>r.json()).then(data=>{{
+    document.getElementById('kira-typing')?.remove();
+    if(data.error) {{
+      appendKiraMsg('error', data.error);
+      if(data.needs_api_key) appendKiraMsg('system', 'Bitte trage deinen API Key unter Einstellungen > KI-Assistent ein.');
+    }} else {{
+      kiraSessionId = data.session_id;
+      const provInfo = data.provider ? (data.model ? data.provider+' ('+data.model+')' : data.provider) : '';
+      const fallback = data.fallback_info && data.fallback_info.length ? data.fallback_info : null;
+      appendKiraMsg('assistant', data.antwort, data.tools_verwendet, provInfo, fallback);
+    }}
+    kiraSending = false;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    input.focus();
+  }}).catch(()=>{{
+    document.getElementById('kira-typing')?.remove();
+    appendKiraMsg('error', 'Verbindungsfehler.');
+    kiraSending = false;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }});
+}}
+
+function appendKiraMsg(rolle, text, tools, providerInfo, fallbackInfo) {{
+  const area = document.getElementById('kiraChatArea');
+  const welcome = area.querySelector('.kira-welcome');
+  if(welcome) welcome.remove();
+  const div = document.createElement('div');
+  if(rolle==='user') {{
+    div.className = 'kira-msg kira-msg-user';
+    div.textContent = text;
+  }} else if(rolle==='assistant') {{
+    div.className = 'kira-msg kira-msg-kira';
+    div.innerHTML = kiraFormatText(text);
+    if(tools && tools.length) {{
+      const ti = document.createElement('div');
+      ti.className = 'kira-tools-used';
+      ti.innerHTML = tools.map(t=>'<span class="kira-tool-badge">'+escH(t)+'</span>').join(' ');
+      div.appendChild(ti);
+    }}
+    // Provider-Info anzeigen
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:10px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+    if(providerInfo) meta.innerHTML = '<span style="opacity:.7">via '+escH(providerInfo)+'</span>';
+    if(fallbackInfo && fallbackInfo.length) {{
+      meta.innerHTML += '<span style="color:#e8a545;opacity:.8" title="'+escH(fallbackInfo.join(', '))+'">⚡ Fallback</span>';
+    }}
+    if(meta.innerHTML) div.appendChild(meta);
+  }} else if(rolle==='error') {{
+    div.className = 'kira-msg kira-msg-error';
+    div.textContent = text;
+  }} else {{
+    div.className = 'kira-msg kira-msg-system';
+    div.textContent = text;
+  }}
+  area.appendChild(div);
+  scrollKiraChat();
+}}
+
+function kiraFormatText(text) {{
+  return escH(text)
+    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\\n- /g, '<br>&bull; ')
+    .replace(/\\n(\\d+)\\. /g, '<br>$1. ')
+    .replace(/\\n/g, '<br>');
+}}
+
+function scrollKiraChat() {{
+  const area = document.getElementById('kiraChatArea');
+  setTimeout(()=>{{ area.scrollTop = area.scrollHeight; }}, 50);
+}}
+
+function newKiraChat() {{
+  kiraSessionId = null;
+  const area = document.getElementById('kiraChatArea');
+  area.innerHTML = '<div class="kira-welcome"><div class="kira-welcome-icon">K</div><div class="kira-welcome-text">Neuer Chat gestartet. Wie kann ich helfen?</div></div>';
+  document.getElementById('kiraInput').value = '';
+  showKTab('chat');
+}}
+
+// Hard Reset — Cache umgehen, alles neu laden
+function hardReload() {{
+  // Cache-Busting: URL mit Timestamp
+  window.location.href = '/?nocache=' + Date.now();
+}}
+
+// Briefing aktualisieren
+function refreshBriefing() {{
+  const el = document.getElementById('kira-briefing');
+  if(!el) return;
+  el.style.opacity = '.5';
+  fetch('/api/kira/briefing/regenerate').then(r=>r.json()).then(data=>{{
+    if(data.zusammenfassung) {{
+      location.reload();
+    }} else {{
+      el.style.opacity = '1';
+      showToast(data.error || 'Briefing-Fehler');
+    }}
+  }}).catch(()=>{{ el.style.opacity='1'; showToast('Fehler'); }});
+}}
+
+// Monitor-Status prüfen (alle 30s) — aktualisiert Header-Chip
+function checkMonitorStatus() {{
+  fetch('/api/monitor/status').then(r=>r.json()).then(data=>{{
+    const chip = document.getElementById('monitorStatusChip');
+    const txt = document.getElementById('monitorStatusText');
+    const dot = document.querySelector('#monitorStatusChip .chip-dot');
+    if(!chip) return;
+    if(data.running) {{
+      chip.className = 'top-chip ok';
+      if(txt) txt.textContent = 'Verbunden';
+      if(dot) {{ dot.style.background='#639922'; }}
+      chip.title = 'Mail-Monitor aktiv' + (data.last_poll ? ' — '+new Date(data.last_poll).toLocaleTimeString('de-DE') : '');
+    }} else {{
+      chip.className = 'top-chip';
+      chip.style.background='#FCEBEB';chip.style.borderColor='#F7C1C1';chip.style.color='#A32D2D';
+      if(txt) txt.textContent = 'Offline';
+      chip.title = 'Mail-Monitor inaktiv';
+    }}
+  }}).catch(()=>{{}});
+}}
+setInterval(checkMonitorStatus, 30000);
+setTimeout(checkMonitorStatus, 2000);
+
+// Server-Shutdown Bestätigung beim Tab-Schließen
+window.addEventListener('beforeunload', function(e) {{
+  // Nur fragen wenn Server läuft (nicht bei Navigation innerhalb der Seite)
+  if(document.visibilityState === 'visible') {{
+    e.preventDefault();
+    e.returnValue = 'Kira Dashboard schließen? Der Server wird weiter laufen.';
+  }}
+}});
+
+// Server stoppen wenn Fenster geschlossen wird (optional über Button)
+function shutdownServer() {{
+  if(confirm('Server komplett herunterfahren?')) {{
+    fetch('/api/shutdown', {{method:'POST'}}).then(()=>{{
+      document.title = 'Kira - Gestoppt';
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#bda27c;font-size:20px">Server gestoppt. Fenster kann geschlossen werden.</div>';
+    }}).catch(()=>{{}});
+  }}
+}}
+
+function loadKiraHistorie() {{
+  fetch('/api/kira/conversations').then(r=>r.json()).then(data=>{{
+    const el = document.getElementById('kira-historie-list');
+    if(!data || !data.length) {{
+      el.innerHTML = '<div style="color:var(--muted);padding:10px">Noch keine Konversationen gespeichert.</div>';
+      return;
+    }}
+    let html = '<div class="kira-sec"><div class="kira-sec-title">Bisherige Konversationen</div>';
+    data.forEach(c=>{{
+      const datum = c.gestartet ? new Date(c.gestartet).toLocaleString('de-DE',{{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}}) : '';
+      html += '<div class="kira-card clickable" onclick="loadKiraConv(\\\''+c.session_id+'\\\')">'+
+        '<div class="kira-card-title">'+escH(c.vorschau||'(Leer)')+'</div>'+
+        '<div class="kira-card-meta">'+datum+' &middot; '+c.nachrichten+' Nachr. &middot; '+
+        ((c.tokens?.input||0)+(c.tokens?.output||0))+' Tokens</div></div>';
+    }});
+    html += '</div>';
+    el.innerHTML = html;
+  }}).catch(()=>{{}});
+}}
+
+function loadKiraConv(sessionId) {{
+  kiraSessionId = sessionId;
+  showKTab('chat');
+  const area = document.getElementById('kiraChatArea');
+  area.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">Lade Konversation&hellip;</div>';
+  fetch('/api/kira/conversation?session_id='+sessionId).then(r=>r.json()).then(messages=>{{
+    area.innerHTML = '';
+    messages.forEach(m=>{{
+      if(m.rolle==='user' || m.rolle==='assistant') appendKiraMsg(m.rolle, m.nachricht||'');
+    }});
+  }}).catch(()=>{{
+    area.innerHTML = '<div style="color:#e84545;padding:8px">Fehler beim Laden.</div>';
+  }});
+}}
+
 // Kira proaktiv öffnen wenn wichtige Aufgaben da sind
 function kiraProaktivCheck() {{
   const dismissed = parseInt(localStorage.getItem('kira_dismissed')||'0');
-  const cooldown = 30 * 60 * 1000; // 30 Minuten Cooldown nach Dismiss
+  const cooldown = 30 * 60 * 1000;
   if(Date.now() - dismissed < cooldown) return;
   fetch('/api/kira/insights').then(r=>r.json()).then(data=>{{
     kiraInsightsCache = data;
     const hochprio = (data.aufgaben||[]).filter(a => a.prio >= 2);
     if(hochprio.length > 0 && !kiraOpen) {{
+      // Show pulse on FAB and pre-fill chat hint
+      const fab = document.querySelector('.kira-fab');
+      if(fab) fab.classList.add('kira-fab-pulse');
       renderKiraHome(data);
-      // Sanftes Aufpoppen nach 2 Sekunden
       setTimeout(()=>{{
-        if(!kiraOpen) {{
-          openKiraNaked();
-          const fab = document.querySelector('.kira-fab');
-          if(fab) fab.classList.add('kira-fab-pulse');
-        }}
+        if(!kiraOpen) toggleKiraQuick();
       }}, 2000);
-    }} else {{
-      renderKiraHome(data);
     }}
   }}).catch(()=>{{}});
 }}
 
-// Mit Kira besprechen – Kommunikationsfenster
+// Mit Kira besprechen – Chat öffnen mit Kontext
 function openKira(taskId){{
   const ctx = KIRA_CTX[taskId];
   if(!ctx){{ showToast('Kein Kontext'); return; }}
   openKiraNaked();
   showKTab('chat');
-
-  const fehlend = ctx.kategorie==='Neue Lead-Anfrage'
-    ? '<li>Ort / PLZ des Projekts</li><li>Maße der Fläche</li><li>Fotos der Fläche</li><li>Gewünschte Zieloptik</li>'
-    : '<li>Details aus dem Mailinhalt prüfen</li>';
-
-  const risiko = ctx.kategorie==='Antwort erforderlich'
-    ? 'Antwort ist überfällig – Reaktionszeit beachten.'
-    : ctx.kategorie==='Neue Lead-Anfrage'
-    ? 'Keine Preise in der Erstantwort. Erst Infos sammeln, dann qualifizieren.'
-    : '';
-
-  document.getElementById('komm-container').innerHTML = `
-    <div style="padding-top:4px">
-      <div class="komm-block">
-        <div class="komm-lbl">Zusammenfassung</div>
-        <div class="komm-txt">
-          <strong>${{escH(ctx.titel)}}</strong><br>
-          <span style="color:var(--muted);font-size:11px">Von: ${{escH(ctx.name||ctx.email)}} &middot; ${{escH(ctx.konto)}} &middot; ${{escH(ctx.datum)}}</span><br>
-          <span style="color:rgba(255,255,255,.75)">${{escH(ctx.zusammenfassung)}}</span>
-        </div>
-      </div>
-      <div class="komm-block">
-        <div class="komm-lbl">Einordnung</div>
-        <div class="komm-txt">
-          <strong>Kategorie:</strong> ${{escH(ctx.kategorie)}}<br>
-          <strong>Absenderrolle:</strong> ${{escH(ctx.absender_rolle)}}<br>
-          <strong>Empfehlung:</strong> ${{escH(ctx.empfohlene_aktion)}}<br>
-          <strong>Grund:</strong> ${{escH(ctx.kategorie_grund)}}
-        </div>
-      </div>
-      ${{risiko?'<div class="komm-block"><div class="komm-lbl">Hinweis</div><div class="komm-txt">'+escH(risiko)+'</div></div>':''}}
-      <div class="komm-block">
-        <div class="komm-lbl">Fehlende Infos</div>
-        <div class="komm-txt"><ul>${{fehlend}}</ul></div>
-      </div>
-      <div class="komm-block">
-        <div class="komm-lbl">Deine Gedanken / Richtung</div>
-        <textarea class="komm-input" id="kai-in-${{taskId}}"
-          placeholder="z.B. kurze Rückfrage stellen, Termin vorschlagen, Absage..."></textarea>
-        <div class="komm-actions">
-          <button class="btn-kp" onclick="generateDraft(${{taskId}})">Entwurf erstellen</button>
-          <a href="mailto:${{escH(ctx.email)}}?subject=${{encodeURIComponent('Re: '+(ctx.betreff||''))}}"
-             class="btn-ks" target="_blank">Outlook</a>
-        </div>
-      </div>
-      <div id="draft-${{taskId}}"></div>
-    </div>`;
+  // Pre-fill chat with task context
+  const input = document.getElementById('kiraInput');
+  if(input) {{
+    const msg = 'Aufgabe: ' + (ctx.titel||'') + '\\nVon: ' + (ctx.name||ctx.email||'') +
+      '\\nKategorie: ' + (ctx.kategorie||'') +
+      '\\nZusammenfassung: ' + (ctx.zusammenfassung||'') +
+      '\\n\\nWas schlägst du vor?';
+    input.value = msg;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    input.focus();
+  }}
 }}
 
 function generateDraft(taskId){{
@@ -1914,11 +3164,13 @@ document.addEventListener('keydown',e=>{{
     else if(document.getElementById('geschBewertModal').classList.contains('open')) closeGeschBewertung();
     else if(document.getElementById('editRegelModal').classList.contains('open')) closeEditRegel();
     else if(document.getElementById('korrModal').classList.contains('open')) closeKorrModal();
-    else if(kiraOpen) closeKira();
+    else if(document.getElementById('kiraWorkspace').classList.contains('open')) closeKiraWorkspace();
+    else if(document.getElementById('kiraQuick').classList.contains('open')) closeKiraQuick();
   }}
 }});
-// Restore active tab on load
+// Restore active tab + design on load
 (function(){{
+  restoreDesign();
   const tab = localStorage.getItem('kira_active_tab');
   if(tab && tab !== 'dashboard') showPanel(tab);
   const gt = localStorage.getItem('kira_gesch_tab');
@@ -1926,8 +3178,8 @@ document.addEventListener('keydown',e=>{{
 }})();
 // Kira proaktiv: Insights laden + ggf. Panel öffnen
 setTimeout(()=>kiraProaktivCheck(), 1500);
-// Auto-refresh every 5 min, preserves tab state via localStorage
-setTimeout(()=>location.reload(),300000);
+// Auto-refresh every 5 min (only if no active chat)
+setTimeout(()=>{{ if(!kiraSending) location.reload(); }},300000);
 </script>
 </body>
 </html>"""
@@ -1935,304 +3187,642 @@ setTimeout(()=>location.reload(),300000);
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 CSS = """
-:root{--gold:#bda27c;--gl:#d4b896;--bg:#0b0b0b;--card:#111;--border:rgba(255,255,255,.09);
-      --text:#e8e8e8;--muted:rgba(255,255,255,.48);--kp:#8b6baa;--kl:#b08fd0;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,Arial,sans-serif;font-size:14px;line-height:1.5;overflow-x:hidden;}
-a{color:var(--gold);text-decoration:none;}
+/* ═══ DESIGN SYSTEM ═══ Neutral, CSS-Variable-driven, Light/Dark ready ═══ */
+:root{
+  /* Accent — overridden by user settings */
+  --accent:#4f7df9;--accent-l:#6b94ff;--accent-bg:rgba(79,125,249,.08);--accent-border:rgba(79,125,249,.25);
+  /* Kira accent */
+  --kl:var(--accent-l);--kp:var(--accent);
+  /* Semantic */
+  --danger:#dc4a4a;--success:#3dae6a;--warn:#d4933e;--info:#4f7df9;
+  /* Surfaces — Dark mode default */
+  --bg:#0e0e10;--bg-raised:#161618;--bg-overlay:#1c1c1f;--card:#161618;
+  --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.14);
+  /* Text */
+  --text:#e4e4e7;--text-secondary:rgba(255,255,255,.58);--muted:rgba(255,255,255,.42);
+  /* Sizing */
+  --fs-xs:11px;--fs-sm:12.5px;--fs-base:14px;--fs-md:15px;--fs-lg:17px;--fs-xl:22px;--fs-xxl:28px;
+  --radius:8px;--radius-lg:12px;
+  /* Configurable design tokens */
+  --card-radius:var(--radius-lg);--shadow-strength:0.12;--transition-speed:0.2s;
+  /* Sidebar */
+  --sidebar-w:220px;--sidebar-collapsed-w:56px;
+  /* Compat aliases */
+  --gold:var(--accent);--gl:var(--accent-l);
+}
+/* Light mode */
+[data-theme="light"]{
+  --bg:#f5f5f7;--bg-raised:#fff;--bg-overlay:#f0f0f3;--card:#fff;
+  --border:rgba(0,0,0,.08);--border-strong:rgba(0,0,0,.14);
+  --text:#1a1a1e;--text-secondary:rgba(0,0,0,.58);--muted:rgba(0,0,0,.42);
+  --accent-bg:rgba(79,125,249,.06);--accent-border:rgba(79,125,249,.2);
+}
+/* Density */
+[data-density="compact"]{--fs-base:12px;--fs-md:13px;}
+[data-density="comfortable"]{--fs-base:14px;--fs-md:15px;}
+/* Reduced motion */
+[data-reduce-motion="true"] *{animation:none!important;transition-duration:0s!important;}
+/* High contrast */
+[data-high-contrast="true"]{--text:#fff;--text-secondary:rgba(255,255,255,.75);--muted:rgba(255,255,255,.6);
+  --border:rgba(255,255,255,.18);--border-strong:rgba(255,255,255,.28);}
+[data-theme="light"][data-high-contrast="true"]{--text:#000;--text-secondary:rgba(0,0,0,.75);--muted:rgba(0,0,0,.6);
+  --border:rgba(0,0,0,.18);--border-strong:rgba(0,0,0,.28);}
+/* Shadow modes */
+[data-shadow="none"] .task-card,[data-shadow="none"] .kpi-card,[data-shadow="none"] .dash-kpi,
+[data-shadow="none"] .modal,[data-shadow="none"] .kira-workspace,[data-shadow="none"] .kira-quick{box-shadow:none!important;}
+[data-shadow="strong"] .task-card,[data-shadow="strong"] .kpi-card,[data-shadow="strong"] .dash-kpi{box-shadow:0 2px 12px rgba(0,0,0,.15);}
+/* Font size override */
+[data-fontsize="small"]{font-size:12px;}
+[data-fontsize="large"]{font-size:15px;}
 
-/* Header & Nav */
-.header{background:linear-gradient(180deg,rgba(189,162,124,.13),transparent);border-bottom:1px solid var(--border);
-         padding:13px 22px;display:flex;align-items:center;justify-content:space-between;
-         position:sticky;top:0;z-index:100;backdrop-filter:blur(8px);}
-.header-logo{font-size:17px;font-weight:900;color:var(--gold);}
-.header-logo span{color:var(--text);font-weight:300;}
-.header-meta{color:var(--muted);font-size:12px;text-align:right;}
-.header-meta strong{color:var(--text);display:block;font-size:14px;}
-.nav{display:flex;gap:2px;padding:9px 22px;border-bottom:1px solid var(--border);background:#0d0d0d;}
-.nav-item{padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
-           color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
-.nav-item:hover{color:var(--text);background:rgba(255,255,255,.05);}
-.nav-item.active{color:var(--gold);background:rgba(189,162,124,.11);border-color:rgba(189,162,124,.28);}
-.alarm-dot{display:inline-block;background:#e84545;border-radius:50%;width:7px;height:7px;margin-left:5px;vertical-align:middle;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+  font-size:var(--fs-md);line-height:1.55;overflow-x:hidden;display:flex;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+/* ═══ APP SHELL — Sidebar + Main ═══ */
+.app-shell{display:flex;flex:1;min-height:100vh;}
+
+/* Sidebar — always dark, independent from page theme */
+.sidebar{width:var(--sidebar-w);background:#1C1C1A;border-right:0.5px solid #2C2C2A;
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:90;
+  transition:width .22s cubic-bezier(.4,0,.2,1);overflow:hidden;flex-shrink:0;}
+.sidebar.collapsed{width:var(--sidebar-collapsed-w);}
+.sidebar-brand{padding:16px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid #2C2C2A;min-height:56px;}
+.sidebar-logo{width:28px;height:28px;border-radius:6px;background:var(--accent);color:#fff;display:flex;
+  align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;}
+.sidebar-logo img{width:28px;height:28px;border-radius:6px;object-fit:cover;}
+.sidebar-brand-text{display:flex;flex-direction:column;overflow:hidden;white-space:nowrap;}
+.sidebar-brand-name{font-size:var(--fs-md);font-weight:600;color:#fff;line-height:1.2;}
+.sidebar-brand-sub{font-size:var(--fs-xs);color:#5F5E5A;line-height:1.2;}
+.sidebar.collapsed .sidebar-brand-text{display:none;}
+
+.sidebar-nav{flex:1;overflow-y:auto;padding:10px 8px;}
+.sidebar-group{margin-bottom:4px;}
+.sidebar-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#5F5E5A;
+  padding:10px 8px 4px;user-select:none;}
+.sidebar.collapsed .sidebar-group-label{display:none;}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius);
+  cursor:pointer;color:#B4B2A9;font-size:13px;font-weight:500;
+  transition:all .12s;user-select:none;position:relative;white-space:nowrap;margin-bottom:1px;}
+.sidebar-item:hover{background:#252523;color:#fff;}
+.sidebar-item.active{background:#2C2C2A;color:#fff;border:none;}
+.sidebar-item .si-icon{width:20px;text-align:center;font-size:14px;flex-shrink:0;opacity:.6;}
+.sidebar-item.active .si-icon{opacity:1;}
+.sidebar-item .si-label{overflow:hidden;text-overflow:ellipsis;}
+.sidebar.collapsed .si-label{display:none;}
+.sidebar-item .si-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto;
+  background:rgba(220,74,74,.15);color:#ff7a7a;border:none;}
+.sidebar-item .si-badge.planned{background:#222;color:#666;border:none;font-weight:500;}
+.sidebar.collapsed .si-badge{display:none;}
+.sidebar-item.planned{opacity:.45;}
+.sidebar-item.planned:hover{opacity:.75;}
+
+.sidebar-bottom{border-top:0.5px solid #2C2C2A;padding:8px;}
+.sidebar-toggle{display:flex;align-items:center;justify-content:center;padding:8px;cursor:pointer;
+  color:#5F5E5A;border-radius:var(--radius);transition:all .12s;}
+.sidebar-toggle:hover{background:#252523;color:#B4B2A9;}
+
+/* Main content */
+.main-area{flex:1;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;min-height:100vh;}
+.sidebar.collapsed ~ .main-area,.app-shell.sb-collapsed .main-area{margin-left:var(--sidebar-collapsed-w);}
+
+/* Header / Topbar */
+.header{background:var(--bg-raised);border-bottom:0.5px solid var(--border);
+  padding:0 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:80;min-height:52px;gap:16px;}
+.header-left{display:flex;align-items:center;gap:12px;flex:1;}
+.header-search{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:8px;
+  padding:7px 14px;font-size:13px;color:var(--text-secondary);width:280px;max-width:100%;
+  font-family:inherit;outline:none;transition:border-color .15s;}
+.header-search:focus{border-color:var(--accent);color:var(--text);}
+.header-search::placeholder{color:var(--muted);}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.top-chip{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;
+  padding:5px 12px;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;
+  cursor:pointer;user-select:none;white-space:nowrap;transition:background .12s;}
+.top-chip:hover{background:var(--accent-bg);border-color:var(--accent-border);}
+.top-chip.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11;}
+.top-chip.ok:hover{background:#ddeec8;}
+.chip-dot{width:7px;height:7px;background:#639922;border-radius:50%;flex-shrink:0;}
+.header-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent-bg);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  color:var(--accent);cursor:pointer;flex-shrink:0;border:0.5px solid var(--accent-border);}
+/* legacy compat */
+.header-title{font-size:var(--fs-lg);font-weight:800;color:var(--text);}
+.header-meta{color:var(--muted);font-size:var(--fs-sm);display:flex;align-items:center;gap:12px;}
+.header-meta strong{color:var(--text);font-size:var(--fs-base);}
 
 /* Panels */
-.panel{display:none;padding:18px 22px 80px;max-width:1100px;margin:0 auto;}
+.panel{display:none;padding:20px 24px 80px;max-width:1200px;margin:0 auto;width:100%;}
 .panel.active{display:block;}
+/* Dashboard: full-width, no max-width constraint */
+#panel-dashboard{max-width:none;padding:20px 24px 80px;}
 
-/* Summary / KPI Bar */
+/* Planned module shell */
+.planned-shell{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:340px;text-align:center;padding:60px 30px;}
+.planned-shell-icon{font-size:48px;margin-bottom:16px;opacity:.3;}
+.planned-shell-title{font-size:var(--fs-xl);font-weight:800;color:var(--text);margin-bottom:8px;}
+.planned-shell-desc{font-size:var(--fs-base);color:var(--muted);max-width:420px;line-height:1.7;margin-bottom:16px;}
+.planned-badge{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);font-weight:700;
+  padding:5px 14px;border-radius:20px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+.planned-features{margin-top:24px;text-align:left;max-width:420px;display:flex;flex-direction:column;gap:6px;}
+.planned-feature-item{font-size:var(--fs-base);color:var(--text-secondary);padding:8px 14px;
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);line-height:1.5;}
+
+/* ═══ DASHBOARD — 4 Zones (reference redesign) ═══ */
+
+/* Zone A: Tagesbriefing — horizontal bar */
+.dash-briefing{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
+  padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;flex-shrink:0;}
+.dash-briefing-items{display:flex;align-items:center;gap:18px;flex-wrap:wrap;flex:1;}
+.dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);white-space:nowrap;}
+.dash-b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dash-briefing-refresh{margin-left:auto;background:var(--bg);border:0.5px solid var(--border-strong);
+  border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;
+  flex-shrink:0;transition:background .12s;}
+.dash-briefing-refresh:hover{background:var(--accent-bg);color:var(--accent);}
+
+/* Zone B: KPI Grid */
+.dash-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px;}
+@media(max-width:1100px){.dash-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media(max-width:860px){.dash-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:480px){.dash-kpi-grid{grid-template-columns:1fr 1fr;}}
+.dash-kpi{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
+  padding:16px 18px;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .12s;position:relative;}
+.dash-kpi:hover{border-color:var(--accent);box-shadow:0 2px 12px rgba(0,0,0,.06);transform:translateY(-1px);}
+.dash-kpi-label{font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.3;}
+.dash-kpi-row{display:flex;align-items:baseline;gap:8px;}
+.dash-kpi-val{font-size:26px;font-weight:500;color:var(--text);line-height:1.1;}
+.dash-kpi-change{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;white-space:nowrap;}
+.dash-kpi-change.up{background:#EAF3DE;color:#3B6D11;}
+.dash-kpi-change.warn{background:#FAEEDA;color:#854F0B;}
+.dash-kpi-change.danger{background:#FCEBEB;color:#A32D2D;}
+.dash-kpi-change.info{background:#E6F1FB;color:#185FA5;}
+.dash-kpi-spark{margin-top:10px;height:34px;overflow:hidden;}
+.dash-kpi-spark svg{width:100%;height:34px;}
+/* KPI state variants */
+.dash-kpi.kpi-danger{border-color:rgba(226,75,74,.3);}
+.dash-kpi.kpi-danger .dash-kpi-val{color:#E24B4A;}
+.dash-kpi.kpi-warn{border-color:rgba(239,159,39,.3);}
+.dash-kpi.kpi-warn .dash-kpi-val{color:#EF9F27;}
+.dash-kpi.kpi-accent{border-color:var(--accent-border);background:var(--accent-bg);}
+.dash-kpi.kpi-accent .dash-kpi-val{color:var(--accent);}
+
+/* Zone C: Work Blocks */
+.dash-work-grid{display:grid;grid-template-columns:63fr 37fr;gap:16px;margin-bottom:20px;}
+@media(max-width:900px){.dash-work-grid{grid-template-columns:1fr;}}
+.dash-panel{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;padding:18px 20px;}
+.dash-panel-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.dash-panel-sub{font-size:11px;color:var(--muted);margin-bottom:14px;}
+.dash-right-col{display:flex;flex-direction:column;gap:14px;}
+
+/* Heute priorisiert cards */
+.dash-prio-item{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;
+  background:var(--bg);border:0.5px solid var(--border);border-radius:8px;
+  border-left:3px solid #ccc;margin-bottom:8px;transition:box-shadow .15s;}
+.dash-prio-item:last-child{margin-bottom:0;}
+.dash-prio-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.dash-prio-item.prio-red{border-left-color:#E24B4A;}
+.dash-prio-item.prio-amber{border-left-color:#EF9F27;}
+.dash-prio-item.prio-blue{border-left-color:#378ADD;}
+.dash-prio-item.prio-green{border-left-color:#1D9E75;}
+.dash-prio-item.prio-gray{border-left-color:#B4B2A9;}
+.dash-prio-body{flex:1;min-width:0;}
+.dash-prio-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dash-prio-meta{font-size:11px;color:var(--muted);margin-bottom:5px;}
+.dash-prio-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+.dash-tag{font-size:10px;padding:2px 7px;border-radius:4px;white-space:nowrap;font-weight:500;}
+.dash-tag-red{background:#FCEBEB;color:#A32D2D;}
+.dash-tag-amber{background:#FAEEDA;color:#854F0B;}
+.dash-tag-blue{background:#E6F1FB;color:#185FA5;}
+.dash-tag-gray{background:#F1EFE8;color:#5F5E5A;}
+.dash-tag-green{background:#EAF3DE;color:#3B6D11;}
+.dash-prio-next{font-size:10px;color:var(--muted);margin-left:2px;}
+.dash-prio-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0;align-items:flex-start;padding-top:2px;}
+.dash-btn{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid var(--border-strong);
+  background:var(--bg);color:var(--text-secondary);cursor:pointer;white-space:nowrap;
+  transition:background .12s;font-family:inherit;}
+.dash-btn:hover{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);}
+.dash-btn-kira{background:#EEEDFE;border-color:#CECBF6;color:#534AB7;}
+.dash-btn-kira:hover{background:#DDD9FA;}
+
+/* Termine & Fristen list */
+.dash-term-item{display:flex;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:6px;font-size:12px;color:var(--text);}
+.dash-term-item:nth-child(odd){background:var(--bg);}
+.dash-term-date{font-size:11px;font-weight:600;min-width:48px;flex-shrink:0;}
+.dash-term-date.urgent{color:#E24B4A;}
+.dash-term-date.soon{color:#EF9F27;}
+.dash-term-date.normal{color:var(--muted);}
+.dash-term-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dash-term-badge{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:auto;white-space:nowrap;font-weight:500;}
+
+/* Geschäft aktuell list */
+.dash-biz-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-radius:6px;font-size:12px;color:var(--text);}
+.dash-biz-item:nth-child(odd){background:var(--bg);}
+.dash-biz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dash-biz-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.dash-biz-val{margin-left:auto;font-weight:600;font-size:12px;white-space:nowrap;flex-shrink:0;}
+
+/* Zone D: Signals */
+.dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
+  padding:18px 20px;margin-bottom:20px;}
+.dash-sig-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
+@media(max-width:860px){.dash-sig-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:480px){.dash-sig-grid{grid-template-columns:1fr;}}
+.dash-sig{padding:10px 14px;border-radius:8px;border:0.5px solid;display:flex;align-items:flex-start;
+  gap:8px;font-size:11px;cursor:pointer;transition:opacity .15s;line-height:1.45;}
+.dash-sig:hover{opacity:.8;}
+.dash-sig .sig-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.dash-sig .sig-text{flex:1;}
+.dash-sig .sig-arr{margin-left:auto;font-size:12px;opacity:.5;flex-shrink:0;}
+.dash-sig.s-red{background:#FCEBEB;border-color:#F7C1C1;color:#791F1F;}
+.dash-sig.s-amber{background:#FAEEDA;border-color:#FAC775;color:#633806;}
+.dash-sig.s-blue{background:#E6F1FB;border-color:#B5D4F4;color:#0C447C;}
+.dash-sig.s-coral{background:#FAECE7;border-color:#F5C4B3;color:#712B13;}
+.dash-sig.s-teal{background:#E1F5EE;border-color:#9FE1CB;color:#085041;}
+.dash-sig.s-gray{background:var(--bg);border-color:var(--border);color:var(--text-secondary);}
+
+/* Legacy compat for old cockpit classes (used in Kira briefing inside panel-dashboard) */
+.briefing-icon{width:26px;height:26px;background:var(--accent);color:#fff;border-radius:6px;display:flex;
+  align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;}
+.monitor-dot{width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;}
+
+/* Legacy compat */
 .summary{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
-.sum-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 15px;flex:1;min-width:90px;}
-.sum-num{font-size:22px;font-weight:900;color:var(--gold);}
-.sum-label{font-size:11px;color:var(--muted);margin-top:1px;}
-.sum-alarm{border-color:rgba(232,69,69,.35);background:rgba(232,69,69,.05);}
-.sum-alarm .sum-num{color:#e84545;}
+.sum-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:11px 15px;flex:1;min-width:90px;}
+.sum-num{font-size:var(--fs-xl);font-weight:900;color:var(--accent);}
+.sum-label{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}
+.sum-alarm{border-color:rgba(220,74,74,.35);background:rgba(220,74,74,.04);}
+.sum-alarm .sum-num{color:var(--danger);}
 .clickable-kpi{cursor:pointer;transition:border-color .2s,transform .1s;}
-.clickable-kpi:hover{border-color:rgba(189,162,124,.4);transform:translateY(-1px);}
-
-/* Dashboard Grid */
-.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;}
-@media(max-width:860px){.dash-grid{grid-template-columns:1fr;}}
-.dash-side{display:flex;flex-direction:column;gap:14px;}
-.dash-mini-block{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;}
-.dash-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;flex-wrap:wrap;font-size:12px;}
-.dash-typ{color:var(--gold);font-weight:700;min-width:80px;}
+.clickable-kpi:hover{border-color:var(--accent-border);transform:translateY(-1px);}
+.dash-mini-block{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:13px;}
+.dash-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;font-size:var(--fs-sm);}
+.dash-typ{color:var(--accent);font-weight:700;min-width:80px;}
 .dash-datum{color:var(--muted);min-width:70px;}
 .dash-betrag{color:var(--text);font-weight:600;min-width:80px;text-align:right;}
-.dash-name{color:rgba(255,255,255,.6);flex:1;}
-.dash-summary-num{font-size:26px;font-weight:900;color:var(--gold);margin:8px 0 2px;}
+.dash-name{color:var(--text-secondary);flex:1;}
+.dash-summary-num{font-size:var(--fs-xxl);font-weight:900;color:var(--accent);margin:8px 0 2px;}
 
-/* Sections */
+/* ═══ Kommunikation Filters ═══ */
+.komm-view-tabs{display:flex;gap:2px;margin-bottom:12px;flex-wrap:wrap;}
+.komm-view-tab{padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);font-weight:700;
+  color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
+.komm-view-tab:hover{color:var(--text);background:rgba(128,128,128,.08);}
+.komm-view-tab.active{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-border);}
+.komm-filter-bar{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;
+  padding:10px 14px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);}
+.komm-filter-bar select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;
+  padding:5px 10px;font-size:var(--fs-sm);font-family:inherit;cursor:pointer;}
+.komm-filter-bar select:focus{outline:none;border-color:var(--accent-border);}
+.komm-filter-check{font-size:var(--fs-sm);color:var(--text-secondary);display:flex;align-items:center;gap:4px;cursor:pointer;}
+.komm-filter-check input{accent-color:var(--accent);}
+.komm-filter-count{font-size:var(--fs-sm);color:var(--muted);margin-left:auto;}
+
+/* ═══ Sections ═══ */
 .section{margin-bottom:18px;}
-.section-title{font-size:11px;font-weight:800;color:var(--gold);letter-spacing:.8px;
-                text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:10px;cursor:pointer;user-select:none;}
-.section-title:after{content:' ▾';font-size:10px;}
+.section-title{font-size:var(--fs-xs);font-weight:800;color:var(--accent);letter-spacing:.8px;
+  text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:10px;cursor:pointer;user-select:none;}
+.section-title:after{content:' \\25BE';font-size:10px;}
 .section.collapsed .section-body{display:none;}
-.section.collapsed .section-title:after{content:' ▸';}
-.count-badge{background:rgba(189,162,124,.18);color:var(--gold);font-size:11px;padding:1px 7px;border-radius:10px;font-weight:700;letter-spacing:0;text-transform:none;}
+.section.collapsed .section-title:after{content:' \\25B8';}
+.count-badge{background:var(--accent-bg);color:var(--accent);font-size:var(--fs-xs);padding:1px 7px;
+  border-radius:10px;font-weight:700;letter-spacing:0;text-transform:none;}
 
-/* Task Card */
-.task-card{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;transition:border-color .2s;}
-.task-card:hover{border-color:rgba(189,162,124,.22);}
-.prio-hoch  {border-left:3px solid #e84545;}
-.prio-mittel{border-left:3px solid var(--gold);}
-.prio-niedrig{border-left:3px solid #555;}
+/* ═══ Task Card ═══ */
+.task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--card-radius);
+  padding:12px 14px;margin-bottom:8px;transition:border-color .2s;}
+.task-card:hover{border-color:var(--accent-border);}
+.prio-hoch  {border-left:3px solid var(--danger);}
+.prio-mittel{border-left:3px solid var(--accent);}
+.prio-niedrig{border-left:3px solid rgba(128,128,128,.4);}
 .task-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px;}
 .task-tags{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
-.task-datum{color:var(--muted);font-size:12px;}
-.task-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:5px;}
-.task-summary{font-size:12px;color:rgba(255,255,255,.72);margin-bottom:5px;}
-.task-meta-row{font-size:12px;color:var(--muted);margin-bottom:4px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
-.meta-label{color:rgba(255,255,255,.38);}
-.meta-val{color:rgba(255,255,255,.68);}
-.meta-sep{color:rgba(255,255,255,.2);}
-.muted-email{color:rgba(255,255,255,.4);font-size:11px;}
-.task-naechste{font-size:12px;color:var(--gold);margin-bottom:4px;font-weight:600;}
-.task-grund{font-size:11px;color:var(--muted);margin-bottom:5px;font-style:italic;}
-.task-notiz{font-size:12px;color:var(--muted);margin-bottom:7px;font-style:italic;}
+.task-datum{color:var(--muted);font-size:var(--fs-sm);}
+.task-title{font-size:var(--fs-md);font-weight:700;color:var(--text);margin-bottom:5px;}
+.task-summary{font-size:var(--fs-sm);color:var(--text-secondary);margin-bottom:5px;}
+.task-meta-row{font-size:var(--fs-sm);color:var(--muted);margin-bottom:4px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
+.meta-label{color:var(--muted);}
+.meta-val{color:var(--text-secondary);}
+.meta-sep{color:var(--border-strong);}
+.muted-email{color:var(--muted);font-size:var(--fs-xs);}
+.task-naechste{font-size:var(--fs-sm);color:var(--accent);margin-bottom:4px;font-weight:600;}
+.task-grund{font-size:var(--fs-xs);color:var(--muted);margin-bottom:5px;font-style:italic;}
+.task-notiz{font-size:var(--fs-sm);color:var(--muted);margin-bottom:7px;font-style:italic;}
 .task-actions{display:flex;gap:5px;flex-wrap:wrap;}
 
-/* Tags */
-.tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;}
-.tag-alarm  {background:rgba(232,69,69,.2);color:#e84545;border:1px solid rgba(232,69,69,.38);}
-.tag-anfrage{background:rgba(189,162,124,.2);color:var(--gold);border:1px solid rgba(189,162,124,.35);}
-.tag-antwort{background:rgba(100,160,255,.14);color:#7baff5;border:1px solid rgba(100,160,255,.28);}
-.tag-zahlung{background:rgba(80,200,120,.14);color:#6dc98a;border:1px solid rgba(80,200,120,.28);}
-.tag-rechnung{background:rgba(200,180,80,.14);color:#c8b450;border:1px solid rgba(200,180,80,.28);}
-.tag-shop   {background:rgba(200,130,80,.14);color:#e09060;border:1px solid rgba(200,130,80,.28);}
-.tag-muted  {background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border);}
-.konto-badge{font-size:11px;color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:5px;padding:2px 6px;}
-.badge{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:700;}
-.badge-warn {background:rgba(200,150,50,.2);color:#c89650;border:1px solid rgba(200,150,50,.3);}
-.badge-warn2{background:rgba(230,100,50,.2);color:#e06040;border:1px solid rgba(230,100,50,.3);}
-.badge-alarm{background:rgba(232,69,69,.2);color:#e84545;border:1px solid rgba(232,69,69,.3);}
+/* ═══ Tags ═══ */
+.tag{font-size:var(--fs-xs);font-weight:800;padding:2px 8px;border-radius:20px;}
+.tag-alarm  {background:rgba(220,74,74,.12);color:var(--danger);border:1px solid rgba(220,74,74,.3);}
+.tag-anfrage{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+.tag-antwort{background:rgba(79,125,249,.1);color:#6b94ff;border:1px solid rgba(79,125,249,.25);}
+.tag-zahlung{background:rgba(61,174,106,.1);color:var(--success);border:1px solid rgba(61,174,106,.25);}
+.tag-rechnung{background:rgba(212,147,62,.1);color:var(--warn);border:1px solid rgba(212,147,62,.25);}
+.tag-shop   {background:rgba(200,130,80,.1);color:#d08050;border:1px solid rgba(200,130,80,.2);}
+.tag-muted  {background:rgba(128,128,128,.08);color:var(--muted);border:1px solid var(--border);}
+.konto-badge{font-size:var(--fs-xs);color:var(--muted);background:rgba(128,128,128,.06);border:1px solid var(--border);border-radius:5px;padding:2px 6px;}
+.badge{font-size:var(--fs-xs);padding:2px 7px;border-radius:10px;font-weight:700;}
+.badge-warn {background:rgba(212,147,62,.15);color:var(--warn);border:1px solid rgba(212,147,62,.25);}
+.badge-warn2{background:rgba(220,100,50,.15);color:#d06040;border:1px solid rgba(220,100,50,.25);}
+.badge-alarm{background:rgba(220,74,74,.12);color:var(--danger);border:1px solid rgba(220,74,74,.25);}
 .muted{color:var(--muted);}
 
-/* Buttons */
-.btn{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:none;
-      display:inline-block;transition:all .15s;text-decoration:none;line-height:1.4;}
-.btn-primary{background:var(--gold);color:#000;}
-.btn-primary:hover{background:var(--gl);}
-.btn-kira{background:rgba(139,107,170,.22);color:var(--kl);border:1px solid rgba(139,107,170,.42);}
-.btn-kira:hover{background:rgba(139,107,170,.36);}
-.btn-sec{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border);}
-.btn-sec:hover{background:rgba(255,255,255,.12);}
-.btn-done{background:rgba(80,200,120,.13);color:#6dc98a;border:1px solid rgba(80,200,120,.27);}
-.btn-done:hover{background:rgba(80,200,120,.25);}
-.btn-later{background:rgba(200,150,50,.11);color:#c89650;border:1px solid rgba(200,150,50,.22);}
-.btn-later:hover{background:rgba(200,150,50,.22);}
-.btn-ignore{background:rgba(120,120,120,.11);color:#888;border:1px solid rgba(120,120,120,.22);}
-.btn-ignore:hover{background:rgba(120,120,120,.22);}
-.btn-korr{background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.09);}
-.btn-korr:hover{background:rgba(255,255,255,.09);color:var(--text);}
+/* ═══ Buttons ═══ */
+.btn{padding:6px 12px;border-radius:var(--radius);font-size:var(--fs-sm);font-weight:700;cursor:pointer;
+  border:none;display:inline-block;transition:all .15s;text-decoration:none;line-height:1.4;font-family:inherit;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.88;}
+.btn-kira{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+.btn-kira:hover{background:rgba(79,125,249,.18);}
+.btn-sec{background:rgba(128,128,128,.08);color:var(--text);border:1px solid var(--border);}
+.btn-sec:hover{background:rgba(128,128,128,.14);}
+.btn-done{background:rgba(61,174,106,.1);color:var(--success);border:1px solid rgba(61,174,106,.22);}
+.btn-done:hover{background:rgba(61,174,106,.2);}
+.btn-later{background:rgba(212,147,62,.1);color:var(--warn);border:1px solid rgba(212,147,62,.2);}
+.btn-later:hover{background:rgba(212,147,62,.2);}
+.btn-ignore{background:rgba(128,128,128,.08);color:rgba(128,128,128,.7);border:1px solid rgba(128,128,128,.18);}
+.btn-ignore:hover{background:rgba(128,128,128,.16);}
+.btn-korr{background:rgba(128,128,128,.05);color:var(--muted);border:1px solid var(--border);}
+.btn-korr:hover{background:rgba(128,128,128,.12);color:var(--text);}
+.btn-sm{padding:5px 12px;font-size:var(--fs-sm);}
+.btn-tiny{padding:3px 8px;font-size:var(--fs-xs);}
+.btn-xs{padding:2px 6px;font-size:10px;}
+.btn-green{background:rgba(61,174,106,.1);color:var(--success);border:1px solid rgba(61,174,106,.22);}
+.btn-green:hover{background:rgba(61,174,106,.2);}
+.btn-gold{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+.btn-gold:hover{opacity:.85;}
+.btn-muted{background:rgba(128,128,128,.06);color:var(--muted);border:1px solid var(--border);}
+.btn-muted:hover{background:rgba(128,128,128,.12);color:var(--text);}
+.btn-warn{background:rgba(220,74,74,.06);color:#d06060;border:1px solid rgba(220,74,74,.18);}
+.btn-warn:hover{background:rgba(220,74,74,.14);}
+.badge-korrekt{font-size:10px;font-weight:700;color:var(--success);background:rgba(61,174,106,.1);padding:1px 6px;border-radius:3px;}
+.att-link{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;margin:2px 3px;border-radius:5px;font-size:var(--fs-sm);
+  background:var(--accent-bg);border:1px solid var(--accent-border);color:var(--accent);text-decoration:none;transition:all .15s;}
+.att-link:hover{opacity:.85;}
+.att-icon{font-size:10px;font-weight:800;color:var(--muted);}
 
-/* Organisation */
-.org-row{display:flex;gap:10px;padding:7px 8px;border-radius:7px;margin-bottom:3px;align-items:center;flex-wrap:wrap;background:rgba(189,162,124,.04);}
-.org-typ-badge{font-size:11px;font-weight:700;color:var(--gold);background:rgba(189,162,124,.12);padding:2px 8px;border-radius:4px;min-width:60px;text-align:center;}
-.org-datum{color:var(--muted);font-size:12px;min-width:90px;}
-.org-betreff{flex:1;font-size:13px;}
-.org-email{font-size:12px;min-width:130px;text-align:right;}
-.org-konto{font-size:11px;}
+/* ═══ Organisation ═══ */
+.org-view-tabs{display:flex;gap:2px;margin-bottom:14px;flex-wrap:wrap;}
+.org-view{display:none;}.org-view.active{display:block;}
+.org-row{display:flex;gap:10px;padding:7px 8px;border-radius:var(--radius);margin-bottom:3px;align-items:center;flex-wrap:wrap;background:var(--accent-bg);}
+.org-typ-badge{font-size:var(--fs-xs);font-weight:700;color:var(--accent);background:rgba(128,128,128,.08);padding:2px 8px;border-radius:4px;min-width:60px;text-align:center;}
+.org-datum{color:var(--muted);font-size:var(--fs-sm);min-width:90px;}
+.org-betreff{flex:1;font-size:var(--fs-base);}
+.org-email{font-size:var(--fs-sm);min-width:130px;text-align:right;}
+.org-konto{font-size:var(--fs-xs);}
 
-/* Geschäft */
+/* ═══ Geschaeft ═══ */
 .gesch-tabs,.wissen-tabs{display:flex;gap:2px;margin-bottom:14px;flex-wrap:wrap;}
-.gesch-tab,.wissen-tab{padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;
+.gesch-tab,.wissen-tab{padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);font-weight:700;
   color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
-.gesch-tab:hover,.wissen-tab:hover{color:var(--text);background:rgba(255,255,255,.05);}
-.gesch-tab.active,.wissen-tab.active{color:var(--gold);background:rgba(189,162,124,.11);border-color:rgba(189,162,124,.28);}
+.gesch-tab:hover,.wissen-tab:hover{color:var(--text);background:rgba(128,128,128,.08);}
+.gesch-tab.active,.wissen-tab.active{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-border);}
 .gesch-panel,.wissen-panel{display:none;}
 .gesch-panel.active,.wissen-panel.active{display:block;}
 .gesch-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-.gesch-sum-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
-.gesch-sum-num{font-size:20px;font-weight:900;color:var(--gold);}
-.gesch-sum-label{font-size:11px;color:var(--muted);margin-top:2px;}
-.gesch-table{font-size:12px;}
-.gesch-row{display:flex;gap:6px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;}
-.gesch-header{font-weight:700;color:var(--gold);border-bottom:1px solid var(--border);}
+.gesch-sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;text-align:center;}
+.gesch-sum-num{font-size:var(--fs-xl);font-weight:900;color:var(--accent);}
+.gesch-sum-label{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
+.gesch-table{font-size:var(--fs-sm);}
+.gesch-row{display:flex;gap:6px;padding:6px 4px;border-bottom:1px solid var(--border);align-items:center;}
+.gesch-header{font-weight:700;color:var(--accent);border-bottom:1px solid var(--border-strong);}
 .gc-typ{min-width:100px;}
 .gc-datum{min-width:80px;color:var(--muted);}
 .gc-betrag{min-width:80px;text-align:right;font-weight:600;}
 .gc-nr{min-width:90px;color:var(--muted);}
 .gc-partner{min-width:120px;flex:1;}
-.gc-betreff{flex:2;color:rgba(255,255,255,.6);}
-.gesch-typ-badge{font-size:10px;font-weight:700;color:var(--gold);background:rgba(189,162,124,.1);padding:1px 6px;border-radius:3px;}
-.gesch-sum-alarm{border-color:rgba(232,69,69,.35);background:rgba(232,69,69,.05);}
-.gesch-sum-alarm .gesch-sum-num{color:#e84545;}
-.gesch-aktiv-card{background:var(--card);border:1px solid rgba(232,69,69,.2);border-radius:10px;padding:13px;margin-bottom:10px;}
+.gc-betreff{flex:2;color:var(--text-secondary);}
+.gesch-typ-badge{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:3px;}
+.gesch-sum-alarm{border-color:rgba(220,74,74,.3);background:rgba(220,74,74,.04);}
+.gesch-sum-alarm .gesch-sum-num{color:var(--danger);}
+.gesch-aktiv-card{background:var(--card);border:1px solid rgba(220,74,74,.16);border-radius:var(--radius-lg);padding:13px;margin-bottom:10px;}
 .gesch-aktiv-header{display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
-.gesch-aktiv-betrag{font-size:16px;font-weight:900;color:var(--text);}
-.gesch-aktiv-datum{font-size:12px;color:var(--muted);margin-left:auto;}
+.gesch-aktiv-betrag{font-size:var(--fs-lg);font-weight:900;color:var(--text);}
+.gesch-aktiv-datum{font-size:var(--fs-sm);color:var(--muted);margin-left:auto;}
 .gesch-aktiv-body{margin-bottom:8px;}
-.gesch-aktiv-betreff{font-size:13px;font-weight:600;color:var(--text);}
-.gesch-aktiv-partner{font-size:12px;color:var(--muted);}
+.gesch-aktiv-betreff{font-size:var(--fs-base);font-weight:600;color:var(--text);}
+.gesch-aktiv-partner{font-size:var(--fs-sm);color:var(--muted);}
 .gesch-aktiv-actions{display:flex;gap:6px;flex-wrap:wrap;}
-.gesch-typ-eingang{color:var(--gold);background:rgba(189,162,124,.15);}
-.gesch-typ-mahnung{color:#e84545;background:rgba(232,69,69,.12);}
-.gesch-routine-row{opacity:.7;}
-.gesch-routine-row:hover{opacity:1;}
-.gesch-row-aktiv{border-left:2px solid #e84545;}
+.gesch-typ-eingang{color:var(--accent);background:var(--accent-bg);}
+.gesch-typ-mahnung{color:var(--danger);background:rgba(220,74,74,.08);}
+.gesch-routine-row{opacity:.7;}.gesch-routine-row:hover{opacity:1;}
+.gesch-row-aktiv{border-left:2px solid var(--danger);}
 .gesch-row-routine{opacity:.55;}
 .gc-detail{min-width:100px;flex:1;color:var(--muted);}
 .gc-actions{display:flex;gap:4px;min-width:100px;justify-content:flex-end;}
-.gesch-ar-summary{display:flex;gap:20px;padding:10px 14px;margin-bottom:10px;background:rgba(189,162,124,.06);
-  border:1px solid var(--border);border-radius:8px;font-size:13px;flex-wrap:wrap;}
+.gesch-ar-summary{display:flex;gap:20px;padding:10px 14px;margin-bottom:10px;background:var(--accent-bg);
+  border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-base);flex-wrap:wrap;}
 .gesch-ar-summary span{white-space:nowrap;}
-.btn{border:none;cursor:pointer;border-radius:6px;font-weight:700;font-family:inherit;transition:all .15s;}
-.btn-sm{padding:5px 12px;font-size:12px;}
-.btn-tiny{padding:3px 8px;font-size:11px;}
-.btn-xs{padding:2px 6px;font-size:10px;}
-.btn-green{background:rgba(80,180,80,.15);color:#5cb85c;border:1px solid rgba(80,180,80,.3);}
-.btn-green:hover{background:rgba(80,180,80,.25);}
-.btn-gold{background:rgba(189,162,124,.15);color:var(--gold);border:1px solid rgba(189,162,124,.3);}
-.btn-gold:hover{background:rgba(189,162,124,.25);}
-.btn-muted{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border);}
-.btn-muted:hover{background:rgba(255,255,255,.1);color:var(--text);}
-.btn-warn{background:rgba(232,69,69,.08);color:#e88;border:1px solid rgba(232,69,69,.2);}
-.btn-warn:hover{background:rgba(232,69,69,.18);}
-.badge-korrekt{font-size:10px;font-weight:700;color:#5cb85c;background:rgba(80,180,80,.12);padding:1px 6px;border-radius:3px;}
-.att-link{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;margin:2px 3px;border-radius:5px;font-size:12px;
-  background:rgba(189,162,124,.08);border:1px solid rgba(189,162,124,.2);color:var(--gold);text-decoration:none;transition:all .15s;}
-.att-link:hover{background:rgba(189,162,124,.18);border-color:rgba(189,162,124,.4);}
-.att-icon{font-size:10px;font-weight:800;color:var(--muted);}
-
-/* Geschäft Hero-Volumen */
-.gesch-volumen-hero{background:linear-gradient(135deg,rgba(189,162,124,.08),rgba(189,162,124,.02));border:1px solid rgba(189,162,124,.2);border-radius:12px;padding:18px 24px;margin-bottom:16px;text-align:center;transition:border-color .2s;}
-.gesch-volumen-hero:hover{border-color:rgba(189,162,124,.5);}
-.gesch-volumen-hero.gesch-sum-alarm{border-color:rgba(232,69,69,.3);background:linear-gradient(135deg,rgba(232,69,69,.06),rgba(232,69,69,.02));}
-.gesch-volumen-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
-.gesch-volumen-num{font-size:28px;font-weight:800;color:var(--gold);letter-spacing:-.5px;}
-.gesch-volumen-hero.gesch-sum-alarm .gesch-volumen-num{color:#e84545;}
-.gesch-volumen-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.gesch-volumen-hero{background:linear-gradient(135deg,var(--accent-bg),transparent);border:1px solid var(--accent-border);
+  border-radius:var(--radius-lg);padding:18px 24px;margin-bottom:16px;text-align:center;transition:border-color .2s;}
+.gesch-volumen-hero:hover{border-color:var(--accent);}
+.gesch-volumen-hero.gesch-sum-alarm{border-color:rgba(220,74,74,.3);background:linear-gradient(135deg,rgba(220,74,74,.05),transparent);}
+.gesch-volumen-label{font-size:var(--fs-sm);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.gesch-volumen-num{font-size:28px;font-weight:800;color:var(--accent);letter-spacing:-.5px;}
+.gesch-volumen-hero.gesch-sum-alarm .gesch-volumen-num{color:var(--danger);}
+.gesch-volumen-sub{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;}
 .gesch-sum-card{cursor:pointer;transition:border-color .2s,transform .1s;}
-.gesch-sum-card:hover{border-color:rgba(189,162,124,.4);transform:translateY(-1px);}
-/* Geschäft Filter & Tabellen */
+.gesch-sum-card:hover{border-color:var(--accent-border);transform:translateY(-1px);}
 .gesch-filter-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
-.gesch-filter-bar select{background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;}
-.gesch-filter-bar select:focus{outline:none;border-color:rgba(189,162,124,.4);}
-.gesch-filter-count{font-size:12px;color:var(--muted);margin-left:auto;}
-.gc-status{min-width:80px;}
-.gc-nf{min-width:110px;}
-.gesch-urgent-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;margin-bottom:3px;background:rgba(232,69,69,.04);font-size:13px;flex-wrap:wrap;}
-.gesch-nf-indicator{font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.05);}
-.nf-overdue{color:#e84545;background:rgba(232,69,69,.12);animation:pulse 2s infinite;}
-.nf-planned{color:var(--gold);}
+.gesch-filter-bar select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:var(--fs-sm);font-family:inherit;cursor:pointer;}
+.gesch-filter-bar select:focus{outline:none;border-color:var(--accent-border);}
+.gesch-filter-count{font-size:var(--fs-sm);color:var(--muted);margin-left:auto;}
+.gc-status{min-width:80px;}.gc-nf{min-width:110px;}
+.gesch-urgent-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:var(--radius);margin-bottom:3px;background:rgba(220,74,74,.04);font-size:var(--fs-base);flex-wrap:wrap;}
+.gesch-nf-indicator{font-size:var(--fs-xs);font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(128,128,128,.08);}
+.nf-overdue{color:var(--danger);background:rgba(220,74,74,.1);animation:pulse 2s infinite;}
+.nf-planned{color:var(--accent);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
-/* Einstellungen */
-.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);}
-.settings-row label{font-size:13px;color:var(--text);min-width:200px;}
-.settings-row input[type=text],.settings-row input[type=number]{background:#0b0b0b;color:var(--text);border:1px solid var(--border);
-  border-radius:6px;padding:6px 10px;font-size:13px;width:220px;font-family:inherit;}
-.settings-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);}
+/* ═══ Einstellungen ═══ */
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);}
+.settings-row label{font-size:var(--fs-base);color:var(--text);min-width:200px;}
+.settings-row input[type=text],.settings-row input[type=number]{background:var(--bg);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;font-size:var(--fs-base);width:220px;font-family:inherit;}
+.settings-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);}
+.settings-row input[type=color]{width:40px;height:28px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:transparent;}
+.settings-row select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:var(--fs-base);font-family:inherit;}
 
-/* Wissen */
-.wissen-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
-.wissen-vorschlag{border-color:rgba(139,107,170,.25);}
-.wissen-korr{border-color:rgba(200,150,50,.2);}
-.wissen-titel{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px;}
-.wissen-inhalt{font-size:12px;color:rgba(255,255,255,.72);margin-bottom:6px;line-height:1.6;}
-.wissen-status{font-size:11px;color:var(--muted);}
+/* ═══ Wissen ═══ */
+.wissen-level-tabs{display:flex;gap:4px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.wissen-level-tab{padding:8px 18px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-base);font-weight:800;
+  color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
+.wissen-level-tab:hover{color:var(--text);background:rgba(128,128,128,.08);}
+.wissen-level-tab.active{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-border);}
+.wissen-level{display:none;}.wissen-level.active{display:block;}
+.wissen-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;margin-bottom:8px;}
+.wissen-vorschlag{border-color:var(--accent-border);}
+.wissen-korr{border-color:rgba(212,147,62,.2);}
+.wissen-titel{font-size:var(--fs-base);font-weight:700;color:var(--accent);margin-bottom:4px;}
+.wissen-inhalt{font-size:var(--fs-sm);color:var(--text-secondary);margin-bottom:6px;line-height:1.6;}
+.wissen-status{font-size:var(--fs-xs);color:var(--muted);}
 .wissen-actions{display:flex;gap:6px;}
+.wissen-meta{font-size:var(--fs-xs);color:var(--muted);display:flex;align-items:center;}
 
-/* Toast */
-.status-toast{position:fixed;bottom:82px;right:24px;background:#1a1a1a;border:1px solid rgba(189,162,124,.4);
-               border-radius:10px;padding:10px 18px;color:var(--gold);font-weight:700;font-size:13px;
-               transform:translateY(50px);opacity:0;transition:all .28s;z-index:500;pointer-events:none;}
+/* ═══ Toast ═══ */
+.status-toast{position:fixed;bottom:82px;right:24px;background:var(--bg-raised);border:1px solid var(--accent-border);
+  border-radius:var(--radius-lg);padding:10px 18px;color:var(--accent);font-weight:700;font-size:var(--fs-base);
+  transform:translateY(50px);opacity:0;transition:all .28s;z-index:500;pointer-events:none;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);}
 .status-toast.show{transform:translateY(0);opacity:1;}
 
-/* Kira FAB */
+/* ═══ Kira FAB ═══ */
 .kira-fab{position:fixed;bottom:22px;right:22px;z-index:200;
-           background:linear-gradient(135deg,#5d3f7a,#8b6baa);border-radius:50%;
-           width:52px;height:52px;display:flex;align-items:center;justify-content:center;
-           cursor:pointer;box-shadow:0 4px 18px rgba(139,107,170,.5);font-size:18px;
-           transition:transform .2s,box-shadow .2s;border:none;color:#fff;font-weight:900;}
-.kira-fab:hover{transform:scale(1.09);box-shadow:0 6px 26px rgba(139,107,170,.68);}
+  background:#534AB7;border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.25);
+  transition:transform .2s,box-shadow .2s;border:none;color:#fff;position:fixed;}
+.kira-fab:hover{transform:scale(1.07);box-shadow:0 6px 26px rgba(83,74,183,.45);}
+.kira-fab-k{color:#fff;font-size:16px;font-weight:600;line-height:1;}
+.kira-fab-label{color:#CECBF6;font-size:8px;margin-top:1px;line-height:1;}
+.kira-fab-status{position:absolute;top:1px;right:1px;width:12px;height:12px;
+  background:#1D9E75;border-radius:50%;border:2px solid var(--bg);}
 
-/* Kira Panel */
-.kira-panel{position:fixed;top:0;right:0;height:100vh;width:390px;max-width:96vw;
-             background:#0d0b12;border-left:1px solid rgba(139,107,170,.28);z-index:300;
-             transform:translateX(106%);transition:transform .28s cubic-bezier(.4,0,.2,1);
-             display:flex;flex-direction:column;box-shadow:-6px 0 36px rgba(0,0,0,.6);}
-.kira-panel.open{transform:translateX(0);}
-.kira-ph{padding:14px 16px 11px;border-bottom:1px solid rgba(139,107,170,.18);
-          display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.kira-ph-title{font-size:15px;font-weight:900;color:var(--kl);}
-.kira-ph-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+/* ═══ Kira Quick Panel (Modus B) ═══ */
+.kira-quick{position:fixed;bottom:82px;right:22px;z-index:250;width:320px;
+  background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  box-shadow:0 8px 40px rgba(0,0,0,.35);display:none;flex-direction:column;overflow:hidden;}
+.kira-quick.open{display:flex;}
+.kira-quick-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);}
+.kira-quick-actions{padding:6px 0;}
+.kira-quick-item{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background .12s;font-size:var(--fs-sm);}
+.kira-quick-item:hover{background:var(--accent-bg);}
+.kira-quick-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0;}
+.kira-quick-item strong{font-size:var(--fs-base);color:var(--text);}
+
+/* ═══ Kira Workspace (Modus C) ═══ */
+.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px;}
+.kira-workspace-overlay.open{display:flex;}
+.kira-workspace{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  width:95vw;max-width:1200px;height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 60px rgba(0,0,0,.5);overflow:hidden;}
+.kira-ws-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.kira-ws-body{display:flex;flex:1;overflow:hidden;}
+.kira-ws-sidebar{width:200px;border-right:1px solid var(--border);padding:12px;overflow-y:auto;flex-shrink:0;background:var(--bg);}
+.kira-ws-sidebar-title{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;margin-bottom:4px;}
+.kira-ws-ctx-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;}
+.kira-ws-ctx{padding:7px 10px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);color:var(--text-secondary);transition:all .12s;}
+.kira-ws-ctx:hover{background:var(--accent-bg);color:var(--text);}
+.kira-ws-ctx.active{background:var(--accent-bg);color:var(--accent);font-weight:700;}
+.kira-ws-ctx.planned-ctx{opacity:.4;cursor:default;font-style:italic;}
+.kira-ws-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Legacy compat */
+.kira-ph-title{font-size:15px;font-weight:900;color:var(--accent);}
+.kira-ph-sub{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}
 .kira-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;}
-.kira-close:hover{color:var(--text);background:rgba(255,255,255,.08);}
-.kira-tabs{display:flex;gap:1px;padding:7px 10px;border-bottom:1px solid rgba(139,107,170,.13);flex-shrink:0;}
-.kira-tab{flex:1;text-align:center;padding:5px 3px;font-size:11px;font-weight:700;
-           color:var(--muted);cursor:pointer;border-radius:6px;transition:all .15s;}
-.kira-tab:hover{color:var(--text);background:rgba(255,255,255,.05);}
-.kira-tab.active{color:var(--kl);background:rgba(139,107,170,.15);}
+.kira-close:hover{color:var(--text);background:rgba(128,128,128,.12);}
 .kira-content{flex:1;overflow-y:auto;padding:13px 14px;}
 .kira-sec{margin-bottom:14px;}
-.kira-sec-title{font-size:10px;font-weight:800;color:rgba(176,143,208,.85);letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px;}
-.kira-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 11px;margin-bottom:7px;cursor:default;}
+.kira-sec-title{font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px;opacity:.8;}
+.kira-card{background:rgba(128,128,128,.06);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;margin-bottom:7px;cursor:default;}
 .kira-card.clickable{cursor:pointer;}
-.kira-card.clickable:hover{border-color:rgba(139,107,170,.35);background:rgba(139,107,170,.08);}
+.kira-card.clickable:hover{border-color:var(--accent-border);background:var(--accent-bg);}
 .kira-task-card{cursor:pointer;transition:all .2s;}
-.kira-task-card:hover{border-color:rgba(139,107,170,.4);background:rgba(139,107,170,.1);transform:translateX(-2px);}
-.kira-prio-high{border-left:3px solid #e84545;}
-.kira-prio-med{border-left:3px solid #f0ad4e;}
-.kira-prio-low{border-left:3px solid rgba(189,162,124,.4);}
+.kira-task-card:hover{border-color:var(--accent-border);background:var(--accent-bg);transform:translateX(-2px);}
+.kira-prio-high{border-left:3px solid var(--danger);}
+.kira-prio-med{border-left:3px solid var(--warn);}
+.kira-prio-low{border-left:3px solid rgba(128,128,128,.3);}
 .kira-fab-pulse{animation:kiraPulse 2s ease-in-out infinite;}
-@keyframes kiraPulse{0%,100%{box-shadow:0 3px 15px rgba(93,63,122,.4);}50%{box-shadow:0 3px 25px rgba(232,69,69,.6);}}
-.kira-card-title{font-size:13px;font-weight:700;margin-bottom:3px;}
-.kira-card-meta{font-size:12px;color:var(--muted);}
+@keyframes kiraPulse{0%,100%{box-shadow:0 3px 15px rgba(0,0,0,.3);}50%{box-shadow:0 3px 25px rgba(220,74,74,.5);}}
+.kira-card-title{font-size:var(--fs-base);font-weight:700;margin-bottom:3px;}
+.kira-card-meta{font-size:var(--fs-sm);color:var(--muted);}
+
+/* Kira Chat */
+.kira-content.kira-chat-mode{overflow:hidden;padding:0;}
+.kira-chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;}
+.kira-chat-area{flex:1;overflow-y:auto;padding:13px 14px;}
+.kira-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);
+  background:var(--bg-raised);flex-shrink:0;align-items:flex-end;}
+.kira-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:9px 12px;font-size:var(--fs-base);line-height:1.5;resize:none;
+  font-family:inherit;min-height:38px;max-height:120px;overflow-y:auto;}
+.kira-input:focus{outline:none;border-color:var(--accent-border);}
+.kira-send-btn{background:var(--accent);border:none;border-radius:50%;
+  width:38px;height:38px;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.kira-send-btn:hover{transform:scale(1.06);box-shadow:0 2px 12px rgba(0,0,0,.25);}
+.kira-send-btn:disabled{opacity:.4;cursor:default;transform:none;}
+.kira-msg{padding:9px 12px;border-radius:12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.6;
+  max-width:88%;word-wrap:break-word;animation:kiraFadeIn .25s ease;}
+@keyframes kiraFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.kira-msg-user{background:var(--accent-bg);color:var(--text);margin-left:auto;border-bottom-right-radius:4px;border:1px solid var(--accent-border);}
+.kira-msg-kira{background:rgba(128,128,128,.08);color:var(--text);border-bottom-left-radius:4px;}
+.kira-msg-kira strong{color:var(--accent);}
+.kira-msg-kira code{background:rgba(128,128,128,.12);padding:1px 4px;border-radius:3px;font-size:var(--fs-sm);}
+.kira-msg-error{background:rgba(220,74,74,.08);color:#d06060;border:1px solid rgba(220,74,74,.18);}
+.kira-msg-system{background:var(--accent-bg);color:var(--accent);font-size:var(--fs-sm);text-align:center;max-width:100%;}
+.kira-tools-used{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;}
+.kira-tool-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--accent-bg);
+  color:var(--accent);border:1px solid var(--accent-border);}
+.kira-typing{display:flex;gap:4px;padding:10px 14px;align-items:center;}
+.kira-typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.4;
+  animation:kiraTypingDot 1.4s infinite ease-in-out;}
+.kira-typing span:nth-child(2){animation-delay:.2s;}
+.kira-typing span:nth-child(3){animation-delay:.4s;}
+@keyframes kiraTypingDot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
+.kira-welcome{text-align:center;padding:40px 20px;}
+.kira-welcome-icon{width:56px;height:56px;background:var(--accent);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
+  font-size:22px;font-weight:900;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.kira-welcome-text{color:var(--muted);font-size:var(--fs-base);line-height:1.7;}
+#kc-aufgaben,#kc-muster,#kc-kwissen,#kc-historie{overflow-y:auto;padding:13px 14px;flex:1;}
 
 /* Kommunikationsfenster */
-.komm-block{background:rgba(0,0,0,.22);border:1px solid rgba(139,107,170,.18);border-radius:8px;padding:11px;margin-bottom:9px;}
-.komm-lbl{font-size:10px;font-weight:800;color:rgba(176,143,208,.8);letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px;}
-.komm-txt{font-size:12px;color:rgba(255,255,255,.78);line-height:1.6;}
+.komm-block{background:rgba(128,128,128,.04);border:1px solid var(--border);border-radius:var(--radius);padding:11px;margin-bottom:9px;}
+.komm-lbl{font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px;opacity:.8;}
+.komm-txt{font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.6;}
 .komm-txt ul{padding-left:16px;}
-.komm-input{width:100%;background:#0b0a10;color:var(--text);border:1px solid rgba(139,107,170,.28);
-             border-radius:8px;padding:9px;font-size:13px;line-height:1.6;min-height:72px;
-             resize:vertical;font-family:inherit;}
-.komm-input:focus{outline:none;border-color:rgba(139,107,170,.55);}
-.komm-result{background:#0b0a10;border:1px solid rgba(189,162,124,.22);border-radius:8px;
-              padding:10px;font-size:12px;white-space:pre-wrap;line-height:1.7;
-              max-height:240px;overflow-y:auto;color:rgba(255,255,255,.82);}
+.komm-input{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius);padding:9px;font-size:var(--fs-base);line-height:1.6;min-height:72px;
+  resize:vertical;font-family:inherit;}
+.komm-input:focus{outline:none;border-color:var(--accent-border);}
+.komm-result{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+  padding:10px;font-size:var(--fs-sm);white-space:pre-wrap;line-height:1.7;
+  max-height:240px;overflow-y:auto;color:var(--text-secondary);}
 .komm-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
-.btn-kp{background:rgba(139,107,170,.28);color:var(--kl);border:1px solid rgba(139,107,170,.48);
-         padding:7px 13px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;border-style:solid;}
-.btn-kp:hover{background:rgba(139,107,170,.42);}
-.btn-ks{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid rgba(255,255,255,.1);
-         padding:6px 11px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;}
-.btn-ks:hover{color:var(--text);background:rgba(255,255,255,.1);}
+.btn-kp{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);
+  padding:7px 13px;border-radius:var(--radius);font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:all .15s;border-style:solid;}
+.btn-kp:hover{opacity:.85;}
+.btn-ks{background:rgba(128,128,128,.06);color:var(--muted);border:1px solid var(--border);
+  padding:6px 11px;border-radius:var(--radius);font-size:var(--fs-sm);font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;}
+.btn-ks:hover{color:var(--text);background:rgba(128,128,128,.12);}
 
-/* Korrektur Modal */
-.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.84);z-index:400;align-items:center;justify-content:center;padding:20px;}
+/* ═══ Modals ═══ */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:center;justify-content:center;padding:20px;}
+[data-theme="light"] .modal-ov{background:rgba(0,0,0,.4);}
 .modal-ov.open{display:flex;}
-.modal{background:#161616;border:1px solid rgba(189,162,124,.28);border-radius:13px;padding:20px;width:100%;max-width:460px;}
-.modal h3{color:var(--gold);font-size:14px;margin-bottom:12px;}
-.modal select,.modal textarea,.modal input[type=text]{width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);
-  border-radius:7px;padding:8px;font-size:13px;font-family:inherit;margin-bottom:9px;}
+.modal{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:20px;width:100%;max-width:460px;
+  box-shadow:0 8px 40px rgba(0,0,0,.3);}
+.modal h3{color:var(--accent);font-size:var(--fs-md);margin-bottom:12px;}
+.modal select,.modal textarea,.modal input[type=text]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius);padding:8px;font-size:var(--fs-base);font-family:inherit;margin-bottom:9px;}
 .modal textarea{min-height:70px;resize:vertical;}
 .modal-actions{display:flex;gap:7px;margin-top:4px;}
 
-.empty{color:var(--muted);font-size:13px;padding:7px 0;}
-footer{color:var(--muted);font-size:12px;text-align:center;padding:13px;border-top:1px solid var(--border);}
+.empty{color:var(--muted);font-size:var(--fs-base);padding:7px 0;}
+footer{color:var(--muted);font-size:var(--fs-sm);text-align:center;padding:13px;border-top:1px solid var(--border);}
+
+/* ═══ Responsive ═══ */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);position:fixed;z-index:150;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .main-area{margin-left:0!important;}
+  .header{padding:12px 16px;}
+  .panel{padding:16px 14px 80px;}
+  .mobile-burger{display:flex!important;}
+}
+.mobile-burger{display:none;align-items:center;justify-content:center;width:36px;height:36px;
+  border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;background:transparent;color:var(--text);font-size:18px;}
+.mobile-burger:hover{background:rgba(128,128,128,.08);}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:140;}
+.sidebar-overlay.active{display:block;}
 """
 
 
@@ -2317,6 +3907,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/kira/insights':
             self._api_kira_insights()
+
+        elif self.path == '/api/monitor/status':
+            self._json(get_monitor_status())
+
+        elif self.path == '/api/kira/briefing':
+            try:
+                briefing = generate_daily_briefing()
+                self._json(briefing)
+            except Exception as e:
+                self._json({"error": str(e)})
+
+        elif self.path == '/api/kira/briefing/regenerate':
+            try:
+                import sqlite3 as _sq
+                _db = _sq.connect(str(TASKS_DB))
+                from datetime import date as _d
+                _db.execute("DELETE FROM kira_briefings WHERE datum=?", (_d.today().isoformat(),))
+                _db.commit()
+                _db.close()
+                briefing = generate_daily_briefing()
+                self._json(briefing)
+            except Exception as e:
+                self._json({"error": str(e)})
+
+        elif self.path == '/api/kira/conversations':
+            self._json(kira_get_conversations())
+
+        elif self.path.startswith('/api/kira/conversation?'):
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            sid = params.get('session_id', [''])[0]
+            self._json(kira_get_messages(sid) if sid else [])
 
         else:
             self._respond(404, 'text/plain', b'Not found')
@@ -2620,6 +4242,136 @@ class DashboardHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
         body   = json.loads(self.rfile.read(length) or b'{}')
 
+        # Kira Chat (LLM)
+        if self.path == '/api/kira/chat':
+            nachricht = body.get('nachricht', '').strip()
+            if not nachricht:
+                self._json({'error': 'Keine Nachricht'})
+                return
+            session_id = body.get('session_id')
+            try:
+                result = kira_chat(nachricht, session_id)
+                self._json(result)
+            except Exception as e:
+                self._json({'error': f'Chat-Fehler: {str(e)}'})
+            return
+
+        # Kira API Key speichern (Legacy-Compat + neuer Weg)
+        if self.path == '/api/kira/api-key':
+            key = body.get('api_key', '').strip()
+            pid = body.get('provider_id', '')
+            if not key:
+                self._json({'ok': False, 'error': 'Kein Key angegeben'})
+                return
+            if pid:
+                save_provider_key(pid, key)
+            else:
+                secrets_path = SCRIPTS_DIR / "secrets.json"
+                secrets = {}
+                try: secrets = json.loads(secrets_path.read_text('utf-8'))
+                except: pass
+                secrets['anthropic_api_key'] = key
+                secrets_path.write_text(json.dumps(secrets, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True})
+            return
+
+        # Provider Key speichern
+        if self.path == '/api/kira/provider/save-key':
+            pid = body.get('provider_id', '').strip()
+            key = body.get('api_key', '').strip()
+            if not pid or not key:
+                self._json({'ok': False, 'error': 'Provider-ID und Key erforderlich'})
+                return
+            save_provider_key(pid, key)
+            self._json({'ok': True})
+            return
+
+        # Provider hinzufügen
+        if self.path == '/api/kira/provider/add':
+            typ = body.get('typ', '').strip()
+            name = body.get('name', '').strip()
+            if typ not in PROVIDER_TYPES:
+                self._json({'ok': False, 'error': 'Unbekannter Provider-Typ'})
+                return
+            ptype = PROVIDER_TYPES[typ]
+            if not name:
+                name = ptype["name"]
+            try:
+                c = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+            except: c = {}
+            llm = c.setdefault("llm", {})
+            providers = llm.setdefault("providers", [])
+            max_prio = max((p.get("prioritaet", 0) for p in providers), default=0)
+            pid = f"{typ}-{len(providers)+1}-{int(datetime.now().timestamp())}"
+            new_p = {
+                "id": pid,
+                "typ": typ,
+                "name": name,
+                "model": ptype.get("default_model", ""),
+                "aktiv": True,
+                "prioritaet": max_prio + 1,
+            }
+            if typ == "custom":
+                new_p["base_url"] = ""
+            providers.append(new_p)
+            (SCRIPTS_DIR / "config.json").write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True, 'provider_id': pid})
+            return
+
+        # Provider aktivieren/deaktivieren
+        if self.path == '/api/kira/provider/toggle':
+            pid = body.get('provider_id', '')
+            aktiv = body.get('aktiv', True)
+            try:
+                c = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                for p in c.get("llm", {}).get("providers", []):
+                    if p.get("id") == pid:
+                        p["aktiv"] = bool(aktiv)
+                        break
+                (SCRIPTS_DIR / "config.json").write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Provider Priorität verschieben
+        if self.path == '/api/kira/provider/move':
+            pid = body.get('provider_id', '')
+            direction = body.get('direction', 0)  # -1 = höher, +1 = niedriger
+            try:
+                c = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                providers = c.get("llm", {}).get("providers", [])
+                providers.sort(key=lambda p: p.get("prioritaet", 99))
+                idx = next((i for i, p in enumerate(providers) if p.get("id") == pid), None)
+                if idx is not None:
+                    new_idx = max(0, min(len(providers)-1, idx + direction))
+                    if new_idx != idx:
+                        providers.insert(new_idx, providers.pop(idx))
+                        for i, p in enumerate(providers):
+                            p["prioritaet"] = i + 1
+                        c["llm"]["providers"] = providers
+                        (SCRIPTS_DIR / "config.json").write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Provider löschen
+        if self.path == '/api/kira/provider/delete':
+            pid = body.get('provider_id', '')
+            try:
+                c = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                providers = c.get("llm", {}).get("providers", [])
+                c["llm"]["providers"] = [p for p in providers if p.get("id") != pid]
+                # Re-number priorities
+                for i, p in enumerate(c["llm"]["providers"]):
+                    p["prioritaet"] = i + 1
+                (SCRIPTS_DIR / "config.json").write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Task actions
         m = re.match(r'/api/task/(\d+)/(\w[\w-]*)', self.path)
         if m:
@@ -2654,6 +4406,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             regel_id = int(m2.group(1))
             aktion   = m2.group(2)
             self._handle_wissen_action(regel_id, aktion, body)
+            return
+
+        # Server Shutdown
+        if self.path == '/api/shutdown':
+            self._json({'ok': True})
+            stop_monitor()
+            threading.Timer(0.5, lambda: os._exit(0)).start()
             return
 
         # Geschäft actions
@@ -2812,6 +4571,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 for key in body:
                     if isinstance(body[key], dict) and isinstance(old.get(key), dict):
                         merged[key] = {**old[key], **body[key]}
+                # Provider-Updates aus llm._provider_updates anwenden
+                llm_section = merged.get("llm", {})
+                provider_updates = llm_section.pop("_provider_updates", None)
+                if provider_updates and "providers" in llm_section:
+                    prov_map = {p["id"]: p for p in llm_section["providers"]}
+                    for upd in provider_updates:
+                        pid = upd.get("id", "")
+                        if pid in prov_map:
+                            if upd.get("model"):
+                                prov_map[pid]["model"] = upd["model"]
+                            if upd.get("base_url") is not None:
+                                prov_map[pid]["base_url"] = upd["base_url"]
                 config_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), 'utf-8')
                 self._json({'ok': True})
             except Exception as e:
@@ -2988,16 +4759,26 @@ def run_server(open_browser=True):
     port      = config.get("server", {}).get("port", PORT)
     auto_open = config.get("server", {}).get("auto_open_browser", True)
 
-    httpd = HTTPServer(('127.0.0.1', port), DashboardHandler)
+    httpd = ThreadedHTTPServer(('127.0.0.1', port), DashboardHandler)
     url   = f"http://localhost:{port}"
-    print(f"[Kira Dashboard v3] {url}")
+    print(f"[Kira Dashboard v4] {url}")
 
     if open_browser and auto_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
 
+    # Mail-Monitor starten (Echtzeit-IMAP-Polling)
+    monitor_cfg = config.get("mail_monitor", {})
+    if monitor_cfg.get("aktiv", True):
+        monitor_thread = start_monitor_thread()
+        if monitor_thread:
+            print("[Mail-Monitor] Gestartet (IMAP-Polling)")
+        else:
+            print("[Mail-Monitor] Nicht verfügbar (msal fehlt oder keine Config)")
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
+        stop_monitor()
         print("\nServer gestoppt.")
 
 
