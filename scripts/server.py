@@ -210,40 +210,52 @@ def build_dashboard(tasks, db):
   <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
 </div>'''
 
-    # ── Zone B: KPI-Karten mit Sparklines ──
-    def spark_line(color, pts):
-        return f'<div class="dash-kpi-spark"><svg viewBox="0 0 200 34"><polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.5" opacity="0.5"/></svg></div>'
-    def spark_bars(color, rects):
-        return f'<div class="dash-kpi-spark"><svg viewBox="0 0 200 34">{rects}</svg></div>'
+    # ── Zone B: KPI-Karten ──
+    # Echte Monats-Sparkline für Rechnungsvolumen (letzte 6 Monate)
+    rechnung_spark = ""
+    try:
+        months = db.execute("""
+            SELECT strftime('%Y-%m', datum) as m, SUM(betrag_brutto) as total
+            FROM ausgangsrechnungen WHERE datum >= date('now','-6 months')
+            GROUP BY m ORDER BY m
+        """).fetchall()
+        if months and len(months) >= 2:
+            vals = [r['total'] or 0 for r in months[-6:]]
+            max_v = max(vals) or 1
+            bar_w = 28; gap = 6
+            bars = ""
+            for i, v in enumerate(vals):
+                h = max(3, int(v / max_v * 26))
+                x = 8 + i * (bar_w + gap)
+                op = round(0.25 + 0.55 * v / max_v, 2)
+                bars += f'<rect x="{x}" y="{34-h}" width="{bar_w}" height="{h}" rx="3" fill="#EF9F27" opacity="{op}"/>'
+            rechnung_spark = f'<div class="dash-kpi-spark"><svg viewBox="0 0 220 34">{bars}</svg></div>'
+    except: pass
 
     kpi_html = f"""<div class="dash-kpi-grid" id="kpi-bar">
   <div class="dash-kpi {'kpi-danger' if n_antwort>0 else ''}" onclick="filterKomm('Antwort erforderlich')">
     <div class="dash-kpi-label">Antworten n&ouml;tig</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_antwort}</span>{'<span class="dash-kpi-change danger">dringend</span>' if n_antwort>0 else '<span class="dash-kpi-change info">aktuell</span>'}</div>
-    {spark_line('#E24B4A','0,30 30,26 60,22 90,28 120,18 150,12 170,8 200,14')}
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_antwort}</span>{'<span class="dash-kpi-change danger">dringend</span>' if n_antwort>0 else '<span class="dash-kpi-change info">kein Handlungsbedarf</span>'}</div>
   </div>
   <div class="dash-kpi {'kpi-accent' if n_leads>0 else ''}" onclick="filterKomm('Neue Lead-Anfrage')">
     <div class="dash-kpi-label">Neue Leads</div>
     <div class="dash-kpi-row"><span class="dash-kpi-val">{n_leads}</span><span class="dash-kpi-change info">diese Woche</span></div>
-    {spark_line('#378ADD','0,32 30,28 60,30 90,24 120,20 150,16 170,18 200,10')}
   </div>
   <div class="dash-kpi {'kpi-warn' if s_ar_offen>0 else ''}" onclick="showPanel('geschaeft')">
     <div class="dash-kpi-label">Offenes Rechnungsvolumen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">&euro;&nbsp;{s_ar_offen:,.0f}</span>{'<span class="dash-kpi-change warn">' + str(n_ar_offen) + ' offen</span>' if n_ar_offen>0 else ''}</div>
-    {spark_bars('#EF9F27','<rect x="10" y="20" width="22" height="14" rx="2" fill="#EF9F27" opacity="0.3"/><rect x="42" y="14" width="22" height="20" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="74" y="8" width="22" height="26" rx="2" fill="#EF9F27" opacity="0.5"/><rect x="106" y="12" width="22" height="22" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="138" y="6" width="22" height="28" rx="2" fill="#EF9F27" opacity="0.6"/><rect x="170" y="10" width="22" height="24" rx="2" fill="#EF9F27" opacity="0.5"/>')}
+    <div class="dash-kpi-row"><span class="dash-kpi-val">&euro;&thinsp;{s_ar_offen:,.0f}</span>{'<span class="dash-kpi-change warn">' + str(n_ar_offen) + ' Rg.</span>' if n_ar_offen>0 else ''}</div>
+    {rechnung_spark}
   </div>
   <div class="dash-kpi {'kpi-warn' if n_nachfass>0 else ''}" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)">
     <div class="dash-kpi-label">Nachfass f&auml;llig</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_nachfass}</span>{'<span class="dash-kpi-change warn">!! Angebote</span>' if n_nachfass>0 else ''}</div>
-    {spark_line('#BA7517','0,20 40,24 80,18 120,26 160,14 200,22')}
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_nachfass}</span>{'<span class="dash-kpi-change warn">Angebote</span>' if n_nachfass>0 else ''}</div>
   </div>
   <div class="dash-kpi" onclick="filterKomm('Angebotsrückmeldung')">
-    <div class="dash-kpi-label">Angebotsrückmeldungen</div>
+    <div class="dash-kpi-label">Angebots&shy;rückmeldungen</div>
     <div class="dash-kpi-row"><span class="dash-kpi-val">{n_angebot}</span>{'<span class="dash-kpi-change up">offen</span>' if n_angebot>0 else ''}</div>
-    {spark_line('#639922','0,28 40,24 80,20 120,16 160,18 200,12')}
   </div>
   <div class="dash-kpi {'kpi-danger' if n_org>0 else ''}" onclick="showPanel('organisation')">
-    <div class="dash-kpi-label">Termine / Fristen</div>
+    <div class="dash-kpi-label">Termine &amp; Fristen</div>
     <div class="dash-kpi-row"><span class="dash-kpi-val">{n_org}</span>{'<span class="dash-kpi-change danger">heute</span>' if n_org>0 else ''}</div>
   </div>
   <div class="dash-kpi" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('eingangsre'),100)">
@@ -253,7 +265,6 @@ def build_dashboard(tasks, db):
   <div class="dash-kpi" onclick="showPanel('kommunikation')">
     <div class="dash-kpi-label">Gesamt offen</div>
     <div class="dash-kpi-row"><span class="dash-kpi-val">{n_ges}</span></div>
-    {spark_line('#888780','0,10 40,14 80,18 120,16 160,20 200,22')}
   </div>
 </div>"""
 
@@ -290,9 +301,13 @@ def build_dashboard(tasks, db):
     <div class="dash-prio-meta">{meta}</div>
     <div class="dash-prio-tags">{prio_tag(kat)}{next_hint}</div>
   </div>
-  <div class="dash-prio-actions">
-    <button class="dash-btn" onclick="filterKomm('{esc(kat)}')">&#x2192; &Ouml;ffnen</button>
-    <button class="dash-btn dash-btn-kira" onclick="openKiraWorkspace('aufgabe')">Mit Kira</button>
+  <div class="dash-prio-menu" id="pmenu-{tid}">
+    <button class="dash-prio-dots" onclick="togglePrioMenu(this)" title="Aktionen">&#x22EE;</button>
+    <div class="dash-prio-dropdown">
+      <button class="dash-prio-dd-btn" onclick="filterKomm('{esc(kat)}');document.querySelectorAll('.dash-prio-menu.open').forEach(m=>m.classList.remove('open'))">&#x2192; &Ouml;ffnen</button>
+      <div class="dash-prio-dd-sep"></div>
+      <button class="dash-prio-dd-btn dd-kira" onclick="openKiraWorkspace('aufgabe');document.querySelectorAll('.dash-prio-menu.open').forEach(m=>m.classList.remove('open'))">&#x2728; Mit Kira bearbeiten</button>
+    </div>
   </div>
 </div>'''
 
@@ -2022,6 +2037,19 @@ function showPanel(name) {{
   closeMobileSidebar();
 }}
 
+// Prio-Karte Kebab-Menu
+function togglePrioMenu(btn) {{
+  const menu = btn.closest('.dash-prio-menu');
+  const wasOpen = menu.classList.contains('open');
+  document.querySelectorAll('.dash-prio-menu.open').forEach(m => m.classList.remove('open'));
+  if (!wasOpen) menu.classList.add('open');
+}}
+document.addEventListener('click', function(e) {{
+  if (!e.target.closest('.dash-prio-menu')) {{
+    document.querySelectorAll('.dash-prio-menu.open').forEach(m => m.classList.remove('open'));
+  }}
+}});
+
 function toggleSidebar() {{
   const sb = document.getElementById('sidebar');
   sb.classList.toggle('collapsed');
@@ -3408,8 +3436,9 @@ a:hover{text-decoration:underline;}
 /* ═══ DASHBOARD — 4 Zones (reference redesign) ═══ */
 
 /* Zone A: Tagesbriefing — horizontal bar */
-.dash-briefing{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
-  padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.dash-briefing{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
+  padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);}
 .dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;flex-shrink:0;}
 .dash-briefing-items{display:flex;align-items:center;gap:18px;flex-wrap:wrap;flex:1;}
 .dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);white-space:nowrap;}
@@ -3420,69 +3449,102 @@ a:hover{text-decoration:underline;}
 .dash-briefing-refresh:hover{background:var(--accent-bg);color:var(--accent);}
 
 /* Zone B: KPI Grid */
-.dash-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px;}
+.dash-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px;}
 @media(max-width:1100px){.dash-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
 @media(max-width:860px){.dash-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:480px){.dash-kpi-grid{grid-template-columns:1fr 1fr;}}
-.dash-kpi{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
-  padding:16px 18px;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .12s;position:relative;}
-.dash-kpi:hover{border-color:var(--accent);box-shadow:0 2px 12px rgba(0,0,0,.06);transform:translateY(-1px);}
-.dash-kpi-label{font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.3;}
-.dash-kpi-row{display:flex;align-items:baseline;gap:8px;}
-.dash-kpi-val{font-size:26px;font-weight:500;color:var(--text);line-height:1.1;}
-.dash-kpi-change{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;white-space:nowrap;}
+.dash-kpi{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
+  padding:18px 20px;cursor:pointer;
+  transition:border-color .18s,box-shadow .18s,transform .15s;position:relative;
+  box-shadow:0 1px 4px rgba(0,0,0,.05);}
+.dash-kpi:hover{border-color:var(--accent);
+  box-shadow:0 6px 22px rgba(0,0,0,.1),0 1px 4px rgba(0,0,0,.05);transform:translateY(-2px);}
+.dash-kpi:active{transform:translateY(0);}
+.dash-kpi-label{font-size:10px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;
+  letter-spacing:.6px;text-transform:uppercase;}
+.dash-kpi-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.dash-kpi-val{font-size:30px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.5px;}
+.dash-kpi-change{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;white-space:nowrap;}
 .dash-kpi-change.up{background:#EAF3DE;color:#3B6D11;}
 .dash-kpi-change.warn{background:#FAEEDA;color:#854F0B;}
 .dash-kpi-change.danger{background:#FCEBEB;color:#A32D2D;}
-.dash-kpi-change.info{background:#E6F1FB;color:#185FA5;}
-.dash-kpi-spark{margin-top:10px;height:34px;overflow:hidden;}
+.dash-kpi-change.info{background:#E8F0FE;color:#1a5ca8;}
+.dash-kpi-spark{margin-top:14px;height:34px;overflow:hidden;}
 .dash-kpi-spark svg{width:100%;height:34px;}
 /* KPI state variants */
-.dash-kpi.kpi-danger{border-color:rgba(226,75,74,.3);}
-.dash-kpi.kpi-danger .dash-kpi-val{color:#E24B4A;}
-.dash-kpi.kpi-warn{border-color:rgba(239,159,39,.3);}
-.dash-kpi.kpi-warn .dash-kpi-val{color:#EF9F27;}
+.dash-kpi.kpi-danger{border-color:rgba(226,75,74,.35);background:rgba(226,75,74,.02);}
+.dash-kpi.kpi-danger .dash-kpi-val{color:#D63B3A;}
+.dash-kpi.kpi-warn{border-color:rgba(239,159,39,.35);}
+.dash-kpi.kpi-warn .dash-kpi-val{color:#C17C13;}
 .dash-kpi.kpi-accent{border-color:var(--accent-border);background:var(--accent-bg);}
 .dash-kpi.kpi-accent .dash-kpi-val{color:var(--accent);}
 
 /* Zone C: Work Blocks */
-.dash-work-grid{display:grid;grid-template-columns:63fr 37fr;gap:16px;margin-bottom:20px;}
+.dash-work-grid{display:grid;grid-template-columns:63fr 37fr;gap:18px;margin-bottom:22px;}
 @media(max-width:900px){.dash-work-grid{grid-template-columns:1fr;}}
-.dash-panel{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;padding:18px 20px;}
-.dash-panel-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:3px;}
-.dash-panel-sub{font-size:11px;color:var(--muted);margin-bottom:14px;}
-.dash-right-col{display:flex;flex-direction:column;gap:14px;}
+.dash-panel{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
+  padding:20px 22px;box-shadow:0 1px 5px rgba(0,0,0,.05);}
+.dash-panel-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;letter-spacing:-.1px;}
+.dash-panel-sub{font-size:11px;color:var(--text-secondary);margin-bottom:16px;font-weight:500;}
+.dash-right-col{display:flex;flex-direction:column;gap:16px;}
 
 /* Heute priorisiert cards */
-.dash-prio-item{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;
-  background:var(--bg);border:0.5px solid var(--border);border-radius:8px;
-  border-left:3px solid #ccc;margin-bottom:8px;transition:box-shadow .15s;}
+.dash-prio-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+  background:var(--bg);border:0.5px solid var(--border);border-radius:9px;
+  border-left:3px solid #ccc;margin-bottom:8px;
+  transition:box-shadow .15s,transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .dash-prio-item:last-child{margin-bottom:0;}
-.dash-prio-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.06);}
-.dash-prio-item.prio-red{border-left-color:#E24B4A;}
-.dash-prio-item.prio-amber{border-left-color:#EF9F27;}
-.dash-prio-item.prio-blue{border-left-color:#378ADD;}
+.dash-prio-item:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);transform:translateY(-1px);}
+.dash-prio-item.prio-red{border-left-color:#D63B3A;}
+.dash-prio-item.prio-amber{border-left-color:#C17C13;}
+.dash-prio-item.prio-blue{border-left-color:#2E72C2;}
 .dash-prio-item.prio-green{border-left-color:#1D9E75;}
 .dash-prio-item.prio-gray{border-left-color:#B4B2A9;}
 .dash-prio-body{flex:1;min-width:0;}
-.dash-prio-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;
+.dash-prio-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dash-prio-meta{font-size:11px;color:var(--muted);margin-bottom:5px;}
+.dash-prio-meta{font-size:11px;color:var(--text-secondary);margin-bottom:5px;font-weight:500;}
 .dash-prio-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
-.dash-tag{font-size:10px;padding:2px 7px;border-radius:4px;white-space:nowrap;font-weight:500;}
-.dash-tag-red{background:#FCEBEB;color:#A32D2D;}
-.dash-tag-amber{background:#FAEEDA;color:#854F0B;}
-.dash-tag-blue{background:#E6F1FB;color:#185FA5;}
+.dash-tag{font-size:10px;padding:2px 7px;border-radius:5px;white-space:nowrap;font-weight:600;}
+.dash-tag-red{background:#FCEBEB;color:#8B2020;}
+.dash-tag-amber{background:#FEF3E2;color:#7A4A08;}
+.dash-tag-blue{background:#E8F0FE;color:#1a5ca8;}
 .dash-tag-gray{background:#F1EFE8;color:#5F5E5A;}
-.dash-tag-green{background:#EAF3DE;color:#3B6D11;}
-.dash-prio-next{font-size:10px;color:var(--muted);margin-left:2px;}
-.dash-prio-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0;align-items:flex-start;padding-top:2px;}
-.dash-btn{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid var(--border-strong);
-  background:var(--bg);color:var(--text-secondary);cursor:pointer;white-space:nowrap;
-  transition:background .12s;font-family:inherit;}
-.dash-btn:hover{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);}
-.dash-btn-kira{background:#EEEDFE;border-color:#CECBF6;color:#534AB7;}
-.dash-btn-kira:hover{background:#DDD9FA;}
+.dash-tag-green{background:#EAF3DE;color:#2E6010;}
+.dash-prio-next{font-size:10px;color:var(--text-secondary);margin-left:2px;font-style:italic;}
+/* Kebab/dots context menu */
+.dash-prio-menu{position:relative;flex-shrink:0;margin-left:auto;}
+.dash-prio-dots{background:none;border:1px solid transparent;border-radius:6px;width:30px;height:30px;
+  cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;
+  font-size:18px;line-height:1;letter-spacing:1px;
+  transition:background .12s,color .12s,border-color .12s,transform .22s cubic-bezier(.4,0,.2,1);
+  padding:0;font-family:inherit;}
+.dash-prio-dots:hover,.dash-prio-menu.open .dash-prio-dots{
+  background:var(--bg-raised);color:var(--text);border-color:var(--border);}
+.dash-prio-menu.open .dash-prio-dots{transform:rotate(90deg);}
+.dash-prio-dropdown{position:absolute;right:0;top:calc(100% + 5px);background:var(--bg-raised);
+  border:1px solid var(--border);border-radius:10px;padding:4px;min-width:155px;
+  box-shadow:0 8px 32px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06);z-index:200;
+  opacity:0;transform:translateY(-8px) scale(.96);pointer-events:none;
+  transition:opacity .16s,transform .16s cubic-bezier(.4,0,.2,1);}
+.dash-prio-menu.open .dash-prio-dropdown{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
+.dash-prio-dd-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 12px;
+  background:none;border:none;border-radius:7px;font-size:12px;font-weight:500;color:var(--text);
+  cursor:pointer;font-family:inherit;transition:background .1s,color .1s;white-space:nowrap;}
+.dash-prio-dd-btn:hover{background:var(--accent-bg);color:var(--accent);}
+.dash-prio-dd-btn.dd-kira{color:#534AB7;}
+.dash-prio-dd-btn.dd-kira:hover{background:#EEEDFE;color:#534AB7;}
+.dash-prio-dd-sep{height:1px;background:var(--border);margin:3px 4px;}
+/* Standalone buttons (used elsewhere on dashboard) */
+.dash-btn{font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);
+  background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s,box-shadow .12s,transform .12s;
+  font-family:inherit;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.dash-btn:hover{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);
+  box-shadow:0 3px 10px rgba(79,125,249,.18);transform:translateY(-1px);}
+.dash-btn:active{transform:translateY(0);box-shadow:none;}
+.dash-btn-kira{background:#EEEDFE;border-color:#CECBF6;color:#534AB7;box-shadow:0 1px 3px rgba(83,74,183,.1);}
+.dash-btn-kira:hover{background:#DDD9FA;box-shadow:0 3px 10px rgba(83,74,183,.25);transform:translateY(-1px);}
 
 /* Termine & Fristen list */
 .dash-term-item{display:flex;align-items:center;gap:10px;padding:8px 10px;
@@ -3504,22 +3566,23 @@ a:hover{text-decoration:underline;}
 .dash-biz-val{margin-left:auto;font-weight:600;font-size:12px;white-space:nowrap;flex-shrink:0;}
 
 /* Zone D: Signals */
-.dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;
-  padding:18px 20px;margin-bottom:20px;}
-.dash-sig-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
+.dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
+  padding:20px 22px;margin-bottom:22px;box-shadow:0 1px 5px rgba(0,0,0,.05);}
+.dash-sig-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px;}
 @media(max-width:860px){.dash-sig-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:480px){.dash-sig-grid{grid-template-columns:1fr;}}
-.dash-sig{padding:10px 14px;border-radius:8px;border:0.5px solid;display:flex;align-items:flex-start;
-  gap:8px;font-size:11px;cursor:pointer;transition:opacity .15s;line-height:1.45;}
-.dash-sig:hover{opacity:.8;}
+.dash-sig{padding:11px 14px;border-radius:9px;border:1px solid;display:flex;align-items:flex-start;
+  gap:8px;font-size:11px;font-weight:500;cursor:pointer;
+  transition:box-shadow .15s,transform .15s;line-height:1.5;}
+.dash-sig:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.1);}
 .dash-sig .sig-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;}
 .dash-sig .sig-text{flex:1;}
-.dash-sig .sig-arr{margin-left:auto;font-size:12px;opacity:.5;flex-shrink:0;}
-.dash-sig.s-red{background:#FCEBEB;border-color:#F7C1C1;color:#791F1F;}
-.dash-sig.s-amber{background:#FAEEDA;border-color:#FAC775;color:#633806;}
-.dash-sig.s-blue{background:#E6F1FB;border-color:#B5D4F4;color:#0C447C;}
-.dash-sig.s-coral{background:#FAECE7;border-color:#F5C4B3;color:#712B13;}
-.dash-sig.s-teal{background:#E1F5EE;border-color:#9FE1CB;color:#085041;}
+.dash-sig .sig-arr{margin-left:auto;font-size:13px;opacity:.6;flex-shrink:0;font-weight:600;}
+.dash-sig.s-red{background:#FEF2F2;border-color:#FCA5A5;color:#7C1E1E;}
+.dash-sig.s-amber{background:#FFFBEB;border-color:#FCD34D;color:#7A4A08;}
+.dash-sig.s-blue{background:#EFF6FF;border-color:#93C5FD;color:#1a4a8a;}
+.dash-sig.s-coral{background:#FFF5F2;border-color:#FCA497;color:#712B13;}
+.dash-sig.s-teal{background:#F0FDF9;border-color:#6EE7C0;color:#0D5B46;}
 .dash-sig.s-gray{background:var(--bg);border-color:var(--border);color:var(--text-secondary);}
 
 /* Legacy compat for old cockpit classes (used in Kira briefing inside panel-dashboard) */
