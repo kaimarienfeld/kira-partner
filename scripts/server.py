@@ -1625,7 +1625,7 @@ def generate_html() -> str:
       <span class="sidebar-brand-sub" id="brandSub">Assistenz</span>
     </div>
     <button class="sb-toggle-btn" id="sbToggleBtn" onclick="toggleSidebar()" title="Sidebar ein-/ausklappen">
-      <span id="sidebarToggleIcon">&#x276E;</span>
+      <svg id="sidebarToggleIcon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><line x1="5.5" y1="1.5" x2="5.5" y2="14.5" stroke="currentColor" stroke-width="1.5"/></svg>
     </button>
   </div>
   <div class="sb-resize-handle" id="sidebarResizeHandle"></div>
@@ -2024,10 +2024,8 @@ function showPanel(name) {{
 
 function toggleSidebar() {{
   const sb = document.getElementById('sidebar');
-  const icon = document.getElementById('sidebarToggleIcon');
   sb.classList.toggle('collapsed');
   const collapsed = sb.classList.contains('collapsed');
-  icon.innerHTML = collapsed ? '&#x276F;' : '&#x276E;';
   localStorage.setItem('kira_sidebar_collapsed', collapsed ? '1' : '0');
   document.getElementById('appShell').classList.toggle('sb-collapsed', collapsed);
 }}
@@ -2189,8 +2187,6 @@ function restoreDesign() {{
     const sb=document.getElementById('sidebar');
     sb.classList.add('collapsed');
     document.getElementById('appShell').classList.add('sb-collapsed');
-    const icon=document.getElementById('sidebarToggleIcon');
-    if(icon) icon.innerHTML='&#x276F;';
   }}
 }}
 
@@ -3312,6 +3308,9 @@ a:hover{text-decoration:underline;}
   justify-content:center;flex-shrink:0;transition:background .12s,color .12s;margin-left:auto;}
 .sb-toggle-btn:hover{background:rgba(0,0,0,.07);color:#1C1C1A;}
 .sidebar.collapsed .sb-toggle-btn{margin-left:0;}
+.sidebar.collapsed .sidebar-brand{justify-content:center;padding:13px 0;}
+.sidebar.collapsed .sidebar-logo{display:none;}
+.sidebar.collapsed .sb-toggle-btn svg{transform:scaleX(-1);}
 
 /* Drag-resize handle — right edge of sidebar */
 .sb-resize-handle{position:absolute;top:0;right:0;width:5px;height:100%;cursor:col-resize;z-index:10;
