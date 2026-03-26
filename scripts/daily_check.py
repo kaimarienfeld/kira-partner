@@ -21,8 +21,8 @@ COWORK_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 from task_manager import get_due_reminders, increment_reminder, load_config
-from mail_classifier import classify_mail, extract_email, is_system_sender, kategorie_to_task_typ
-from response_gen import generate_draft
+from llm_classifier import classify_mail, extract_email, is_system_sender, kategorie_to_task_typ
+from llm_response_gen import generate_draft
 
 ARCHIV_ROOT = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 MAILBOXEN = ["anfrage_raumkult_eu","info_raumkult_eu","invoice_sichtbeton-cire_de",
@@ -171,8 +171,9 @@ def process_new_mails(new_mails, stats):
         dom = k_email.split('@')[-1] if '@' in k_email else ''
         if dom in EIGENE_DOMAINS: continue
 
-        # Klassifizieren mit mail_classifier
-        cl = classify_mail(konto, absnd, betr, text, folder=folder, is_sent=is_sent)
+        # Klassifizieren — Datum übergeben für zeitlichen Angebote-Abgleich
+        cl = classify_mail(konto, absnd, betr, text, folder=folder,
+                           is_sent=is_sent, mail_datum=datum, kanal="email")
         kat = cl["kategorie"]
 
         # Ignorieren / Newsletter / Zur Kenntnis -> kein Task

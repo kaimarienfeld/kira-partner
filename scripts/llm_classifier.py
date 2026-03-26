@@ -53,9 +53,11 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
     angebote_block = ""
     if angebote_kontext:
         angebote_block = f"""
-⚠️  OFFENE ANGEBOTE ZUM ABSENDER (sehr wichtig für Klassifizierung):
+⚠️  OFFENE ANGEBOTE ZUM ABSENDER (alle älter als diese Mail):
 {angebote_kontext}
-→ Wenn die Mail sich auf ein obiges Angebot bezieht: Kategorie = "Angebotsrueckmeldung"
+→ PFLICHT: Lies den Mailtext sorgfältig — nur wenn der INHALT auf ein Angebot, Auftrag,
+  Preis, Projekt oder eine Zusammenarbeit Bezug nimmt: Kategorie = "Angebotsrueckmeldung".
+  Reine Danke-Mails oder unrelated Themen → andere passende Kategorie wählen.
 """
 
     corrections_block = ""
@@ -137,10 +139,11 @@ def _parse_llm_response(text):
     return data
 
 
-def _get_angebote_kontext(absender: str, text: str) -> str:
+def _get_angebote_kontext(absender: str, text: str, mail_datum: str = "") -> str:
     """
     Prüft ob offene Angebote zum Absender existieren.
     Drei Ebenen: direkte E-Mail → Firmen-Domain → Kundenname im Text.
+    Filtert Angebote die NACH dem Maildatum erstellt wurden (zeitliche Kausalität).
     """
     try:
         email = extract_email(absender).lower()
@@ -149,15 +152,33 @@ def _get_angebote_kontext(absender: str, text: str) -> str:
         db.row_factory = sqlite3.Row
         treffer = []
 
+        # Datum-Guard: nur Angebote die VOR oder AM TAG der Mail erstellt wurden
+        # Wenn kein Datum: kein Filter (sicher fallback)
+        datum_filter = ""
+        datum_param  = []
+        if mail_datum:
+            datum_kurz = str(mail_datum)[:10]
+            datum_filter = " AND (erstellt IS NULL OR erstellt <= ?)"
+            datum_param  = [datum_kurz]
+
         # 1. Direkte E-Mail-Übereinstimmung
         rows = db.execute(
             "SELECT angebots_nr, kunde, status, erstellt, betrag FROM angebote "
-            "WHERE status='offen' AND LOWER(kunde_email)=?", (email,)
+            f"WHERE status='offen' AND LOWER(kunde_email)=?{datum_filter}",
+            [email] + datum_param
         ).fetchall()
         for r in rows:
+            tage = ""
+            if r['erstellt'] and mail_datum:
+                try:
+                    from datetime import datetime as _dt
+                    diff = (_dt.strptime(str(mail_datum)[:10], "%Y-%m-%d")
+                            - _dt.strptime(str(r['erstellt'])[:10], "%Y-%m-%d")).days
+                    tage = f", {diff} Tage vor Mail"
+                except: pass
             treffer.append(
                 f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                f"(Datum: {(r['erstellt'] or '')[:10]}, Betrag: {r['betrag']}€) "
+                f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}{tage}, Betrag: {r['betrag']}€) "
                 f"→ DIREKTE E-MAIL-ÜBEREINSTIMMUNG"
             )
 
@@ -165,19 +186,22 @@ def _get_angebote_kontext(absender: str, text: str) -> str:
         if not treffer and domain and domain not in _GENERIC_DOMAINS:
             rows2 = db.execute(
                 "SELECT angebots_nr, kunde, status, erstellt FROM angebote "
-                "WHERE status='offen' AND LOWER(kunde_email) LIKE ?", (f"%@{domain}",)
+                f"WHERE status='offen' AND LOWER(kunde_email) LIKE ?{datum_filter}",
+                [f"%@{domain}"] + datum_param
             ).fetchall()
             for r in rows2:
                 treffer.append(
                     f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                    f"(Datum: {(r['erstellt'] or '')[:10]}) "
-                    f"→ GLEICHE FIRMEN-DOMAIN wie Absender"
+                    f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}) "
+                    f"→ GLEICHE FIRMEN-DOMAIN, anderer Account"
                 )
 
         # 3. Kundenname im Mailtext (Firmenname aus Angeboten in Text suchen)
         if not treffer:
             kandidaten = db.execute(
-                "SELECT angebots_nr, kunde, erstellt FROM angebote WHERE status='offen' AND kunde IS NOT NULL"
+                "SELECT angebots_nr, kunde, erstellt FROM angebote "
+                f"WHERE status='offen' AND kunde IS NOT NULL{datum_filter}",
+                datum_param
             ).fetchall()
             text_lower = (text or "")[:3000].lower()
             for r in kandidaten:
@@ -185,7 +209,7 @@ def _get_angebote_kontext(absender: str, text: str) -> str:
                 if len(name) >= 5 and name.lower() in text_lower:
                     treffer.append(
                         f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                        f"(Datum: {(r['erstellt'] or '')[:10]}) "
+                        f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}) "
                         f"→ KUNDENNAME IM MAILTEXT gefunden"
                     )
 
@@ -230,7 +254,12 @@ def _get_correction_beispiele(limit: int = 12) -> str:
 
 def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                       anhaenge: list = None, folder: str = "",
-                      is_sent: bool = False) -> dict:
+                      is_sent: bool = False, mail_datum: str = "",
+                      kanal: str = "email") -> dict:
+    """
+    kanal: "email" | "whatsapp" | "instagram" | "sms" | ...
+    Alle Kanäle durchlaufen dieselbe LLM-Pipeline.
+    """
     """
     LLM-gestützte Mail-Klassifizierung mit Fast-Path und Fallback.
     Gleiche Signatur und Return-Format wie mail_classifier.classify_mail().
@@ -262,7 +291,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             raise RuntimeError("Kein Provider konfiguriert")
 
         # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen als Lernbeispiele
-        angebote_kontext     = _get_angebote_kontext(absender, text)
+        angebote_kontext     = _get_angebote_kontext(absender, text, mail_datum=mail_datum)
         correction_beispiele = _get_correction_beispiele()
 
         prompt = _build_classification_prompt(
@@ -315,6 +344,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
 # Re-Export für Kompatibilität
 def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   anhaenge: list = None, folder: str = "",
-                  is_sent: bool = False) -> dict:
-    """Alias — kann direkt als Drop-in-Replacement importiert werden."""
-    return classify_mail_llm(konto, absender, betreff, text, anhaenge, folder, is_sent)
+                  is_sent: bool = False, mail_datum: str = "",
+                  kanal: str = "email") -> dict:
+    """Alias — Drop-in-Replacement, bereit für Multi-Kanal (kanal='whatsapp' etc.)."""
+    return classify_mail_llm(konto, absender, betreff, text, anhaenge, folder,
+                             is_sent, mail_datum=mail_datum, kanal=kanal)
