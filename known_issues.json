@@ -1,0 +1,88 @@
+{
+  "_updated": "2026-03-27",
+  "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
+  "issues": [
+    {
+      "id": "ISS-001",
+      "status": "open",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "kira-workspace",
+      "title": "Kira Workspace UI nicht getestet nach Rebuild",
+      "description": "session-g hat gesamte Kira-UI (kq-*/kw-*) neu aufgebaut. Server-Start und visuelles Testing stehen aus.",
+      "discovered": "2026-03-27",
+      "session": "session-g",
+      "workaround": null,
+      "to_verify": [
+        "kiraQuick öffnet/schließt korrekt",
+        "kiraWorkspace 3-Spalten-Layout korrekt",
+        "sendKiraMsg() - kiraSendBtn disabled funktioniert",
+        "showKTab() mit data-tab Attribut",
+        "loadKiraHistSidebar() lädt Konversationen",
+        "kiraSetQuickActions() 7 Typen",
+        "setKiraContextBar() zeigt kw-cbar"
+      ]
+    },
+    {
+      "id": "ISS-002",
+      "status": "open",
+      "priority": "medium",
+      "module": "scripts/runtime_log.py",
+      "area": "runtime-log",
+      "title": "runtime_log.py nicht getestet",
+      "description": "Modul neu erstellt in session-h, kein Test durchgeführt. DB-Erstellung und elog()-Aufrufe ungetestet.",
+      "discovered": "2026-03-27",
+      "session": "session-h",
+      "workaround": null,
+      "to_verify": [
+        "runtime_events.db wird beim Server-Start erstellt",
+        "elog() schreibt korrekt in events-Tabelle",
+        "event_payloads werden gespeichert wenn vollkontext_speichern=True",
+        "GET /api/runtime/events gibt Daten zurück",
+        "POST /api/runtime/event empfängt JS-Events",
+        "Einstellungen-Section lädt und speichert runtime_log Config",
+        "_rtlog() in Browser-Konsole keine Fehler"
+      ]
+    },
+    {
+      "id": "ISS-003",
+      "status": "open",
+      "priority": "low",
+      "module": "scripts/server.py",
+      "area": "python",
+      "title": "SyntaxWarnings in server.py (pre-existing)",
+      "description": "3 SyntaxWarnings für ungültige Escape-Sequences in Regex-Patterns (Zeilen 4789-4791). Pre-existing, nicht durch session-g/h eingeführt.",
+      "discovered": "2026-03-27",
+      "session": "session-h",
+      "lines": [4789, 4790, 4791],
+      "workaround": "Raw-Strings (r'...') verwenden wenn die Zeilen angefasst werden",
+      "to_verify": []
+    },
+    {
+      "id": "ISS-004",
+      "status": "open",
+      "priority": "high",
+      "module": "scripts/mail_monitor.py",
+      "area": "runtime-log",
+      "title": "mail_monitor.py hat keine runtime_log Integration",
+      "description": "Mail-Klassifizierungen und Task-Erstellungen durch den Mail-Monitor werden nicht im Runtime-Log erfasst. Geplant aber noch nicht implementiert.",
+      "discovered": "2026-03-27",
+      "session": "session-h",
+      "workaround": "activity_log wird weiterhin genutzt",
+      "to_verify": []
+    },
+    {
+      "id": "ISS-005",
+      "status": "open",
+      "priority": "medium",
+      "module": "scripts/daily_check.py",
+      "area": "runtime-log",
+      "title": "daily_check.py hat keine runtime_log Integration",
+      "description": "Täglicher Check-Job loggt nicht ins Runtime-Log.",
+      "discovered": "2026-03-27",
+      "session": "session-h",
+      "workaround": "activity_log wird weiterhin genutzt",
+      "to_verify": []
+    }
+  ]
+}
