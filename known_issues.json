@@ -3,6 +3,20 @@
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
+      "id": "ISS-009",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/runtime_log.py",
+      "area": "runtime-log",
+      "title": "WAL-Wachstum durch redundante _ensure_db()-Commits → Chrome/PC-Crash",
+      "description": "_ensure_db() wurde bei jedem elog()/eget()/estats()-Aufruf ausgeführt und rief db.commit() auf — auch ohne Schema-Änderung. Jede DB-Operation erzeugte einen WAL-Frame. Die WAL wuchs auf 4,8 MB. Beim nächsten Server-Start blockierte der Checkpoint → Seite lud nicht → Chrome + PC hingen/crashten.",
+      "discovered": "2026-03-27",
+      "fixed": "2026-03-27",
+      "session": "session-l",
+      "fix_summary": "_db_initialized-Flag verhindert wiederholte CREATE + commit. PRAGMA wal_autocheckpoint=100 (checkpoint alle ~400 KB statt 4 MB). WAL: 4,8 MB → 0 bytes nach page load.",
+      "workaround": null
+    },
+    {
       "id": "ISS-001",
       "status": "verified",
       "priority": "medium",
