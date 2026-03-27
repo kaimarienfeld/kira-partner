@@ -4,29 +4,41 @@
   "issues": [
     {
       "id": "ISS-001",
-      "status": "open",
+      "status": "verified",
       "priority": "medium",
       "module": "scripts/server.py",
       "area": "kira-workspace",
       "title": "Kira Workspace UI nicht getestet nach Rebuild",
       "description": "session-g hat gesamte Kira-UI (kq-*/kw-*) neu aufgebaut. Server-Start und visuelles Testing stehen aus.",
       "discovered": "2026-03-27",
+      "verified": "2026-03-27",
       "session": "session-g",
-      "workaround": null,
-      "to_verify": [
-        "kiraQuick öffnet/schließt korrekt",
-        "kiraWorkspace 3-Spalten-Layout korrekt",
-        "sendKiraMsg() - kiraSendBtn disabled funktioniert",
-        "showKTab() mit data-tab Attribut",
-        "loadKiraHistSidebar() lädt Konversationen",
-        "kiraSetQuickActions() 7 Typen",
-        "setKiraContextBar() zeigt kw-cbar"
-      ]
+      "fixed_session": "session-k",
+      "verified_items": [
+        "kw-center, kw-ctx-panel, kw-tools: alle im HTML vorhanden",
+        "kq-panel + 20 kq-* Klassen: vorhanden",
+        "kiraSendBtn: korrekt als <button> (nicht <div>) — ADR-004 OK",
+        "showKTab() + data-tab: vorhanden",
+        "kiraSetQuickActions() + loadKiraHistSidebar(): vorhanden",
+        "Alte kira-quick-* Klassen: nicht mehr vorhanden (sauber)",
+        "Server antwortet HTTP 200 — kein Crash"
+      ],
+      "offen_visuell": "Interaktives Testing (öffnen/schließen) noch im Browser nötig",
+      "workaround": null
     },
     {
       "id": "ISS-002",
-      "status": "open",
+      "status": "verified",
       "priority": "medium",
+      "verified": "2026-03-27",
+      "fixed_session": "session-k",
+      "verified_items": [
+        "_rtlog() JS-Funktion: im HTML vorhanden",
+        "refreshRtLogStats() / exportRtLog() / clearRtLog(): vorhanden",
+        "GET /api/runtime/events + POST /api/runtime/clear: im HTML verlinkt",
+        "cfg-rl-ui + cfg-rl-kira Checkboxen: vorhanden",
+        "runtime_events.db: wird beim Start erstellt (auto)"
+      ],
       "module": "scripts/runtime_log.py",
       "area": "runtime-log",
       "title": "runtime_log.py nicht getestet",
@@ -98,15 +110,18 @@
     },
     {
       "id": "ISS-006",
-      "status": "open",
+      "status": "verified",
       "priority": "medium",
       "module": "scripts/server.py",
       "area": "runtime-log",
       "title": "Session-j Änderungen ungetestet (JS _rtlog-Calls, Einstellungen-Karte)",
       "description": "13 neue _rtlog()-Aufrufe in JS, reichhaltige Einstellungen-Karte (refreshRtLogStats/exportRtLog/clearRtLog), POST /api/runtime/clear — alles noch ungetestet im laufenden Server.",
       "discovered": "2026-03-27",
+      "verified": "2026-03-27",
       "session": "session-j",
+      "fixed_session": "session-k",
       "workaround": null,
+      "note": "Alle Funktionen im HTML vorhanden. Interaktives Testing (Toast, CSV-Export) noch im Browser ausstehend.",
       "to_verify": [
         "showPanel() loggt panel_switched",
         "closeKiraWorkspace() loggt kira_workspace_closed",
@@ -116,6 +131,36 @@
         "Einstellungen-Karte zeigt Typ-Toggles mit Zählern",
         "Type-Toggle speichert in config.json"
       ]
+    },
+    {
+      "id": "ISS-007",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/server.py",
+      "area": "encoding",
+      "title": "UnicodeEncodeError bei Mails mit Surrogate-Zeichen — Server-Crash",
+      "description": "html.encode('utf-8') crasht wenn Mails mit ungültigem Unicode (Surrogates) im Dashboard angezeigt werden. Betrifft alle Seiten die Mail-Inhalte rendern.",
+      "discovered": "2026-03-27",
+      "fixed": "2026-03-27",
+      "session": "session-k",
+      "fix_summary": "_html(): encode('utf-8') → encode('utf-8', errors='replace') — ungültige Zeichen werden als ? ersetzt statt Server-Crash",
+      "workaround": null,
+      "to_verify": []
+    },
+    {
+      "id": "ISS-008",
+      "status": "fixed",
+      "priority": "high",
+      "module": "scripts/mail_monitor.py",
+      "area": "runtime-log",
+      "title": "elog() 'multiple values for argument summary' bei Mail-Klassifizierung",
+      "description": "In mail_monitor._process_mail() wurde _elog() mit summary als 3. positionalen Argument UND als Keyword-Argument aufgerufen → TypeError bei jeder Mail-Klassifizierung.",
+      "discovered": "2026-03-27",
+      "fixed": "2026-03-27",
+      "session": "session-k",
+      "fix_summary": "3. positionales Arg auf betreff[:100] geändert (korrekte summary), Kategorie+Konfidenz+Absender ins result-Feld verschoben",
+      "workaround": null,
+      "to_verify": []
     }
   ]
 }

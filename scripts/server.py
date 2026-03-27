@@ -7186,7 +7186,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             db.close()
 
     def _html(self, html: str):
-        b = html.encode('utf-8')
+        b = html.encode('utf-8', errors='replace')
         self._respond(200, 'text/html; charset=utf-8', b)
 
     def _json(self, data):

@@ -365,11 +365,11 @@ def _process_mail(mail_data, konto_label, folder_name):
           f"{absender[:60]} | {betreff[:80]} | Konfidenz: {konfidenz}",
           "warnung" if konfidenz == "niedrig" else "ok",
           dauer_ms=kat_ms)
-    _elog('kira', 'mail_classified', f"{kategorie} | {konfidenz} | {absender[:60]}",
+    _elog('kira', 'mail_classified', f"{betreff[:100]}",
           source='mail_monitor', modul='mail_monitor', submodul='klassifizierung',
           actor_type='system', status='warnung' if konfidenz=='niedrig' else 'ok',
           duration_ms=kat_ms, context_type='mail', context_id=msg_id,
-          summary=f"{betreff[:100]}")
+          result=f"{kategorie} | {konfidenz} | {absender[:60]}")
 
     # Nur handlungsrelevante Kategorien als Task anlegen
     skip_kategorien = ["Ignorieren", "Newsletter / Werbung", "Abgeschlossen"]
