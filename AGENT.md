@@ -17,17 +17,19 @@
 
 ### Session-Ende / Nach jeder Änderung
 1. **Git Commit** erstellen (immer nach jeder abgeschlossenen Änderung)
+   → **pre-commit Hook läuft automatisch** und schreibt atomare Mikro-Einträge in change_log.jsonl
+   → Kein manuelles Schreiben nötig — Hook übernimmt das
 2. `session_handoff.json` aktualisieren (was wurde getan, nächster Schritt)
 3. `feature_registry.json` aktualisieren (Status geänderter Features)
 4. `known_issues.json` aktualisieren (neue Issues rein, behobene auf "fixed")
-5. **`change_log.jsonl` ergänzen** — für JEDE geänderte Datei einen Eintrag schreiben (Mikro-Log!)
-6. `MEMORY.md` prüfen und bei Bedarf ergänzen
-7. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
-8. `server_map.md` aktualisieren wenn neue Funktionen in server.py hinzukamen
+5. `MEMORY.md` prüfen und bei Bedarf ergänzen
+6. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
+7. `server_map.md` aktualisieren wenn neue Funktionen in server.py hinzukamen
 
-> **change_log.jsonl Schema:**
-> `{"timestamp":"YYYY-MM-DDTHH:MM:SS","session_id":"session-YYYY-MM-DD-X","feature_id":"kebab-id","modul":"modul","action":"ACTION_TYP","files":["pfad/datei"],"summary":"kurze Zusammenfassung","details":"Details was genau geändert wurde","status_before":"vorher","status_after":"nachher"}`
-> Action-Typen: bugfix, feature_added, function_added, function_changed, css_block_added, css_block_removed, html_block_changed, api_endpoint_added, logging_call_added, module_added, import_added, file_updated, config_changed, python_module_created
+> **Atomares Mikro-Logging (automatisch via pre-commit Hook):**
+> `scripts/diff_to_changelog.py --staged` — ein Eintrag pro CSS-Property, Funktion, HTML-Attribut, Farbe, Schriftart
+> Manuell ausführen: `python scripts/diff_to_changelog.py --since HEAD~1 --dry-run`
+> Bei Bedarf nachträglich: `python scripts/diff_to_changelog.py --since COMMIT_HASH`
 
 ---
 
