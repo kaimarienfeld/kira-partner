@@ -925,7 +925,7 @@ def build_geschaeft(db):
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
     <div id="gesch-angebote" class="gesch-panel">{_build_ang_table(ang, today)}</div>
     <div id="gesch-eingangsre" class="gesch-panel">{_gesch_aktiv_cards(eingang)}</div>
-    <div id="gesch-zahlungen" class="gesch-panel">{_build_ar_table(ar_bezahlt) if ar_bezahlt else "<p class='empty'>Keine bezahlten Rechnungen.</p>"}</div>
+    <div id="gesch-zahlungen" class="gesch-panel">{_build_ar_table(ar_bezahlt, scope="az") if ar_bezahlt else "<p class='empty'>Keine bezahlten Rechnungen.</p>"}</div>
     <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>
     <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
     <div id="gesch-kalkulation" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4D0;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalkulation</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Projekt- und Leistungskalkulation mit Materialkosten, Arbeitszeit und Gewinnmarge.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
@@ -1129,8 +1129,8 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
     return html
 
 
-def _build_ar_table(rows):
-    """Ausgangsrechnungen-Tab mit Filter, Detail-Infos und Tabelle."""
+def _build_ar_table(rows, scope="ar"):
+    """Ausgangsrechnungen-Tab mit Filter, Detail-Infos und Tabelle. scope: 'ar' oder 'az'."""
     if not rows:
         return "<p class='empty'>Keine Ausgangsrechnungen vorhanden.</p>"
     years = sorted(set(r.get("datum", "")[:4] for r in rows if r.get("datum")), reverse=True)
@@ -1145,14 +1145,14 @@ def _build_ar_table(rows):
       <span style="color:#50c878">Bezahlt: <strong>{bezahlt:,.2f} &euro;</strong></span>
     </div>
     <div class="gesch-filter-bar">
-      <select id="ar-filter-year" onchange="filterAR()"><option value="">Alle Jahre</option>{y_opts}</select>
-      <select id="ar-filter-status" onchange="filterAR()">
+      <select id="{scope}-filter-year" onchange="filterAR('{scope}')"><option value="">Alle Jahre</option>{y_opts}</select>
+      <select id="{scope}-filter-status" onchange="filterAR('{scope}')">
         <option value="">Alle Status</option><option value="offen">Offen</option>
         <option value="bezahlt">Bezahlt</option><option value="streitfall">Streitfall</option>
       </select>
-      <span id="ar-count" class="gesch-filter-count">{len(rows)} Rechnungen</span>
+      <span id="{scope}-count" class="gesch-filter-count">{len(rows)} Rechnungen</span>
     </div>
-    <div class="gesch-table" id="ar-table">
+    <div class="gesch-table" id="{scope}-table">
       <div class="gesch-row gesch-header">
         <span class="gc-nr">RE-Nr</span><span class="gc-datum">Datum</span>
         <span class="gc-partner">Kunde</span><span class="gc-betrag">Betrag</span>
@@ -1201,7 +1201,7 @@ def _build_ar_table(rows):
             acts = f'<button class="btn btn-xs btn-green" onclick="arSetStatus({rid},\'bezahlt\')">Doch bezahlt</button>'
         else:
             acts = '<span style="color:rgba(80,200,120,.6);font-size:11px">&#10003; bezahlt</span>'
-        html += f"""<div class="gesch-row ar-row" id="ar-{rid}" data-year="{yr}" data-status="{status}">
+        html += f"""<div class="gesch-row {scope}-row" id="{scope}-{rid}" data-year="{yr}" data-status="{status}">
           <span class="gc-nr">{re_nr}{m_badge}</span><span class="gc-datum">{format_datum(datum)}</span>
           <span class="gc-partner">{kunde}</span><span class="gc-betrag">{betrag}</span>
           <span class="gc-detail" style="font-size:11px">{detail_html}</span>
@@ -1986,13 +1986,15 @@ def build_wissen(db):
         ("fest",     "Gesch&auml;ftsregeln"),
     ]
 
-    def _wissen_card(r, editable=True):
+    def _wissen_card(r, editable=True, with_id=True):
         rid = r['id']
+        id_attr = f' id="wr-{rid}"' if with_id else ""
+        wi_id_attr = f' id="wi-{rid}"' if with_id else ""
         edit_btn = f"""<button class="btn btn-korr" style="margin-left:8px;font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(r.get('kategorie',''))}')">Bearbeiten</button>""" if editable else ""
         del_btn = f"""<button class="btn btn-ignore" style="margin-left:4px;font-size:11px;padding:2px 8px;" onclick="wissenAction({rid},'loeschen')">Entfernen</button>""" if editable else ""
-        return f"""<div class="wissen-card" id="wr-{rid}">
+        return f"""<div class="wissen-card"{id_attr}>
           <div class="wissen-titel">{esc(r['titel'])}</div>
-          <div class="wissen-inhalt" id="wi-{rid}">{esc(r['inhalt'])}</div>
+          <div class="wissen-inhalt"{wi_id_attr}>{esc(r['inhalt'])}</div>
           <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{edit_btn}{del_btn}</div>
         </div>"""
 
@@ -2027,15 +2029,15 @@ def build_wissen(db):
         items = grouped.get(kat_key, [])
         if not items: continue
         active = " active" if first else ""
-        biblio_tabs += f'<div class="wissen-tab{active}" onclick="showWissenTab(\'{kat_key}\')">{kat_label} ({len(items)})</div>'
-        cards = "".join(_wissen_card(r) for r in items)
-        biblio_panels += f'<div id="wissen-{kat_key}" class="wissen-panel{active}">{cards}</div>'
+        biblio_tabs += f'<div class="wissen-tab{active}" onclick="showWissenTab(\'{kat_key}\',\'wbp\')">{kat_label} ({len(items)})</div>'
+        cards = "".join(_wissen_card(r, with_id=False) for r in items)
+        biblio_panels += f'<div id="wbp-{kat_key}" class="wissen-panel{active}">{cards}</div>'
         first = False
     # FAQ und Projektwissen als geplant
-    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'faq\')" style="opacity:.55">FAQ <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
-    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'projektwissen\')" style="opacity:.55">Projektwissen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
-    biblio_panels += '<div id="wissen-faq" class="wissen-panel"><p class="empty">FAQ-Eintr&auml;ge werden hier angezeigt, sobald sie erstellt werden.</p></div>'
-    biblio_panels += '<div id="wissen-projektwissen" class="wissen-panel"><p class="empty">Projektwissen wird hier gesammelt &ndash; aus abgeschlossenen Auftr&auml;gen und Erkenntnissen.</p></div>'
+    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'faq\',\'wbp\')" style="opacity:.55">FAQ <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
+    biblio_tabs += '<div class="wissen-tab" onclick="showWissenTab(\'projektwissen\',\'wbp\')" style="opacity:.55">Projektwissen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>'
+    biblio_panels += '<div id="wbp-faq" class="wissen-panel"><p class="empty">FAQ-Eintr&auml;ge werden hier angezeigt, sobald sie erstellt werden.</p></div>'
+    biblio_panels += '<div id="wbp-projektwissen" class="wissen-panel"><p class="empty">Projektwissen wird hier gesammelt &ndash; aus abgeschlossenen Auftr&auml;gen und Erkenntnissen.</p></div>'
     if not biblio_tabs:
         biblio_tabs = ""
         biblio_panels = "<p class='empty'>Noch keine Bibliotheks-Eintr&auml;ge.</p>"
@@ -2076,7 +2078,7 @@ def build_wissen(db):
                 </div>"""
             regel_panels += f'<div id="wissen-korrekturen" class="wissen-panel{active}">{cards or "<p class=\'empty\'>Noch keine Korrekturen.</p>"}</div>'
         elif kat_key == "freigaben":
-            cards = "".join(_wissen_card(r, editable=False) for r in items) if items else "<p class='empty'>Noch keine freigegebenen Regeln.</p>"
+            cards = "".join(_wissen_card(r, editable=False, with_id=False) for r in items) if items else "<p class='empty'>Noch keine freigegebenen Regeln.</p>"
             regel_panels += f'<div id="wissen-freigaben" class="wissen-panel{active}">{cards}</div>'
         elif kat_key in ("gelernt", "vorschlag"):
             cards = "".join(_wissen_card_review(r, kat_key) for r in items) if items else "<p class='empty'>Keine Eintr&auml;ge.</p>"
@@ -3487,17 +3489,18 @@ function submitGeschBewertung() {{
   }}).catch(()=>showToast('Fehler'));
 }}
 
-// Ausgangsrechnungen filtern
-function filterAR() {{
-  const year = document.getElementById('ar-filter-year').value;
-  const status = document.getElementById('ar-filter-status').value;
+// Ausgangsrechnungen filtern (scope: 'ar' für alle, 'az' für Zahlungen)
+function filterAR(scope) {{
+  const s = scope || 'ar';
+  const year = document.getElementById(s+'-filter-year').value;
+  const status = document.getElementById(s+'-filter-status').value;
   let count = 0;
-  document.querySelectorAll('.ar-row').forEach(row => {{
+  document.querySelectorAll('.'+s+'-row').forEach(row => {{
     const show = (!year || row.dataset.year === year) && (!status || row.dataset.status === status);
     row.style.display = show ? '' : 'none';
     if (show) count++;
   }});
-  document.getElementById('ar-count').textContent = count + ' Rechnungen';
+  document.getElementById(s+'-count').textContent = count + ' Rechnungen';
 }}
 
 // Angebote filtern
@@ -3793,8 +3796,8 @@ function exportRtLog() {{
     const rows = d.entries||[];
     if(!rows.length){{showToast('Keine Einträge'); return;}}
     const cols = ['ts','event_type','action','summary','modul','status','provider','model','token_in','token_out','duration_ms'];
-    let csv = cols.join(';')+'\n';
-    rows.forEach(r=>{{csv+=cols.map(c=>(String(r[c]||'')).replace(/;/g,',')).join(';')+'\n';}});
+    let csv = cols.join(';')+'\\n';
+    rows.forEach(r=>{{csv+=cols.map(c=>(String(r[c]||'')).replace(/;/g,',')).join(';')+'\\n';}});
     const a=document.createElement('a');
     a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
     a.download='runtime_log_'+new Date().toISOString().slice(0,10)+'.csv';
@@ -3997,12 +4000,12 @@ function showWissenLevel(el, level) {{
   document.getElementById('wissen-level-'+level)?.classList.add('active');
 }}
 
-// Wissen sub-tabs
-function showWissenTab(name) {{
+// Wissen sub-tabs (ns: 'wbp' für Bibliothek-Panels, 'wissen' für Regelsteuerung)
+function showWissenTab(name, ns) {{
   document.querySelectorAll('.wissen-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.wissen-panel').forEach(p=>p.classList.remove('active'));
   event.target.classList.add('active');
-  document.getElementById('wissen-'+name)?.classList.add('active');
+  document.getElementById((ns||'wissen')+'-'+name)?.classList.add('active');
 }}
 
 // Wissen actions
@@ -5841,7 +5844,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args): pass
 
     def do_GET(self):
-        if self.path in ('/', '/dashboard', '/index.html'):
+        if self.path == '/favicon.ico':
+            # Minimal valid 1x1 32bpp transparent ICO (70 bytes)
+            ico = bytes.fromhex(
+                '000001000100'          # ICONDIR: reserved=0, type=1, count=1
+                '01010000010020003000000016000000'  # ICONDIRENTRY: 1x1, 0c, 1p, 32bpp, size=48, off=22
+                # BITMAPINFOHEADER (40 bytes):
+                '28000000'              # biSize=40
+                '01000000'              # biWidth=1
+                '02000000'              # biHeight=2 (ICO doubles height)
+                '0100'                  # biPlanes=1
+                '2000'                  # biBitCount=32
+                '00000000'              # biCompression=BI_RGB
+                '00000000'              # biSizeImage=0
+                '00000000'              # biXPelsPerMeter=0
+                '00000000'              # biYPelsPerMeter=0
+                '00000000'              # biClrUsed=0
+                '00000000'              # biClrImportant=0
+                '00000000'              # XOR pixel: BGRA fully transparent
+                '00000000'              # AND mask: DWORD-padded
+            )
+            self._respond(200, 'image/x-icon', ico)
+
+        elif self.path in ('/', '/dashboard', '/index.html'):
             html = generate_html()
             self._html(html)
 
