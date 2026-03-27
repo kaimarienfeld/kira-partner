@@ -3916,7 +3916,7 @@ function clCloseLog() {{
 // \u00C4nderungsverlauf als JSONL herunterladen
 function exportChangeLog() {{
   fetch('/api/changelog?limit=9999').then(r=>r.json()).then(d=>{{
-    const lines = (d.entries||[]).slice().reverse().map(e=>JSON.stringify(e)).join('\n');
+    const lines = (d.entries||[]).slice().reverse().map(e=>JSON.stringify(e)).join('\\n');
     const blob  = new Blob([lines], {{type:'application/x-ndjson'}});
     const url   = URL.createObjectURL(blob);
     const a     = document.createElement('a');
