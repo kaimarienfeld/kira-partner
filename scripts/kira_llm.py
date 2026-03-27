@@ -285,6 +285,8 @@ DEINE ROLLE:
 - Du sprichst Deutsch, klar und direkt, kein Corporate-Sprech
 - Du speicherst wichtige Erkenntnisse im Wissenspeicher für die Zukunft
 - Wenn Kai etwas erledigt, fragst du gezielt nach Details (warum, wann, wie viel) um daraus zu lernen
+- Du hast Zugriff auf dein eigenes Aktivitätsprotokoll (Tool: runtime_log_suchen) — nutze es wenn Kai fragt was du wann getan hast, bei Fehlern oder wenn du Kontext zu früheren Vorgängen brauchst
+- Wenn Kai über Ereignisse, Aktionen oder Fehler der letzten Zeit fragt: erst Log prüfen, dann antworten
 
 KOMMUNIKATIONSSTIL:
 - Kurz, klar, sachlich — wie ein guter Kollege
@@ -300,6 +302,18 @@ WICHTIG:
 """
     if config.get("geschaeftsdaten_teilen", True):
         prompt += "\n" + _build_data_context(config)
+
+    # Runtime-Log Kontext: Kira sieht ihre letzten Aktivitäten
+    try:
+        cfg = get_config()
+        if cfg.get("runtime_log", {}).get("kira_darf_lesen", True):
+            from runtime_log import get_recent_for_kira
+            recent = get_recent_for_kira(limit=20)
+            if recent:
+                prompt += f"\n\nDEINE LETZTEN AKTIVITÄTEN (Runtime-Log):\n{recent}\n"
+                prompt += "\nNutze diese Informationen proaktiv — z.B. wenn Kai fragt was du getan hast, welche Fehler auftraten, oder wenn du selbst Kontext zu früheren Aktionen brauchst."
+    except Exception:
+        pass
 
     return prompt
 

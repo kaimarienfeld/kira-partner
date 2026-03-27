@@ -13,6 +13,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 
+try:
+    from runtime_log import elog as _elog
+except Exception:
+    def _elog(*a, **k): return ""
+
 SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 COWORK_DIR    = SCRIPTS_DIR.parent / "cowork"
@@ -32,7 +37,15 @@ KONTO_LABEL = {
     "invoice@sichtbeton-cire.de":"invoice","shop@sichtbeton-cire.de":"shop",
     "kaimrf@rauMKultSichtbeton.onmicrosoft.com":"intern",
 }
-EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com"}
+EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com",
+                  "invoicefetcher.email"}  # DATEV-Weiterleitung
+
+# Generische Domains — kein cross-domain-Match sinnvoll
+_GENERIC_SENT_DOMAINS = {
+    "gmail.com","web.de","gmx.de","gmx.net","yahoo.com","yahoo.de",
+    "outlook.com","hotmail.com","t-online.de","freenet.de","icloud.com",
+    "live.com","posteo.de","protonmail.com","mailbox.org","aol.com",
+}
 
 TASKS_DB  = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB = KNOWLEDGE_DIR / "kunden.db"
@@ -65,6 +78,23 @@ def load_status():
 
 def save_status(data):
     STATUS_FILE.write_text(json.dumps(data,ensure_ascii=False,indent=2),'utf-8')
+
+
+def resolve_alias(email: str) -> str:
+    """Löst E-Mail-Alias auf die Haupt-E-Mail auf (aus kunden_aliases in tasks.db)."""
+    if not email:
+        return email
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        row = db.execute(
+            "SELECT haupt_email FROM kunden_aliases WHERE LOWER(alias_email)=?",
+            (email.lower(),)
+        ).fetchone()
+        db.close()
+        if row:
+            return row[0]
+    except: pass
+    return email
 
 
 def get_kunden_email(absender, an, folder):
@@ -112,6 +142,223 @@ def scan_new_mails(since_dt):
     return sorted(new_mails, key=lambda x: x['datum'])
 
 
+# ── Angebot-Status Auto-Update ───────────────────────────────────────────────
+def _try_update_angebot_from_mail(k_email: str, text: str, tasks_db):
+    """
+    Wenn eine Angebotsrückmeldung eingeht, versucht diese Funktion via LLM
+    zu erkennen ob das Angebot angenommen, abgelehnt oder als Rückfrage einzustufen ist.
+    Aktualisiert kunden.db angebote-Tabelle entsprechend.
+    """
+    try:
+        kdb = sqlite3.connect(str(TASKS_DB))
+        kdb.row_factory = sqlite3.Row
+        angebote = kdb.execute(
+            "SELECT id, a_nummer, status FROM angebote WHERE LOWER(kunde_email)=? AND status='offen' ORDER BY erstellt_am DESC LIMIT 1",
+            (k_email.lower(),)
+        ).fetchall()
+        if not angebote:
+            kdb.close()
+            return
+
+        angebot = dict(angebote[0])
+        angebots_nr = angebot.get("a_nummer","")
+        ang_id      = angebot.get("id")
+
+        # LLM fragen: Annahme, Absage oder Rückfrage?
+        try:
+            from kira_llm import chat as kira_chat
+            result = kira_chat(
+                user_message=(
+                    f"[SYSTEM: Angebot-Analyse — antworte NUR mit einem Wort]\n"
+                    f"Hat diese Mail das Angebot angenommen, abgelehnt, oder ist es eine Rückfrage?\n"
+                    f"Antworte NUR: akzeptiert | abgelehnt | rueckfrage | unklar\n\n"
+                    f"Mailtext:\n{text[:1500]}"
+                ),
+                session_id=None
+            )
+            antwort = (result.get("antwort","") or "").strip().lower()
+
+            if "akzeptiert" in antwort or "angenommen" in antwort:
+                kdb.execute("UPDATE angebote SET status='angenommen', grund_angenommen=? WHERE id=?",
+                            ("Auto-erkannt aus Mail", ang_id))
+                kdb.commit()
+                print(f"  Angebot {angebots_nr}: automatisch als 'angenommen' markiert")
+            elif "abgelehnt" in antwort or "absage" in antwort:
+                kdb.execute("UPDATE angebote SET status='abgelehnt', grund_abgelehnt=? WHERE id=?",
+                            ("Auto-erkannt aus Mail", ang_id))
+                kdb.commit()
+                print(f"  Angebot {angebots_nr}: automatisch als 'abgelehnt' markiert")
+            elif "rueckfrage" in antwort or "rückfrage" in antwort:
+                # Keine Status-Änderung, aber Notiz im Task
+                pass
+            # Bei "unklar": keine Änderung
+        except Exception:
+            pass
+        kdb.close()
+    except Exception:
+        pass
+
+
+# ── DATEV-Duplikat-Erkennung ───────────────────────────────────────────────────
+
+def _decode_mime(s: str) -> str:
+    """Dekodiert MIME encoded-word Header (=?charset?encoding?text?=)."""
+    if not s or '=?' not in s:
+        return s or ''
+    try:
+        import email.header as _eh
+        parts = _eh.decode_header(s)
+        out = []
+        for chunk, enc in parts:
+            if isinstance(chunk, bytes):
+                out.append(chunk.decode(enc or 'utf-8', errors='replace'))
+            else:
+                out.append(str(chunk))
+        return ' '.join(out)
+    except Exception:
+        return s
+
+
+def _norm(s: str) -> str:
+    """Normalisiert Text: MIME-dekodiert, lowercase, Whitespace normalisiert."""
+    return re.sub(r'\s+', ' ', _decode_mime(s or '')).strip().lower()
+
+
+def _text_similarity(a: str, b: str) -> float:
+    """Jaccard-Wortüberlappung 0.0–1.0."""
+    if not a or not b:
+        return 0.0
+    wa = set(re.sub(r'[^\w]', ' ', a.lower()).split())
+    wb = set(re.sub(r'[^\w]', ' ', b.lower()).split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / max(len(wa), len(wb))
+
+
+def _get_attachment_names(folder_path: str) -> set:
+    """Dateinamen (lowercase) im Anhangordner."""
+    if not folder_path:
+        return set()
+    try:
+        p = Path(folder_path)
+        if p.is_dir():
+            return {f.name.lower() for f in p.iterdir() if f.is_file()}
+    except Exception:
+        pass
+    return set()
+
+
+def _log_loeschhistorie(tasks_db, task_id, konto, absender, betreff,
+                         datum_mail, anhaenge_info, grund,
+                         referenz_task_id, referenz_konto):
+    """Schreibt Lösch- oder Behalte-Entscheidungen in loeschhistorie."""
+    try:
+        tasks_db.execute("""INSERT INTO loeschhistorie
+            (geloescht_am, task_id, konto, absender, betreff, datum_mail,
+             anhaenge_info, grund, referenz_task_id, referenz_konto)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+             task_id, konto, absender, betreff, datum_mail,
+             anhaenge_info, grund, referenz_task_id, referenz_konto))
+    except Exception:
+        pass
+
+
+_NO_DUP = {'is_duplicate': False, 'action': 'keep', 'grund': '', 'ref_id': None, 'ref_konto': ''}
+
+
+def _check_datev_duplicate(betr, text, anhaenge_pfad, konto, tasks_db) -> dict:
+    """
+    Prüft ob eine Mail eine DATEV-Einzelweiterleitung ist.
+    Entscheidungslogik (Priorität):
+      1. Betreff-Ähnlichkeit (MIME-dekodiert, normalisiert) ≥ 0.8 gegen Task im anderen Konto
+         a. Anhang-Namen kreuzen sich    → SKIP (Duplikat)
+         b. Meine Anhang-Datei nicht im Referenz-Task → KEEP (abweichender Inhalt)
+         c. Kein eigener Anhang          → SKIP (leere Weiterleitungskopie)
+      2. Body-Ähnlichkeit ≥ 0.5 (Fallback wenn Betreff abweicht)
+         → gleiche Logik wie 1
+    """
+    my_files   = _get_attachment_names(anhaenge_pfad)
+    norm_betr  = _norm(betr)
+
+    # Kandidaten: Tasks anderer Konten (max. 50 neueste)
+    try:
+        refs = tasks_db.execute("""
+            SELECT id, konto, beschreibung, anhaenge_pfad, betreff
+            FROM tasks WHERE konto != ?
+            ORDER BY id DESC LIMIT 50
+        """, (konto,)).fetchall()
+    except Exception:
+        return _NO_DUP
+
+    # Besten Kandidaten nach Betreff-Ähnlichkeit finden
+    best_ref      = None
+    best_betr_sim = 0.0
+    best_body_sim = 0.0
+
+    for ref in refs:
+        b_sim = _text_similarity(norm_betr, _norm(ref['betreff'] or ''))
+        if b_sim > best_betr_sim:
+            best_betr_sim = b_sim
+            best_body_sim = _text_similarity(text or '', ref['beschreibung'] or '')
+            best_ref      = ref
+
+    # Kein Kandidat mit ausreichender Betreff-Übereinstimmung?
+    if best_ref is None or best_betr_sim < 0.7:
+        # Fallback: Body-Ähnlichkeit als einziges Kriterium
+        if text:
+            for ref in refs:
+                b_sim = _text_similarity(text, ref['beschreibung'] or '')
+                if b_sim > best_body_sim:
+                    best_body_sim = b_sim
+                    best_ref      = ref
+                    best_betr_sim = _text_similarity(norm_betr, _norm(ref['betreff'] or ''))
+        if best_ref is None or best_body_sim < 0.5:
+            return _NO_DUP
+
+    # Entscheidung anhand Anhänge
+    ref_files = _get_attachment_names(best_ref['anhaenge_pfad'])
+    ref_id    = best_ref['id']
+    ref_konto = best_ref['konto']
+    hint      = f"Betreff-Ähnl. {best_betr_sim:.0%}, Body-Ähnl. {best_body_sim:.0%}"
+
+    if my_files and ref_files:
+        match = my_files & ref_files
+        if match:
+            return {
+                'is_duplicate': True, 'action': 'skip', 'ref_id': ref_id, 'ref_konto': ref_konto,
+                'grund': (f"DATEV-Duplikat: Anhang '{next(iter(match))}' bereits in "
+                          f"Task #{ref_id} (konto={ref_konto}) — {hint}."),
+            }
+        # Anhang existiert NICHT im Original → neuer Inhalt → behalten
+        return {
+            'is_duplicate': False, 'action': 'keep', 'ref_id': ref_id, 'ref_konto': ref_konto,
+            'grund': (f"Abweichender Anhang ({', '.join(sorted(my_files))}) — "
+                      f"nicht in Referenz-Task #{ref_id} ({ref_konto}) — {hint}. Behalten."),
+        }
+
+    if my_files and not ref_files:
+        # Original hat keine (mehr) Anhänge, ich habe welche → könnte neuer Inhalt sein
+        # Wenn Betreff sehr ähnlich und kein Anhang im Original gespeichert: Duplikat
+        if best_betr_sim >= 0.85:
+            return {
+                'is_duplicate': True, 'action': 'skip', 'ref_id': ref_id, 'ref_konto': ref_konto,
+                'grund': (f"DATEV-Duplikat: Anhang-Ordner von Referenz-Task #{ref_id} nicht mehr "
+                          f"zugreifbar, Betreff aber nahezu identisch — {hint}."),
+            }
+        return _NO_DUP
+
+    # Kein eigener Anhang — DATEV-Weiterleitungskopie ohne Datei
+    if best_betr_sim >= 0.8 or best_body_sim >= 0.75:
+        return {
+            'is_duplicate': True, 'action': 'skip', 'ref_id': ref_id, 'ref_konto': ref_konto,
+            'grund': (f"DATEV-Duplikat: kein eigener Anhang, {hint}, "
+                      f"Referenz-Task #{ref_id} (konto={ref_konto})."),
+        }
+
+    return _NO_DUP
+
+
 # ── Mails klassifizieren und in DBs eintragen ────────────────────────────────
 def process_new_mails(new_mails, stats):
     """Klassifiziert neue Mails mit mail_classifier und trägt sie ein."""
@@ -120,19 +367,39 @@ def process_new_mails(new_mails, stats):
     tasks_db  = sqlite3.connect(str(TASKS_DB))
     tasks_db.row_factory = sqlite3.Row
 
-    # Gesendete Index laden
-    sent_index = {}
+    # Gesendete Index laden — konto-übergreifend aus sent_mails.db (enthält ALLE Konten)
+    # Zusätzlich: cross-domain Matching (muller@firma.de ~ max.muller@firma.de)
+    sent_index = {}        # {kunden_email: [datum, ...]}
+    sent_domains = {}      # {domain: [datum, ...]}  für cross-domain-Check
     try:
         sent_db.row_factory = sqlite3.Row
         for r in sent_db.execute("SELECT kunden_email, datum FROM gesendete_mails ORDER BY datum").fetchall():
-            em = (r["kunden_email"] or "").lower()
-            if em: sent_index.setdefault(em, []).append(r["datum"])
+            em = (r["kunden_email"] or "").lower().strip()
+            if not em: continue
+            sent_index.setdefault(em, []).append(r["datum"])
+            # Domain-Index für cross-domain-Match (nicht bei generischen Domains)
+            dom = em.split('@')[-1] if '@' in em else ''
+            if dom and dom not in _GENERIC_SENT_DOMAINS:
+                sent_domains.setdefault(dom, []).append(r["datum"])
     except: pass
+
+    # Load permanently deleted message_ids from loeschhistorie
+    deleted_msgids = set()
+    try:
+        _del_rows = tasks_db.execute(
+            "SELECT message_id FROM loeschhistorie WHERE message_id IS NOT NULL AND message_id != ''"
+        ).fetchall()
+        deleted_msgids = {row[0] for row in _del_rows}
+    except Exception:
+        pass
 
     for m in new_mails:
         folder  = m['folder']
         is_sent = "Gesendete" in folder or "Sent" in folder
         k_email = get_kunden_email(m['absender'], m['an'], folder)
+        # Alias-Auflösung: bekannte Alias-Adressen auf Haupt-E-Mail mappen
+        if k_email:
+            k_email = resolve_alias(k_email)
         konto   = m['konto']
         absnd   = m['absender']
         betr    = m['betreff']
@@ -167,9 +434,33 @@ def process_new_mails(new_mails, stats):
 
         if not k_email: continue
 
-        # Eigene Domain überspringen
+        # Eigene Domain überspringen (Kunde = eigene Adresse)
         dom = k_email.split('@')[-1] if '@' in k_email else ''
         if dom in EIGENE_DOMAINS: continue
+
+        # DATEV/Weiterleitungs-Filter: Absender ist eigene Adresse (internes Routing)
+        # → prüft Body-Ähnlichkeit + Anhang-Dateinamen gegen vorhandene Tasks
+        absnd_dom = absnd.split('@')[-1].lower() if '@' in absnd else ''
+        if absnd_dom in EIGENE_DOMAINS:
+            dup = _check_datev_duplicate(
+                betr, text, m.get('anhaenge_pfad', ''), konto, tasks_db
+            )
+            anhaenge_info = ', '.join(_get_attachment_names(m.get('anhaenge_pfad', ''))) or '–'
+            if dup['action'] == 'skip':
+                _log_loeschhistorie(
+                    tasks_db, None, konto, absnd, betr, datum,
+                    anhaenge_info, dup['grund'], dup['ref_id'], dup['ref_konto']
+                )
+                stats['ignoriert'] = stats.get('ignoriert', 0) + 1
+                continue
+            elif dup['grund']:
+                # Abweichender Anhang → behalten, Grund als Notiz in loeschhistorie
+                _log_loeschhistorie(
+                    tasks_db, None, konto, absnd, betr, datum,
+                    anhaenge_info,
+                    'BEHALTEN – ' + dup['grund'],
+                    dup['ref_id'], dup['ref_konto']
+                )
 
         # Klassifizieren — Datum übergeben für zeitlichen Angebote-Abgleich
         cl = classify_mail(konto, absnd, betr, text, folder=folder,
@@ -185,27 +476,58 @@ def process_new_mails(new_mails, stats):
             stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
             continue
 
-        # Schon beantwortet?
-        dates = sent_index.get(k_email.lower(), [])
+        # Schon beantwortet? — konto-übergreifend (direkte E-Mail + cross-domain)
+        k_email_l = k_email.lower()
+        dates = sent_index.get(k_email_l, [])
         if any(d > datum for d in dates):
             continue
+        # Cross-domain-Check: wenn Firmen-Domain bekannt und bereits geantwortet
+        k_domain = k_email_l.split('@')[-1] if '@' in k_email_l else ''
+        if k_domain and k_domain not in _GENERIC_SENT_DOMAINS:
+            domain_dates = sent_domains.get(k_domain, [])
+            if any(d > datum for d in domain_dates):
+                continue
 
         # Duplikat-Check
         if msgid:
             existing = tasks_db.execute("SELECT id FROM tasks WHERE message_id=?", (msgid,)).fetchone()
             if existing: continue
 
+        # Skip permanently deleted mails
+        if msgid and msgid in deleted_msgids:
+            continue
+
         task_typ = kategorie_to_task_typ(kat)
 
-        # Entwurf
+        # Entwurf — auch für Angebotsrückmeldungen
         entwurf = ""
         claude_prompt = ""
-        if cl["antwort_noetig"] and k_email:
+        benoetigt_entwurf = (
+            cl["antwort_noetig"]
+            or kat == "Angebotsrueckmeldung"
+            or kat == "Antwort erforderlich"
+        )
+        if benoetigt_entwurf and k_email:
             try:
-                draft = generate_draft(betr, absnd, text, k_email)
+                # Für Angebotsrückmeldungen: Hinweis übergeben
+                hint = "Angebotsrueckmeldung" if kat == "Angebotsrueckmeldung" else ""
+                draft = generate_draft(betr, absnd, text, k_email, hint=hint)
                 entwurf = draft.get("entwurf","")
                 claude_prompt = draft.get("claude_prompt","")
             except: pass
+
+        # Thread-ID: bestehenden Thread desselben Kunden (letzte 30 Tage) suchen
+        thread_id = None
+        try:
+            from datetime import timedelta as _td
+            cutoff30 = (datetime.now() - _td(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+            existing_thread = tasks_db.execute(
+                "SELECT id, thread_id FROM tasks WHERE kunden_email=? AND erstellt_am >= ? ORDER BY id ASC LIMIT 1",
+                (k_email, cutoff30)
+            ).fetchone()
+            if existing_thread:
+                thread_id = existing_thread["thread_id"] or f"T{existing_thread['id']}"
+        except: pass
 
         # Task anlegen
         try:
@@ -214,8 +536,8 @@ def process_new_mails(new_mails, stats):
                  kunden_email, kunden_name, absender_rolle, empfohlene_aktion,
                  kategorie_grund, message_id, mail_folder_pfad, anhaenge_pfad,
                  antwort_entwurf, claude_prompt, betreff, konto, datum_mail,
-                 prioritaet, antwort_noetig)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 prioritaet, antwort_noetig, thread_id, konfidenz)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (task_typ, kat, betr[:120] or f"Mail von {k_email}",
                  cl["zusammenfassung"], text[:1000],
                  k_email, "", cl["absender_rolle"],
@@ -223,8 +545,17 @@ def process_new_mails(new_mails, stats):
                  msgid, m['mail_folder_pfad'], m['anhaenge_pfad'] or "",
                  entwurf[:4000], claude_prompt[:2000],
                  betr[:120], konto, datum,
-                 cl["prioritaet"], 1 if cl["antwort_noetig"] else 0))
+                 cl["prioritaet"], 1 if cl["antwort_noetig"] else 0,
+                 thread_id, cl.get("konfidenz", "mittel")))
+            new_id = tasks_db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            # Wenn kein Thread existierte, neuen Thread mit eigener ID starten
+            if not thread_id:
+                tasks_db.execute("UPDATE tasks SET thread_id=? WHERE id=?",
+                                 (f"T{new_id}", new_id))
             stats['tasks_erstellt'] = stats.get('tasks_erstellt',0)+1
+            # Auto-Update Angebot-Status bei Angebotsrückmeldung
+            if kat == "Angebotsrueckmeldung":
+                _try_update_angebot_from_mail(k_email, text, tasks_db)
         except Exception as e:
             print(f"  Task-Fehler: {e}")
 
@@ -277,6 +608,9 @@ try {{
 # ── Hauptprogramm ─────────────────────────────────────────────────────────────
 def main():
     print(f"[{datetime.now().strftime('%H:%M')}] rauMKult Daily Check v4...")
+    _t0_job = __import__('time').monotonic()
+    _elog('system', 'daily_check_started', 'Daily Check gestartet',
+          source='daily_check', modul='daily_check', actor_type='system', status='ok')
     config = load_config()
 
     status = load_status()
@@ -350,6 +684,11 @@ def main():
     print(f"  Tasks offen: {total_open} (davon {n_antwort} Antwort nötig)")
     print(f"  Erinnerungen fällig: {len(due)}")
     print(f"[{datetime.now().strftime('%H:%M')}] Fertig.")
+    _elog('system', 'daily_check_completed',
+          f"Daily Check: {stats.get('gesamt',0)} Mails, {stats.get('tasks_erstellt',0)} Tasks, {total_open} offen",
+          source='daily_check', modul='daily_check', actor_type='system', status='ok',
+          duration_ms=int((__import__('time').monotonic()-_t0_job)*1000),
+          result=f"mails={stats.get('gesamt',0)} tasks={stats.get('tasks_erstellt',0)} offen={total_open}")
 
 
 if __name__ == "__main__":

@@ -90,17 +90,46 @@
       "id": "runtime-log-mail-integration",
       "name": "Runtime-Log Mail-Monitor-Integration",
       "module": "mail_monitor.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-27",
-      "description": "elog bei Mail-Klassifizierung, Task-Erstellung, Monitor-Start/-Stop"
+      "description": "elog bei Mail-Klassifizierung, Task-Erstellung, Monitor-Start/-Stop",
+      "session": "session-j"
     },
     {
       "id": "runtime-log-daily-check-integration",
       "name": "Runtime-Log Daily-Check-Integration",
       "module": "daily_check.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-27",
-      "description": "elog für Job-Start/-Ende mit Ergebnissen (Mails gefunden, Tasks erstellt)"
+      "description": "elog für Job-Start/-Ende mit Ergebnissen (Mails gefunden, Tasks erstellt, Dauer in ms)",
+      "session": "session-j"
+    },
+    {
+      "id": "runtime-log-full-ui-coverage",
+      "name": "Runtime-Log vollständige UI-Coverage (session-j)",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "13 neue _rtlog()-Calls (showPanel, loadThread, setStatus, geschKira, readMail, arSetStatus, angSetStatus, wissenAction, closeKiraWorkspace, newKiraChat, loadKiraConv, kqDirectSend, loadRuntimeLog), _rtlog_type_row() Helper, refreshRtLogStats/exportRtLog/clearRtLog, POST /api/runtime/clear",
+      "session": "session-j"
+    },
+    {
+      "id": "runtime-log-rich-settings-card",
+      "name": "Runtime-Log Einstellungen-Karte (reich)",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "Master-Toggle + Status-Dot, 5 Typ-Toggles mit Entry-Zählern, Options (fehler_immer/vollkontext/kira_darf_lesen), Live-Stats-Grid, Viewer mit Filter, Export CSV + DB-Leeren",
+      "session": "session-j"
+    },
+    {
+      "id": "kira-log-context-injection",
+      "name": "Kira nutzt Runtime-Log aktiv (System-Prompt)",
+      "module": "kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "get_recent_for_kira(limit=20) wird in build_system_prompt() injiziert. Kira hat explizite Instruktion: erst Log prüfen, dann antworten.",
+      "session": "session-j"
     },
     {
       "id": "mail-monitor",

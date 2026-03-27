@@ -122,3 +122,4 @@ Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.
 | session-g | 2026-03-27 | Kira-Workspace UI Rebuild (kq-*/kw-*, 3-Spalten, Quick Panel) |
 | session-h | 2026-03-27 | Runtime-Log-System (runtime_log.py, server.py Integration, Einstellungen-UI) |
 | session-i | 2026-03-27 | Memory-System ausgebaut (server_map, ADRs, known_issues, user_briefs, UEBERSICHT aktuell) |
+| session-j | 2026-03-27 | Vollständiges Runtime-Logging: mail_monitor+daily_check+13 JS _rtlog-Calls, Kira nutzt Logs aktiv, reichhaltige Einstellungen-Karte |

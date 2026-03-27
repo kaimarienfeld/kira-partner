@@ -1470,6 +1470,21 @@ def _build_mahnung_section(gemahnt, ar_offen, mahnung_details=None):
 
 
 # ── EINSTELLUNGEN Panel ──────────────────────────────────────────────────────
+def _rtlog_type_row(typ, label, cfg_id, checked, count):
+    dot = '#5cb85c' if checked else '#888'
+    chk = 'checked' if checked else ''
+    cnt = f'<span style="font-size:10px;color:var(--muted);margin-left:auto;margin-right:8px">{count} Eintr.</span>' if count else ''
+    return f'''<div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="width:7px;height:7px;border-radius:50%;background:{dot};display:inline-block"></span>
+        <label style="font-size:12px;font-family:monospace;color:var(--kl)">{typ}</label>
+        <span style="font-size:11px;color:var(--muted)">{label}</span>
+      </div>
+      {cnt}
+      <input type="checkbox" id="{cfg_id}" {chk}>
+    </div>'''
+
+
 def build_einstellungen():
     config = {}
     try:
@@ -1849,74 +1864,90 @@ def build_einstellungen():
         <div id="changelog-entries" style="margin-top:10px;display:none;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
       </div>
     </div>
-    <div class="section">
-      <div class="section-title">Runtime-Log / Telemetrie</div>
+    <div class="section" id="sec-rtlog">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Runtime-Log &amp; Telemetrie</span>
+        <span id="rtlog-live-dot" style="width:8px;height:8px;border-radius:50%;background:{'#5cb85c' if rtlog_cfg.get('aktiv',True) else '#888'};display:inline-block" title="{'Aktiv' if rtlog_cfg.get('aktiv',True) else 'Inaktiv'}"></span>
+      </div>
       <div class="section-body">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
-          L&uuml;ckenlose Nachvollziehbarkeit aller UI-, Kira- und System-Ereignisse.
-          Gespeichert in <code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">knowledge/runtime_events.db</code>.
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+          L&uuml;ckenloses Protokoll aller UI-, Kira- und System-Ereignisse.
+          Kira kann damit auf Verlauf und Fehler zugreifen.
+          DB: <code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">knowledge/runtime_events.db</code>
         </div>
-        <div class="settings-row">
-          <label>Logging aktiv</label>
-          <input type="checkbox" id="cfg-rl-aktiv" {'checked' if rtlog_cfg.get('aktiv', True) else ''}>
+
+        <!-- Master-Toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#111;border-radius:8px;margin-bottom:10px;border:1px solid var(--border)">
+          <div>
+            <span style="font-weight:700;font-size:13px">Logging aktiv</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px">Haupt-Schalter</span>
+          </div>
+          <input type="checkbox" id="cfg-rl-aktiv" {'checked' if rtlog_cfg.get('aktiv', True) else ''} style="width:16px;height:16px;cursor:pointer">
         </div>
-        <div class="settings-row">
-          <label>UI-Ereignisse (Klicks, Navigation)</label>
-          <input type="checkbox" id="cfg-rl-ui" {'checked' if rtlog_cfg.get('ui_events', True) else ''}>
+
+        <!-- Typ-Toggles mit Live-Stats -->
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
+          <div style="padding:6px 10px;background:#0d0d0d;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ereignis-Typen</div>
+          {_rtlog_type_row('ui',       'UI-Klicks &amp; Navigation',      'cfg-rl-ui',       rtlog_cfg.get('ui_events',True),       rl_by_type.get('ui',0))}
+          {_rtlog_type_row('kira',     'Kira Tools &amp; Kontext',        'cfg-rl-kira',     rtlog_cfg.get('kira_events',True),     rl_by_type.get('kira',0))}
+          {_rtlog_type_row('llm',      'LLM Provider / Token / Dauer',   'cfg-rl-llm',      rtlog_cfg.get('llm_events',True),      rl_by_type.get('llm',0))}
+          {_rtlog_type_row('system',   'System &amp; Hintergrund-Jobs',  'cfg-rl-bg',       rtlog_cfg.get('hintergrund_events',True),rl_by_type.get('system',0))}
+          {_rtlog_type_row('settings', 'Einstellungs&auml;nderungen',    'cfg-rl-settings', rtlog_cfg.get('settings_events',True), rl_by_type.get('settings',0))}
         </div>
-        <div class="settings-row">
-          <label>Kira-Ereignisse (Tools, Kontext)</label>
-          <input type="checkbox" id="cfg-rl-kira" {'checked' if rtlog_cfg.get('kira_events', True) else ''}>
+
+        <!-- Spezial-Optionen -->
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
+          <div style="padding:6px 10px;background:#0d0d0d;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Optionen</div>
+          <div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
+            <label style="font-size:12px">Fehler immer loggen <span style="color:var(--muted);font-size:10px">(auch wenn Typ deaktiviert)</span></label>
+            <input type="checkbox" id="cfg-rl-fehler" {'checked' if rtlog_cfg.get('fehler_immer_loggen', True) else ''}>
+          </div>
+          <div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
+            <label style="font-size:12px">Vollkontext speichern <span style="color:var(--muted);font-size:10px">(User-Fragen + Kira-Antworten vollst&auml;ndig)</span></label>
+            <input type="checkbox" id="cfg-rl-vollkontext" {'checked' if rtlog_cfg.get('vollkontext_speichern', True) else ''}>
+          </div>
+          <div class="settings-row" style="padding:6px 10px">
+            <label style="font-size:12px">Kira darf Logs lesen <span style="color:var(--muted);font-size:10px">(Tool: runtime_log_suchen aktiv)</span></label>
+            <input type="checkbox" id="cfg-rl-kira-lesen" {'checked' if rtlog_cfg.get('kira_darf_lesen', True) else ''}>
+          </div>
         </div>
-        <div class="settings-row">
-          <label>LLM-Ereignisse (Chat, Token)</label>
-          <input type="checkbox" id="cfg-rl-llm" {'checked' if rtlog_cfg.get('llm_events', True) else ''}>
+
+        <!-- Live-Stats -->
+        <div id="rtlog-stats-box" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#0a0a0a;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Live-Statistiken</span>
+            <button class="btn btn-xs btn-sec" onclick="refreshRtLogStats()" style="font-size:10px;padding:2px 8px">&#x21BB; Aktualisieren</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px" id="rtlog-stats-grid">
+            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">{rl_total}</div><div style="font-size:10px;color:var(--muted)">Gesamt</div></div>
+            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">{rl_today}</div><div style="font-size:10px;color:var(--muted)">Heute</div></div>
+            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:{'#e84545' if rl_fehler else 'var(--kl)'}">{rl_fehler}</div><div style="font-size:10px;color:var(--muted)">Fehler</div></div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">
+            <span>Sitzungen: <strong style="color:var(--text)">{rl_sessions}</strong></span>
+            <span>DB-Gr&ouml;&szlig;e: <strong style="color:var(--text)">{rl_db_size}</strong></span>
+            <span>Typen: <strong style="color:var(--text)">{" · ".join(f'{k}:{v}' for k,v in rl_by_type.items()) or "–"}</strong></span>
+          </div>
         </div>
-        <div class="settings-row">
-          <label>Hintergrund-Jobs</label>
-          <input type="checkbox" id="cfg-rl-bg" {'checked' if rtlog_cfg.get('hintergrund_events', True) else ''}>
-        </div>
-        <div class="settings-row">
-          <label>Einstellungs&auml;nderungen</label>
-          <input type="checkbox" id="cfg-rl-settings" {'checked' if rtlog_cfg.get('settings_events', True) else ''}>
-        </div>
-        <div class="settings-row">
-          <label>Fehler immer loggen</label>
-          <input type="checkbox" id="cfg-rl-fehler" {'checked' if rtlog_cfg.get('fehler_immer_loggen', True) else ''}>
-        </div>
-        <div class="settings-row">
-          <label>Vollkontext speichern (User + Kira-Antworten)</label>
-          <input type="checkbox" id="cfg-rl-vollkontext" {'checked' if rtlog_cfg.get('vollkontext_speichern', True) else ''}>
-        </div>
-        <div class="settings-row">
-          <label>Kira darf Logs lesen</label>
-          <input type="checkbox" id="cfg-rl-kira-lesen" {'checked' if rtlog_cfg.get('kira_darf_lesen', True) else ''}>
-        </div>
-        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
-          <div class="settings-row"><label>Ereignisse gesamt</label><span style="font-size:13px;color:var(--text-secondary)">{rl_total}</span></div>
-          <div class="settings-row"><label>Heute</label><span style="font-size:13px;color:var(--text-secondary)">{rl_today}</span></div>
-          <div class="settings-row"><label>Fehler</label><span style="font-size:13px;color:{'#e84545' if rl_fehler else 'var(--text-secondary)'};">{rl_fehler}</span></div>
-          <div class="settings-row"><label>Sitzungen</label><span style="font-size:13px;color:var(--text-secondary)">{rl_sessions}</span></div>
-          <div class="settings-row"><label>Datenbankgr&ouml;&szlig;e</label><span style="font-size:13px;color:var(--text-secondary)">{rl_db_size}</span></div>
-          <div class="settings-row"><label>Aufschl&uuml;sselung</label><span style="font-size:12px;color:var(--text-secondary)">{" &middot; ".join(f'{k}: {v}' for k,v in rl_by_type.items()) or "&ndash;"}</span></div>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="rl-filter-type" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+
+        <!-- Viewer -->
+        <div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select id="rl-filter-type" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit">
             <option value="">Alle Typen</option>
             <option value="ui">ui</option><option value="kira">kira</option>
             <option value="llm">llm</option><option value="system">system</option>
             <option value="settings">settings</option>
           </select>
-          <select id="rl-filter-status" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Status</option>
-            <option value="ok">ok</option><option value="fehler">fehler</option>
+          <select id="rl-filter-status" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Status</option><option value="ok">ok</option><option value="fehler">fehler</option>
           </select>
-          <input id="rl-filter-search" type="text" placeholder="Suche in summary&hellip;"
-            style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:160px">
+          <input id="rl-filter-search" type="text" placeholder="Suche&hellip;" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;width:140px">
           <button class="btn btn-xs btn-sec" onclick="loadRuntimeLog(false)">Anzeigen</button>
-          <button class="btn btn-xs btn-sec" onclick="loadRuntimeLog(false,true)">Nur Fehler</button>
+          <button class="btn btn-xs" style="background:#e84545;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer" onclick="loadRuntimeLog(false,true)">Nur Fehler</button>
+          <button class="btn btn-xs btn-sec" onclick="exportRtLog()" style="margin-left:auto">Export CSV</button>
+          <button class="btn btn-xs" style="background:transparent;color:#e84545;border:1px solid #e84545;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer" onclick="clearRtLog()">DB leeren</button>
         </div>
-        <div id="runtimelog-entries" style="margin-top:10px;display:none;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
+        <div id="runtimelog-entries" style="display:none;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
       </div>
     </div>
     <div style="margin-top:14px">
@@ -2750,6 +2781,7 @@ const PANEL_TITLES = {{
 }};
 
 function showPanel(name) {{
+  _rtlog('ui','panel_switched','Panel: '+name,{{submodul:'navigation',context_type:'panel',context_id:name}});
   document.querySelectorAll('.sidebar-item').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   const nav = document.getElementById('nav-'+name);
@@ -3114,6 +3146,7 @@ function selectKommItem(tid, ev) {{
 
 // Thread-Verlauf laden
 function loadThread(tid) {{
+  _rtlog('ui','thread_loaded','Thread geladen',{{submodul:'kommunikation',context_type:'mail',context_id:String(tid)}});
   const wrap = document.getElementById('km-thread-'+tid);
   if(!wrap) return;
   wrap.innerHTML = '<div class="km-ctx-h">Nachrichten-Verlauf</div><div class="km-ctx-thread-loading">&#x23F3; wird geladen&hellip;</div>';
@@ -3166,6 +3199,7 @@ function showOrgView(el, view) {{
 
 // Task status
 function setStatus(id, status) {{
+  _rtlog('ui','task_status_set','Task '+id+' -> '+status,{{submodul:'kommunikation',context_type:'task',context_id:String(id)}});
   fetch('/api/task/'+id+'/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify({{status}})}}).then(r=>r.json()).then(d=>{{
     if(d.ok){{
@@ -3324,6 +3358,7 @@ function showGeschTab(name) {{
 
 // Geschäft: Kira mit Datensatz-Kontext öffnen
 function geschKira(typ, nr, partner, betrag) {{
+  _rtlog('ui','gesch_kira_opened',typ+' '+nr+' via Kira',{{submodul:'geschaeft',context_type:typ,context_id:String(nr)}});
   openKiraNaked();
   showKTab('chat');
   const labels = {{re:'Rechnung',ang:'Angebot',eingang:'Eingangsrechnung',mah:'Mahnung'}};
@@ -3406,6 +3441,7 @@ function openAttachments(encodedPath) {{
 
 // Mail lesen
 function readMail(encodedMsgId) {{
+  _rtlog('ui','mail_read','Mail geöffnet',{{submodul:'kommunikation',context_type:'mail'}});
   document.getElementById('mr-betreff').textContent='Laden...';
   document.getElementById('mr-meta').innerHTML='';
   document.getElementById('mr-body').textContent='';
@@ -3479,6 +3515,7 @@ function filterAng() {{
 
 // Ausgangsrechnung Status ändern -> Kira-Interaktion
 function arSetStatus(id, status) {{
+  _rtlog('ui','rechnung_status_set','RE '+id+' -> '+status,{{submodul:'geschaeft',context_type:'rechnung',context_id:String(id)}});
   if (status === 'bezahlt') {{
     openKiraInterakt('ausgangsrechnung', id, 'bezahlt', 'Rechnung als bezahlt markieren', [
       {{type:'date', id:'ki-datum', label:'Zahlungseingang am:', value:new Date().toISOString().slice(0,10)}},
@@ -3498,6 +3535,7 @@ function arSetStatus(id, status) {{
 
 // Angebot Status ändern -> Kira-Interaktion
 function angSetStatus(id, status) {{
+  _rtlog('ui','angebot_status_set','Ang '+id+' -> '+status,{{submodul:'geschaeft',context_type:'angebot',context_id:String(id)}});
   if (status === 'angenommen') {{
     openKiraInterakt('angebot', id, 'angenommen', 'Angebot angenommen', [
       {{type:'date', id:'ki-datum', label:'Angenommen am:', value:new Date().toISOString().slice(0,10)}},
@@ -3728,6 +3766,52 @@ function loadRuntimeLog(append, onlyFehler) {{
   }}).catch(()=>{{box.innerHTML='<div style="padding:10px;color:#e84545;font-size:11px">Fehler beim Laden.</div>';box.style.display='block';}});
 }}
 
+function refreshRtLogStats() {{
+  fetch('/api/runtime/stats',{{cache:'no-store'}}).then(r=>r.json()).then(d=>{{
+    const g = document.getElementById('rtlog-stats-grid');
+    if(!g) return;
+    const byType = d.by_type||{{}};
+    g.innerHTML = `<div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">${{d.total||0}}</div><div style="font-size:10px;color:var(--muted)">Gesamt</div></div>
+      <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">${{d.today||0}}</div><div style="font-size:10px;color:var(--muted)">Heute</div></div>
+      <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:${{d.fehler>0?'#e84545':'var(--kl)'}};">${{d.fehler||0}}</div><div style="font-size:10px;color:var(--muted)">Fehler</div></div>`;
+    const dot = document.getElementById('rtlog-live-dot');
+    if(dot) dot.style.background = '#5cb85c';
+    // Update type dot colors
+    const types = {{'ui':'cfg-rl-ui','kira':'cfg-rl-kira','llm':'cfg-rl-llm','system':'cfg-rl-bg','settings':'cfg-rl-settings'}};
+  }}).catch(()=>{{}});
+}}
+
+function exportRtLog() {{
+  const typ = document.getElementById('rl-filter-type')?.value||'';
+  const status = document.getElementById('rl-filter-status')?.value||'';
+  const search = document.getElementById('rl-filter-search')?.value||'';
+  let url = '/api/runtime/events?limit=5000&offset=0';
+  if(typ) url+=`&event_type=${{encodeURIComponent(typ)}}`;
+  if(status) url+=`&status=${{encodeURIComponent(status)}}`;
+  if(search) url+=`&search=${{encodeURIComponent(search)}}`;
+  fetch(url,{{cache:'no-store'}}).then(r=>r.json()).then(d=>{{
+    const rows = d.entries||[];
+    if(!rows.length){{showToast('Keine Einträge'); return;}}
+    const cols = ['ts','event_type','action','summary','modul','status','provider','model','token_in','token_out','duration_ms'];
+    let csv = cols.join(';')+'\n';
+    rows.forEach(r=>{{csv+=cols.map(c=>(String(r[c]||'')).replace(/;/g,',')).join(';')+'\n';}});
+    const a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+    a.download='runtime_log_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();
+    showToast(`${{rows.length}} Einträge exportiert`);
+  }});
+}}
+
+function clearRtLog() {{
+  if(!confirm('Runtime-Log-Datenbank wirklich leeren? Alle Einträge werden gelöscht.')) return;
+  fetch('/api/runtime/clear',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok){{showToast('Runtime-Log geleert'); refreshRtLogStats(); document.getElementById('runtimelog-entries').innerHTML=''; document.getElementById('runtimelog-entries').style.display='none';}}
+      else showToast(d.error||'Fehler');
+    }}).catch(()=>showToast('Fehler'));
+}}
+
 // Änderungsverlauf laden / toggle
 function loadChangeLog(append) {{
   const box = document.getElementById('changelog-entries');
@@ -3923,6 +4007,7 @@ function showWissenTab(name) {{
 
 // Wissen actions
 function wissenAction(regelId, aktion) {{
+  _rtlog('ui','wissen_action',aktion+' Regel '+regelId,{{submodul:'wissen',context_type:'regel',context_id:String(regelId)}});
   fetch('/api/wissen/'+regelId+'/'+aktion,{{method:'POST'}}).then(r=>r.json()).then(d=>{{
     if(d.ok) {{
       const labels = {{bestaetigen:'Regel bestätigt',ablehnen:'Regel abgelehnt',loeschen:'Regel entfernt'}};
@@ -4003,6 +4088,7 @@ function openKiraWorkspace(context) {{
   else showKTab('chat');
 }}
 function closeKiraWorkspace() {{
+  _rtlog('ui','kira_workspace_closed','Kira Workspace geschlossen',{{submodul:'kira'}});
   document.getElementById('kiraWorkspace').classList.remove('open');
   kiraOpen=false;
   localStorage.setItem('kira_dismissed', Date.now());
@@ -4213,6 +4299,7 @@ function scrollKiraChat() {{
 }}
 
 function newKiraChat() {{
+  _rtlog('ui','new_kira_chat','Neuer Kira-Chat gestartet',{{submodul:'kira'}});
   kiraSessionId = null;
   const area = document.getElementById('kiraChatArea');
   area.innerHTML = '<div class="kira-welcome"><div class="kira-welcome-icon">K</div><div class="kira-welcome-text">Neuer Chat gestartet. Wie kann ich helfen?</div></div>';
@@ -4398,6 +4485,7 @@ function loadKiraHistorie() {{
 }}
 
 function loadKiraConv(sessionId) {{
+  _rtlog('ui','kira_conv_loaded','Konversation geladen',{{submodul:'kira',context_type:'konversation',context_id:String(sessionId)}});
   kiraSessionId = sessionId;
   showKTab('chat');
   const area = document.getElementById('kiraChatArea');
@@ -4481,6 +4569,7 @@ function setKiraTools(attachments, rules, actions) {{
 
 // Quick Panel: Direkt senden
 function kqDirectSend() {{
+  _rtlog('ui','kq_direct_send','Quick Panel Direkt-Senden',{{submodul:'kira'}});
   const inp = document.getElementById('kqInput');
   if(!inp || !inp.value.trim()) return;
   const msg = inp.value.trim();
@@ -6297,6 +6386,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     status=body.get('status', 'ok'),
                     result=body.get('result'),
                 )
+                self._json({'ok': True})
+            except Exception as ex:
+                self._json({'ok': False, 'error': str(ex)})
+            return
+
+        # Runtime-Log leeren
+        if self.path == '/api/runtime/clear':
+            try:
+                from runtime_log import _clear_all
+                _clear_all()
                 self._json({'ok': True})
             except Exception as ex:
                 self._json({'ok': False, 'error': str(ex)})

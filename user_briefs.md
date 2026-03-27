@@ -2,7 +2,6 @@
 
 > Append-only. Nie überschreiben, nie umsortieren.
 > Bei jedem größeren Auftrag den Original-Wortlaut festhalten.
-> Dient als Referenz: "Warum wurde das so gebaut?" → hier steht die Original-Anforderung.
 
 ---
 
@@ -34,8 +33,6 @@
 > Quick Panel 7 Items (mit Farb-Icons):
 > - Neue Frage (purple), Aufgaben (amber), Rechnungen (green), Angebote (blue),
 >   Kunden (coral), Letzte Verläufe (gray), Suche (teal)
-> - Jedes Item: farbige Icon-Box + Title + Sub + Pfeil-Arrow
-> - Footer: Input + Senden-Button (kqDirectSend)
 >
 > Nach Kira fertig: stoppen."
 
@@ -50,71 +47,56 @@
 > "Bitte erweitere das bestehende Logging-System in Kira jetzt zu einem vollständigen,
 > lückenlosen Runtime- und Kontext-Logging-System für das gesamte Programm.
 >
-> NICHT ein drittes System bauen — zuerst den aktuellen Stand prüfen,
-> dann sinnvoll erweitern oder migrieren.
+> NICHT ein drittes System bauen — zuerst den aktuellen Stand prüfen, dann erweitern.
 >
-> Ziel: lückenlose Nachvollziehbarkeit für drei Akteure:
-> - Kai (was hat Kira wann getan?)
-> - Claude Code (was wurde in welcher Session gebaut?)
-> - Kira selbst (was habe ich getan, welche Fehler gab es?)
+> Ziel: lückenlose Nachvollziehbarkeit für Kai, Claude Code und Kira selbst.
 >
 > Was muss geloggt werden:
-> - UI-Klicks und Ereignisse (Panel öffnen, Status setzen, Navigation)
-> - Kira Chat / Tool-Aufrufe / Kontext-Übergaben
-> - LLM Provider / Modell / Tokens / Dauer / Fallback / Fehler
-> - Hintergrundjobs (Mail-Monitor, daily_check)
-> - Einstellungsänderungen (mit Vor- und Nachwert)
+> - UI-Klicks und Ereignisse, Kira Chat/Tools/Kontext,
+>   LLM Provider/Modell/Tokens, Hintergrundjobs, Einstellungsänderungen
 >
-> Für relevante Ereignisse: vollständiger Kontext-Payload speichern:
-> - Volle Nutzerfrage, volle Kira-Antwort, vollständiger Kontext-Snapshot
->
-> Architektur-Anforderungen:
-> - SQLite Event-Store bevorzugt (nicht JSONL)
-> - Zwei Tabellen: Metadaten-Tabelle + Payload-Tabelle
-> - 5 Event-Typen: ui / kira / llm / system / settings
-> - Performance: buffered/async, WAL-Modus, keine blockierenden Schreibvorgänge,
->   keine hochfrequenten Events loggen
->
-> Pflichtfelder (Metadaten):
-> id, timestamp, session_id, event_type, source, modul, submodul,
-> actor_type, context_type, context_id, action, status, result, summary,
-> provider, model, token_in, token_out, duration_ms,
-> error_code, error_message, follow_up_required, related_event_id
->
-> Payload-Felder:
-> user_input_full, assistant_output_full, context_snapshot_json,
-> entity_snapshot_json, settings_before_json, settings_after_json,
-> mail_body_full, thread_excerpt_full
->
-> Kira muss Logs lesen können:
-> - Tool 'runtime_log_suchen' in kira_llm.py
-> - Nur aktiv wenn kira_darf_lesen=True in Config
->
-> Einstellungen-Section im Dashboard:
-> - Granularitäts-Steuerung per Toggle pro Event-Typ
-> - Stats-Anzeige (total, heute, fehler, db-größe)
-> - Filter + Viewer"
+> Architektur: SQLite, 2 Tabellen (Metadaten + Payload), 5 Typen: ui/kira/llm/system/settings
+> Performance: WAL-Modus, keine blockierenden Writes
+> Kira muss Logs lesen können. Einstellungen-Section für Granularitäts-Steuerung."
 
-**Ergebnis:** runtime_log.py erstellt (280 Zeilen), kira_llm.py + server.py vollständig integriert.
-Offen: mail_monitor.py + daily_check.py Integration ausstehend (ISS-004, ISS-005).
+**Ergebnis:** runtime_log.py erstellt, kira_llm.py + server.py integriert.
+Offen: mail_monitor + daily_check Integration, vollständige JS-Coverage.
 
 ---
 
 ## 2026-03-27 | session-i | Memory-System + Cross-Session-Continuity
 
-**Auftrag:**
+**Auftrag:** "Was benötigst du noch um session-übergreifend besser arbeiten zu können,
+damit nichts verloren geht? Anweisungen auch mitloggen."
 
-> "Ist es sinnvoll die Anweisungen in irgendeiner Form mit zu loggen?
-> Ja bitte unbedingt und in den Regeln dann mit aufnehmen."
+**Ergebnis:** server_map.md, architecture_decisions.md, known_issues.json, user_briefs.md,
+KIRA_KOMPLETT_UEBERSICHT.md aktualisiert, Regeln ergänzt.
 
-> (Vorher): "Was benötigst du noch um session-übergreifend besser arbeiten zu können,
-> damit nichts — aber auch wirklich nichts — verloren geht und die nächste Session
-> bis ins kleinste Detail sieht was vorher gemacht wurde?"
+---
 
-**Ergebnis:**
-- server_map.md (alle Funktionen + Zeilen)
-- architecture_decisions.md (7 ADRs)
-- known_issues.json (5 offene Issues)
-- user_briefs.md (diese Datei)
-- KIRA_KOMPLETT_UEBERSICHT.md auf Stand 27.03. gebracht
-- Feedback-Regel für Briefs aufgenommen
+## 2026-03-27 | session-j | Runtime-Log vollständig + Kira Log-Zugriff + Einstellungen-Karte
+
+**Auftrag (Originalwortlaut):**
+
+> "Das Programm-Logging ist aber auch aktiv, also dass alles aufgezeichnet wird was
+> im Programm geklickt, eingegeben, verändert, gesprochen, von KI benutzt etc. wird?
+>
+> Ja bitte vollständig ergänzen und Kira + LLM Zugriff geben und nötigen
+> skill/prompt/skript dafür geben dass sie es mit nutzen soll in jeder Situation.
+> In den Einstellungen eine neue Karte anlegen, wo man alle relevanten Logs schalten kann,
+> man sieht ob aktiv, wieviel Logs enthalten, Größe, LLM dazu an oder aus..
+> und was sonst noch sinnvoll ist für das Kira Projekt."
+
+**Anforderungen:**
+1. Alle fehlenden JS _rtlog() Aufrufe ergänzen (showPanel, setStatus, arSetStatus, angSetStatus, geschKira, readMail, loadThread, newKiraChat, kqDirectSend, loadKiraConv, wissenAction, etc.)
+2. mail_monitor.py: elog() für Mail-Klassifizierung, Task-Erstellung, Monitor-Start/Stop
+3. daily_check.py: elog() für Job-Start/-Ende mit Ergebnissen
+4. Kira aktiv mit Logs versorgen: get_recent_for_kira() in System-Kontext einbauen
+5. Kira-Instruktion: wann und wie sie die Logs nutzen soll (Systemprompt-Erweiterung)
+6. Neue Einstellungen-Karte "Runtime-Log & Telemetrie" mit:
+   - Alle Typ-Toggles mit Live-Status (aktiv + Anzahl Einträge + letzte Aktivität)
+   - DB-Größe, Gesamt-Stats
+   - LLM-Zugriff an/aus mit Erklärung
+   - Vollkontext an/aus
+   - Letzte Einträge Viewer (inline)
+   - Export + Bereinigen

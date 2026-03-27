@@ -60,29 +60,62 @@
     },
     {
       "id": "ISS-004",
-      "status": "open",
+      "status": "fixed",
       "priority": "high",
       "module": "scripts/mail_monitor.py",
       "area": "runtime-log",
       "title": "mail_monitor.py hat keine runtime_log Integration",
       "description": "Mail-Klassifizierungen und Task-Erstellungen durch den Mail-Monitor werden nicht im Runtime-Log erfasst. Geplant aber noch nicht implementiert.",
       "discovered": "2026-03-27",
+      "fixed": "2026-03-27",
       "session": "session-h",
-      "workaround": "activity_log wird weiterhin genutzt",
-      "to_verify": []
+      "fixed_session": "session-j",
+      "fix_summary": "5 elog()-Aufrufe: mail_classified, task_created, task_creation_failed, monitor_started, monitor_stopped",
+      "workaround": null,
+      "to_verify": [
+        "Monitor-Start loggt in runtime_events.db",
+        "Mail-Klassifizierung mit Kategorie + Konfidenz geloggt",
+        "Task-Erstellung mit task_id geloggt"
+      ]
     },
     {
       "id": "ISS-005",
-      "status": "open",
+      "status": "fixed",
       "priority": "medium",
       "module": "scripts/daily_check.py",
       "area": "runtime-log",
       "title": "daily_check.py hat keine runtime_log Integration",
       "description": "Täglicher Check-Job loggt nicht ins Runtime-Log.",
       "discovered": "2026-03-27",
+      "fixed": "2026-03-27",
       "session": "session-h",
-      "workaround": "activity_log wird weiterhin genutzt",
-      "to_verify": []
+      "fixed_session": "session-j",
+      "fix_summary": "elog() bei Job-Start und Job-Ende mit Dauer + Statistik (Mails/Tasks/Offen)",
+      "workaround": null,
+      "to_verify": [
+        "daily_check_started und daily_check_completed erscheinen im Log"
+      ]
+    },
+    {
+      "id": "ISS-006",
+      "status": "open",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "runtime-log",
+      "title": "Session-j Änderungen ungetestet (JS _rtlog-Calls, Einstellungen-Karte)",
+      "description": "13 neue _rtlog()-Aufrufe in JS, reichhaltige Einstellungen-Karte (refreshRtLogStats/exportRtLog/clearRtLog), POST /api/runtime/clear — alles noch ungetestet im laufenden Server.",
+      "discovered": "2026-03-27",
+      "session": "session-j",
+      "workaround": null,
+      "to_verify": [
+        "showPanel() loggt panel_switched",
+        "closeKiraWorkspace() loggt kira_workspace_closed",
+        "clearRtLog() leert DB und zeigt Toast",
+        "exportRtLog() liefert CSV-Download",
+        "refreshRtLogStats() aktualisiert Karten",
+        "Einstellungen-Karte zeigt Typ-Toggles mit Zählern",
+        "Type-Toggle speichert in config.json"
+      ]
     }
   ]
 }

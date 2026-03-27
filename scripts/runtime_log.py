@@ -425,6 +425,21 @@ def get_recent_for_kira(limit: int = 30, session_id: str = None) -> str:
         return ""
 
 
+def _clear_all() -> None:
+    """Löscht alle Events aus der DB. Nur für manuelle Bereinigung via UI."""
+    with _lock:
+        try:
+            db = sqlite3.connect(str(EVENTS_DB))
+            _ensure_db(db)
+            db.execute("DELETE FROM events")
+            db.execute("DELETE FROM event_payloads")
+            db.execute("VACUUM")
+            db.commit()
+            db.close()
+        except Exception:
+            pass
+
+
 # ── Config-Defaults sicherstellen ─────────────────────────────────────────────
 
 def ensure_config_defaults() -> None:
