@@ -38,6 +38,7 @@ EVENTS_DB   = SCRIPTS_DIR.parent / "knowledge" / "runtime_events.db"
 CONFIG_FILE = SCRIPTS_DIR / "config.json"
 
 _lock = Lock()
+_db_initialized = False  # True nach erstem Schema-Setup — verhindert wiederholte COMMITs
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -76,8 +77,13 @@ def _vollkontext_aktiv() -> bool:
 # ── DB-Schema ────────────────────────────────────────────────────────────────
 
 def _ensure_db(db: sqlite3.Connection) -> None:
+    global _db_initialized
+    # Verbindungs-Einstellungen (per Connection, kein Commit nötig)
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=NORMAL")
+    db.execute("PRAGMA wal_autocheckpoint=100")  # Checkpoint alle 100 Pages (~400 KB) statt 1000
+    if _db_initialized:
+        return  # Schema existiert bereits — kein erneutes CREATE + COMMIT
     db.execute("""CREATE TABLE IF NOT EXISTS events (
         id               TEXT    PRIMARY KEY,
         ts               TEXT    NOT NULL,
@@ -128,6 +134,7 @@ def _ensure_db(db: sqlite3.Connection) -> None:
     except Exception:
         pass
     db.commit()
+    _db_initialized = True
 
 
 # ── Haupt-Schreib-Funktion ────────────────────────────────────────────────────
