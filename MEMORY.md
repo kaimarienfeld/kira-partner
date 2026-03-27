@@ -8,6 +8,7 @@
 
 ## Grundprinzip
 - [feedback_commit_and_memory_update.md](feedback_commit_and_memory_update.md) — PFLICHT: Nach jeder Änderung committen + alle Tracking-Dateien aktualisieren
+- [feedback_user_briefs_rule.md](feedback_user_briefs_rule.md) — PFLICHT: Größere Aufträge als Original-Brief in user_briefs.md festhalten
 - [feedback_llm_first.md](feedback_llm_first.md) — LLM-First: Alle Features mit KI-Integration, nie offline-only
 - [feedback_dashboard_ui_rebuild.md](feedback_dashboard_ui_rebuild.md) — Dashboard UI aus Referenzvorlagen bauen, alte UI vollständig ersetzen
 - [feedback_feature_list_rule.md](feedback_feature_list_rule.md) — PFLICHT: feature_registry.json VOR und NACH jeder Session prüfen+aktualisieren
@@ -43,7 +44,8 @@
 - `knowledge/rechnungen_detail.db` — Rechnungsdetails via PDF-Extraktion
 
 ## Fortschritt & Logs
-- [change_log.jsonl](change_log.jsonl) — Append-only Entwicklungs-Log (feingranular, nie überschreiben)
+- [user_briefs.md](user_briefs.md) — Original-Aufträge von Kai (append-only, warum wurde was gebaut?)
+- [change_log.jsonl](change_log.jsonl) — Append-only Code-Änderungs-Log (feingranular, nie überschreiben)
 
 ## Cowork-Ausgaben (automatisch generiert)
 - `cowork/AKTUELL.md` — Immer aktueller Tagesbericht (wird überschrieben)

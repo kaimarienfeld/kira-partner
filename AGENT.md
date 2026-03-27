@@ -11,12 +11,18 @@
 2. `session_handoff.json` lesen (letzter Arbeitsstand, offene Punkte, nächster Schritt)
 3. `feature_registry.json` lesen (Feature-Status aller Module)
 
+### Session-Start: Größerer Auftrag kommt rein
+1. **Sofort** in `user_briefs.md` festhalten — Original-Wortlaut oder treue Rekonstruktion
+2. Dann mit der Arbeit beginnen
+
 ### Session-Ende / Nach jeder Änderung
 1. **Git Commit** erstellen (immer nach jeder abgeschlossenen Änderung)
 2. `session_handoff.json` aktualisieren (was wurde getan, nächster Schritt)
 3. `feature_registry.json` aktualisieren (Status geänderter Features)
-4. `MEMORY.md` prüfen und bei Bedarf ergänzen
-5. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
+4. `known_issues.json` aktualisieren (neue Issues rein, behobene auf "fixed")
+5. `MEMORY.md` prüfen und bei Bedarf ergänzen
+6. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
+7. `server_map.md` aktualisieren wenn neue Funktionen in server.py hinzukamen
 
 ---
 
@@ -115,3 +121,4 @@ Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.
 |---------|-------|-----|
 | session-g | 2026-03-27 | Kira-Workspace UI Rebuild (kq-*/kw-*, 3-Spalten, Quick Panel) |
 | session-h | 2026-03-27 | Runtime-Log-System (runtime_log.py, server.py Integration, Einstellungen-UI) |
+| session-i | 2026-03-27 | Memory-System ausgebaut (server_map, ADRs, known_issues, user_briefs, UEBERSICHT aktuell) |

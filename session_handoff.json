@@ -1,28 +1,36 @@
 {
-  "last_session": "session-2026-03-27-h",
+  "last_session": "session-2026-03-27-i",
   "date": "2026-03-27",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
-    "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus)",
-    "session-h: kira_llm.py erweitert (elog in execute_tool + chat + runtime_log_suchen Tool)",
-    "session-h: server.py vollständig integriert (API-Endpunkte, elog an 4 Stellen, JS _rtlog(), Einstellungen-UI-Section)"
+    "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
+    "session-i: Memory-System komplett ausgebaut: server_map.md, architecture_decisions.md (7 ADRs), known_issues.json (5 Issues), user_briefs.md mit Briefs für g/h/i, KIRA_KOMPLETT_UEBERSICHT.md auf Stand 27.03. gebracht, Regeln für user_briefs aufgenommen"
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
     "runtime-log-system",
-    "runtime-log-server-integration"
+    "runtime-log-server-integration",
+    "memory-system-cross-session"
   ],
   "open_tasks": [
-    "mail_monitor.py: runtime_log Integration (elog bei Mail-Klassifizierung + Task-Erstellung)",
-    "daily_check.py: runtime_log Integration (elog für Job-Start/-Ende mit Ergebnissen)",
-    "Einstellungen: Aktivitätsprotokoll-Section noch ohne rlog()-Verknüpfung (nur change_log Stats)",
-    "Test: Gesamter Server-Start nach Rebuild",
-    "KIRA_KOMPLETT_UEBERSICHT.md aktualisieren (Stand noch 25.03.2026)"
+    "mail_monitor.py: runtime_log Integration (ISS-004)",
+    "daily_check.py: runtime_log Integration (ISS-005)",
+    "Test: Gesamter Server-Start nach Rebuild (ISS-001, ISS-002 — kritisch!)",
+    "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte, könnten präzisiert werden"
   ],
-  "next_step": "mail_monitor.py und daily_check.py mit runtime_log integrieren, dann vollständigen Test des Servers durchführen",
+  "next_step": "Server testen (ISS-001 + ISS-002) — dann mail_monitor.py und daily_check.py mit runtime_log integrieren",
   "critical_notes": [
-    "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht",
+    "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
-    "runtime_events.db wird automatisch beim ersten Server-Start erstellt (ensure_config_defaults + _ensure_db)"
-  ]
+    "runtime_events.db wird automatisch beim ersten Server-Start erstellt",
+    "activity_log.py NICHT anfassen — Backward-Compat (ADR-001)",
+    "server.py hat ~7200 Zeilen — vor Arbeit server_map.md lesen!"
+  ],
+  "tracking_files": {
+    "user_briefs": "user_briefs.md — Original-Aufträge (session-g, h, i eingetragen)",
+    "feature_registry": "feature_registry.json — 21 Features",
+    "known_issues": "known_issues.json — 5 offene Issues",
+    "server_map": "server_map.md — alle Funktionen mit Zeilen",
+    "arch_decisions": "architecture_decisions.md — 7 ADRs"
+  }
 }
