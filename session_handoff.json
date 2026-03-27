@@ -6,7 +6,7 @@
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
     "session-i: Memory-System komplett ausgebaut: server_map.md, architecture_decisions.md (7 ADRs), known_issues.json (5 Issues), user_briefs.md mit Briefs für g/h/i, KIRA_KOMPLETT_UEBERSICHT.md auf Stand 27.03. gebracht, Regeln für user_briefs aufgenommen",
     "session-j: Vollständiges Runtime-Logging + Kira Log-Zugriff: mail_monitor.py (5 elog-Calls), daily_check.py (Start/Ende), kira_llm.py (get_recent_for_kira in System-Prompt + DEINE ROLLE Instruktion), server.py (13 neue _rtlog-Calls, _rtlog_type_row(), reichhaltige Einstellungen-Karte, refreshRtLogStats/exportRtLog/clearRtLog, POST /api/runtime/clear), runtime_log.py (_clear_all())",
-    "session-k: Bugfixes + Server-Test: ISS-007 _html() UnicodeEncodeError gefixt (errors='replace'), ISS-008 elog() summary-Doppelarg in mail_monitor gefixt. ISS-001/002/006 per HTTP-Test verifiziert — kq-*/kw-* OK, Runtime-Log OK, HTTP 200, kiraSendBtn als <button> OK. Atomares Mikro-Logging (diff_to_changelog.py + pre-commit Hook) eingerichtet."
+    "session-k: Bugfixes + Server-Test: ISS-007 _html() UnicodeEncodeError gefixt (errors='replace'), ISS-008 elog() summary-Doppelarg in mail_monitor gefixt. ISS-001/002/006 per HTTP-Test verifiziert — kq-*/kw-* OK, Runtime-Log OK, HTTP 200, kiraSendBtn als <button> OK. Atomares Mikro-Logging (diff_to_changelog.py + pre-commit Hook) eingerichtet. JS SyntaxError line 5059 (exportRtLog \\n) gefixt. 47 duplicate form field IDs behoben: _build_ar_table(scope=), _wissen_card(with_id=), Bibliothek-Panels auf wbp-* umgestellt, showWissenTab(ns). favicon.ico 404 gefixt (70-byte ICO)."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -25,7 +25,7 @@
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
     "ISS-003: SyntaxWarnings (pre-existing, niedrige Prio) — JS-Regex in Python-Strings, raw-strings wenn berührt"
   ],
-  "next_step": "Browser öffnen: http://localhost:8765/ — Kira Workspace interaktiv testen (Quick Panel, Chat, Einstellungen Runtime-Log Karte)",
+  "next_step": "Browser öffnen: http://localhost:8765/ — Konsole sollte jetzt sauber sein. Interaktiv testen: Quick Panel, Chat, clearRtLog Toast, exportRtLog CSV.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
@@ -37,7 +37,7 @@
   "tracking_files": {
     "user_briefs": "user_briefs.md — Original-Aufträge (session-g bis j eingetragen)",
     "feature_registry": "feature_registry.json — 26 Features (5 neu in session-j)",
-    "known_issues": "known_issues.json — ISS-001..006 (ISS-004/005 fixed, ISS-006 neu)",
+    "known_issues": "known_issues.json — ISS-001..008 (ISS-004/005/007/008 fixed, ISS-001/002/006 verified)",
     "server_map": "server_map.md — alle Funktionen mit Zeilennummern",
     "arch_decisions": "architecture_decisions.md — 7 ADRs"
   }
