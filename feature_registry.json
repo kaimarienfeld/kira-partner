@@ -1,0 +1,179 @@
+{
+  "_schema": "v2",
+  "_updated": "2026-03-27",
+  "features": [
+    {
+      "id": "dashboard-ui",
+      "name": "Dashboard Hauptseite",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "KPI-Karten, Top-Aufgaben, letzte Geschäftsvorgänge, Sparklines"
+    },
+    {
+      "id": "kommunikation-panel",
+      "name": "Kommunikation Panel",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "Aufgabenkarten nach Kategorie, Kira-Buttons, Status-Aktionen, Erinnerungs-Badges"
+    },
+    {
+      "id": "geschaeft-panel",
+      "name": "Geschäft Panel (5 Sub-Tabs)",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "Übersicht, Ausgangsrechnungen, Angebote, Eingangsrechnungen, Mahnungen"
+    },
+    {
+      "id": "wissen-panel",
+      "name": "Wissen Panel",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "7 Kategorien, fest hinterlegte Regeln, automatisch gelernte Regeln, Kira-Vorschläge"
+    },
+    {
+      "id": "kira-workspace-ui",
+      "name": "Kira Workspace UI (kq-*/kw-*)",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "3-Spalten-Layout (ctx-panel/center/tools), Quick Panel 7 Items, Kontext-Bar, Quick-Actions-Bar, History-Sidebar",
+      "session": "session-g"
+    },
+    {
+      "id": "kira-multi-llm",
+      "name": "Kira Multi-LLM Fallback",
+      "module": "kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "Anthropic/OpenAI/OpenRouter/Ollama/Custom, Prioritäts-Fallback, Provider-Verwaltung"
+    },
+    {
+      "id": "kira-tools",
+      "name": "Kira Tools (8 Stück)",
+      "module": "kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "rechnung_bezahlt, angebot_status, eingangsrechnung_erledigt, kunde_nachschlagen, nachfass_email_entwerfen, wissen_speichern, rechnungsdetails_abrufen, web_recherche"
+    },
+    {
+      "id": "runtime-log",
+      "name": "Runtime-Log System",
+      "module": "runtime_log.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "SQLite Event-Store, 5 Typen (ui/kira/llm/system/settings), WAL-Modus, Vollkontext-Payloads, Kira-lesbar via Tool",
+      "session": "session-h"
+    },
+    {
+      "id": "runtime-log-server-integration",
+      "name": "Runtime-Log Server-Integration",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "API-Endpunkte (GET events/stats/payload, POST event), JS _rtlog(), Einstellungen-UI-Section, elog() an 4 Server-Stellen",
+      "session": "session-h"
+    },
+    {
+      "id": "runtime-log-kira-integration",
+      "name": "Runtime-Log Kira-Integration",
+      "module": "kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "elog in execute_tool (success/failure), elog in chat() (user+assistant+tokens), runtime_log_suchen Tool",
+      "session": "session-h"
+    },
+    {
+      "id": "runtime-log-mail-integration",
+      "name": "Runtime-Log Mail-Monitor-Integration",
+      "module": "mail_monitor.py",
+      "status": "planned",
+      "last_updated": "2026-03-27",
+      "description": "elog bei Mail-Klassifizierung, Task-Erstellung, Monitor-Start/-Stop"
+    },
+    {
+      "id": "runtime-log-daily-check-integration",
+      "name": "Runtime-Log Daily-Check-Integration",
+      "module": "daily_check.py",
+      "status": "planned",
+      "last_updated": "2026-03-27",
+      "description": "elog für Job-Start/-Ende mit Ergebnissen (Mails gefunden, Tasks erstellt)"
+    },
+    {
+      "id": "mail-monitor",
+      "name": "Echtzeit Mail-Monitor (IMAP-Polling)",
+      "module": "mail_monitor.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "IMAP-Polling alle ~60s, automatische Task-Erstellung, Push-Benachrichtigung"
+    },
+    {
+      "id": "activity-log",
+      "name": "Aktivitätsprotokoll (Legacy)",
+      "module": "activity_log.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "8-Spalten SQLite, einfaches Log für Server-Start/Task-Status/Kira-Chat. Backward-Compat bleibt."
+    },
+    {
+      "id": "change-log",
+      "name": "Änderungsverlauf (Mikro-Log)",
+      "module": "change_log.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "Append-only JSONL, Developer/Claude-Code Log jeder Code-Änderung"
+    },
+    {
+      "id": "einstellungen-panel",
+      "name": "Einstellungen Panel",
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-27",
+      "description": "Design, Push, Aufgaben, Nachfass, Dashboard, Multi-LLM, Aktivitätsprotokoll, Änderungsverlauf, Runtime-Log/Telemetrie",
+      "session": "session-h"
+    },
+    {
+      "id": "direktmail-antwort",
+      "name": "Direkte E-Mail-Antwort aus Dashboard",
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-27",
+      "description": "SMTP-Integration, Antworten-Button sendet fertigen Entwurf direkt. Config vorbereitet."
+    },
+    {
+      "id": "kira-tagesstart-briefing",
+      "name": "Kira Tagesstart-Briefing",
+      "module": "kira_llm.py",
+      "status": "partial",
+      "last_updated": "2026-03-27",
+      "description": "generate_daily_briefing() vorhanden, API-Endpunkt vorhanden. Morgen-Anzeige im Dashboard noch nicht."
+    },
+    {
+      "id": "kunden-360",
+      "name": "Kunden-360-Ansicht",
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-25",
+      "description": "Eigene Seite pro Kunde: Timeline aller Interaktionen, Mails, Angebote, Rechnungen"
+    },
+    {
+      "id": "angebots-kalkulation",
+      "name": "Angebots-Kalkulations-Assistent",
+      "module": "kira_llm.py",
+      "status": "planned",
+      "last_updated": "2026-03-25",
+      "description": "Schätzung aus Projektbeschreibung + Vergleich mit historischen Projekten"
+    },
+    {
+      "id": "cashflow-prognose",
+      "name": "Cashflow-Prognose",
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-25",
+      "description": "Erwartete Eingänge basierend auf offenen Rechnungen + Zahlungsverhalten"
+    }
+  ]
+}

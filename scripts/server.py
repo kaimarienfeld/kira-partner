@@ -8,7 +8,7 @@ strukturiertes Geschäft, interaktives Wissen.
 """
 import json, sys, os, webbrowser, threading, urllib.parse, sqlite3, re, mimetypes
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -21,6 +21,9 @@ ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_r
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+from activity_log import log as alog, get_entries as alog_entries, get_stats as alog_stats
+from runtime_log import (elog as rlog, eget as rlog_get, eget_payload as rlog_payload,
+                          estats as rlog_stats, ensure_config_defaults as rlog_ensure_cfg)
 from llm_response_gen import generate_draft
 from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversations,
                        get_conversation_messages as kira_get_messages,
@@ -30,6 +33,15 @@ from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversat
 from mail_monitor import start_monitor_thread, get_monitor_status, stop_monitor
 
 PORT = 8765
+
+# Safe migration: add message_id column to loeschhistorie if missing
+try:
+    _db = sqlite3.connect(str(TASKS_DB))
+    _db.execute("ALTER TABLE loeschhistorie ADD COLUMN message_id TEXT")
+    _db.commit()
+    _db.close()
+except Exception:
+    pass
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
@@ -80,6 +92,7 @@ def task_card(t: dict) -> str:
     konto = esc(t.get("konto","") or "")
     datum = format_datum(t.get("datum_mail"))
     notiz = esc(t.get("notiz","") or "")
+    naechste_er = t.get('naechste_erinnerung', '') or ''
     anh   = t.get("anhaenge_pfad","") or ""
     zusammenfassung  = esc(t.get("zusammenfassung","") or "")
     absender_rolle   = esc(t.get("absender_rolle","") or "")
@@ -99,6 +112,22 @@ def task_card(t: dict) -> str:
         f'<span class="badge badge-warn2">{erin}. Erinnerung</span>' if erin == 2 else
         f'<span class="badge badge-alarm">{erin}. Erinnerung</span>' if erin > 2 else ""
     )
+    thread_count = t.get("_thread_count", 1) or 1
+    thread_badge = (f'<span class="badge" title="Thread: {thread_count} Nachrichten" style="background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);font-size:9px">'
+                    f'&#x1F4AC; {thread_count}</span>') if thread_count > 1 else ""
+    konfidenz = t.get("konfidenz", "mittel") or "mittel"
+    konfidenz_badge = ('<span class="badge" title="Niedrige Klassifizierungs-Konfidenz — bitte prüfen" '
+                       'style="background:#FFF3CD;color:#856404;border:1px solid #FFECB5;font-size:9px">'
+                       '? unsicher</span>') if konfidenz == "niedrig" else ""
+
+    erinnerung_badge = ""
+    if naechste_er:
+        try:
+            er_dt = datetime.fromisoformat(naechste_er[:19])
+            er_fmt = er_dt.strftime("%d.%m. %H:%M")
+            erinnerung_badge = f'<span class="badge badge-erinnerung" title="Erinnerung geplant">&#x23F0; {er_fmt}</span>'
+        except Exception:
+            pass
 
     fotos_btn = ""
     if anh:
@@ -115,12 +144,16 @@ def task_card(t: dict) -> str:
                 if antwort_noetig else "")
 
     return f"""
-<div class="task-card {prio_class(prio)}" id="task-{tid}">
+<div class="task-card {prio_class(prio)}" id="task-{tid}" data-kat="{js_esc(kat)}">
+  <label class="tc-check" title="Auswählen"><input type="checkbox" onchange="toggleSelect({tid},this)"></label>
   <div class="task-header">
     <div class="task-tags">
       <span class="tag {tag_class}">{tag_text}</span>
       {"<span class='konto-badge'>" + konto + "</span>" if konto else ""}
       {badge}
+      {thread_badge}
+      {konfidenz_badge}
+      {erinnerung_badge}
     </div>
     <span class="task-datum">{datum}</span>
   </div>
@@ -139,10 +172,12 @@ def task_card(t: dict) -> str:
     {"<a href='" + esc(mailto) + "' class='btn btn-primary' target='_blank'>Outlook</a>" if email else ""}
     {fotos_btn}
     {mail_btn}
-    <button class="btn btn-done"   onclick="setStatus({tid},'erledigt')">Erledigt</button>
-    <button class="btn btn-later"  onclick="setStatus({tid},'spaeter')">Später</button>
-    <button class="btn btn-ignore" onclick="setStatus({tid},'ignorieren')">Ignorieren</button>
-    <button class="btn btn-korr"   onclick="openKorrektur({tid},'{js_esc(kat)}')">Korrektur</button>
+    <button class="btn btn-done"     onclick="setStatusLernen({tid},'erledigt','{js_esc(kat)}')">Erledigt</button>
+    <button class="btn btn-kenntnis" onclick="setStatusLernen({tid},'zur_kenntnis','{js_esc(kat)}')">Zur Kenntnis</button>
+    <button class="btn btn-later"    onclick="openSpaeterDialog({tid})">Später</button>
+    <button class="btn btn-ignore"   onclick="setStatusLernen({tid},'ignorieren','{js_esc(kat)}')">Ignorieren</button>
+    <button class="btn btn-korr"     onclick="openKorrektur({tid},'{js_esc(kat)}')">Korrektur</button>
+    <button class="btn btn-loeschen" onclick="confirmLoeschen({tid})">Löschen</button>
   </div>
 </div>"""
 
@@ -189,25 +224,34 @@ def build_dashboard(tasks, db):
     if s_ar_offen > 0:
         briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#1D9E75"></span>&euro;&nbsp;{s_ar_offen:,.0f} offenes Volumen</div>')
 
-    # LLM-Briefing (falls verfügbar)
-    llm_summary = ""
+    # LLM-Briefing (falls verfügbar) — voll anzeigen
+    llm_block = ""
     try:
         briefing = generate_daily_briefing()
-        bz = (briefing.get("zusammenfassung","") or "").strip()
+        bz   = (briefing.get("zusammenfassung","") or "").strip()
+        prios = briefing.get("prioritaeten") or []
         if bz:
-            llm_summary = f'<div class="dash-b-item" style="color:var(--text);font-style:italic;font-size:11px">{esc(bz[:120])}{"&hellip;" if len(bz)>120 else ""}</div>'
+            prio_html = ""
+            if prios:
+                typ_col = {"rechnung":"#E24B4A","angebot":"#EF9F27","aufgabe":"#378ADD"}
+                items = "".join(
+                    f'<div class="dash-bs-prio"><span class="dash-bs-dot" style="background:{typ_col.get(str(p.get("typ","aufgabe")).lower(),"#888")}"></span>{esc(str(p.get("text",""))[:120])}</div>'
+                    for p in prios[:5]
+                )
+                prio_html = f'<div class="dash-bs-prios">{items}</div>'
+            llm_block = f'<div class="dash-briefing-summary"><div class="dash-bs-text">{esc(bz)}</div>{prio_html}</div>'
     except: pass
 
-    if not briefing_items and not llm_summary:
+    if not briefing_items:
         briefing_items = ['<div class="dash-b-item" style="color:var(--success)"><span class="dash-b-dot" style="background:var(--success)"></span>Alles im gr&uuml;nen Bereich</div>']
 
     briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
-  <div class="dash-briefing-title">Tagesbriefing</div>
-  <div class="dash-briefing-items">
-    {"".join(briefing_items)}
-    {llm_summary}
+  <div class="dash-briefing-head">
+    <div class="dash-briefing-title">Tagesbriefing</div>
+    <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
   </div>
-  <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
+  <div class="dash-briefing-items">{"".join(briefing_items)}</div>
+  {llm_block}
 </div>'''
 
     # ── Zone B: KPI-Karten ──
@@ -439,10 +483,52 @@ def build_dashboard(tasks, db):
             except: pass
     except: pass
 
+    # Korrektur-Statistik: Häufig falsch klassifizierte Kategorien (letzte 90 Tage)
+    try:
+        cutoff90 = (datetime.now().replace(hour=0,minute=0,second=0)
+                   .__class__.now() if False else datetime.now()).strftime("%Y-%m-%d")
+        from datetime import timedelta as _td90
+        cutoff90 = (datetime.now() - _td90(days=90)).strftime("%Y-%m-%d")
+        korr_rows = db.execute("""
+            SELECT alter_typ, neuer_typ, COUNT(*) c
+            FROM corrections
+            WHERE alter_typ != neuer_typ AND erstellt_am >= ?
+            GROUP BY alter_typ, neuer_typ
+            HAVING c >= 3
+            ORDER BY c DESC LIMIT 3
+        """, (cutoff90,)).fetchall()
+        for r in korr_rows:
+            c = r['c']
+            von = esc(r['alter_typ'] or '')
+            zu  = esc(r['neuer_typ'] or '')
+            signals.append(('s-amber', '#EF9F27',
+                f'{c}x &#x201E;{von}&#x201C; &#x2192; &#x201E;{zu}&#x201C; korrigiert &mdash; Lernhinweis',
+                "showPanel('wissen')"))
+    except: pass
+
+    # Lösch-History: automatisch gefilterte DATEV-Duplikate (letzte 7 Tage)
+    try:
+        from datetime import timedelta as _td7
+        cutoff7 = (datetime.now() - _td7(days=7)).strftime("%Y-%m-%d")
+        lh_count = db.execute(
+            "SELECT COUNT(*) FROM loeschhistorie WHERE geloescht_am >= ? AND grund NOT LIKE 'BEHALTEN%'",
+            (cutoff7,)
+        ).fetchone()[0]
+        lh_keep  = db.execute(
+            "SELECT COUNT(*) FROM loeschhistorie WHERE geloescht_am >= ? AND grund LIKE 'BEHALTEN%'",
+            (cutoff7,)
+        ).fetchone()[0]
+        if lh_count > 0:
+            keep_hint = f", {lh_keep}x abweichend behalten" if lh_keep else ""
+            signals.append(('s-blue', '#6CB4F0',
+                f'{lh_count} Mail{"s" if lh_count>1 else ""} automatisch als DATEV-Duplikat gefiltert{keep_hint}',
+                "showLöschHistorie()"))
+    except: pass
+
     signals_html = ""
     if signals:
         sig_items = ""
-        for cls, dot_color, text, action in signals[:6]:
+        for cls, dot_color, text, action in signals[:7]:
             sig_items += f'<div class="dash-sig {cls}" onclick="{action}"><span class="sig-dot" style="background:{dot_color}"></span><span class="sig-text">{text}</span><span class="sig-arr">&#x2192;</span></div>'
         signals_html = f"""<div class="dash-signals">
   <div class="dash-panel-title">Signale &amp; Auff&auml;lligkeiten</div>
@@ -457,71 +543,200 @@ def build_dashboard(tasks, db):
 
 # ── KOMMUNIKATION Panel ──────────────────────────────────────────────────────
 def build_kommunikation(tasks):
-    # Ansichten / Sub-Tabs
-    view_tabs = [
-        ("alle", "Alle"),
-        ("Antwort erforderlich", "Antwort erforderlich"),
-        ("Neue Lead-Anfrage", "Neue Leads"),
-        ("Angebotsrückmeldung", "Angebotsrückmeldungen"),
-        ("Zur Kenntnis", "Zur Kenntnis"),
-        ("Shop / System", "Newsletter / System"),
-        ("erledigt", "Abgeschlossen"),
-    ]
-    tabs_html = '<div class="komm-view-tabs">'
-    for key, label in view_tabs:
-        active = " active" if key == "alle" else ""
-        tabs_html += f'<div class="komm-view-tab{active}" onclick="filterKommView(this,\'{key}\')">{label}</div>'
-    tabs_html += '</div>'
+    # Stats
+    n_offen = len(tasks)
+    n_leads    = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
+    n_angebote = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung")
+    n_dringend = sum(1 for t in tasks if (t.get("prioritaet","") or "").lower() == "hoch")
 
-    # Filter-Bar
-    konten = sorted(set(t.get("konto","") or "" for t in tasks if t.get("konto")))
-    konto_opts = "".join(f'<option value="{esc(k)}">{esc(k)}</option>' for k in konten)
-    filter_html = f"""<div class="komm-filter-bar">
-      <select id="komm-filter-quelle" onchange="applyKommFilters()">
-        <option value="">Alle Quellen</option>{konto_opts}
-      </select>
-      <select id="komm-filter-dringlichkeit" onchange="applyKommFilters()">
-        <option value="">Alle Priorit&auml;ten</option>
-        <option value="hoch">Hoch</option>
-        <option value="mittel">Mittel</option>
-        <option value="niedrig">Niedrig</option>
-      </select>
-      <label class="komm-filter-check"><input type="checkbox" id="komm-filter-antwort" onchange="applyKommFilters()"> Offene Frage</label>
-      <label class="komm-filter-check"><input type="checkbox" id="komm-filter-anhang" onchange="applyKommFilters()"> Mit Anh&auml;ngen</label>
-      <span id="komm-filter-count" class="komm-filter-count">{len(tasks)} Vorg&auml;nge</span>
-    </div>"""
-
-    # Task cards with data attributes for filtering
-    groups = [
-        ("Antwort erforderlich",  "Antwort erforderlich", []),
-        ("Neue Lead-Anfrage",     "Neue Leads",           []),
-        ("Angebotsrückmeldung",   "Angebotsrückmeldungen",[]),
-        ("Rechnung / Beleg",      "Rechnungen / Belege",  []),
-        ("Shop / System",         "Shop / System",        []),
-    ]
-    rest = []
+    # Segment counts
+    seg_counts = {
+        "Antwort erforderlich": 0,
+        "Neue Lead-Anfrage":    0,
+        "Angebotsrückmeldung":  0,
+        "Zur Kenntnis":         0,
+        "Shop / System":        0,
+    }
     for t in tasks:
         kat = t.get("kategorie","")
-        placed = False
-        for key, label, lst in groups:
-            if kat == key:
-                lst.append(t)
-                placed = True
-                break
-        if not placed:
-            rest.append(t)
+        if kat in seg_counts:
+            seg_counts[kat] += 1
 
-    cards_html = ""
-    for key, label, lst in groups:
-        cards_html += build_section(label, lst)
-    if rest:
-        cards_html += build_section("Sonstige", rest, collapsed=True)
-    if not cards_html:
-        cards_html = "<p class='empty'>Keine offenen Kommunikationsaufgaben.</p>"
+    stats_parts = [f'<span class="km-stat km-stat-link" onclick="jumpToSeg(\'alle\')"><b>{n_offen}</b> offen</span>']
+    if n_leads:    stats_parts.append(f'<span class="km-stat km-stat-link" onclick="jumpToSeg(\'Neue Lead-Anfrage\')"><b>{n_leads}</b> neue Leads</span>')
+    if n_angebote: stats_parts.append(f'<span class="km-stat km-stat-link" onclick="jumpToSeg(\'Angebotsrückmeldung\')"><b>{n_angebote}</b> Angebotsrückm.</span>')
+    if n_dringend: stats_parts.append(f'<span class="km-stat km-stat-link" style="color:var(--danger)" onclick="jumpToSeg(\'dringend\')"><b>{n_dringend}</b> dringend</span>')
 
-    return f"""{tabs_html}
-{filter_html}
-<div id="komm-cards-container">{cards_html}</div>"""
+    mod_hdr = f"""<div class="km-hdr">
+  <div class="km-hdr-left">
+    <span class="km-title">Kommunikation</span>
+    <div class="km-stats">{"".join(stats_parts)}</div>
+  </div>
+  <div class="km-hdr-acts">
+    <button class="km-act-btn" onclick="document.getElementById('km-search-input').focus()">&#x2315; Suche</button>
+    <button class="km-act-btn" id="km-view-toggle" onclick="toggleKommFokusModus()">&#x229E; Fokusmodus</button>
+    <button class="km-act-btn" onclick="if(_selectedIds.size)multiLoeschen();else showToast('Nichts ausgewählt')">&#x2611; Sammelaktion</button>
+  </div>
+</div>"""
+
+    # Segment tabs
+    seg_tabs = [
+        ("alle",                  "Alle",                 n_offen),
+        ("Antwort erforderlich",  "Antwort erforderlich", seg_counts["Antwort erforderlich"]),
+        ("Neue Lead-Anfrage",     "Neue Leads",           seg_counts["Neue Lead-Anfrage"]),
+        ("Angebotsrückmeldung",   "Angebotsrückm.",       seg_counts["Angebotsrückmeldung"]),
+        ("Zur Kenntnis",          "Zur Kenntnis",         seg_counts["Zur Kenntnis"]),
+        ("Shop / System",         "Newsletter / System",  seg_counts["Shop / System"]),
+    ]
+    segs_html = '<div class="km-seg" id="km-seg-nav">'
+    for key, label, cnt in seg_tabs:
+        active = ' active' if key == "alle" else ""
+        segs_html += f'<div class="km-seg-t{active}" onclick="kommSegFilter(this,\'{key}\')">{label}<span class="km-seg-cnt">{cnt}</span></div>'
+    segs_html += '</div>'
+
+    # Filter bar
+    konten = sorted(set(t.get("konto","") or "" for t in tasks if t.get("konto")))
+    konto_opts = "".join(f'<option value="{esc(k)}">{esc(k)}</option>' for k in konten)
+
+    flt_html = f"""<div class="km-flt" id="km-flt-bar">
+  <span class="km-flt-label">Filter:</span>
+  <span class="km-fc" data-filter="antwort" onclick="toggleKommFc(this)">offene Frage</span>
+  <span class="km-fc" data-filter="fotos" onclick="toggleKommFc(this)">mit Fotos</span>
+  <span class="km-fc" data-filter="anhang" onclick="toggleKommFc(this)">mit Anh&auml;ngen</span>
+  <select class="km-fc-sel" id="km-filter-quelle" onchange="applyKommFilters2()">
+    <option value="">Quelle</option>{konto_opts}
+  </select>
+  <select class="km-fc-sel" id="km-filter-prio" onchange="applyKommFilters2()">
+    <option value="">Dringlichkeit</option>
+    <option value="hoch">Hoch</option>
+    <option value="mittel">Mittel</option>
+    <option value="niedrig">Niedrig</option>
+  </select>
+  <span class="km-fc" data-filter="beantwortet" onclick="toggleKommFc(this)">bereits beantwortet</span>
+  <span class="km-fc" data-filter="pruefung" onclick="toggleKommFc(this)">manuelle Pr&uuml;fung</span>
+  <span class="km-fc" data-filter="kira" onclick="toggleKommFc(this)">nur mit Kira</span>
+  <span class="km-fc-count" id="km-filter-count">{n_offen} Vorg&auml;nge</span>
+  <input type="text" class="km-search-inp" id="km-search-input" placeholder="&#x2315; Suche&hellip;" oninput="applyKommFilters2()">
+</div>"""
+
+    def _wi_accent(t):
+        prio = (t.get("prioritaet","") or "").lower()
+        kat  = t.get("kategorie","") or ""
+        if prio == "hoch":           return "#E24B4A"
+        if kat == "Angebotsrückmeldung": return "#EF9F27"
+        if kat == "Neue Lead-Anfrage":   return "#378ADD"
+        if kat == "Zur Kenntnis":        return "#888780"
+        if kat == "Shop / System":       return "#666460"
+        return "var(--accent)"
+
+    def _wi_tags(t):
+        tags = []
+        kat   = t.get("kategorie","") or ""
+        prio  = (t.get("prioritaet","") or "").lower()
+        antwort = t.get("antwort_noetig", 0)
+        anh   = t.get("anhaenge_pfad","") or ""
+        er    = t.get("naechste_erinnerung","") or ""
+
+        if prio == "hoch":   tags.append('<span class="km-tg km-tg-red">dringend</span>')
+        elif prio == "mittel": tags.append('<span class="km-tg km-tg-amber">mittel</span>')
+        if antwort:          tags.append('<span class="km-tg km-tg-amber">Frage</span>')
+        anh_l = anh.lower()
+        if any(x in anh_l for x in (".jpg",".jpeg",".png",".gif")):
+            tags.append('<span class="km-tg km-tg-blue">Fotos</span>')
+        elif anh:
+            tags.append('<span class="km-tg km-tg-gray">Anhang</span>')
+        if kat == "Neue Lead-Anfrage":  tags.append('<span class="km-tg km-tg-blue">neuer Lead</span>')
+        elif kat == "Angebotsrückmeldung": tags.append('<span class="km-tg km-tg-purple">Angebotsrückm.</span>')
+        elif kat == "Zur Kenntnis":     tags.append('<span class="km-tg km-tg-green">zur Kenntnis</span>')
+        elif kat == "Shop / System":    tags.append('<span class="km-tg km-tg-gray">System</span>')
+        if er:
+            try:
+                er_dt = datetime.fromisoformat(er)
+                tags.append(f'<span class="km-tg km-tg-warn">&#x23F0; {er_dt.strftime("%d.%m. %H:%M")}</span>')
+            except: pass
+        return "".join(tags)
+
+    def _wi_item(t):
+        tid   = t["id"]
+        kat   = t.get("kategorie","") or ""
+        prio  = (t.get("prioritaet","") or "").lower()
+        titel = esc(t.get("titel","") or t.get("betreff","") or "(Kein Betreff)")
+        summ  = esc((t.get("zusammenfassung","") or "")[:140])
+        grund = esc((t.get("kategorie_grund","") or "")[:100])
+        empf  = esc((t.get("empfohlene_aktion","") or "")[:110])
+        rolle = esc(t.get("absender_rolle","") or "")
+        email = esc(t.get("kunden_email","") or "")
+        konto = esc(t.get("konto","") or "")
+        anh   = t.get("anhaenge_pfad","") or ""
+        anh_l = anh.lower()
+        has_fotos  = "1" if any(x in anh_l for x in (".jpg",".jpeg",".png",".gif")) else "0"
+        antwort    = t.get("antwort_noetig", 0)
+        mit_termin = 1 if t.get("mit_termin") else 0
+        man_pruef  = 1 if t.get("manuelle_pruefung") else 0
+        beantw     = 1 if t.get("beantwortet") else 0
+        has_kira   = "1" if (t.get("zusammenfassung") or t.get("empfohlene_aktion")) else "0"
+        datum_raw  = t.get("datum_eingang","") or t.get("datum_mail","") or ""
+        datum_fmt = ""
+        try:
+            dt    = datetime.fromisoformat(str(datum_raw)[:19])
+            delta = datetime.now() - dt
+            if delta.days == 0:   datum_fmt = f"heute {dt.strftime('%H:%M')}"
+            elif delta.days == 1: datum_fmt = "gestern"
+            elif delta.days < 7:  datum_fmt = f"vor {delta.days} Tagen"
+            else:                  datum_fmt = dt.strftime("%d.%m.")
+        except: datum_fmt = str(datum_raw)[:10] if datum_raw else ""
+
+        accent    = _wi_accent(t)
+        tags_html = _wi_tags(t)
+        meta_str  = (rolle + (" &middot; " + email[:30] if email else "")) if (rolle or email) else ""
+
+        kenntnis_btn = f'<button class="wi-quick-btn wi-btn-k" onclick="setStatusLernen({tid},\'zur_kenntnis\',\'{js_esc(kat)}\');event.stopPropagation()" title="Zur Kenntnis nehmen">&#x2714; Zur Kenntnis</button>'
+        check_html   = f'<label class="wi-check" title="Auswählen" onclick="event.stopPropagation()"><input type="checkbox" onchange="toggleSelect({tid},this)"></label>'
+
+        return f"""<div class="wi" id="task-{tid}"
+  data-tid="{tid}" data-kat="{js_esc(kat)}" data-prio="{prio}"
+  data-antwort="{"1" if antwort else "0"}" data-anhang="{"1" if anh else "0"}"
+  data-fotos="{has_fotos}" data-email="{esc(email)}"
+  data-termin="{mit_termin}" data-pruefung="{man_pruef}"
+  data-beantwortet="{beantw}" data-kira="{has_kira}"
+  onclick="selectKommItem({tid},event)">
+  {check_html}
+  <div class="wi-accent" style="background:{accent}"></div>
+  <div class="wi-body">
+    <div class="wi-top">
+      <div class="wi-tags-row">{tags_html}{"<span class='konto-badge'>"+konto+"</span>" if konto else ""}</div>
+      <div class="wi-time">{datum_fmt}</div>
+    </div>
+    <div class="wi-title">{titel}</div>
+    {"<div class='wi-meta'><span class='meta-label'>Rolle:</span> <span class='meta-val'>" + meta_str + "</span></div>" if meta_str else ""}
+    {"<div class='wi-sum'>" + summ + "</div>" if summ else ""}
+    {"<div class='wi-empfehlung'>&#x279C; " + empf + "</div>" if empf else ""}
+    {"<div class='wi-grund'>" + grund + "</div>" if grund else ""}
+    <div class="wi-acts">{kenntnis_btn}</div>
+  </div>
+</div>"""
+
+    items_html = "".join(_wi_item(t) for t in tasks)
+    if not items_html:
+        items_html = '<div class="km-empty">&#x2709;<br>Keine offenen Kommunikationsaufgaben.</div>'
+
+    ctx_placeholder = """<div class="km-ctx-inner" id="km-ctx-content">
+  <div class="km-ctx-empty">
+    <span style="font-size:36px;opacity:.2">&#x25B7;</span>
+    <span>Vorgang aus der Liste w&auml;hlen</span>
+    <span style="font-size:11px;opacity:.6">Klick &ouml;ffnet Kontext &amp; Aktionen</span>
+  </div>
+</div>"""
+
+    return f"""{mod_hdr}
+{segs_html}
+{flt_html}
+<div class="km-workspace">
+  <div class="km-wl" id="km-wl">
+    <div class="km-wl-inner" id="km-items">{items_html}</div>
+  </div>
+  <div class="km-ctx" id="km-ctx">{ctx_placeholder}</div>
+</div>"""
 
 # ── ORGANISATION Panel ────────────────────────────────────────────────────────
 def build_organisation(db):
@@ -660,7 +875,40 @@ def build_geschaeft(db):
     # Bezahlte Rechnungen für Zahlungen-Tab
     ar_bezahlt = [r for r in ar if r.get("status") == "bezahlt"]
 
+    alarm_vol = ' alarm' if s_ar_offen else ''
+    alarm_ein = ' alarm' if eingang else ''
+    alarm_nf  = ' alarm' if n_nf else ''
+    alarm_mah = ' alarm' if ar_gemahnt else ''
     html = f"""
+    <div class="gh-mod-header">
+      <div class="gh-mod-title">Gesch&auml;ft</div>
+      <div class="gh-mod-stats">
+        <div class="gh-stat{alarm_vol}">
+          <div class="gh-stat-num">{s_ar_offen:,.0f}&thinsp;&euro;</div>
+          <div class="gh-stat-lbl">Offenes Vol.</div>
+        </div>
+        <div class="gh-stat{alarm_ein}">
+          <div class="gh-stat-num">{len(eingang)}</div>
+          <div class="gh-stat-lbl">Eingangsre.</div>
+        </div>
+        <div class="gh-stat">
+          <div class="gh-stat-num">{len(ang_offen)}</div>
+          <div class="gh-stat-lbl">Angebote</div>
+        </div>
+        <div class="gh-stat{alarm_nf}">
+          <div class="gh-stat-num">{n_nf}</div>
+          <div class="gh-stat-lbl">Nachfass</div>
+        </div>
+        <div class="gh-stat{alarm_mah}">
+          <div class="gh-stat-num">{len(ar_gemahnt)}</div>
+          <div class="gh-stat-lbl">Gemahnt</div>
+        </div>
+      </div>
+      <div class="gh-mod-acts">
+        <button class="btn btn-sm btn-muted" onclick="openKiraWorkspace('chat')">Kira fragen</button>
+        <button class="btn btn-sm btn-muted" onclick="location.reload()">Sync</button>
+      </div>
+    </div>
     <div class="gesch-tabs">
       <div class="gesch-tab active" onclick="showGeschTab('uebersicht')">Übersicht</div>
       <div class="gesch-tab" onclick="showGeschTab('ausgangsre')">Ausgangsrechnungen ({len(ar)})</div>
@@ -708,96 +956,174 @@ def _build_gesch_auswertung(stats):
 
 
 def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats=None):
-    """Übersicht-Tab mit KPI-Cards, dringenden Punkten und Statistik."""
-    vol_cls = ' gesch-sum-alarm' if s_ar_offen else ''
-    html = f"""<div class="gesch-volumen-hero{vol_cls}" onclick="showGeschTab('ausgangsre')" style="cursor:pointer">
-      <div class="gesch-volumen-label">Offenes Volumen (Ausgangsrechnungen)</div>
-      <div class="gesch-volumen-num">{s_ar_offen:,.2f} EUR</div>
-      <div class="gesch-volumen-sub">{len(ar_offen)} offene Rechnungen</div>
-    </div>
-    <div class="gesch-summary-grid">
-      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_offen else ''}" onclick="showGeschTab('ausgangsre')" style="cursor:pointer">
-        <div class="gesch-sum-num">{len(ar_offen)}</div>
-        <div class="gesch-sum-label">Offene Ausgangsrechnungen</div>
+    """Übersicht-Tab: 6 KPI-Hero-Cards + 60/40-Zones (Aktuelle Vorgänge / Signale & Warnungen)."""
+    s = stats or {}
+    n_ar_offen = len(ar_offen)
+    n_ang_offen = len(ang_offen)
+    n_eingang = len(eingang)
+    n_gemahnt = len(ar_gemahnt)
+    ar_bez_eur = s.get("ar_bezahlt_eur", 0)
+    ang_ges = s.get("ang_total", 0)
+    ang_ann = s.get("ang_angenommen", 0)
+    ang_abl = s.get("ang_abgelehnt", 0)
+    quote = f"{ang_ann/ang_ges*100:.0f}%" if ang_ges >= 3 else "–"
+    skonto_dringend = s.get("skonto_dringend", [])
+
+    # ── 6 KPI Cards ──────────────────────────────────────────────────────────
+    a1 = " alarm" if n_ar_offen else ""
+    a2 = " alarm" if s_ar_offen else ""
+    a4 = " alarm" if n_nf else ""
+    a5 = " alarm" if n_eingang else ""
+    a6 = " alarm" if n_gemahnt else ""
+    html = f"""<div class="gh-kpi-grid">
+      <div class="gh-kpi-card{a1}" onclick="showGeschTab('ausgangsre')">
+        <div class="gh-kpi-num">{n_ar_offen}</div>
+        <div class="gh-kpi-lbl">Offene Rechnungen</div>
+        <div class="gh-kpi-sub">{s_ar_offen:,.0f}&thinsp;&euro; ausstehend</div>
       </div>
-      <div class="gesch-sum-card" onclick="showGeschTab('angebote')" style="cursor:pointer">
-        <div class="gesch-sum-num">{len(ang_offen)}</div>
-        <div class="gesch-sum-label">Offene Angebote</div>
+      <div class="gh-kpi-card{a2}" onclick="showGeschTab('ausgangsre')">
+        <div class="gh-kpi-num" style="font-size:18px">{s_ar_offen:,.0f}&thinsp;&euro;</div>
+        <div class="gh-kpi-lbl">Offenes Volumen</div>
+        <div class="gh-kpi-sub">Bezahlt: {ar_bez_eur:,.0f}&thinsp;&euro;</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if n_nf else ''}" onclick="showGeschTab('angebote')" style="cursor:pointer">
-        <div class="gesch-sum-num">{n_nf}</div>
-        <div class="gesch-sum-label">Nachfass fällig</div>
+      <div class="gh-kpi-card" onclick="showGeschTab('angebote')">
+        <div class="gh-kpi-num">{n_ang_offen}</div>
+        <div class="gh-kpi-lbl">Offene Angebote</div>
+        <div class="gh-kpi-sub">Quote: {quote} ({ang_ges} gesamt)</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if eingang else ''}" onclick="showGeschTab('eingangsre')" style="cursor:pointer">
-        <div class="gesch-sum-num">{len(eingang)}</div>
-        <div class="gesch-sum-label">Offene Eingangsrechnungen</div>
+      <div class="gh-kpi-card{a4}" onclick="showGeschTab('angebote')">
+        <div class="gh-kpi-num">{n_nf}</div>
+        <div class="gh-kpi-lbl">Nachfass f&auml;llig</div>
+        <div class="gh-kpi-sub">Offene Angebote kontaktieren</div>
       </div>
-      <div class="gesch-sum-card{' gesch-sum-alarm' if ar_gemahnt else ''}" onclick="showGeschTab('mahnungen')" style="cursor:pointer">
-        <div class="gesch-sum-num">{len(ar_gemahnt)}</div>
-        <div class="gesch-sum-label">Gemahnte Rechnungen</div>
+      <div class="gh-kpi-card{a5}" onclick="showGeschTab('eingangsre')">
+        <div class="gh-kpi-num">{n_eingang}</div>
+        <div class="gh-kpi-lbl">Eingangsrechnungen</div>
+        <div class="gh-kpi-sub">Offen zur Pr&uuml;fung</div>
+      </div>
+      <div class="gh-kpi-card{a6}" onclick="showGeschTab('mahnungen')">
+        <div class="gh-kpi-num">{n_gemahnt}</div>
+        <div class="gh-kpi-lbl">Gemahnte Rechnungen</div>
+        <div class="gh-kpi-sub">Mahnverfahren aktiv</div>
       </div>
     </div>"""
-    # Skonto-Hinweise (zeitkritisch!)
-    skonto_dringend = stats.get("skonto_dringend", []) if stats else []
-    if skonto_dringend:
-        html += '<div class="section" style="margin-top:16px"><div class="section-title" style="color:#50c878">Skonto-Fristen</div><div class="section-body">'
-        for sk in sorted(skonto_dringend, key=lambda x: x["skonto_datum"]):
-            tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d").date() - datetime.now().date()).days
-            dringend_cls = ' style="color:#e84545"' if tage_rest <= 2 else ""
-            html += f'<div class="gesch-urgent-item"><span class="badge badge-korrekt">{sk["skonto_prozent"]}%</span> {sk["re_nr"]} &middot; <span{dringend_cls}>noch {tage_rest} Tage</span> (bis {format_datum(sk["skonto_datum"])}) &middot; Ersparnis: {sk["skonto_betrag"]:,.2f} EUR</div>'
-        html += '</div></div>'
 
-    # Dringende Punkte
-    urgent = []
-    for r in ar_offen[:3]:
+    # ── Left zone: Aktuelle Vorgänge ──────────────────────────────────────────
+    items = []
+
+    # Skonto-Fristen zuerst (zeitkritisch)
+    for sk in sorted(skonto_dringend, key=lambda x: x["skonto_datum"]):
+        tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d").date() - datetime.now().date()).days
+        color = 'style="color:var(--danger)"' if tage_rest <= 2 else ""
+        betrag_s = f'{sk["skonto_betrag"]:,.2f}&thinsp;&euro;' if sk.get("skonto_betrag") else ""
+        items.append(f'<div class="gh-bi-row"><span class="gh-bi-typ re">Skonto</span>'
+                     f'<div class="gh-bi-info"><div class="gh-bi-name">{sk["re_nr"]} &middot; '
+                     f'<span {color}>{tage_rest}d verbleibend</span></div>'
+                     f'<div class="gh-bi-meta">Frist: {format_datum(sk["skonto_datum"])} &middot; '
+                     f'{sk["skonto_prozent"]}% = {betrag_s}</div></div></div>')
+
+    # Offene Ausgangsrechnungen
+    for r in ar_offen[:6]:
         re_nr = esc(r.get("re_nummer", ""))
-        kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
+        kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:28])
+        betrag = f'{r.get("betrag_brutto") or 0:,.0f}&thinsp;&euro;'
         d = r.get("_detail", {})
         ziel = d.get("zahlungsziel_datum", "")
-        extra = f' &middot; Fällig: {format_datum(ziel)}' if ziel else ""
-        urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge gesch-typ-eingang">Rechnung</span> {re_nr} &middot; {kunde} &middot; {format_datum(r.get("datum"))}{extra}</div>')
+        meta = f'Datum: {format_datum(r.get("datum"))}'
+        if ziel: meta += f' &middot; F&auml;llig: {format_datum(ziel)}'
+        mc = r.get("mahnung_count") or 0
+        extra = f' <span style="color:var(--danger);font-weight:700">M{mc}</span>' if mc else ""
+        items.append(f'<div class="gh-bi-row"><span class="gh-bi-typ re">Rechnung</span>'
+                     f'<div class="gh-bi-info"><div class="gh-bi-name">{re_nr}{extra} &middot; {kunde}</div>'
+                     f'<div class="gh-bi-meta">{meta}</div></div>'
+                     f'<div class="gh-bi-right"><span class="gh-bi-betrag">{betrag}</span></div></div>')
+
+    # Nachfass-fällige Angebote
     for r in ang_offen:
         if (r.get("naechster_nachfass") or "") <= today:
             a_nr = esc(r.get("a_nummer", ""))
-            kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-            urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge" style="color:var(--kl);background:var(--accent-bg)">Nachfass</span> {a_nr} &middot; {kunde} &middot; Fällig: {r.get("naechster_nachfass","")}</div>')
-    for r in ar_gemahnt[:2]:
+            kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:28])
+            nf_d = r.get("naechster_nachfass", "")
+            nf_cnt = r.get("nachfass_count") or 0
+            items.append(f'<div class="gh-bi-row"><span class="gh-bi-typ nf">Nachfass</span>'
+                         f'<div class="gh-bi-info"><div class="gh-bi-name">{a_nr} &middot; {kunde}</div>'
+                         f'<div class="gh-bi-meta">F&auml;llig: {format_datum(nf_d)} &middot; {nf_cnt}/3 Kontakte</div>'
+                         f'</div></div>')
+
+    # Offene Eingangsrechnungen
+    for r in eingang[:3]:
+        partner = esc((r.get("gegenpartei") or r.get("gegenpartei_email") or "")[:28])
+        betreff = esc((r.get("betreff") or "")[:35])
+        betrag_s = f'{r.get("betrag", 0) or 0:,.0f}&thinsp;&euro;' if r.get("betrag") else ""
+        name_s = partner or betreff
+        items.append(f'<div class="gh-bi-row">'
+                     f'<span class="gh-bi-typ re" style="color:var(--text);background:rgba(128,128,128,.12)">Eingang</span>'
+                     f'<div class="gh-bi-info"><div class="gh-bi-name">{name_s}</div>'
+                     f'<div class="gh-bi-meta">{format_datum(r.get("datum"))}'
+                     f'{(" &middot; " + betrag_s) if betrag_s else ""}</div></div></div>')
+
+    items_html = "".join(items) if items else '<p class="empty">Keine aktiven Vorg&auml;nge.</p>'
+    n_left = n_ar_offen + n_nf + n_eingang
+
+    # ── Right zone: Signale & Warnungen ──────────────────────────────────────
+    warns = []
+
+    for r in ar_gemahnt[:4]:
         re_nr = esc(r.get("re_nummer", ""))
-        kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:30])
-        mc = r.get("mahnung_count", 0)
-        urgent.append(f'<div class="gesch-urgent-item"><span class="gesch-typ-badge gesch-typ-mahnung">Mahnung x{mc}</span> {re_nr} &middot; {kunde}</div>')
-    if not urgent:
-        urgent.append('<p class="empty">Keine dringenden Punkte.</p>')
-    n_urg = len(ar_offen) + n_nf + len(ar_gemahnt)
-    html += f"""<div class="section" style="margin-top:16px">
-      <div class="section-title">Dringend <span class="count-badge">{n_urg}</span></div>
-      <div class="section-body">{"".join(urgent[:7])}</div>
-    </div>"""
-    # Statistik-Sektion
-    if stats:
-        s = stats
-        ang_total = s.get("ang_total", 0)
-        ang_angen = s.get("ang_angenommen", 0)
-        ang_abgel = s.get("ang_abgelehnt", 0)
-        quote = f"{ang_angen / ang_total * 100:.0f}%" if ang_total >= 3 else "–"
-        hinweis = "" if ang_total >= 10 else f'<span class="muted" style="font-size:11px;margin-left:8px">(Datenbasis: {ang_total} Angebote)</span>'
-        ar_ges = s.get("ar_gesamt_eur", 0)
-        ar_bez = s.get("ar_bezahlt_eur", 0)
-        zdauern = s.get("zahlungsdauern", [])
-        zd_avg = f'{sum(zdauern)/len(zdauern):.0f}d' if zdauern else "–"
-        zd_hinweis = "" if len(zdauern) >= 5 else f' <span class="muted" style="font-size:10px">({len(zdauern)} Werte)</span>'
-        html += f"""<div class="section" style="margin-top:16px">
-      <div class="section-title">Statistik &amp; Finanzen</div>
-      <div class="section-body">
-        <div class="gesch-summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{ar_ges:,.0f} &euro;</div><div class="gesch-sum-label">Fakturiert gesamt</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num" style="color:#50c878">{ar_bez:,.0f} &euro;</div><div class="gesch-sum-label">Bezahlt</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{s.get('ar_bezahlt',0)}/{s.get('ar_total',0)}</div><div class="gesch-sum-label">Rechnungen bezahlt</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{zd_avg}</div><div class="gesch-sum-label">&Oslash; Zahlungsdauer{zd_hinweis}</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{quote}</div><div class="gesch-sum-label">Angebotsquote{hinweis}</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_angen}</div><div class="gesch-sum-label">Angenommen</div></div>
-          <div class="gesch-sum-card"><div class="gesch-sum-num">{ang_abgel}</div><div class="gesch-sum-label">Abgelehnt</div></div>
+        kunde = esc((r.get("kunde_name") or r.get("kunde_email") or "")[:25])
+        mc = r.get("mahnung_count") or 0
+        betrag = f'{r.get("betrag_brutto") or 0:,.0f}&thinsp;&euro;'
+        warns.append(f'<div class="gh-warn-item"><div class="gh-warn-dot"></div>'
+                     f'<div class="gh-warn-body"><div class="gh-warn-text">{re_nr} &middot; {kunde}</div>'
+                     f'<div class="gh-warn-sub">Mahnung x{mc} &middot; {betrag}</div>'
+                     f'<span class="gh-warn-act" onclick="showGeschTab(\'mahnungen\')">Mahnungen &rarr;</span>'
+                     f'</div></div>')
+
+    for sk in sorted(skonto_dringend, key=lambda x: x["skonto_datum"])[:2]:
+        tage_rest = (datetime.strptime(sk["skonto_datum"], "%Y-%m-%d").date() - datetime.now().date()).days
+        warns.append(f'<div class="gh-warn-item info"><div class="gh-warn-dot"></div>'
+                     f'<div class="gh-warn-body"><div class="gh-warn-text">Skonto-Frist: {sk["re_nr"]}</div>'
+                     f'<div class="gh-warn-sub">{tage_rest}d verbleibend &middot; '
+                     f'{sk["skonto_prozent"]}% = {sk.get("skonto_betrag",0):,.2f}&thinsp;&euro;</div>'
+                     f'</div></div>')
+
+    if n_nf > 0:
+        warns.append(f'<div class="gh-warn-item info"><div class="gh-warn-dot"></div>'
+                     f'<div class="gh-warn-body"><div class="gh-warn-text">{n_nf} Angebot(e) zum Nachfassen f&auml;llig</div>'
+                     f'<div class="gh-warn-sub">Keine Reaktion &rarr; Angebot verloren</div>'
+                     f'<span class="gh-warn-act" onclick="showGeschTab(\'angebote\')">Angebote &rarr;</span>'
+                     f'</div></div>')
+
+    zdauern = s.get("zahlungsdauern", [])
+    zd_avg = f'{sum(zdauern)/len(zdauern):.0f}' if zdauern else "–"
+    if zdauern:
+        warns.append(f'<div class="gh-warn-item ok"><div class="gh-warn-dot"></div>'
+                     f'<div class="gh-warn-body"><div class="gh-warn-text">&Oslash; Zahlungsdauer: {zd_avg} Tage</div>'
+                     f'<div class="gh-warn-sub">{s.get("ar_bezahlt",0)}/{s.get("ar_total",0)} Rechnungen bezahlt</div>'
+                     f'</div></div>')
+
+    if ang_ges >= 3:
+        warns.append(f'<div class="gh-warn-item ok"><div class="gh-warn-dot"></div>'
+                     f'<div class="gh-warn-body"><div class="gh-warn-text">Angebotsquote: {quote}</div>'
+                     f'<div class="gh-warn-sub">{ang_ann} angenommen &middot; {ang_abl} abgelehnt</div>'
+                     f'</div></div>')
+
+    warn_html = "".join(warns) if warns else '<p class="empty" style="font-size:var(--fs-sm)">Keine Signale.</p>'
+
+    html += f"""<div class="gh-zones">
+      <div class="gh-zone">
+        <div class="gh-zone-hdr">
+          <span>Aktuelle Vorg&auml;nge</span>
+          <span class="count-badge">{n_left}</span>
         </div>
+        <div class="gh-zone-body">{items_html}</div>
+      </div>
+      <div class="gh-zone">
+        <div class="gh-zone-hdr">
+          <span>Signale &amp; Warnungen</span>
+          <button class="btn btn-xs btn-muted" onclick="openKiraWorkspace('chat')" style="font-size:10px">Kira</button>
+        </div>
+        <div class="gh-zone-body">{warn_html}</div>
       </div>
     </div>"""
     return html
@@ -868,6 +1194,7 @@ def _build_ar_table(rows):
         anh_btn = f'<button class="btn btn-xs btn-gold" onclick="openAttachments(\'{urllib.parse.quote(anh, safe="")}\')">PDF</button>' if anh else ""
         mref = r.get("mail_ref", "") or ""
         mail_btn = f'<button class="btn btn-xs btn-muted" onclick="readMail(\'{urllib.parse.quote(mref, safe="")}\')">Mail</button>' if mref else ""
+        kira_btn = f'<button class="btn btn-xs btn-muted" onclick="geschKira(\'re\',\'{js_esc(re_nr)}\',\'{js_esc(kunde)}\',\'{betrag}\')" title="Mit Kira besprechen">Kira</button>'
         if status == "offen":
             acts = f'<button class="btn btn-xs btn-green" onclick="arSetStatus({rid},\'bezahlt\')">Bezahlt</button> <button class="btn btn-xs btn-warn" onclick="arSetStatus({rid},\'streitfall\')">Streitfall</button>'
         elif status == "streitfall":
@@ -879,7 +1206,7 @@ def _build_ar_table(rows):
           <span class="gc-partner">{kunde}</span><span class="gc-betrag">{betrag}</span>
           <span class="gc-detail" style="font-size:11px">{detail_html}</span>
           <span class="gc-status"><span class="tag {s_cls}">{status}</span></span>
-          <span class="gc-actions">{anh_btn} {mail_btn} {acts}</span>
+          <span class="gc-actions">{anh_btn} {mail_btn} {kira_btn} {acts}</span>
         </div>"""
     html += '</div>'
     return html
@@ -930,6 +1257,7 @@ def _build_ang_table(rows, today):
         anh_btn = f'<button class="btn btn-xs btn-gold" onclick="openAttachments(\'{urllib.parse.quote(anh, safe="")}\')">PDF</button>' if anh else ""
         mref = r.get("mail_ref", "") or ""
         mail_btn = f'<button class="btn btn-xs btn-muted" onclick="readMail(\'{urllib.parse.quote(mref, safe="")}\')">Mail</button>' if mref else ""
+        kira_btn = f'<button class="btn btn-xs btn-muted" onclick="geschKira(\'ang\',\'{js_esc(a_nr)}\',\'{js_esc(kunde)}\',\'\')" title="Mit Kira besprechen">Kira</button>'
         if status == "offen":
             acts = (f'<button class="btn btn-xs btn-green" onclick="angSetStatus({rid},\'angenommen\')">Angenommen</button> '
                     f'<button class="btn btn-xs btn-warn" onclick="angSetStatus({rid},\'abgelehnt\')">Abgelehnt</button> '
@@ -945,7 +1273,7 @@ def _build_ang_table(rows, today):
           <span class="gc-partner">{kunde}</span>
           <span class="gc-status"><span class="tag {s_cls}">{status}</span></span>
           <span class="gc-nf">{nf_html}</span>
-          <span class="gc-actions">{anh_btn} {mail_btn} {acts}</span>
+          <span class="gc-actions">{anh_btn} {mail_btn} {kira_btn} {acts}</span>
         </div>"""
     html += '</div>'
     return html
@@ -998,6 +1326,7 @@ def _gesch_aktiv_cards(rows):
             {mail_btn}
             {korr_btn}
             <button class="btn btn-tiny btn-warn" onclick="geschBewertungDialog({gid})">Falsch</button>
+            <button class="btn btn-tiny btn-muted" onclick="geschKira('eingang','{js_esc(re_nr)}','{js_esc(partner)}','{js_esc(betrag)}')" title="Mit Kira besprechen">Kira</button>
           </div>
         </div>"""
     return html
@@ -1147,11 +1476,52 @@ def build_einstellungen():
         config = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
     except: pass
 
-    ntfy = config.get("ntfy", {})
-    aufg = config.get("aufgaben", {})
-    srv  = config.get("server", {})
-    nf   = config.get("nachfass", {})
-    llm  = get_llm_config()
+    ntfy  = config.get("ntfy", {})
+    aufg  = config.get("aufgaben", {})
+    srv   = config.get("server", {})
+    nf    = config.get("nachfass", {})
+    llm   = get_llm_config()
+    proto = config.get("protokoll", {})
+    rtlog_cfg = config.get("runtime_log", {})
+    # Runtime-Log Stats
+    try:
+        _rl_s = rlog_stats()
+        rl_total    = _rl_s.get("total", 0)
+        rl_today    = _rl_s.get("today", 0)
+        rl_fehler   = _rl_s.get("fehler", 0)
+        rl_sessions = _rl_s.get("sessions", 0)
+        rl_db_size  = _rl_s.get("db_size", "unbekannt")
+        rl_by_type  = _rl_s.get("by_type", {})
+    except Exception:
+        rl_total = rl_today = rl_fehler = rl_sessions = 0
+        rl_db_size = "unbekannt"
+        rl_by_type = {}
+    # Change-Log Stats
+    try:
+        from change_log import get_stats as _cl_stats
+        _cl_s = _cl_stats()
+        change_log_count    = _cl_s.get("total",    0)
+        change_log_last     = _cl_s.get("last",      "")
+        change_log_moduls   = _cl_s.get("moduls",    [])
+        change_log_results  = _cl_s.get("results",   [])
+        change_log_by_res   = _cl_s.get("by_result", {})
+        change_log_features = _cl_s.get("features",  [])
+        change_log_actions  = _cl_s.get("actions",   [])
+    except Exception:
+        change_log_count    = 0
+        change_log_last     = ""
+        change_log_moduls   = []
+        change_log_results  = []
+        change_log_by_res   = {}
+        change_log_features = []
+        change_log_actions  = []
+    # DB-Größe berechnen
+    try:
+        db_size_bytes = TASKS_DB.stat().st_size
+        if db_size_bytes < 1024:         db_size_str = f"{db_size_bytes} B"
+        elif db_size_bytes < 1024**2:    db_size_str = f"{db_size_bytes/1024:.1f} KB"
+        else:                            db_size_str = f"{db_size_bytes/1024**2:.2f} MB"
+    except: db_size_str = "unbekannt"
 
     # Multi-Provider Karten generieren
     providers = get_all_providers()
@@ -1413,6 +1783,142 @@ def build_einstellungen():
         </div>
       </div>
     </div>
+    <div class="section">
+      <div class="section-title">Aktivit&auml;tsprotokoll</div>
+      <div class="section-body">
+        <div class="settings-row">
+          <label>Max. Eintr&auml;ge <span style="color:var(--muted);font-weight:400">(0 = unbegrenzt)</span></label>
+          <input type="number" id="cfg-proto-max" value="{proto.get('max_eintraege', 0)}" min="0" max="100000" style="width:100px">
+        </div>
+        <div class="settings-row">
+          <label>Eintr&auml;ge behalten (Tage) <span style="color:var(--muted);font-weight:400">(0 = nie l&ouml;schen)</span></label>
+          <input type="number" id="cfg-proto-tage" value="{proto.get('tage', 0)}" min="0" max="3650" style="width:100px">
+        </div>
+        <div class="settings-row">
+          <label>Datenbankgr&ouml;&szlig;e (tasks.db)</label>
+          <span style="font-size:13px;color:var(--text-secondary)">{db_size_str}</span>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">&Auml;nderungsverlauf (Mikro-Log)</div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Mikrogranulares append-only Log aller Code-, CSS-, JS- und Konfigurations&auml;nderungen
+          (<code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">change_log.jsonl</code>).
+          Jeder Micro-Schritt = eigene Zeile. Nie &uuml;berschreiben, nie umsortieren.
+        </div>
+        <div class="settings-row">
+          <label>Eintr&auml;ge gesamt</label>
+          <span style="font-size:13px;color:var(--text-secondary)">{change_log_count}</span>
+        </div>
+        <div class="settings-row">
+          <label>Letzter Eintrag</label>
+          <span style="font-size:13px;color:var(--text-secondary)">{change_log_last or "&ndash;"}</span>
+        </div>
+        <div class="settings-row">
+          <label>Ergebnis-Verteilung</label>
+          <span style="font-size:12px;color:var(--text-secondary)">{" &middot; ".join(f'{k}: {v}' for k,v in change_log_by_res.items()) or "&ndash;"}</span>
+        </div>
+        <div class="settings-row">
+          <label>Speicherort</label>
+          <span style="font-size:11px;color:var(--muted);font-family:monospace">memory/change_log.jsonl</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select id="cl-filter-modul" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Module</option>
+            {"".join(f'<option value="{m}">{m}</option>' for m in change_log_moduls)}
+          </select>
+          <select id="cl-filter-result" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Ergebnisse</option>
+            {"".join(f'<option value="{r}">{r}</option>' for r in change_log_results)}
+          </select>
+          <select id="cl-filter-feature" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Features</option>
+            {"".join(f'<option value="{f}">{f}</option>' for f in change_log_features)}
+          </select>
+          <select id="cl-filter-action" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Actions</option>
+            {"".join(f'<option value="{a}">{a}</option>' for a in change_log_actions)}
+          </select>
+          <input id="cl-filter-search" type="text" placeholder="Suche in summary / details / location&hellip;"
+            style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:200px">
+          <button class="btn btn-xs btn-sec" onclick="loadChangeLog(false)">Anzeigen</button>
+          <button class="btn btn-xs btn-sec" onclick="exportChangeLog()">Export JSONL</button>
+        </div>
+        <div id="changelog-entries" style="margin-top:10px;display:none;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Runtime-Log / Telemetrie</div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          L&uuml;ckenlose Nachvollziehbarkeit aller UI-, Kira- und System-Ereignisse.
+          Gespeichert in <code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">knowledge/runtime_events.db</code>.
+        </div>
+        <div class="settings-row">
+          <label>Logging aktiv</label>
+          <input type="checkbox" id="cfg-rl-aktiv" {'checked' if rtlog_cfg.get('aktiv', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>UI-Ereignisse (Klicks, Navigation)</label>
+          <input type="checkbox" id="cfg-rl-ui" {'checked' if rtlog_cfg.get('ui_events', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Kira-Ereignisse (Tools, Kontext)</label>
+          <input type="checkbox" id="cfg-rl-kira" {'checked' if rtlog_cfg.get('kira_events', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>LLM-Ereignisse (Chat, Token)</label>
+          <input type="checkbox" id="cfg-rl-llm" {'checked' if rtlog_cfg.get('llm_events', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Hintergrund-Jobs</label>
+          <input type="checkbox" id="cfg-rl-bg" {'checked' if rtlog_cfg.get('hintergrund_events', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Einstellungs&auml;nderungen</label>
+          <input type="checkbox" id="cfg-rl-settings" {'checked' if rtlog_cfg.get('settings_events', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Fehler immer loggen</label>
+          <input type="checkbox" id="cfg-rl-fehler" {'checked' if rtlog_cfg.get('fehler_immer_loggen', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Vollkontext speichern (User + Kira-Antworten)</label>
+          <input type="checkbox" id="cfg-rl-vollkontext" {'checked' if rtlog_cfg.get('vollkontext_speichern', True) else ''}>
+        </div>
+        <div class="settings-row">
+          <label>Kira darf Logs lesen</label>
+          <input type="checkbox" id="cfg-rl-kira-lesen" {'checked' if rtlog_cfg.get('kira_darf_lesen', True) else ''}>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
+          <div class="settings-row"><label>Ereignisse gesamt</label><span style="font-size:13px;color:var(--text-secondary)">{rl_total}</span></div>
+          <div class="settings-row"><label>Heute</label><span style="font-size:13px;color:var(--text-secondary)">{rl_today}</span></div>
+          <div class="settings-row"><label>Fehler</label><span style="font-size:13px;color:{'#e84545' if rl_fehler else 'var(--text-secondary)'};">{rl_fehler}</span></div>
+          <div class="settings-row"><label>Sitzungen</label><span style="font-size:13px;color:var(--text-secondary)">{rl_sessions}</span></div>
+          <div class="settings-row"><label>Datenbankgr&ouml;&szlig;e</label><span style="font-size:13px;color:var(--text-secondary)">{rl_db_size}</span></div>
+          <div class="settings-row"><label>Aufschl&uuml;sselung</label><span style="font-size:12px;color:var(--text-secondary)">{" &middot; ".join(f'{k}: {v}' for k,v in rl_by_type.items()) or "&ndash;"}</span></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="rl-filter-type" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Typen</option>
+            <option value="ui">ui</option><option value="kira">kira</option>
+            <option value="llm">llm</option><option value="system">system</option>
+            <option value="settings">settings</option>
+          </select>
+          <select id="rl-filter-status" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">Alle Status</option>
+            <option value="ok">ok</option><option value="fehler">fehler</option>
+          </select>
+          <input id="rl-filter-search" type="text" placeholder="Suche in summary&hellip;"
+            style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:160px">
+          <button class="btn btn-xs btn-sec" onclick="loadRuntimeLog(false)">Anzeigen</button>
+          <button class="btn btn-xs btn-sec" onclick="loadRuntimeLog(false,true)">Nur Fehler</button>
+        </div>
+        <div id="runtimelog-entries" style="margin-top:10px;display:none;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
+      </div>
+    </div>
     <div style="margin-top:14px">
       <button class="btn btn-sm btn-gold" onclick="saveSettings()">Einstellungen speichern</button>
       <span id="settings-status" style="margin-left:10px;color:var(--muted);font-size:12px"></span>
@@ -1587,6 +2093,15 @@ def generate_html() -> str:
     db = get_db()
     tasks_rows = db.execute("SELECT * FROM tasks WHERE status='offen' ORDER BY prioritaet DESC, datum_mail DESC").fetchall()
     tasks = [dict(r) for r in tasks_rows]
+    # Thread-Zählung: wie viele Tasks je thread_id?
+    thread_counts = {}
+    for t in tasks:
+        tid = t.get("thread_id") or ""
+        if tid:
+            thread_counts[tid] = thread_counts.get(tid, 0) + 1
+    for t in tasks:
+        tid = t.get("thread_id") or ""
+        t["_thread_count"] = thread_counts.get(tid, 1) if tid else 1
     heute = datetime.now().strftime("%d.%m.%Y %H:%M")
     n_ges = len(tasks)
     n_antwort = sum(1 for t in tasks if t.get("kategorie") == "Antwort erforderlich")
@@ -1607,6 +2122,11 @@ def generate_html() -> str:
             "kategorie_grund":t.get("kategorie_grund","") or "",
             "beschreibung":(t.get("beschreibung","") or "")[:500],
             "antwort_noetig": t.get("antwort_noetig",0),
+            "message_id": t.get("message_id","") or "",
+            "anhang_pfad": t.get("anhaenge_pfad","") or "",
+            "prioritaet": t.get("prioritaet","") or "",
+            "naechste_erinnerung": t.get("naechste_erinnerung","") or "",
+            "notiz": t.get("notiz","") or "",
         }
     prompts_json = {t["id"]:t.get("claude_prompt","") for t in tasks if t.get("claude_prompt")}
 
@@ -1628,6 +2148,7 @@ def generate_html() -> str:
 </style>
 </head>
 <body>
+<div id="_diag" style="position:fixed;top:54px;left:50%;transform:translateX(-50%);z-index:99999;background:#dc4a4a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;pointer-events:none">&#x26A0; JavaScript l&#228;uft NICHT &#8212; Browser-Konsole (F12) pr&#252;fen</div>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
 <div class="app-shell" id="appShell">
 
@@ -1688,6 +2209,10 @@ def generate_html() -> str:
     </div>
   </nav>
   <div class="sidebar-bottom">
+    <div class="sidebar-item" id="nav-protokoll" onclick="showPanel('protokoll');loadProtokoll()" data-label="Protokoll">
+      <span class="si-icon">&#x1F4CB;</span><span class="si-label">Protokoll</span>
+      <span class="si-badge" id="proto-fehler-badge" style="display:none;background:rgba(220,74,74,.12);color:var(--danger);border-color:rgba(220,74,74,.25)"></span>
+    </div>
     <div class="sidebar-item" id="nav-einstellungen" onclick="showPanel('einstellungen')" data-label="Einstellungen">
       <span class="si-icon">&#x2699;</span><span class="si-label">Einstellungen</span>
     </div>
@@ -1706,7 +2231,7 @@ def generate_html() -> str:
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
-      <button class="btn btn-muted btn-xs" onclick="hardReload()" title="Neu laden" style="border-radius:6px">&#x21BB;</button>
+      <button class="btn btn-muted btn-xs" id="updateBtn" onclick="serverNeustart()" title="Server komplett neu starten (alle Instanzen beenden)" style="border-radius:6px">&#x21BB; Neustart</button>
     </div>
   </div>
 
@@ -1716,6 +2241,47 @@ def generate_html() -> str:
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
+  <div class="panel" id="panel-protokoll">
+    <div class="page-header">
+      <h1 class="page-title">&#x1F4CB; Aktivit&auml;tsprotokoll</h1>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="proto-filter-bereich" class="proto-filter" onchange="loadProtokoll()">
+          <option value="">Alle Bereiche</option>
+          <option value="Server">Server</option>
+          <option value="Mail">Mail</option>
+          <option value="Klassifizierung">Klassifizierung</option>
+          <option value="Task">Task</option>
+          <option value="Kira">Kira</option>
+          <option value="LLM">LLM</option>
+        </select>
+        <select id="proto-filter-status" class="proto-filter" onchange="loadProtokoll()">
+          <option value="">Alle Status</option>
+          <option value="ok">OK</option>
+          <option value="warnung">Warnung</option>
+          <option value="fehler">Fehler</option>
+        </select>
+        <button class="btn btn-sec btn-xs" onclick="loadProtokoll()">&#x21BB; Aktualisieren</button>
+        <button class="btn btn-sec btn-xs" onclick="copyProtoCSV()" title="Als CSV kopieren">&#x1F4CB; Kopieren</button>
+      </div>
+    </div>
+    <div id="proto-stats" class="proto-stats-bar"></div>
+    <div class="proto-table-wrap">
+      <table class="proto-table" id="proto-table">
+        <thead><tr>
+          <th style="width:140px">Zeit</th>
+          <th style="width:110px">Bereich</th>
+          <th style="width:160px">Aktion</th>
+          <th>Details</th>
+          <th style="width:60px">Status</th>
+          <th style="width:70px">Dauer</th>
+        </tr></thead>
+        <tbody id="proto-body"><tr><td colspan=6 style="text-align:center;padding:40px;color:var(--muted)">Wird geladen&hellip;</td></tr></tbody>
+      </table>
+    </div>
+    <div id="proto-load-more" style="text-align:center;padding:16px;display:none">
+      <button class="btn btn-sec btn-xs" onclick="loadProtokoll(true)">Weitere laden</button>
+    </div>
+  </div>
 
   <!-- Geplante Module gem&auml;&szlig; Prompt_04 -->
   <div class="panel" id="panel-kunden">
@@ -1849,105 +2415,180 @@ def generate_html() -> str:
 </button>
 
 <!-- Kira Quick Panel (Modus B) -->
-<div class="kira-quick" id="kiraQuick">
-  <div class="kira-quick-header">
-    <span style="font-weight:800;color:var(--accent)">Kira</span>
-    <button class="kira-close" onclick="closeKiraQuick()">&times;</button>
+<div class="kq-panel" id="kiraQuick">
+  <div class="kq-header">
+    <div class="kq-logo"><span class="kq-logo-k">K</span><span class="kq-logo-l">Kira</span></div>
+    <div class="kq-htext">
+      <div class="kq-htitle">Kira Assistenz</div>
+      <div class="kq-hstatus"><span class="kq-hstatus-dot"></span>Bereit &middot; Anthropic Claude</div>
+    </div>
+    <div class="kq-close" onclick="closeKiraQuick()">&#x2715;</div>
   </div>
-  <div class="kira-quick-actions">
-    <div class="kira-quick-item" onclick="openKiraWorkspace('chat')">
-      <span class="kira-quick-icon">&#x1F4AC;</span>
-      <div><strong>Frage stellen</strong><br><span class="muted">Kira direkt etwas fragen</span></div>
+  <div class="kq-actions">
+    <div class="kq-item" onclick="openKiraWorkspace('chat')">
+      <div class="kq-icon purple">?</div>
+      <div class="kq-body"><div class="kq-title">Frage stellen</div><div class="kq-sub">Freie Frage an Kira &mdash; zu allem im System</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kira-quick-item" onclick="openKiraWorkspace('aufgabe')">
-      <span class="kira-quick-icon">&#x2709;</span>
-      <div><strong>Aufgabe besprechen</strong><br><span class="muted">Offene Vorg&auml;nge mit Kira kl&auml;ren</span></div>
+    <div class="kq-item" onclick="openKiraWorkspace('aufgabe')">
+      <div class="kq-icon amber">&#x2610;</div>
+      <div class="kq-body"><div class="kq-title">Aufgabe besprechen</div><div class="kq-sub">Aktuelle Aufgabe mit Kontext &ouml;ffnen</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kira-quick-item" onclick="showPanel('geschaeft');closeKiraQuick()">
-      <span class="kira-quick-icon">&#x1F4B0;</span>
-      <div><strong>Rechnung pr&uuml;fen</strong><br><span class="muted">Rechnungen und Zahlungen</span></div>
+    <div class="kq-item" onclick="openKiraWorkspace('rechnung')">
+      <div class="kq-icon green">&#x20AC;</div>
+      <div class="kq-body"><div class="kq-title">Rechnung pr&uuml;fen</div><div class="kq-sub">Eingangs- oder Ausgangsrechnung analysieren</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kira-quick-item" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100);closeKiraQuick()">
-      <span class="kira-quick-icon">&#x1F4C4;</span>
-      <div><strong>Angebot pr&uuml;fen</strong><br><span class="muted">Offene Angebote und Nachfass</span></div>
+    <div class="kq-item" onclick="openKiraWorkspace('angebot')">
+      <div class="kq-icon blue">&#x270E;</div>
+      <div class="kq-body"><div class="kq-title">Angebot pr&uuml;fen</div><div class="kq-sub">Angebotsstatus, Nachfass oder Entwurf</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kira-quick-item" onclick="showPanel('kunden');closeKiraQuick()">
-      <span class="kira-quick-icon">&#x1F465;</span>
-      <div><strong>Kunde &ouml;ffnen</strong><br><span class="muted">Kunden-Informationen</span></div>
+    <div class="kq-item" onclick="openKiraWorkspace('kunde')">
+      <div class="kq-icon coral">&#x265F;</div>
+      <div class="kq-body"><div class="kq-title">Kunde &ouml;ffnen</div><div class="kq-sub">Kundendaten, Historie, offene Themen</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kira-quick-item" onclick="openKiraWorkspace('chat');closeKiraQuick()">
-      <span class="kira-quick-icon">&#x1F50D;</span>
-      <div><strong>Suche</strong><br><span class="muted">Kira nach Informationen fragen</span></div>
+    <div class="kq-item" onclick="openKiraWorkspace('suche')">
+      <div class="kq-icon teal">&#x2315;</div>
+      <div class="kq-body"><div class="kq-title">Suche</div><div class="kq-sub">In Mails, Aufgaben, Wissen, Gesch&auml;ft suchen</div></div>
+      <span class="kq-arrow">&#x203A;</span>
     </div>
+    <div class="kq-item" onclick="openKiraWorkspace('historie')">
+      <div class="kq-icon gray">&#x21BB;</div>
+      <div class="kq-body"><div class="kq-title">Letzte Verl&auml;ufe</div><div class="kq-sub">Gespeicherte Kira-Gespr&auml;che wieder &ouml;ffnen</div></div>
+      <span class="kq-arrow">&#x203A;</span>
+    </div>
+  </div>
+  <div class="kq-footer">
+    <input class="kq-input" id="kqInput" type="text" placeholder="Direkt an Kira schreiben&hellip;"
+      onkeydown="if(event.key==='Enter')kqDirectSend()">
+    <button class="kq-send" onclick="kqDirectSend()">&#x2191;</button>
   </div>
 </div>
 
 <!-- Kira Workspace (Modus C) — voller Assistenz-Arbeitsbereich -->
 <div class="kira-workspace-overlay" id="kiraWorkspace">
-  <div class="kira-workspace">
-    <div class="kira-ws-header">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="briefing-icon">K</span>
+  <div class="kw-shell">
+    <div class="kw-header">
+      <div class="kw-header-left">
+        <div class="kw-logo">K</div>
         <div>
-          <div class="kira-ph-title">Kira Workspace</div>
-          <div class="kira-ph-sub">KI-Assistenz</div>
+          <div class="kw-title">Kira Workspace</div>
+          <div class="kw-sub">KI-Assistenz &middot; Anthropic Claude</div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div class="kw-header-right">
         <button class="btn btn-xs btn-muted" onclick="newKiraChat()">Neuer Chat</button>
+        <button class="btn btn-xs btn-muted" onclick="toggleKiraTools()">Werkzeuge</button>
         <button class="kira-close" onclick="closeKiraWorkspace()">&times;</button>
       </div>
     </div>
-    <div class="kira-ws-body">
-      <!-- Links: Kontexte / Threads -->
-      <div class="kira-ws-sidebar">
-        <div class="kira-ws-sidebar-title">Kontexte</div>
-        <div class="kira-ws-ctx-list">
-          <div class="kira-ws-ctx active" onclick="showKTab('chat')">&#x1F4AC; Chat</div>
-          <div class="kira-ws-ctx" onclick="showKTab('aufgaben')">&#x2709; Aufgaben</div>
-          <div class="kira-ws-ctx" onclick="showKTab('muster')">&#x1F4CA; Muster</div>
-          <div class="kira-ws-ctx" onclick="showKTab('kwissen')">&#x1F4DA; Gelernt</div>
-          <div class="kira-ws-ctx" onclick="showKTab('historie')">&#x1F4C2; Historie</div>
+    <div class="kw-body">
+      <!-- Links: Kontexte / Verläufe -->
+      <div class="kw-ctx-panel" id="kwCtxPanel">
+        <div class="kw-ctx-hdr">
+          <div class="kw-ctx-hdr-t">Kontexte &amp; Verl&auml;ufe</div>
+          <input class="kw-ctx-search" type="text" placeholder="&#x2315; Kontext suchen&hellip;">
         </div>
-        <div class="kira-ws-sidebar-title" style="margin-top:14px">Vorbereitet</div>
-        <div class="kira-ws-ctx-list">
-          <div class="kira-ws-ctx planned-ctx">&#x1F465; Kunde</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F4C4; Angebot</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F4B0; Rechnung</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F4C1; Dokument</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F50D; Recherche</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F4E3; Marketing</div>
-          <div class="kira-ws-ctx planned-ctx">&#x1F4AC; Social</div>
+        <div class="kw-ctx-section">
+          <div class="kw-ctx-sec-h">Navigation</div>
+          <div class="kw-ctx-item active" onclick="showKTab('chat')" data-tab="chat">
+            <span class="kw-ctx-chip offer">Chat</span>
+            <div class="kw-ctx-body"><div class="kw-ctx-title">Freier Chat</div><div class="kw-ctx-sub">Direkt mit Kira sprechen</div></div>
+          </div>
+          <div class="kw-ctx-item" onclick="showKTab('aufgaben')" data-tab="aufgaben">
+            <span class="kw-ctx-chip task">Aufgaben</span>
+            <div class="kw-ctx-body"><div class="kw-ctx-title">Offene Aufgaben</div><div class="kw-ctx-sub">Priorisiert &amp; kommentiert</div></div>
+          </div>
+          <div class="kw-ctx-item" onclick="showKTab('muster')" data-tab="muster">
+            <span class="kw-ctx-chip inv">Muster</span>
+            <div class="kw-ctx-body"><div class="kw-ctx-title">Erkannte Muster</div><div class="kw-ctx-sub">Zahlungsverhalten, Quoten</div></div>
+          </div>
+          <div class="kw-ctx-item" onclick="showKTab('kwissen')" data-tab="kwissen">
+            <span class="kw-ctx-chip know">Wissen</span>
+            <div class="kw-ctx-body"><div class="kw-ctx-title">Gelerntes</div><div class="kw-ctx-sub">Kiras Erkenntnisse</div></div>
+          </div>
+        </div>
+        <div class="kw-ctx-sep"></div>
+        <div class="kw-ctx-section">
+          <div class="kw-ctx-sec-h">Letzte Verl&auml;ufe</div>
+          <div id="kw-hist-sidebar"><div style="color:var(--muted);font-size:11px;padding:4px 16px">Lade&hellip;</div></div>
         </div>
       </div>
-      <!-- Mitte: Chat / Hauptinhalt -->
-      <div class="kira-ws-main" id="kiraContent">
-        <div id="kc-chat" class="kira-chat-wrap" style="display:flex">
-          <div class="kira-chat-area" id="kiraChatArea">
-            <div class="kira-welcome">
-              <div class="kira-welcome-icon">K</div>
-              <div class="kira-welcome-text">Hallo! Ich bin Kira, deine KI-Assistentin.<br>
-              Frag mich zu Rechnungen, Angeboten, Kunden &mdash; oder lass uns offene Aufgaben besprechen.</div>
+
+      <!-- Mitte: Chat + Kontext-Bar + Quick-Actions + Input -->
+      <div class="kw-center">
+        <!-- Kontext-Bar -->
+        <div class="kw-cbar" id="kwCbar" style="display:none">
+          <span class="kw-cbar-mode" id="kwCbarMode"></span>
+          <span class="kw-cbar-title" id="kwCbarTitle"></span>
+          <span id="kwCbarTags"></span>
+          <div class="kw-cbar-provider"><span class="kw-cbar-provider-dot"></span>Anthropic Claude</div>
+          <div class="kw-cbar-acts">
+            <span class="kw-cbar-btn" onclick="clearKiraContext()">Kontext l&ouml;sen</span>
+          </div>
+        </div>
+
+        <!-- Tab-Inhalte -->
+        <div id="kiraContent" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div id="kc-chat" class="kira-chat-wrap" style="display:flex">
+            <div class="kira-chat-area" id="kiraChatArea">
+              <div class="kira-welcome">
+                <div class="kira-welcome-icon">K</div>
+                <div class="kira-welcome-text">Hallo! Ich bin Kira, deine KI-Assistentin.<br>
+                Frag mich zu Rechnungen, Angeboten, Kunden &mdash; oder lass uns offene Aufgaben besprechen.</div>
+              </div>
             </div>
           </div>
-          <div class="kira-input-bar">
-            <textarea id="kiraInput" class="kira-input" placeholder="Nachricht an Kira..." rows="1"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendKiraMsg()}}"
-              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-            <button class="kira-send-btn" onclick="sendKiraMsg()" id="kiraSendBtn">&#x27A4;</button>
+          <div id="kc-aufgaben" style="display:none"><div id="kira-aufgaben-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div></div>
+          <div id="kc-muster" style="display:none"><div id="kira-muster-content"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div></div>
+          <div id="kc-kwissen" style="display:none"><div id="kira-lernen-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div></div>
+          <div id="kc-historie" style="display:none"><div id="kira-historie-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div></div>
+        </div>
+
+        <!-- Quick Actions Bar -->
+        <div class="kw-quick-bar" id="kwQuickBar">
+          <span class="kw-quick-lbl">Schnell:</span>
+          <span class="kw-qb" onclick="kiraAddPrompt('Fasse zusammen')">Fasse zusammen</span>
+          <span class="kw-qb" onclick="kiraAddPrompt('Was schlägst du vor?')">Vorschlag</span>
+          <span class="kw-qb" onclick="kiraAddPrompt('Erstelle einen Entwurf')">Entwurf</span>
+          <span class="kw-qb" onclick="kiraAddPrompt('Bewerte das Risiko')">Risiko</span>
+        </div>
+
+        <!-- Input-Bereich -->
+        <div class="kw-input-area">
+          <textarea class="kw-input-box" id="kiraInput" placeholder="Nachricht an Kira…" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendKiraMsg()}}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <div class="kw-input-acts">
+            <div class="kw-ia" title="Kontext anhängen" onclick="showToast('Kontext — In Planung')">+</div>
+            <div class="kw-mode-sel" onclick="toggleKiraModeMenu()">Modus &#x25BE;</div>
+            <button class="kw-ia send" onclick="sendKiraMsg()" id="kiraSendBtn">&#x2191;</button>
           </div>
         </div>
-        <div id="kc-aufgaben" style="display:none">
-          <div id="kira-aufgaben-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+      </div>
+
+      <!-- Rechts: Werkzeuge (collapsible) -->
+      <div class="kw-tools collapsed" id="kwTools">
+        <div class="kw-tools-hdr">
+          <span class="kw-tools-t">Kontext &amp; Werkzeuge</span>
+          <span class="kw-tools-close" onclick="toggleKiraTools()">&#x2715; Einklappen</span>
         </div>
-        <div id="kc-muster" style="display:none">
-          <div id="kira-muster-content"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        <div class="kw-tools-sec">
+          <div class="kw-tools-sh">Anh&auml;nge</div>
+          <div id="kw-tools-attachments"><div class="kw-t-item-sub" style="color:var(--muted)">Keine Anh&auml;nge</div></div>
         </div>
-        <div id="kc-kwissen" style="display:none">
-          <div id="kira-lernen-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        <div class="kw-tools-sep"></div>
+        <div class="kw-tools-sec">
+          <div class="kw-tools-sh">Relevante Regeln</div>
+          <div id="kw-tools-rules"><div class="kw-t-item-sub" style="color:var(--muted)">Keine aktiven Regeln</div></div>
         </div>
-        <div id="kc-historie" style="display:none">
-          <div id="kira-historie-list"><div style="color:var(--muted);font-size:var(--fs-base);">Lade&hellip;</div></div>
+        <div class="kw-tools-sep"></div>
+        <div class="kw-tools-sec">
+          <div class="kw-tools-sh">N&auml;chste Aktionen</div>
+          <div id="kw-tools-actions"><div class="kw-t-item-sub" style="color:var(--muted)">Keine Aktionen vorgeschlagen</div></div>
         </div>
       </div>
     </div>
@@ -1955,6 +2596,31 @@ def generate_html() -> str:
 </div>
 
 <!-- Korrektur Modal -->
+<div class="modal-ov" id="lh-modal" style="display:none" onclick="if(event.target===this)closeLhModal()">
+  <div class="modal" style="max-width:680px;width:90vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin:0">Filter-History &amp; L&ouml;schprotokoll</h3>
+      <button onclick="closeLhModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">&times;</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+      Automatisch herausgefilterte DATEV-Duplikate und Mails mit abweichendem Anhang (behalten).
+    </div>
+    <div id="lh-modal-body"></div>
+  </div>
+</div>
+
+<div class="multi-toolbar" id="multiToolbar">
+  <span class="multi-tb-count" id="multiCount">0 ausgewählt</span>
+  <span class="multi-tb-sep"></span>
+  <button class="btn btn-done"     onclick="multiAction('erledigt')">Erledigt</button>
+  <button class="btn btn-kenntnis" onclick="multiAction('zur_kenntnis')">Zur Kenntnis</button>
+  <button class="btn btn-later"    onclick="multiAction('spaeter')">Später</button>
+  <button class="btn btn-ignore"   onclick="multiAction('ignorieren')">Ignorieren</button>
+  <button class="btn btn-loeschen" onclick="multiLoeschen()">Löschen</button>
+  <span class="multi-tb-sep"></span>
+  <button class="btn btn-korr" onclick="clearSelection()">✕ Abbrechen</button>
+</div>
+
 <div class="modal-ov" id="korrModal">
   <div class="modal">
     <h3>Korrektur / Feedback</h3>
@@ -1973,9 +2639,61 @@ def generate_html() -> str:
     </select>
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Notiz (optional):</label>
     <textarea id="korr-notiz" placeholder="z.B. war kein Lead, war Lieferant..."></textarea>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Als Alias merken (optional):</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="email" id="korr-alias-email" placeholder="alias@email.de" style="flex:1;background:#111;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
+        <input type="email" id="korr-haupt-email" placeholder="haupt@email.de" style="flex:1;background:#111;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
+        <button class="btn btn-sec" onclick="saveAlias()" style="font-size:11px;padding:5px 10px">Alias merken</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Alias-E-Mail wird bei allen Suchen auf Haupt-E-Mail gemappt</div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-done" onclick="saveKorrektur()">Speichern</button>
       <button class="btn btn-ignore" onclick="closeKorrModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Löschen + Kira lernt Modal -->
+<div class="modal-ov" id="loeschModal">
+  <div class="modal" style="max-width:460px">
+    <h3 style="margin:0 0 4px;color:#d06060">&#x1F5D1; Löschen &amp; Kira lernt</h3>
+    <input type="hidden" id="lm-tid">
+    <div id="lm-titel" style="font-size:12px;color:var(--muted);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+    <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px">Warum wird diese Aufgabe gel&ouml;scht? Kira liest die Mail, analysiert und legt eine Lernregel an.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="lm-grund-btns">
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'DATEV-Duplikat')">DATEV-Duplikat</button>
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Systemmail / automatisch')">Systemmail</button>
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Irrelevant')">Irrelevant</button>
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Spam / Werbung')">Spam / Werbung</button>
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Falsches Konto')">Falsches Konto</button>
+      <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Bereits erledigt')">Bereits erledigt</button>
+    </div>
+    <input type="text" id="lm-grund" placeholder="Eigener Grund (oder oben klicken) …"
+      style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')saveLoeschen()">
+    <div id="lm-kira-resp" style="display:none;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);margin-bottom:10px;line-height:1.5;max-height:160px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-loeschen" id="lm-save-btn" onclick="saveLoeschen()">Kira fragen &amp; l&ouml;schen</button>
+      <button class="btn btn-ignore" onclick="closeLoeschModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Später Dialog Modal -->
+<div class="modal-ov" id="spaeterModal">
+  <div class="modal" style="max-width:420px">
+    <h3 style="margin:0 0 6px">&#x23F0; Wann erinnern?</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Kira fragt dich wann &mdash; schreib einfach nat&uuml;rlich, z.B. <em>morgen 10 Uhr</em>, <em>n&auml;chste Woche Montag</em>, <em>in 3 Stunden</em>.</p>
+    <input type="hidden" id="sp-tid">
+    <input type="text" id="sp-wann" placeholder="morgen 10 Uhr …"
+      style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px;margin-bottom:10px;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')saveSpaeter()">
+    <div id="sp-kira-resp" style="display:none;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5"></div>
+    <div class="modal-actions">
+      <button class="btn btn-later" id="sp-save-btn" onclick="saveSpaeter()">Kira fragen</button>
+      <button class="btn btn-ignore" onclick="closeSpaeterDialog()">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -2012,8 +2730,15 @@ def generate_html() -> str:
 </div><!-- /app-shell -->
 
 <script>
-const KIRA_CTX = {json.dumps(kira_ctx, ensure_ascii=False)};
-const PROMPTS  = {json.dumps(prompts_json, ensure_ascii=False)};
+window.onerror = function(msg,src,line,col,err){{
+  let b=document.getElementById('_jserr');
+  if(!b){{b=document.createElement('div');b.id='_jserr';
+    b.style='position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc4a4a;color:#fff;font-size:12px;padding:6px 12px;font-family:monospace;white-space:pre-wrap';
+    document.body&&document.body.appendChild(b);}}
+  b.textContent='JS-FEHLER Zeile '+line+': '+msg;
+}};
+const KIRA_CTX = {json.dumps(kira_ctx, ensure_ascii=False).replace('<', '\\u003C').replace('>', '\\u003E')};
+const PROMPTS  = {json.dumps(prompts_json, ensure_ascii=False).replace('<', '\\u003C').replace('>', '\\u003E')};
 let kiraOpen = false;
 
 // ═══ SIDEBAR & NAV ═══
@@ -2241,61 +2966,193 @@ function filterKomm(kat) {{
   }});
 }}
 
-// Kommunikation View-Tabs
-function filterKommView(el, kat) {{
-  document.querySelectorAll('.komm-view-tab').forEach(t=>t.classList.remove('active'));
+// Kommunikation v2 — Segment Tabs
+let _kommActiveTab = 'alle';
+function kommSegFilter(el, kat) {{
+  document.querySelectorAll('.km-seg-t').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  const container = document.getElementById('komm-cards-container');
-  if(!container) return;
-  if(kat === 'alle') {{
-    container.querySelectorAll('.section').forEach(s=>s.style.display='');
-    container.querySelectorAll('.task-card').forEach(c=>c.style.display='');
-  }} else if(kat === 'erledigt') {{
-    container.querySelectorAll('.section').forEach(s=>s.style.display='none');
-  }} else {{
-    container.querySelectorAll('.section').forEach(s=>{{
-      const title = s.querySelector('.section-title')?.textContent||'';
-      const match = kat==='Antwort erforderlich' && title.includes('Antwort') ||
-        kat==='Neue Lead-Anfrage' && title.includes('Leads') ||
-        kat==='Angebotsrückmeldung' && title.includes('Angebots') ||
-        kat==='Zur Kenntnis' && title.includes('Kenntnis') ||
-        kat==='Shop / System' && (title.includes('Shop')||title.includes('Newsletter'));
-      s.style.display = match ? '' : 'none';
-      if(match) s.classList.remove('collapsed');
-    }});
-  }}
-  applyKommFilters();
+  _kommActiveTab = kat;
+  applyKommFilters2();
+}}
+// Keep old filterKommView alias for Organisation panel tabs (uses .komm-view-tab)
+function filterKommView(el, kat) {{
+  document.querySelectorAll('#panel-kommunikation .komm-view-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
 }}
 
-// Kommunikation Filter
-function applyKommFilters() {{
-  const quelle = document.getElementById('komm-filter-quelle')?.value||'';
-  const prio = document.getElementById('komm-filter-dringlichkeit')?.value||'';
-  const nurAntwort = document.getElementById('komm-filter-antwort')?.checked||false;
-  const nurAnhang = document.getElementById('komm-filter-anhang')?.checked||false;
+// Toggle chip filter
+function toggleKommFc(el) {{
+  el.classList.toggle('active');
+  applyKommFilters2();
+}}
+
+// Kommunikation combined filter
+function applyKommFilters() {{ applyKommFilters2(); }}
+function applyKommFilters2() {{
+  const tab        = _kommActiveTab;
+  const nurAntwort = document.querySelector('.km-fc[data-filter="antwort"]')?.classList.contains('active')||false;
+  const nurFotos   = document.querySelector('.km-fc[data-filter="fotos"]')?.classList.contains('active')||false;
+  const nurAnhang  = document.querySelector('.km-fc[data-filter="anhang"]')?.classList.contains('active')||false;
+  const nurBeantw  = document.querySelector('.km-fc[data-filter="beantwortet"]')?.classList.contains('active')||false;
+  const nurPruef   = document.querySelector('.km-fc[data-filter="pruefung"]')?.classList.contains('active')||false;
+  const nurKira    = document.querySelector('.km-fc[data-filter="kira"]')?.classList.contains('active')||false;
+  const quelle     = document.getElementById('km-filter-quelle')?.value||'';
+  const prio       = document.getElementById('km-filter-prio')?.value||'';
+  const search     = (document.getElementById('km-search-input')?.value||'').toLowerCase().trim();
   let count = 0;
-  document.querySelectorAll('#komm-cards-container .task-card').forEach(card=>{{
+  document.querySelectorAll('#km-items .wi').forEach(wi=>{{
+    const wkat    = wi.dataset.kat||'';
+    const wprio   = wi.dataset.prio||'';
+    const wantwort= wi.dataset.antwort==='1';
+    const wanhang = wi.dataset.anhang==='1';
+    const wfotos  = wi.dataset.fotos==='1';
+    const wemail  = wi.dataset.email||'';
+    const wbeantw = wi.dataset.beantwortet==='1';
+    const wpruef  = wi.dataset.pruefung==='1';
+    const wkira   = wi.dataset.kira==='1';
+    const wtitle  = wi.querySelector('.wi-title')?.textContent||'';
+    const wsum    = wi.querySelector('.wi-sum')?.textContent||'';
     let show = true;
-    if(quelle) {{
-      const kb = card.querySelector('.konto-badge');
-      if(!kb || !kb.textContent.includes(quelle)) show = false;
-    }}
-    if(prio) {{
-      if(!card.classList.contains('prio-'+prio)) show = false;
-    }}
-    if(nurAntwort) {{
-      if(!card.querySelector('.btn-kira')) show = false;
-    }}
-    if(nurAnhang) {{
-      const btns = card.querySelectorAll('.btn');
-      const hasAnh = Array.from(btns).some(b=>b.textContent.includes('Anh'));
-      if(!hasAnh) show = false;
-    }}
-    card.style.display = show ? '' : 'none';
+    if(tab && tab !== 'alle' && wkat !== tab) show = false;
+    if(nurAntwort && !wantwort) show = false;
+    if(nurFotos   && !wfotos)   show = false;
+    if(nurAnhang  && !wanhang)  show = false;
+    if(nurBeantw  && !wbeantw)  show = false;
+    if(nurPruef   && !wpruef)   show = false;
+    if(nurKira    && !wkira)    show = false;
+    if(quelle && !wemail.toLowerCase().includes(quelle.toLowerCase())) show = false;
+    if(prio   && wprio !== prio) show = false;
+    if(search && !wtitle.toLowerCase().includes(search) && !wsum.toLowerCase().includes(search)) show = false;
+    wi.style.display = show ? '' : 'none';
     if(show) count++;
   }});
-  const ce = document.getElementById('komm-filter-count');
+  const ce = document.getElementById('km-filter-count');
   if(ce) ce.textContent = count + ' Vorg\u00e4nge';
+}}
+
+// Springe direkt zu einem Segment-Tab (für Stats-Links)
+function jumpToSeg(kat) {{
+  if(kat==='dringend') {{
+    // Prio-Filter aktivieren statt Tab
+    const sel = document.getElementById('km-filter-prio');
+    if(sel) {{ sel.value='hoch'; applyKommFilters2(); }} return;
+  }}
+  document.querySelectorAll('#km-seg-nav .km-seg-t').forEach(t=>{{
+    const m = t.getAttribute('onclick')?.match(/kommSegFilter\(this,'([^']+)'\)/);
+    if(m && m[1]===kat) kommSegFilter(t,kat);
+  }});
+}}
+
+// Select work item → fill context panel
+function selectKommItem(tid, ev) {{
+  if(ev && ev.target && (ev.target.tagName==='BUTTON'||ev.target.tagName==='INPUT'||ev.target.tagName==='LABEL')) return;
+  document.querySelectorAll('#km-items .wi').forEach(w=>w.classList.remove('sel'));
+  const wi = document.getElementById('task-'+tid);
+  if(wi) wi.classList.add('sel');
+  const ctx = KIRA_CTX[tid];
+  const el  = document.getElementById('km-ctx-content');
+  if(!el) return;
+  if(!ctx) {{ el.innerHTML='<div class="km-ctx-empty"><span>Kein Kontext verfügbar</span></div>'; return; }}
+
+  // Status badges
+  let statusHtml = '';
+  if(ctx.antwort_noetig) statusHtml += '<div class="km-ctx-s open"><span class="dot"></span>Antwort erforderlich</div>';
+  if(ctx.naechste_erinnerung) {{
+    try {{
+      const erDate = new Date(ctx.naechste_erinnerung);
+      statusHtml += '<div class="km-ctx-s wait"><span class="dot"></span>Erinnerung: '+erDate.toLocaleDateString('de',{{day:'2-digit',month:'2-digit'}}) + ' ' + erDate.toLocaleTimeString('de',{{hour:'2-digit',minute:'2-digit'}})+'</div>';
+    }} catch(e) {{}}
+  }}
+  statusHtml += '<div class="km-ctx-s info"><span class="dot"></span>'+escH(ctx.kategorie||'')+'</div>';
+
+  // Attachments
+  let attHtml = '';
+  if(ctx.anhang_pfad) {{
+    const files = ctx.anhang_pfad.split(';').filter(Boolean);
+    files.forEach(f=>{{
+      const fname = f.split('\\\\').pop().split('/').pop();
+      const ftype = fname.toLowerCase().match(/\.pdf$/) ? '&#x1F4C4;' : fname.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) ? '&#x1F5BC;' : '&#x1F4CE;';
+      attHtml += '<div class="km-ctx-att" onclick="openAttachments(\\''+encodeURIComponent(f)+'\\')">'+ftype+' '+escH(fname)+'</div>';
+    }});
+  }}
+
+  // Thread / last message
+  let threadHtml = '';
+  if(ctx.beschreibung) {{
+    threadHtml = '<div class="km-ctx-msg in"><div class="km-ctx-msg-meta">'+escH(ctx.email||ctx.absender_rolle||'')+(ctx.datum?' &middot; '+escH(ctx.datum):'')+'</div>'+escH(ctx.beschreibung.slice(0,400))+'</div>';
+  }}
+
+  // Action buttons
+  const encMid  = ctx.message_id ? encodeURIComponent(ctx.message_id) : '';
+  const encAnh  = ctx.anhang_pfad ? encodeURIComponent(ctx.anhang_pfad) : '';
+  const katEsc  = escH(ctx.kategorie||'');
+
+  let html = '';
+  html += '<div class="km-ctx-title">'+escH(ctx.titel||ctx.betreff||'')+'</div>';
+  if(wi) html += '<div class="km-ctx-meta">'+( wi.querySelector('.wi-foot')?.innerHTML||'' )+'</div>';
+  html += '<div class="km-ctx-status">'+statusHtml+'</div>';
+  if(ctx.zusammenfassung) html += '<div class="km-ctx-block"><div class="km-ctx-h">Zusammenfassung</div><div class="km-ctx-text">'+escH(ctx.zusammenfassung)+'</div></div>';
+  if(ctx.kategorie_grund) html += '<div class="km-ctx-block"><div class="km-ctx-h">Warum diese Einordnung</div><div class="km-ctx-text muted">'+escH(ctx.kategorie_grund)+'</div></div>';
+  if(ctx.empfohlene_aktion) html += '<div class="km-ctx-recommend"><div class="km-ctx-recommend-h">Empfohlene n\u00e4chste Aktion</div><div class="km-ctx-recommend-t">'+escH(ctx.empfohlene_aktion)+'</div></div>';
+  if(attHtml) html += '<div class="km-ctx-block"><div class="km-ctx-h">Anh\u00e4nge</div><div class="km-ctx-attachments">'+attHtml+'</div></div>';
+  // Letzte Nachricht (schnell aus KIRA_CTX)
+  if(threadHtml) html += '<div class="km-ctx-thread" id="km-thread-'+tid+'"><div class="km-ctx-h">Letzte Nachricht <button class="km-thread-load-btn" onclick="loadThread('+tid+')">&#x21BA; Verlauf laden</button></div>'+threadHtml+'</div>';
+  else html += '<div class="km-ctx-thread" id="km-thread-'+tid+'"><div class="km-ctx-h">Nachrichten-Verlauf <button class="km-thread-load-btn" onclick="loadThread('+tid+')">laden</button></div></div>';
+  html += '<div class="km-ctx-actions">';
+  html += '<button class="btn btn-kira" onclick="openKira('+tid+')">Mit Kira besprechen</button>';
+  if(ctx.email) html += '<a class="btn btn-primary" href="mailto:'+escH(ctx.email||'')+'">Outlook &#x2709;</a>';
+  if(encMid) html += '<button class="btn btn-sec" onclick="readMail(\\''+encMid+'\\')">Mail lesen</button>';
+  html += '<button class="btn btn-done" onclick="setStatusLernen('+tid+',\\'erledigt\\',\\''+katEsc+'\\')">Erledigt</button>';
+  html += '<button class="btn btn-kenntnis" onclick="setStatusLernen('+tid+',\\'zur_kenntnis\\',\\''+katEsc+'\\')">Zur Kenntnis</button>';
+  html += '<button class="btn btn-later" onclick="openSpaeterDialog('+tid+')">Sp\u00e4ter</button>';
+  html += '<button class="btn btn-ignore" onclick="setStatusLernen('+tid+',\\'ignorieren\\',\\''+katEsc+'\\')">Ignorieren</button>';
+  html += '<button class="btn btn-korr" onclick="openKorrektur('+tid+',\\''+katEsc+'\\')">Korrektur</button>';
+  html += '<button class="btn btn-loeschen" onclick="confirmLoeschen('+tid+')">L\u00f6schen</button>';
+  html += '</div>';
+  el.innerHTML = html;
+}}
+
+// Thread-Verlauf laden
+function loadThread(tid) {{
+  const wrap = document.getElementById('km-thread-'+tid);
+  if(!wrap) return;
+  wrap.innerHTML = '<div class="km-ctx-h">Nachrichten-Verlauf</div><div class="km-ctx-thread-loading">&#x23F3; wird geladen&hellip;</div>';
+  fetch('/api/task/'+tid+'/thread')
+    .then(r=>r.json())
+    .then(d=>{{
+      if(!d.thread||!d.thread.length){{
+        wrap.innerHTML='<div class="km-ctx-h">Nachrichten-Verlauf</div><div style="font-size:11px;color:var(--muted);padding:8px 0">Keine weiteren Nachrichten gefunden.</div>';
+        return;
+      }}
+      let th = '<div class="km-ctx-h">Verlauf &mdash; '+d.thread.length+' Nachricht'+(d.thread.length!==1?'en':'')+'</div>';
+      d.thread.forEach(m=>{{
+        const isCurrent = m.id==tid;
+        th += '<div class="km-ctx-msg in'+(isCurrent?' km-thread-current':'')+'">';
+        th += '<div class="km-ctx-msg-meta">'+escH(m.betreff||'(kein Betreff)')+(m.datum_mail?' &middot; '+escH(m.datum_mail.slice(0,10)):'')+(isCurrent?' <b>← diese</b>':'')+'</div>';
+        if(m.beschreibung) th += '<div>'+escH(m.beschreibung.slice(0,300))+(m.beschreibung.length>300?'&hellip;':'')+'</div>';
+        th += '</div>';
+      }});
+      wrap.innerHTML = th;
+    }})
+    .catch(()=>{{ wrap.innerHTML='<div class="km-ctx-h">Verlauf</div><div style="font-size:11px;color:var(--muted)">Fehler beim Laden.</div>'; }});
+}}
+
+// Fokusmodus Toggle
+let _kommFokusModus = false;
+function toggleKommFokusModus() {{
+  _kommFokusModus = !_kommFokusModus;
+  const wl  = document.getElementById('km-wl');
+  const ctx = document.getElementById('km-ctx');
+  const btn = document.getElementById('km-view-toggle');
+  if(_kommFokusModus) {{
+    if(wl)  wl.style.width  = '34%';
+    if(ctx) ctx.style.width = '66%';
+    if(btn) btn.textContent = '\u229F Listenmodus';
+  }} else {{
+    if(wl)  wl.style.width  = '58%';
+    if(ctx) ctx.style.width = '42%';
+    if(btn) btn.textContent = '\u229E Fokusmodus';
+  }}
 }}
 
 // Organisation View-Switching
@@ -2319,6 +3176,140 @@ function setStatus(id, status) {{
   }}).catch(()=>showToast('Fehler'));
 }}
 
+// Status setzen + KI-Lern-Eintrag speichern (einzeln, nicht bulk)
+function setStatusLernen(id, status, kat) {{
+  fetch('/api/task/'+id+'/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{status, kat}})}}).then(r=>r.json()).then(d=>{{
+    if(d.ok){{
+      const el = document.getElementById('task-'+id);
+      if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),320);}}
+      const label = {{erledigt:'Erledigt ✓',zur_kenntnis:'Zur Kenntnis ✓',ignorieren:'Ignoriert ✓'}}[status]||'Gespeichert';
+      showToast(label+' — KI lernt');
+    }}
+  }}).catch(()=>showToast('Fehler'));
+}}
+
+// Multi-Select
+let _selectedIds = new Set();
+function toggleSelect(id, cb) {{
+  const card = document.getElementById('task-'+id);
+  if(cb.checked){{ _selectedIds.add(id); card.classList.add('selected'); }}
+  else {{ _selectedIds.delete(id); card.classList.remove('selected'); }}
+  _updateMultiBar();
+}}
+function _updateMultiBar() {{
+  const tb = document.getElementById('multiToolbar');
+  const n  = _selectedIds.size;
+  document.getElementById('multiCount').textContent = n + (n===1?' ausgewählt':' ausgewählt');
+  tb.classList.toggle('visible', n > 0);
+}}
+function clearSelection() {{
+  _selectedIds.forEach(id=>{{
+    const card = document.getElementById('task-'+id);
+    if(card){{ card.classList.remove('selected'); card.querySelector('input[type=checkbox]').checked=false; }}
+  }});
+  _selectedIds.clear();
+  _updateMultiBar();
+}}
+// Multi-Aktion: jede Entscheidung wird einzeln gespeichert (kein Bulk)
+async function multiAction(status) {{
+  const ids = [..._selectedIds];
+  if(!ids.length) return;
+  let done=0;
+  for(const id of ids) {{
+    const card = document.getElementById('task-'+id);
+    const kat  = card ? card.dataset.kat : '';
+    try {{
+      const r = await fetch('/api/task/'+id+'/status',{{method:'POST',
+        headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{status, kat}})}});
+      const d = await r.json();
+      if(d.ok) {{
+        if(card){{card.style.opacity='0.2';setTimeout(()=>card.remove(),300);}}
+        done++;
+      }}
+    }} catch(e){{}}
+  }}
+  clearSelection();
+  showToast(done+' Mails aktualisiert — KI lernt aus jeder Entscheidung');
+}}
+// Löschen + Kira lernt
+function confirmLoeschen(tid) {{
+  const card = document.getElementById('task-'+tid);
+  document.getElementById('lm-tid').value = tid;
+  document.getElementById('lm-titel').textContent = card ? (card.querySelector('.task-title')||{{}}).textContent||'' : '';
+  document.getElementById('lm-grund').value = '';
+  document.getElementById('lm-kira-resp').style.display = 'none';
+  document.getElementById('lm-kira-resp').innerHTML = '';
+  document.getElementById('lm-save-btn').textContent = 'Kira fragen & löschen';
+  document.getElementById('lm-save-btn').disabled = false;
+  document.getElementById('lm-save-btn').onclick = saveLoeschen;
+  document.querySelectorAll('.loeschen-grund-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('loeschModal').classList.add('open');
+  setTimeout(()=>document.getElementById('lm-grund').focus(), 80);
+}}
+function setLoeschGrund(btn, text) {{
+  document.querySelectorAll('.loeschen-grund-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('lm-grund').value = text;
+}}
+function closeLoeschModal() {{ document.getElementById('loeschModal').classList.remove('open'); }}
+async function saveLoeschen() {{
+  const tid   = document.getElementById('lm-tid').value;
+  const grund = document.getElementById('lm-grund').value.trim() || 'Kein Grund angegeben';
+  const btn   = document.getElementById('lm-save-btn');
+  btn.textContent = 'Kira analysiert …'; btn.disabled = true;
+  try {{
+    const r = await fetch('/api/task/'+tid+'/loeschen', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{grund, analysiere: true}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      const resp = document.getElementById('lm-kira-resp');
+      let html = d.kira_antwort ? '<strong>Kira:</strong> '+escH(d.kira_antwort) : '';
+      if(d.regel_gespeichert) html += '<br><span style="font-size:11px;color:var(--success)">&#x2713; Lernregel gespeichert</span>';
+      if(d.archiv_geloescht)  html += '<br><span style="font-size:11px;color:var(--muted)">&#x2713; Archivdatei entfernt</span>';
+      resp.innerHTML = html || 'Gelöscht.';
+      resp.style.display = 'block';
+      const card = document.getElementById('task-'+tid);
+      if(card) {{ card.style.opacity='0.2'; setTimeout(()=>card.remove(),400); }}
+      btn.textContent = 'OK';
+      btn.onclick = ()=>{{ closeLoeschModal(); }};
+      btn.disabled = false;
+    }} else {{
+      showToast('Fehler: '+(d.error||'Unbekannt'));
+      btn.textContent='Kira fragen & löschen'; btn.disabled=false;
+    }}
+  }} catch(e) {{
+    showToast('Netzwerkfehler');
+    btn.textContent='Kira fragen & löschen'; btn.disabled=false;
+  }}
+}}
+async function multiLoeschen() {{
+  const ids = [..._selectedIds];
+  if(!ids.length) return;
+  const grund = prompt('Warum werden diese '+ids.length+' Aufgaben gelöscht?\\n(Kira lernt aus jeder Löschung)', 'DATEV-Duplikat');
+  if(grund === null) return;
+  let done = 0;
+  for(const id of ids) {{
+    try {{
+      const r = await fetch('/api/task/'+id+'/loeschen', {{
+        method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{grund: grund||'Bulk-Löschung', analysiere: true}})
+      }});
+      const d = await r.json();
+      if(d.ok) {{
+        const card = document.getElementById('task-'+id);
+        if(card) {{ card.style.opacity='0.2'; setTimeout(()=>card.remove(),300); }}
+        done++;
+      }}
+    }} catch(e) {{}}
+  }}
+  clearSelection();
+  showKiraToast(done+' Aufgaben gelöscht — Kira hat daraus gelernt');
+}}
+
 // Geschäft sub-tabs
 function showGeschTab(name) {{
   document.querySelectorAll('.gesch-tab').forEach(t=>t.classList.remove('active'));
@@ -2329,6 +3320,28 @@ function showGeschTab(name) {{
   }});
   document.getElementById('gesch-'+name)?.classList.add('active');
   localStorage.setItem('kira_gesch_tab', name);
+}}
+
+// Geschäft: Kira mit Datensatz-Kontext öffnen
+function geschKira(typ, nr, partner, betrag) {{
+  openKiraNaked();
+  showKTab('chat');
+  const labels = {{re:'Rechnung',ang:'Angebot',eingang:'Eingangsrechnung',mah:'Mahnung'}};
+  const label = labels[typ]||typ;
+  setKiraContextBar(label, nr, partner ? [partner] : []);
+  kiraSetQuickActions(typ==='re'||typ==='eingang'?'rechnung':typ==='ang'?'angebot':'frage');
+  const input = document.getElementById('kiraInput');
+  if(input) {{
+    const lines = [label + ': ' + nr];
+    if(partner) lines.push('Kunde/Partner: ' + partner);
+    if(betrag)  lines.push('Betrag: ' + betrag);
+    lines.push('');
+    lines.push('Was schlägst du vor?');
+    input.value = lines.join('\\n');
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    input.focus();
+  }}
 }}
 
 // Geschäft: Erledigt -> Kira-Interaktion öffnen
@@ -2635,6 +3648,21 @@ function saveSettings() {{
       geschaeftsdaten_teilen: document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
       konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
       _provider_updates: providerUpdates
+    }},
+    protokoll: {{
+      max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
+      tage: parseInt(document.getElementById('cfg-proto-tage')?.value)||0
+    }},
+    runtime_log: {{
+      aktiv:                  document.getElementById('cfg-rl-aktiv')?.checked ?? true,
+      ui_events:              document.getElementById('cfg-rl-ui')?.checked ?? true,
+      kira_events:            document.getElementById('cfg-rl-kira')?.checked ?? true,
+      llm_events:             document.getElementById('cfg-rl-llm')?.checked ?? true,
+      hintergrund_events:     document.getElementById('cfg-rl-bg')?.checked ?? true,
+      settings_events:        document.getElementById('cfg-rl-settings')?.checked ?? true,
+      fehler_immer_loggen:    document.getElementById('cfg-rl-fehler')?.checked ?? true,
+      vollkontext_speichern:  document.getElementById('cfg-rl-vollkontext')?.checked ?? true,
+      kira_darf_lesen:        document.getElementById('cfg-rl-kira-lesen')?.checked ?? true
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -2644,6 +3672,170 @@ function saveSettings() {{
     if(d.ok) showToast('Einstellungen gespeichert');
     else showToast(d.error||'Fehler');
   }}).catch(()=>showToast('Fehler'));
+}}
+
+// Runtime-Log: fire-and-forget helper (JS -> POST /api/runtime/event)
+function _rtlog(event_type, action, summary, data) {{
+  try {{
+    fetch('/api/runtime/event', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{event_type, action, summary, source:'browser', modul:'ui',
+                             actor_type:'user', status:'ok', ...data}})
+    }});
+  }} catch(e) {{}}
+}}
+
+// Runtime-Log Viewer
+let _rlOffset = 0;
+function loadRuntimeLog(append, onlyFehler) {{
+  const box = document.getElementById('runtimelog-entries');
+  if(!box) return;
+  if(!append) {{ _rlOffset=0; box.innerHTML=''; }}
+  const typ    = document.getElementById('rl-filter-type')?.value  || '';
+  const status = onlyFehler ? 'fehler' : (document.getElementById('rl-filter-status')?.value || '');
+  const search = document.getElementById('rl-filter-search')?.value || '';
+  const limit  = 50;
+  let url = `/api/runtime/events?limit=${{limit}}&offset=${{_rlOffset}}`;
+  if(typ)    url += `&event_type=${{encodeURIComponent(typ)}}`;
+  if(status) url += `&status=${{encodeURIComponent(status)}}`;
+  if(search) url += `&search=${{encodeURIComponent(search)}}`;
+  fetch(url, {{cache:'no-store'}}).then(r=>r.json()).then(d=>{{
+    box.style.display='block';
+    const entries = d.entries || [];
+    if(!entries.length && !append) {{
+      box.innerHTML='<div style="padding:12px;color:var(--muted);font-size:12px">Keine Eintr&auml;ge gefunden.</div>';
+      return;
+    }}
+    entries.forEach(e=>{{
+      const row = document.createElement('div');
+      row.style.cssText='padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;font-family:monospace';
+      const col = e.status==='fehler' ? '#e84545' : 'var(--kl)';
+      const ts = (e.ts||'').slice(0,19).replace('T',' ');
+      row.innerHTML=`<span style="color:var(--muted)">${{ts}}</span> `+
+        `<span style="color:${{col}};font-weight:700">${{e.event_type||''}}/${{e.action||''}}</span> `+
+        `<span style="color:var(--text)">${{e.summary||''}}</span>`+
+        (e.modul ? `<span style="color:var(--muted);margin-left:6px">[${{e.modul}}]</span>` : '');
+      box.appendChild(row);
+    }});
+    _rlOffset += entries.length;
+    if(entries.length === limit) {{
+      const btn = document.createElement('div');
+      btn.style.cssText='padding:8px;text-align:center;font-size:11px;cursor:pointer;color:var(--kl)';
+      btn.textContent='Weitere laden';
+      btn.onclick=()=>{{ btn.remove(); loadRuntimeLog(true, onlyFehler); }};
+      box.appendChild(btn);
+    }}
+  }}).catch(()=>{{box.innerHTML='<div style="padding:10px;color:#e84545;font-size:11px">Fehler beim Laden.</div>';box.style.display='block';}});
+}}
+
+// Änderungsverlauf laden / toggle
+function loadChangeLog(append) {{
+  const box = document.getElementById('changelog-entries');
+  if(!box) return;
+  const modul   = (document.getElementById('cl-filter-modul')?.value    || '');
+  const result  = (document.getElementById('cl-filter-result')?.value   || '');
+  const search  = (document.getElementById('cl-filter-search')?.value   || '');
+  const feature = (document.getElementById('cl-filter-feature')?.value  || '');
+  const action  = (document.getElementById('cl-filter-action')?.value   || '');
+  const query   = modul+'|'+result+'|'+search+'|'+feature+'|'+action;
+  if(!append) {{
+    if(box.style.display !== 'none' && _clLastQuery === query) {{
+      box.style.display='none'; return;
+    }}
+    _clOffset = 0;
+    _clLastQuery = query;
+    box.style.display='block';
+    box.innerHTML='<div style="padding:10px;color:var(--muted);font-size:12px">L\u00e4dt\u2026</div>';
+  }}
+  const qs = new URLSearchParams({{limit:'50',offset:String(_clOffset),modul,result,search,feature_id:feature,action}});
+  fetch('/api/changelog?' + qs).then(r=>r.json()).then(d=>{{
+    const entries = d.entries||[];
+    const total   = d.total||0;
+    const rCol = {{
+      success:'#50c878', partial_success:'#a78bfa', partial_failure:'#f59e0b',
+      failed:'#e84545', reverted:'#94a3b8', skipped:'#64748b'
+    }};
+    const rows = entries.map(e=>{{
+      const res  = e.result||'';
+      const rc   = rCol[res]||'#aaa';
+      const det  = Array.isArray(e.details) ? e.details : (e.details?[e.details]:[]);
+      const detHtml = det.length
+        ? '<ul style="margin:3px 0 0 14px;padding:0;color:#aaa;font-size:10px">'
+          + det.map(x=>'<li>'+escH(x)+'</li>').join('') + '</ul>'
+        : '';
+      const loc = e.location
+        ? '<div style="color:#6b7280;font-size:10px;margin-top:2px">\uD83D\uDCCD '+escH(e.location)+'</div>'
+        : '';
+      const fu = (e.follow_up||[]).length
+        ? '<div style="color:#a78bfa;font-size:10px;margin-top:2px">\u276F '+(e.follow_up||[]).map(f=>escH(f)).join(' \u00B7 ')+'</div>'
+        : '';
+      const rt = (e.related_todos||[]).length
+        ? '<div style="color:#60a5fa;font-size:10px;margin-top:2px">\u21E8 '+(e.related_todos||[]).map(f=>escH(f)).join(' ')+'</div>'
+        : '';
+      const test = e.test_status && e.test_status!=='not_tested'
+        ? ' <span style="font-size:9px;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:3px;color:#94a3b8">\u2714 '+escH(e.test_status)+'</span>'
+        : '';
+      const sc = e.scope
+        ? ' <span style="font-size:9px;background:rgba(255,255,255,.04);padding:1px 5px;border-radius:3px;color:#64748b">'+escH(e.scope)+'</span>'
+        : '';
+      const fid = e.feature_id
+        ? ' <span style="font-size:9px;color:#4b5563">'+escH(e.feature_id)+'</span>'
+        : '';
+      const st = (e.status_before||e.status_after)
+        ? '<div style="color:#4b5563;font-size:10px;margin-top:2px">'
+          +(e.status_before?escH(e.status_before):'?')
+          +' \u2192 '+(e.status_after?escH(e.status_after):'?')+'</div>'
+        : '';
+      return '<div style="padding:7px 10px;border-bottom:1px solid #1a1a1a">'
+        + '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">'
+        + '<span style="color:#4b5563;font-size:10px;white-space:nowrap">'+(e.timestamp||'').slice(0,16).replace('T',' ')+'</span>'
+        + '<span style="color:'+rc+';font-size:10px;font-weight:700">'+escH(res)+'</span>'
+        + '<span style="color:#60a5fa;font-size:10px">'+escH(e.modul||'')+'</span>'
+        + '<span style="color:#94a3b8;font-size:10px">'+escH(e.action||'')+'</span>'
+        + sc + test + fid
+        + '</div>'
+        + '<div style="color:#e2e8f0;font-size:12px;margin-top:3px">'+escH(e.summary||'')+'</div>'
+        + loc + st + detHtml + fu + rt
+        + '</div>';
+    }}).join('');
+    if(!append) {{
+      const hdrBtn = '<span style="cursor:pointer;color:#60a5fa;user-select:none" onclick="clCloseLog()">Schlie\u00DFen \u00D7</span>';
+      const hdr = '<div style="padding:6px 10px;border-bottom:1px solid #1a1a1a;font-size:11px;color:#4b5563;display:flex;justify-content:space-between">'
+        + '<span>'+total+' Eintr\u00E4ge (gesamt: '+(d.total_raw||0)+')</span>'
+        + hdrBtn+'</div>';
+      box.innerHTML = hdr + rows;
+    }} else {{
+      const mb = box.querySelector('#cl-more-btn');
+      if(mb) mb.remove();
+      box.insertAdjacentHTML('beforeend', rows);
+    }}
+    _clOffset += entries.length;
+    if(_clOffset < total) {{
+      box.insertAdjacentHTML('beforeend',
+        '<div id="cl-more-btn" style="padding:8px 10px;text-align:center">'
+        + '<button class="btn btn-xs btn-muted" onclick="loadChangeLog(true)">Weitere 50 laden ('+(total-_clOffset)+' verbleibend)</button>'
+        + '</div>');
+    }}
+  }}).catch(()=>{{
+    if(!append) box.innerHTML='<div style="padding:10px;color:#e84545;font-size:12px">Fehler beim Laden.</div>';
+  }});
+}}
+var _clOffset = 0;
+var _clLastQuery = '';
+function clCloseLog() {{
+  const b = document.getElementById('changelog-entries');
+  if(b) b.style.display='none';
+}}
+// \u00C4nderungsverlauf als JSONL herunterladen
+function exportChangeLog() {{
+  fetch('/api/changelog?limit=9999').then(r=>r.json()).then(d=>{{
+    const lines = (d.entries||[]).slice().reverse().map(e=>JSON.stringify(e)).join('\n');
+    const blob  = new Blob([lines], {{type:'application/x-ndjson'}});
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = 'change_log.jsonl'; a.click();
+    URL.revokeObjectURL(url);
+  }}).catch(()=>showToast('Export fehlgeschlagen'));
 }}
 
 // Provider Key speichern
@@ -2799,8 +3991,16 @@ function openKiraWorkspace(context) {{
   closeKiraQuick();
   document.getElementById('kiraWorkspace').classList.add('open');
   kiraOpen=true;
+  _rtlog('ui','kira_workspace_open','Kira Workspace geoeffnet',{{submodul:'kira',context_type:context}});
+  loadKiraHistSidebar();
   if(context==='chat') showKTab('chat');
   else if(context==='aufgabe') showKTab('aufgaben');
+  else if(context==='historie') showKTab('historie');
+  else if(context==='rechnung') {{ showKTab('chat'); kiraSetQuickActions('rechnung'); }}
+  else if(context==='angebot') {{ showKTab('chat'); kiraSetQuickActions('angebot'); }}
+  else if(context==='kunde') {{ showKTab('chat'); kiraSetQuickActions('kunde'); }}
+  else if(context==='suche') {{ showKTab('chat'); kiraSetQuickActions('suche'); }}
+  else showKTab('chat');
 }}
 function closeKiraWorkspace() {{
   document.getElementById('kiraWorkspace').classList.remove('open');
@@ -2814,15 +4014,16 @@ function closeKira(){{ closeKiraWorkspace(); closeKiraQuick(); }}
 
 // Kira tabs / context switching
 function showKTab(name){{
-  // Update workspace sidebar active state
-  document.querySelectorAll('.kira-ws-ctx').forEach(c=>c.classList.remove('active'));
-  document.querySelectorAll('.kira-ws-ctx').forEach(c=>{{
-    if(c.textContent.toLowerCase().includes(name==='kwissen'?'gelernt':name==='muster'?'muster':name)) c.classList.add('active');
-  }});
+  // Update left context panel active state
+  document.querySelectorAll('.kw-ctx-item[data-tab]').forEach(c=>c.classList.remove('active'));
+  const activeNav = document.querySelector('.kw-ctx-item[data-tab="'+name+'"]');
+  if(activeNav) activeNav.classList.add('active');
   document.querySelectorAll('[id^=kc-]').forEach(c=>c.style.display='none');
   const content = document.getElementById('kc-'+name);
   if(content) content.style.display = name==='chat' ? 'flex' : 'block';
-  document.getElementById('kiraContent')?.classList.toggle('kira-chat-mode', name==='chat');
+  // Quick bar only in chat
+  const qbar = document.getElementById('kwQuickBar');
+  if(qbar) qbar.style.display = name==='chat' ? '' : 'none';
   if(name==='aufgaben') loadKiraInsights('aufgaben');
   if(name==='muster') loadKiraInsights('muster');
   if(name==='kwissen') loadKiraInsights('kwissen');
@@ -2920,6 +4121,7 @@ function sendKiraMsg() {{
   const msg = input.value.trim();
   if(!msg || kiraSending) return;
   kiraSending = true;
+  _rtlog('ui','kira_msg_sent','Nachricht an Kira gesendet',{{submodul:'kira',context_id:kiraSessionId}});
   input.value = '';
   input.style.height = 'auto';
   appendKiraMsg('user', msg);
@@ -3019,9 +4221,25 @@ function newKiraChat() {{
 }}
 
 // Hard Reset — Cache umgehen, alles neu laden
-function hardReload() {{
-  // Cache-Busting: URL mit Timestamp
-  window.location.href = '/?nocache=' + Date.now();
+// Server komplett neu starten — killt alle Instanzen, startet neu, lädt Seite
+async function serverNeustart() {{
+  // Sofort Ladescreen zeigen — kein schwarzer Tab, kein 404
+  document.open();
+  document.write('<!doctype html><html><head><meta charset=utf-8><style>*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0d0d0d;color:#ccc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px}}.spin{{font-size:36px;animation:rot 1s linear infinite}}@keyframes rot{{to{{transform:rotate(360deg)}}}}p{{font-size:15px;opacity:.8}}small{{font-size:12px;opacity:.45}}</style></head><body><div class=spin>↻</div><p>Server wird neu gestartet …</p><small id=s>0s</small><script>let t=0;setInterval(()=>{{t++;document.getElementById("s").textContent=t+"s";}},1000);<\/script></body></html>');
+  document.close();
+  // Neustart anstoßen (Server antwortet kurz bevor er sich killt)
+  try {{ await fetch('/api/server/neustart',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}}); }} catch(e) {{}}
+  // Warten bis neuer Server antwortet
+  let attempts = 0;
+  const poll = setInterval(async ()=>{{
+    attempts++;
+    try {{
+      const r = await fetch('/api/server/version',{{cache:'no-store'}});
+      if(r.ok) {{ clearInterval(poll); window.location.href = '/?nocache='+Date.now(); }}
+    }} catch(e) {{
+      if(attempts > 40) {{ clearInterval(poll); window.location.href = '/?nocache='+Date.now(); }}
+    }}
+  }}, 500);
 }}
 
 // Briefing aktualisieren
@@ -3040,6 +4258,90 @@ function refreshBriefing() {{
 }}
 
 // Monitor-Status prüfen (alle 30s) — aktualisiert Header-Chip
+// ── Aktivitätsprotokoll ──────────────────────────────────────────────────────
+let _protoOffset = 0;
+function loadProtokoll(append) {{
+  const bereich = document.getElementById('proto-filter-bereich')?.value || '';
+  const status  = document.getElementById('proto-filter-status')?.value  || '';
+  if(!append) _protoOffset = 0;
+  const url = `/api/aktivitaeten?limit=100&offset=${{_protoOffset}}&bereich=${{encodeURIComponent(bereich)}}&status=${{encodeURIComponent(status)}}`;
+  fetch(url,{{cache:'no-store'}}).then(r=>r.json()).then(data=>{{
+    const entries = data.entries || [];
+    const stats   = data.stats   || {{}};
+    // Stats-Bar
+    const sb = document.getElementById('proto-stats');
+    if(sb) {{
+      const fStr = stats.fehler > 0 ? `<span class="ps-fehler"><b>${{stats.fehler}}</b> Fehler</span>` : '<span>Keine Fehler</span>';
+      sb.innerHTML = `<span><b>${{stats.total}}</b> Einträge gesamt</span><span>&bull;</span>${{fStr}}<span>&bull;</span><span>Letzte Aktivität: ${{_fmtProtoTime(stats.letzte)}}</span>`;
+    }}
+    // Fehler-Badge in Sidebar
+    const badge = document.getElementById('proto-fehler-badge');
+    if(badge) {{
+      if(stats.fehler > 0) {{ badge.textContent = stats.fehler; badge.style.display = ''; }}
+      else badge.style.display = 'none';
+    }}
+    // Tabelle
+    const tbody = document.getElementById('proto-body');
+    if(!tbody) return;
+    if(!append) tbody.innerHTML = '';
+    if(!entries.length && !append) {{
+      tbody.innerHTML = '<tr><td colspan=6 style="text-align:center;padding:40px;color:var(--muted)">Keine Einträge</td></tr>';
+      return;
+    }}
+    entries.forEach(e=>{{
+      const tr = document.createElement('tr');
+      const stCls = (e.status==='fehler'?'fehler':e.status==='warnung'?'warnung':'ok');
+      const fehlerTip = e.fehler_text ? ` title="${{e.fehler_text.replace(/"/g,"'").substring(0,200)}}"` : '';
+      tr.innerHTML = `
+        <td style="white-space:nowrap;color:var(--text-secondary)">${{_fmtProtoTime(e.zeitstempel)}}</td>
+        <td><span class="proto-bereich">${{e.bereich||''}}</span></td>
+        <td>${{e.aktion||''}}</td>
+        <td style="color:var(--text-secondary);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{(e.details||'').replace(/"/g,"'")}}">${{e.details||''}}</td>
+        <td${{fehlerTip}}><span class="proto-st ${{stCls}}">${{e.status||'ok'}}</span></td>
+        <td style="color:var(--text-secondary)">${{e.dauer_ms!=null?e.dauer_ms+'ms':''}}</td>`;
+      tbody.appendChild(tr);
+    }});
+    _protoOffset += entries.length;
+    const more = document.getElementById('proto-load-more');
+    if(more) more.style.display = entries.length >= 100 ? '' : 'none';
+  }}).catch(()=>{{}});
+}}
+function _fmtProtoTime(ts) {{
+  if(!ts) return '—';
+  try {{
+    const d = new Date(ts); const now = new Date();
+    const diff = (now - d) / 1000;
+    if(diff < 60) return 'gerade eben';
+    if(diff < 3600) return Math.floor(diff/60) + ' Min.';
+    if(diff < 86400) return 'Heute ' + d.toTimeString().slice(0,5);
+    if(diff < 172800) return 'Gestern ' + d.toTimeString().slice(0,5);
+    return d.toLocaleDateString('de-DE',{{day:'2-digit',month:'2-digit'}}) + ' ' + d.toTimeString().slice(0,5);
+  }} catch(e) {{ return ts; }}
+}}
+function copyProtoCSV() {{
+  const rows = [];
+  document.querySelectorAll('#proto-body tr').forEach(tr=>{{
+    const cells = Array.from(tr.querySelectorAll('td')).map(td=>'"'+td.textContent.trim().replace(/"/g,'""')+'"');
+    rows.push(cells.join(';'));
+  }});
+  navigator.clipboard.writeText('Zeit;Bereich;Aktion;Details;Status;Dauer\\n'+rows.join('\\n'))
+    .then(()=>showToast('In Zwischenablage kopiert'))
+    .catch(()=>showToast('Kopieren fehlgeschlagen'));
+}}
+// Fehler-Badge beim Laden aktualisieren
+(function() {{
+  function checkProtoBadge() {{
+    fetch('/api/aktivitaeten?limit=1',{{cache:'no-store'}}).then(r=>r.json()).then(d=>{{
+      const badge = document.getElementById('proto-fehler-badge');
+      if(!badge) return;
+      const f = (d.stats||{{}}).fehler||0;
+      if(f>0) {{ badge.textContent=f; badge.style.display=''; }} else badge.style.display='none';
+    }}).catch(()=>{{}});
+  }}
+  setTimeout(checkProtoBadge, 3000);
+  setInterval(checkProtoBadge, 60000);
+}})();
+
 function checkMonitorStatus() {{
   fetch('/api/monitor/status').then(r=>r.json()).then(data=>{{
     const chip = document.getElementById('monitorStatusChip');
@@ -3109,6 +4411,118 @@ function loadKiraConv(sessionId) {{
     area.innerHTML = '<div style="color:#e84545;padding:8px">Fehler beim Laden.</div>';
   }});
 }}
+// ── Kira Workspace: neue Hilfsfunktionen ────────────────────────────────────
+
+// Kontext-Bar setzen
+function setKiraContextBar(mode, title, tags) {{
+  const bar = document.getElementById('kwCbar');
+  if(!bar) return;
+  const mEl = document.getElementById('kwCbarMode');
+  const tEl = document.getElementById('kwCbarTitle');
+  const gEl = document.getElementById('kwCbarTags');
+  if(mEl) mEl.textContent = mode;
+  if(tEl) tEl.textContent = title || '';
+  if(gEl) {{
+    gEl.innerHTML = (tags||[]).map(t=>`<span class="kw-cbar-tag">${{escH(t)}}</span>`).join(' ');
+  }}
+  bar.style.display = '';
+}}
+
+// Kontext-Bar löschen
+function clearKiraContext() {{
+  const bar = document.getElementById('kwCbar');
+  if(bar) bar.style.display = 'none';
+  kiraSetQuickActions('frage');
+}}
+
+// Quick-Actions je Kontext-Typ setzen
+function kiraSetQuickActions(typ) {{
+  const bar = document.getElementById('kwQuickBar');
+  if(!bar) return;
+  const sets = {{
+    frage:    ['Fasse zusammen','Was schlägst du vor?','Erklär mir das','Erstelle einen Entwurf'],
+    aufgabe:  ['Analysiere die Aufgabe','Erstelle einen Aktionsplan','Risiko bewerten','Nachfass-Vorlage'],
+    rechnung: ['Rechnung prüfen','Skonto berechnen','Zahlungserinnerung','Buchungshinweis'],
+    angebot:  ['Angebot analysieren','Nachfass-Text erstellen','Chancen bewerten','Ablehnungsgrund'],
+    kunde:    ['Kundenhistorie zusammenfassen','Offene Posten','Kommunikationsnotiz','Nächster Schritt'],
+    suche:    ['Suche in Mails','Suche in Aufgaben','Suche in Wissen','Volltext-Suche'],
+    dokument: ['Zusammenfassen','Kernaussagen','Aktionspunkte','Fragen generieren'],
+  }};
+  const items = sets[typ] || sets.frage;
+  bar.innerHTML = '<span class="kw-quick-lbl">Schnell:</span>' +
+    items.map(t=>`<span class="kw-qb" onclick="kiraAddPrompt('${{t.replace(/'/g,"\\'")}}')">${{escH(t)}}</span>`).join('');
+}}
+
+// Text in Input-Box einfügen
+function kiraAddPrompt(text) {{
+  const inp = document.getElementById('kiraInput');
+  if(!inp) return;
+  inp.value = inp.value ? inp.value + '\n' + text : text;
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+  inp.focus();
+}}
+
+// Werkzeuge-Panel ein-/ausklappen
+function toggleKiraTools() {{
+  const t = document.getElementById('kwTools');
+  if(t) t.classList.toggle('collapsed');
+}}
+
+// Tools-Panel befüllen
+function setKiraTools(attachments, rules, actions) {{
+  const a = document.getElementById('kw-tools-attachments');
+  const r = document.getElementById('kw-tools-rules');
+  const n = document.getElementById('kw-tools-actions');
+  if(a) a.innerHTML = (attachments||[]).length ? attachments.map(f=>`<div class="kw-t-att">&#x1F4CE; ${{escH(f)}}</div>`).join('') : '<div class="kw-t-item-sub" style="color:var(--muted)">Keine Anhänge</div>';
+  if(r) r.innerHTML = (rules||[]).length ? rules.map(x=>`<div class="kw-t-rule"><div class="kw-t-rule-h">${{escH(x.titel||x)}}</div>${{x.inhalt?escH(x.inhalt):''}}</div>`).join('') : '<div class="kw-t-item-sub" style="color:var(--muted)">Keine aktiven Regeln</div>';
+  if(n) n.innerHTML = (actions||[]).length ? actions.map(x=>`<div class="kw-t-next">→ ${{escH(x)}}</div>`).join('') : '<div class="kw-t-item-sub" style="color:var(--muted)">Keine Aktionen vorgeschlagen</div>';
+}}
+
+// Quick Panel: Direkt senden
+function kqDirectSend() {{
+  const inp = document.getElementById('kqInput');
+  if(!inp || !inp.value.trim()) return;
+  const msg = inp.value.trim();
+  inp.value = '';
+  openKiraWorkspace('chat');
+  setTimeout(()=>{{
+    const ki = document.getElementById('kiraInput');
+    if(ki) {{ ki.value = msg; sendKiraMsg(); }}
+  }}, 80);
+}}
+
+// Modus-Menü (In Planung)
+function toggleKiraModeMenu() {{
+  showToast('Modus-Auswahl — In Planung');
+}}
+
+// Verlaufs-Sidebar laden und rendern
+function loadKiraHistSidebar() {{
+  fetch('/api/kira/conversations').then(r=>r.json()).then(data=>{{
+    renderKiraHistSidebar(data);
+  }}).catch(()=>{{}});
+}}
+
+function renderKiraHistSidebar(data) {{
+  const el = document.getElementById('kw-hist-sidebar');
+  if(!el) return;
+  if(!data || !data.length) {{
+    el.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px 16px">Noch keine Konversationen.</div>';
+    return;
+  }}
+  const chipMap = {{}};
+  el.innerHTML = data.slice(0,12).map(c=>{{
+    const d = c.gestartet ? new Date(c.gestartet).toLocaleDateString('de-DE',{{day:'2-digit',month:'2-digit'}}) : '';
+    const preview = (c.vorschau||'(Leer)').substring(0,36);
+    return `<div class="kw-ctx-item" onclick="loadKiraConv('${{c.session_id}}')" style="cursor:pointer">
+      <span class="kw-ctx-chip mail">↻</span>
+      <div class="kw-ctx-body"><div class="kw-ctx-title" title="${{escH(c.vorschau||'')}}">${{escH(preview)}}${{(c.vorschau||{{}}).length>36?'&hellip;':''}} </div>
+      <div class="kw-ctx-sub">${{d}} &middot; ${{c.nachrichten||0}} Nachr.</div></div>
+    </div>`;
+  }}).join('');
+}}
+
 
 // Kira proaktiv öffnen wenn wichtige Aufgaben da sind
 function kiraProaktivCheck() {{
@@ -3191,6 +4605,50 @@ function openKorrektur(taskId, alterKat){{
   document.getElementById('korrModal').classList.add('open');
 }}
 function closeKorrModal(){{ document.getElementById('korrModal').classList.remove('open'); }}
+function saveAlias(){{
+  const alias = document.getElementById('korr-alias-email').value.trim();
+  const haupt = document.getElementById('korr-haupt-email').value.trim();
+  if(!alias || !haupt) {{ showToast('Alias- und Haupt-E-Mail erforderlich'); return; }}
+  fetch('/api/kunden/alias',{{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{alias_email: alias, haupt_email: haupt}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Alias gespeichert: ' + alias + ' → ' + haupt); }}
+    else {{ showToast('Fehler: ' + (d.error || 'Unbekannt')); }}
+  }}).catch(()=>showToast('Netzwerkfehler'));
+}}
+function showLöschHistorie(){{
+  fetch('/api/loeschhistorie').then(r=>r.json()).then(rows=>{{
+    let html='<div style="max-height:70vh;overflow-y:auto">';
+    if(!rows.length){{html+='<p style="color:var(--text-muted);padding:16px">Keine Einträge.</p>';}}
+    rows.forEach(r=>{{
+      const behalten = (r.grund||'').startsWith('BEHALTEN');
+      const col = behalten ? '#6CB4F0' : '#EF9F27';
+      const icon = behalten ? '🔵' : '🗑️';
+      html+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:16px">${{icon}}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;color:var(--text)">${{r.betreff||'(kein Betreff)'}}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin:2px 0">
+              Konto: ${{r.konto||'–'}} &middot; Absender: ${{r.absender||'–'}} &middot; ${{(r.datum_mail||'').slice(0,16)}}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)">Anhänge: ${{r.anhaenge_info||'–'}}</div>
+            <div style="font-size:12px;color:${{col}};margin-top:4px">${{r.grund||'–'}}</div>
+            ${{r.referenz_task_id ? `<div style="font-size:11px;color:var(--text-muted)">Referenz-Task: #${{r.referenz_task_id}} (${{r.referenz_konto}})</div>` : ''}}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);white-space:nowrap">${{(r.geloescht_am||'').slice(0,10)}}</div>
+        </div>
+      </div>`;
+    }});
+    html+='</div>';
+    document.getElementById('lh-modal-body').innerHTML=html;
+    document.getElementById('lh-modal').style.display='flex';
+  }}).catch(()=>showToast('Fehler beim Laden der Lösch-History'));
+}}
+function closeLhModal(){{
+  document.getElementById('lh-modal').style.display='none';
+}}
 function saveKorrektur(){{
   const tid  = document.getElementById('korr-tid').value;
   const alt  = document.getElementById('korr-alt').value;
@@ -3200,10 +4658,10 @@ function saveKorrektur(){{
   fetch('/api/task/'+tid+'/korrektur',{{
     method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify({{alter_typ:alt,neuer_typ:neu,notiz}})
-  }}).then(r=>r.json()).then(()=>{{
+  }}).then(r=>r.json()).then(d=>{{
     closeKorrModal();
-    showToast('Korrektur gespeichert');
-    setTimeout(()=>location.reload(),600);
+    showKiraToast(d.kira_antwort || 'Korrektur gespeichert.');
+    setTimeout(()=>location.reload(),1800);
   }}).catch(()=>showToast('Fehler'));
 }}
 
@@ -3226,6 +4684,52 @@ function showToast(msg){{
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2400);
 }}
+function showKiraToast(msg){{
+  const t=document.getElementById('toast');
+  t.textContent='Kira: '+msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),5000);
+}}
+// Später-Dialog
+function openSpaeterDialog(tid){{
+  document.getElementById('sp-tid').value=tid;
+  document.getElementById('sp-wann').value='';
+  document.getElementById('sp-kira-resp').style.display='none';
+  document.getElementById('sp-kira-resp').textContent='';
+  document.getElementById('sp-save-btn').textContent='Kira fragen';
+  document.getElementById('sp-save-btn').disabled=false;
+  document.getElementById('spaeterModal').classList.add('open');
+  setTimeout(()=>document.getElementById('sp-wann').focus(),80);
+}}
+function closeSpaeterDialog(){{ document.getElementById('spaeterModal').classList.remove('open'); }}
+async function saveSpaeter(){{
+  const tid  = document.getElementById('sp-tid').value;
+  const wann = document.getElementById('sp-wann').value.trim();
+  if(!wann){{ document.getElementById('sp-wann').focus(); return; }}
+  const btn = document.getElementById('sp-save-btn');
+  btn.textContent='Kira denkt …';
+  btn.disabled=true;
+  try{{
+    const r = await fetch('/api/task/'+tid+'/spaeter',{{
+      method:'POST',headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{wann}})
+    }});
+    const d = await r.json();
+    if(d.ok){{
+      const respEl = document.getElementById('sp-kira-resp');
+      respEl.textContent = d.kira_antwort || 'Termin gespeichert.';
+      respEl.style.display='block';
+      btn.textContent='OK';
+      btn.onclick=()=>{{closeSpaeterDialog();location.reload();}};
+      btn.disabled=false;
+    }} else {{
+      showToast('Fehler: '+(d.error||'Unbekannt'));
+      btn.textContent='Kira fragen';btn.disabled=false;
+    }}
+  }}catch(e){{
+    showToast('Netzwerkfehler');
+    btn.textContent='Kira fragen';btn.disabled=false;
+  }}
+}}
 document.addEventListener('keydown',e=>{{
   if(e.key==='Escape'){{
     if(document.getElementById('kiraInteraktModal').classList.contains('open')) closeKiraInterakt();
@@ -3233,6 +4737,8 @@ document.addEventListener('keydown',e=>{{
     else if(document.getElementById('geschBewertModal').classList.contains('open')) closeGeschBewertung();
     else if(document.getElementById('editRegelModal').classList.contains('open')) closeEditRegel();
     else if(document.getElementById('korrModal').classList.contains('open')) closeKorrModal();
+    else if(document.getElementById('loeschModal').classList.contains('open')) closeLoeschModal();
+    else if(document.getElementById('spaeterModal').classList.contains('open')) closeSpaeterDialog();
     else if(document.getElementById('kiraWorkspace').classList.contains('open')) closeKiraWorkspace();
     else if(document.getElementById('kiraQuick').classList.contains('open')) closeKiraQuick();
   }}
@@ -3258,6 +4764,26 @@ function silentRefreshDashboard() {{
   }}).catch(()=>{{}});
 }}
 setInterval(silentRefreshDashboard, 300000);
+
+// ── JS-Diagnose ──────────────────────────────────────────────────────────
+window.onerror = function(msg, src, line, col, err) {{
+  let bar = document.getElementById('js-error-bar');
+  if(!bar) {{
+    bar = document.createElement('div');
+    bar.id = 'js-error-bar';
+    bar.style = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc4a4a;color:#fff;font-size:13px;padding:8px 16px;font-family:monospace';
+    document.body.appendChild(bar);
+  }}
+  bar.textContent = 'JS-FEHLER: ' + msg + ' (Zeile ' + line + ')';
+}};
+// JS-Diagnose: Balken ausblenden wenn JS läuft
+(function() {{
+  const d = document.getElementById('_diag');
+  if(d) d.remove();
+  const btn = document.getElementById('updateBtn');
+  if(btn) btn.title = 'JS OK \u2013 Server neu starten';
+  document.title = document.title.replace(' \u2013 ', ' \u2713 \u2013 ');
+}})();
 </script>
 </body>
 </html>"""
@@ -3435,18 +4961,45 @@ a:hover{text-decoration:underline;}
 
 /* ═══ DASHBOARD — 4 Zones (reference redesign) ═══ */
 
-/* Zone A: Tagesbriefing — horizontal bar */
+/* Zone A: Tagesbriefing */
 .dash-briefing{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
-  padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:14px 20px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px;
   box-shadow:0 1px 4px rgba(0,0,0,.04);}
-.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;flex-shrink:0;}
-.dash-briefing-items{display:flex;align-items:center;gap:18px;flex-wrap:wrap;flex:1;}
-.dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);white-space:nowrap;}
+.dash-briefing-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);}
+.dash-briefing-items{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);}
 .dash-b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dash-briefing-refresh{margin-left:auto;background:var(--bg);border:0.5px solid var(--border-strong);
+.dash-briefing-refresh{background:var(--bg);border:0.5px solid var(--border-strong);
   border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;
-  flex-shrink:0;transition:background .12s;}
+  flex-shrink:0;transition:background .12s;white-space:nowrap;}
 .dash-briefing-refresh:hover{background:var(--accent-bg);color:var(--accent);}
+/* LLM-Zusammenfassung Block */
+.dash-briefing-summary{border-top:0.5px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;}
+.dash-bs-text{font-size:13px;color:var(--text);line-height:1.55;}
+.dash-bs-prios{display:flex;flex-direction:column;gap:4px;}
+.dash-bs-prio{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--text-secondary);}
+.dash-bs-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+/* Protokoll Panel */
+.proto-stats-bar{display:flex;gap:16px;padding:8px 0 14px;font-size:12px;color:var(--text-secondary);}
+.proto-stats-bar b{color:var(--text);}
+.proto-stats-bar .ps-fehler{color:var(--danger);}
+.proto-filter{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;
+  padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer;}
+.proto-table-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:10px;}
+.proto-table{width:100%;border-collapse:collapse;font-size:12px;}
+.proto-table th{background:var(--bg-raised);padding:8px 12px;text-align:left;font-weight:600;
+  color:var(--text-secondary);border-bottom:0.5px solid var(--border);white-space:nowrap;}
+.proto-table td{padding:7px 12px;border-bottom:0.5px solid var(--border);vertical-align:top;color:var(--text);}
+.proto-table tr:last-child td{border-bottom:none;}
+.proto-table tr:hover td{background:var(--bg-raised);}
+.proto-st{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;
+  padding:2px 7px;font-size:10px;font-weight:600;white-space:nowrap;}
+.proto-st.ok{background:rgba(29,158,117,.1);color:#1d9e75;}
+.proto-st.fehler{background:rgba(220,74,74,.1);color:#d04444;}
+.proto-st.warnung{background:rgba(239,159,39,.1);color:#b87c10;}
+.proto-bereich{display:inline-block;background:var(--accent-bg);color:var(--accent);
+  border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;}
 
 /* Zone B: KPI Grid */
 .dash-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px;}
@@ -3622,6 +5175,109 @@ a:hover{text-decoration:underline;}
 .komm-filter-check input{accent-color:var(--accent);}
 .komm-filter-count{font-size:var(--fs-sm);color:var(--muted);margin-left:auto;}
 
+/* ═══ Kommunikation Modul v2 ═══ */
+#panel-kommunikation{max-width:none;padding:0;}
+#panel-kommunikation.active{display:flex;flex-direction:column;}
+.km-hdr{background:var(--header-bg);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.km-hdr-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.km-title{font-size:18px;font-weight:500;color:var(--text);}
+.km-stats{display:flex;gap:14px;flex-wrap:wrap;}
+.km-stat{font-size:12px;color:var(--muted);}
+.km-stat b{font-weight:500;color:var(--text);}
+.km-stat-link{cursor:pointer;border-radius:4px;padding:1px 4px;transition:background .15s;}
+.km-stat-link:hover{background:var(--accent-bg);color:var(--accent);}
+.km-stat-link:hover b{color:var(--accent);}
+.km-ctx-thread-loading{font-size:11px;color:var(--muted);padding:8px 0;}
+.km-thread-current{border-left:2px solid var(--accent);padding-left:8px;}
+.km-thread-load-btn{font-size:10px;padding:1px 7px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--muted);cursor:pointer;margin-left:8px;transition:all .15s;}
+.km-thread-load-btn:hover{border-color:var(--accent-border);color:var(--accent);}
+.km-hdr-acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+.km-act-btn{font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:all .15s;}
+.km-act-btn:hover{border-color:var(--accent-border);color:var(--accent);}
+.km-seg{background:var(--header-bg);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0;overflow-x:auto;scrollbar-width:none;}
+.km-seg::-webkit-scrollbar{display:none;}
+.km-seg-t{padding:11px 16px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s;user-select:none;}
+.km-seg-t:hover{color:var(--text-secondary);}
+.km-seg-t.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+.km-seg-cnt{font-size:10px;background:var(--bg-raised);color:var(--muted);padding:1px 6px;border-radius:10px;margin-left:4px;}
+.km-seg-t.active .km-seg-cnt{background:var(--accent-bg);color:var(--accent);}
+.km-flt{background:var(--header-bg);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.km-flt-label{font-size:11px;color:var(--muted);margin-right:2px;}
+.km-fc{font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:all .15s;user-select:none;}
+.km-fc:hover{border-color:var(--accent-border);color:var(--accent);}
+.km-fc.active{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);}
+.km-fc-sel{font-size:11px;padding:4px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;outline:none;font-family:inherit;}
+.km-fc-sel:focus{border-color:var(--accent-border);}
+.km-fc-count{font-size:11px;color:var(--muted);padding-left:4px;}
+.km-search-inp{font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text);outline:none;width:160px;margin-left:auto;font-family:inherit;}
+.km-search-inp:focus{border-color:var(--accent-border);}
+.km-workspace{display:flex;overflow:hidden;min-height:calc(100vh - 240px);}
+.km-wl{width:58%;border-right:1px solid var(--border);overflow-y:auto;background:var(--bg);transition:width .2s;}
+.km-wl-inner{padding:12px 16px;}
+.km-ctx{width:42%;overflow-y:auto;background:var(--card);transition:width .2s;}
+.km-ctx-inner{padding:20px 24px;}
+.km-ctx-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);font-size:13px;gap:10px;text-align:center;padding:40px 20px;}
+.km-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;line-height:2.2;}
+/* Work Items */
+.wi{display:flex;gap:12px;padding:14px 16px 14px 40px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .18s,background .18s,box-shadow .18s;position:relative;box-shadow:0 1px 6px rgba(0,0,0,.14);}
+.wi:hover{border-color:var(--accent-border);box-shadow:0 3px 16px rgba(79,125,249,.18);}
+.wi.sel{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 2px rgba(79,125,249,.18);}
+.wi.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(55,138,221,.15);}
+.wi-check{position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity .15s;}
+.wi-check input[type=checkbox]{width:20px;height:20px;cursor:pointer;accent-color:var(--accent);}
+.wi:hover .wi-check,.wi.selected .wi-check{opacity:1;}
+.wi-accent{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;}
+.wi-body{flex:1;min-width:0;}
+.wi-top{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.wi-tags-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;flex:1;}
+.wi-time{font-size:11px;color:var(--muted);flex-shrink:0;font-weight:500;}
+.wi-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;line-height:1.3;letter-spacing:-.01em;}
+.wi-meta{font-size:var(--fs-sm);color:var(--muted);margin-bottom:4px;}
+.wi-sum{font-size:13px;color:var(--text-secondary);margin-bottom:4px;line-height:1.5;}
+.wi-empfehlung{font-size:var(--fs-sm);color:var(--accent);font-weight:600;margin-bottom:3px;}
+.wi-grund{font-size:var(--fs-xs);color:var(--muted);font-style:italic;margin-bottom:5px;line-height:1.4;}
+.wi-acts{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+.wi-quick-btn{font-size:var(--fs-xs);padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;transition:all .15s;font-weight:600;}
+.wi-btn-k{background:var(--accent-bg);border:1px solid var(--accent-border);color:var(--accent);}
+.wi-btn-k:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+/* Tags (km-) */
+.km-tg{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap;}
+.km-tg-red{background:rgba(220,74,74,.12);color:#d06060;}
+.km-tg-amber{background:rgba(239,159,39,.12);color:#a07020;}
+.km-tg-blue{background:var(--accent-bg);color:var(--accent);}
+.km-tg-gray{background:var(--bg-raised);color:var(--muted);}
+.km-tg-green{background:rgba(80,180,80,.1);color:#3a8a3a;}
+.km-tg-purple{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+.km-tg-warn{background:rgba(212,147,62,.12);color:var(--warn);border:1px solid rgba(212,147,62,.2);}
+/* Context panel */
+.km-ctx-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3;letter-spacing:-.01em;}
+.km-ctx-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.km-ctx-block{margin-bottom:16px;}
+.km-ctx-h{font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.6px;}
+.km-ctx-text{font-size:13px;color:var(--text);line-height:1.6;}
+.km-ctx-text.muted{color:var(--text-secondary);}
+.km-ctx-status{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.km-ctx-s{font-size:11px;padding:5px 12px;border-radius:6px;display:flex;align-items:center;gap:5px;}
+.km-ctx-s .dot{width:6px;height:6px;border-radius:50%;}
+.km-ctx-s.open{background:rgba(220,74,74,.12);color:#d06060;}
+.km-ctx-s.open .dot{background:#E24B4A;}
+.km-ctx-s.wait{background:rgba(239,159,39,.12);color:#a07020;}
+.km-ctx-s.wait .dot{background:#EF9F27;}
+.km-ctx-s.info{background:var(--accent-bg);color:var(--accent);}
+.km-ctx-s.info .dot{background:var(--accent);}
+.km-ctx-recommend{background:var(--bg-raised);border:1px solid var(--accent-border);border-radius:8px;padding:12px 16px;margin-bottom:16px;}
+.km-ctx-recommend-h{font-size:11px;font-weight:500;color:var(--accent);margin-bottom:4px;}
+.km-ctx-recommend-t{font-size:13px;color:var(--text);line-height:1.5;}
+.km-ctx-attachments{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
+.km-ctx-att{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;cursor:pointer;transition:border-color .15s;}
+.km-ctx-att:hover{border-color:var(--accent-border);color:var(--accent);}
+.km-ctx-thread{border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px;}
+.km-ctx-msg{padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:12px;line-height:1.55;}
+.km-ctx-msg.in{background:var(--bg-raised);color:var(--text);}
+.km-ctx-msg.out{background:var(--accent-bg);color:var(--text);}
+.km-ctx-msg-meta{font-size:10px;color:var(--muted);margin-bottom:3px;}
+.km-ctx-actions{border-top:1px solid var(--border);padding-top:16px;margin-top:4px;display:flex;flex-wrap:wrap;gap:6px;}
+
 /* ═══ Sections ═══ */
 .section{margin-bottom:18px;}
 .section-title{font-size:var(--fs-xs);font-weight:800;color:var(--accent);letter-spacing:.8px;
@@ -3634,7 +5290,7 @@ a:hover{text-decoration:underline;}
 
 /* ═══ Task Card ═══ */
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--card-radius);
-  padding:12px 14px;margin-bottom:8px;transition:border-color .2s;}
+  padding:12px 14px 12px 50px;margin-bottom:8px;transition:border-color .2s;position:relative;}
 .task-card:hover{border-color:var(--accent-border);}
 .prio-hoch  {border-left:3px solid var(--danger);}
 .prio-mittel{border-left:3px solid var(--accent);}
@@ -3681,12 +5337,34 @@ a:hover{text-decoration:underline;}
 .btn-sec:hover{background:rgba(128,128,128,.14);}
 .btn-done{background:rgba(61,174,106,.1);color:var(--success);border:1px solid rgba(61,174,106,.22);}
 .btn-done:hover{background:rgba(61,174,106,.2);}
+.btn-kenntnis{background:rgba(55,138,221,.08);color:#378ADD;border:1px solid rgba(55,138,221,.2);}
+.btn-kenntnis:hover{background:rgba(55,138,221,.16);}
 .btn-later{background:rgba(212,147,62,.1);color:var(--warn);border:1px solid rgba(212,147,62,.2);}
 .btn-later:hover{background:rgba(212,147,62,.2);}
 .btn-ignore{background:rgba(128,128,128,.08);color:rgba(128,128,128,.7);border:1px solid rgba(128,128,128,.18);}
 .btn-ignore:hover{background:rgba(128,128,128,.16);}
 .btn-korr{background:rgba(128,128,128,.05);color:var(--muted);border:1px solid var(--border);}
 .btn-korr:hover{background:rgba(128,128,128,.12);color:var(--text);}
+.badge-erinnerung{background:rgba(212,147,62,.12);color:var(--warn);border:1px solid rgba(212,147,62,.25);}
+.btn-loeschen{background:rgba(220,74,74,.08);color:#d06060;border:1px solid rgba(220,74,74,.2);}
+.btn-loeschen:hover{background:rgba(220,74,74,.18);}
+.loeschen-grund-btn{padding:4px 10px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;transition:all .15s;}
+.loeschen-grund-btn:hover,.loeschen-grund-btn.active{background:rgba(220,74,74,.12);border-color:rgba(220,74,74,.35);color:#d06060;}
+/* Multi-select */
+.tc-check{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity .15s;cursor:pointer;display:flex;align-items:center;}
+.tc-check input[type=checkbox]{width:24px;height:24px;cursor:pointer;accent-color:var(--accent);border-radius:5px;}
+.task-card:hover .tc-check,.task-card.selected .tc-check{opacity:1;}
+.task-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(55,138,221,.18);}
+.task-card.selected::before{content:'';position:absolute;inset:0;border-radius:var(--card-radius);background:rgba(55,138,221,.04);pointer-events:none;}
+/* Multi-Toolbar */
+.multi-toolbar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);padding:10px 16px;display:flex;align-items:center;
+  gap:10px;z-index:9000;transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .2s;opacity:0;}
+.multi-toolbar.visible{transform:translateX(-50%) translateY(0);opacity:1;}
+.multi-tb-count{font-size:13px;font-weight:600;color:var(--text);min-width:72px;}
+.multi-tb-sep{width:1px;height:24px;background:var(--border);}
+.multi-toolbar .btn{font-size:12px;padding:5px 12px;}
 .btn-sm{padding:5px 12px;font-size:var(--fs-sm);}
 .btn-tiny{padding:3px 8px;font-size:var(--fs-xs);}
 .btn-xs{padding:2px 6px;font-size:10px;}
@@ -3715,29 +5393,77 @@ a:hover{text-decoration:underline;}
 .org-konto{font-size:var(--fs-xs);}
 
 /* ═══ Geschaeft ═══ */
+/* Module Header */
+.gh-mod-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;flex-wrap:wrap;}
+.gh-mod-title{font-size:var(--fs-lg);font-weight:800;color:var(--text);white-space:nowrap;}
+.gh-mod-stats{display:flex;gap:16px;flex-wrap:wrap;flex:1;}
+.gh-stat{display:flex;flex-direction:column;align-items:center;min-width:52px;}
+.gh-stat-num{font-size:var(--fs-base);font-weight:700;color:var(--accent);line-height:1.2;}
+.gh-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+.gh-stat.alarm .gh-stat-num{color:var(--danger);}
+.gh-mod-acts{display:flex;gap:6px;margin-left:auto;}
+/* Tabs */
 .gesch-tabs,.wissen-tabs{display:flex;gap:2px;margin-bottom:14px;flex-wrap:wrap;}
-.gesch-tab,.wissen-tab{padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);font-weight:700;
-  color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
+.gesch-tab,.wissen-tab{padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);font-weight:700;color:var(--muted);border:1px solid transparent;transition:all .15s;user-select:none;}
 .gesch-tab:hover,.wissen-tab:hover{color:var(--text);background:rgba(128,128,128,.08);}
 .gesch-tab.active,.wissen-tab.active{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-border);}
 .gesch-panel,.wissen-panel{display:none;}
 .gesch-panel.active,.wissen-panel.active{display:block;}
+/* KPI Grid */
+.gh-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+@media(max-width:680px){.gh-kpi-grid{grid-template-columns:repeat(2,1fr);}}
+.gh-kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:13px 15px;cursor:pointer;transition:border-color .2s,transform .1s;}
+.gh-kpi-card:hover{border-color:var(--accent-border);transform:translateY(-1px);}
+.gh-kpi-card.alarm{border-color:rgba(220,74,74,.3);background:rgba(220,74,74,.03);}
+.gh-kpi-num{font-size:22px;font-weight:800;color:var(--accent);letter-spacing:-.5px;line-height:1.1;}
+.gh-kpi-card.alarm .gh-kpi-num{color:var(--danger);}
+.gh-kpi-lbl{font-size:var(--fs-xs);color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;}
+.gh-kpi-sub{font-size:var(--fs-xs);color:var(--text-secondary);margin-top:2px;}
+/* 60/40 Zones */
+.gh-zones{display:grid;grid-template-columns:3fr 2fr;gap:12px;}
+@media(max-width:860px){.gh-zones{grid-template-columns:1fr;}}
+.gh-zone{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.gh-zone-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--border);font-size:var(--fs-sm);font-weight:700;color:var(--text);}
+.gh-zone-body{padding:8px 10px;max-height:340px;overflow-y:auto;}
+/* Business item rows */
+.gh-bi-row{display:flex;align-items:flex-start;gap:8px;padding:7px 6px;border-radius:6px;margin-bottom:2px;transition:background .12s;}
+.gh-bi-row:hover{background:rgba(128,128,128,.06);}
+.gh-bi-typ{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.gh-bi-typ.re{color:var(--accent);background:var(--accent-bg);}
+.gh-bi-typ.nf{color:#a78bfa;background:rgba(167,139,250,.1);}
+.gh-bi-typ.mah{color:var(--danger);background:rgba(220,74,74,.1);}
+.gh-bi-info{flex:1;min-width:0;}
+.gh-bi-name{font-size:var(--fs-sm);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gh-bi-meta{font-size:10px;color:var(--muted);margin-top:1px;}
+.gh-bi-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;}
+.gh-bi-betrag{font-size:var(--fs-sm);font-weight:700;color:var(--text);white-space:nowrap;}
+/* Warning items */
+.gh-warn-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:6px;margin-bottom:4px;border-left:2px solid rgba(220,74,74,.4);background:rgba(220,74,74,.04);}
+.gh-warn-item.info{border-left-color:var(--accent-border);background:rgba(128,128,128,.04);}
+.gh-warn-item.ok{border-left-color:rgba(80,200,120,.4);background:rgba(80,200,120,.03);}
+.gh-warn-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);margin-top:5px;flex-shrink:0;}
+.gh-warn-item.info .gh-warn-dot{background:var(--accent);}
+.gh-warn-item.ok .gh-warn-dot{background:#50c878;}
+.gh-warn-body{flex:1;}
+.gh-warn-text{font-size:var(--fs-sm);color:var(--text);}
+.gh-warn-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.gh-warn-act{font-size:var(--fs-xs);color:var(--accent);cursor:pointer;margin-top:3px;display:inline-block;}
+.gh-warn-act:hover{text-decoration:underline;}
+/* Table classes (used by AR/ANG/Zahlungen/Mahnungen tabs) */
 .gesch-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-.gesch-sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;text-align:center;}
+.gesch-sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;text-align:center;cursor:pointer;transition:border-color .2s,transform .1s;}
+.gesch-sum-card:hover{border-color:var(--accent-border);transform:translateY(-1px);}
 .gesch-sum-num{font-size:var(--fs-xl);font-weight:900;color:var(--accent);}
 .gesch-sum-label{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
+.gesch-sum-alarm{border-color:rgba(220,74,74,.3);background:rgba(220,74,74,.04);}
+.gesch-sum-alarm .gesch-sum-num{color:var(--danger);}
 .gesch-table{font-size:var(--fs-sm);}
 .gesch-row{display:flex;gap:6px;padding:6px 4px;border-bottom:1px solid var(--border);align-items:center;}
 .gesch-header{font-weight:700;color:var(--accent);border-bottom:1px solid var(--border-strong);}
-.gc-typ{min-width:100px;}
 .gc-datum{min-width:80px;color:var(--muted);}
 .gc-betrag{min-width:80px;text-align:right;font-weight:600;}
-.gc-nr{min-width:90px;color:var(--muted);}
-.gc-partner{min-width:120px;flex:1;}
-.gc-betreff{flex:2;color:var(--text-secondary);}
+.gc-nr{min-width:90px;color:var(--muted);}.gc-partner{min-width:120px;flex:1;}
 .gesch-typ-badge{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:3px;}
-.gesch-sum-alarm{border-color:rgba(220,74,74,.3);background:rgba(220,74,74,.04);}
-.gesch-sum-alarm .gesch-sum-num{color:var(--danger);}
 .gesch-aktiv-card{background:var(--card);border:1px solid rgba(220,74,74,.16);border-radius:var(--radius-lg);padding:13px;margin-bottom:10px;}
 .gesch-aktiv-header{display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
 .gesch-aktiv-betrag{font-size:var(--fs-lg);font-weight:900;color:var(--text);}
@@ -3748,24 +5474,10 @@ a:hover{text-decoration:underline;}
 .gesch-aktiv-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .gesch-typ-eingang{color:var(--accent);background:var(--accent-bg);}
 .gesch-typ-mahnung{color:var(--danger);background:rgba(220,74,74,.08);}
-.gesch-routine-row{opacity:.7;}.gesch-routine-row:hover{opacity:1;}
 .gesch-row-aktiv{border-left:2px solid var(--danger);}
-.gesch-row-routine{opacity:.55;}
-.gc-detail{min-width:100px;flex:1;color:var(--muted);}
-.gc-actions{display:flex;gap:4px;min-width:100px;justify-content:flex-end;}
-.gesch-ar-summary{display:flex;gap:20px;padding:10px 14px;margin-bottom:10px;background:var(--accent-bg);
-  border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-base);flex-wrap:wrap;}
+.gc-detail{min-width:100px;flex:1;color:var(--muted);}.gc-actions{display:flex;gap:4px;min-width:120px;justify-content:flex-end;}
+.gesch-ar-summary{display:flex;gap:20px;padding:10px 14px;margin-bottom:10px;background:var(--accent-bg);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-base);flex-wrap:wrap;}
 .gesch-ar-summary span{white-space:nowrap;}
-.gesch-volumen-hero{background:linear-gradient(135deg,var(--accent-bg),transparent);border:1px solid var(--accent-border);
-  border-radius:var(--radius-lg);padding:18px 24px;margin-bottom:16px;text-align:center;transition:border-color .2s;}
-.gesch-volumen-hero:hover{border-color:var(--accent);}
-.gesch-volumen-hero.gesch-sum-alarm{border-color:rgba(220,74,74,.3);background:linear-gradient(135deg,rgba(220,74,74,.05),transparent);}
-.gesch-volumen-label{font-size:var(--fs-sm);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
-.gesch-volumen-num{font-size:28px;font-weight:800;color:var(--accent);letter-spacing:-.5px;}
-.gesch-volumen-hero.gesch-sum-alarm .gesch-volumen-num{color:var(--danger);}
-.gesch-volumen-sub{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;}
-.gesch-sum-card{cursor:pointer;transition:border-color .2s,transform .1s;}
-.gesch-sum-card:hover{border-color:var(--accent-border);transform:translateY(-1px);}
 .gesch-filter-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
 .gesch-filter-bar select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:var(--fs-sm);font-family:inherit;cursor:pointer;}
 .gesch-filter-bar select:focus{outline:none;border-color:var(--accent-border);}
@@ -3812,43 +5524,131 @@ a:hover{text-decoration:underline;}
 /* ═══ Kira FAB ═══ */
 .kira-fab{position:fixed;bottom:22px;right:22px;z-index:200;
   background:#534AB7;border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;
-  flex-direction:column;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.25);
-  transition:transform .2s,box-shadow .2s;border:none;color:#fff;position:fixed;}
-.kira-fab:hover{transform:scale(1.07);box-shadow:0 6px 26px rgba(83,74,183,.45);}
+  flex-direction:column;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);
+  transition:transform .2s,box-shadow .2s;border:none;color:#fff;}
+.kira-fab:hover{transform:scale(1.07);box-shadow:0 6px 26px rgba(83,74,183,.5);}
 .kira-fab-k{color:#fff;font-size:16px;font-weight:600;line-height:1;}
 .kira-fab-label{color:#CECBF6;font-size:8px;margin-top:1px;line-height:1;}
 .kira-fab-status{position:absolute;top:1px;right:1px;width:12px;height:12px;
   background:#1D9E75;border-radius:50%;border:2px solid var(--bg);}
 
-/* ═══ Kira Quick Panel (Modus B) ═══ */
-.kira-quick{position:fixed;bottom:82px;right:22px;z-index:250;width:320px;
+/* ═══ Kira Quick Panel (kq-*) ═══ */
+.kq-panel{position:fixed;bottom:82px;right:22px;z-index:250;width:340px;
   background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
-  box-shadow:0 8px 40px rgba(0,0,0,.35);display:none;flex-direction:column;overflow:hidden;}
-.kira-quick.open{display:flex;}
-.kira-quick-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);}
-.kira-quick-actions{padding:6px 0;}
-.kira-quick-item{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background .12s;font-size:var(--fs-sm);}
-.kira-quick-item:hover{background:var(--accent-bg);}
-.kira-quick-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0;}
-.kira-quick-item strong{font-size:var(--fs-base);color:var(--text);}
+  box-shadow:0 8px 40px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;}
+.kq-panel.open{display:flex;}
+.kq-header{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--border);}
+.kq-logo{width:34px;height:34px;background:#534AB7;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;}
+.kq-logo-k{color:#fff;font-size:14px;font-weight:600;line-height:1;}
+.kq-logo-l{color:#CECBF6;font-size:7px;margin-top:1px;}
+.kq-htext{flex:1;}
+.kq-htitle{font-size:14px;font-weight:600;color:var(--text);}
+.kq-hstatus{font-size:10px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;margin-top:2px;}
+.kq-hstatus-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0;}
+.kq-close{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+.kq-close:hover{color:var(--text);border-color:var(--border-strong);}
+.kq-actions{padding:8px 10px;}
+.kq-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;
+  transition:background .12s,border-color .12s;border:1px solid transparent;margin-bottom:2px;}
+.kq-item:hover{background:var(--accent-bg);border-color:var(--accent-border);}
+.kq-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.kq-icon.purple{background:rgba(83,74,183,.18);color:#CECBF6;}
+.kq-icon.amber{background:rgba(186,117,23,.18);color:#f0b855;}
+.kq-icon.green{background:rgba(59,109,17,.2);color:#7ecf3f;}
+.kq-icon.blue{background:rgba(24,95,165,.2);color:#6db3f2;}
+.kq-icon.coral{background:rgba(153,60,29,.2);color:#f08060;}
+.kq-icon.teal{background:rgba(15,110,86,.2);color:#3fcfa0;}
+.kq-icon.gray{background:rgba(128,128,128,.12);color:var(--text-secondary);}
+.kq-body{flex:1;min-width:0;}
+.kq-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:1px;}
+.kq-sub{font-size:11px;color:var(--text-secondary);}
+.kq-arrow{font-size:14px;color:var(--border-strong);flex-shrink:0;transition:color .12s;}
+.kq-item:hover .kq-arrow{color:#CECBF6;}
+.kq-footer{padding:9px 14px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.kq-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 11px;
+  font-size:12px;color:var(--text);font-family:inherit;}
+.kq-input:focus{outline:none;border-color:var(--accent-border);}
+.kq-send{width:30px;height:30px;border-radius:8px;background:#534AB7;border:none;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;flex-shrink:0;}
+.kq-send:hover{background:#6358cc;}
 
-/* ═══ Kira Workspace (Modus C) ═══ */
-.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px;}
+/* ═══ Kira Workspace (kw-*) ═══ */
+.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:16px;}
 .kira-workspace-overlay.open{display:flex;}
-.kira-workspace{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
-  width:95vw;max-width:1200px;height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 60px rgba(0,0,0,.5);overflow:hidden;}
-.kira-ws-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;
-  border-bottom:1px solid var(--border);flex-shrink:0;}
-.kira-ws-body{display:flex;flex:1;overflow:hidden;}
-.kira-ws-sidebar{width:200px;border-right:1px solid var(--border);padding:12px;overflow-y:auto;flex-shrink:0;background:var(--bg);}
-.kira-ws-sidebar-title{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;margin-bottom:4px;}
-.kira-ws-ctx-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;}
-.kira-ws-ctx{padding:7px 10px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);color:var(--text-secondary);transition:all .12s;}
-.kira-ws-ctx:hover{background:var(--accent-bg);color:var(--text);}
-.kira-ws-ctx.active{background:var(--accent-bg);color:var(--accent);font-weight:700;}
-.kira-ws-ctx.planned-ctx{opacity:.4;cursor:default;font-style:italic;}
-.kira-ws-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-
+.kw-shell{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  width:96vw;max-width:1260px;height:87vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.6);overflow:hidden;}
+.kw-header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.kw-header-left{display:flex;align-items:center;gap:10px;}
+.kw-logo{width:30px;height:30px;background:#534AB7;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0;}
+.kw-title{font-size:14px;font-weight:700;color:#CECBF6;}
+.kw-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.kw-header-right{display:flex;gap:6px;align-items:center;}
+.kw-body{display:flex;flex:1;overflow:hidden;}
+.kw-ctx-panel{width:240px;min-width:240px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg);}
+.kw-ctx-hdr{padding:12px 15px 9px;border-bottom:1px solid var(--border);}
+.kw-ctx-hdr-t{font-size:12px;font-weight:700;color:var(--text);margin-bottom:7px;}
+.kw-ctx-search{width:100%;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:11px;color:var(--text);font-family:inherit;}
+.kw-ctx-search:focus{outline:none;border-color:var(--accent-border);}
+.kw-ctx-section{padding:9px 0;}
+.kw-ctx-sec-h{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:0 15px 5px;}
+.kw-ctx-item{display:flex;align-items:flex-start;gap:7px;padding:7px 15px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
+.kw-ctx-item:hover{background:var(--accent-bg);}
+.kw-ctx-item.active{background:rgba(83,74,183,.1);border-left-color:#534AB7;}
+.kw-ctx-chip{font-size:8px;padding:2px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.kw-ctx-chip.mail{background:rgba(24,95,165,.2);color:#6db3f2;}
+.kw-ctx-chip.task{background:rgba(186,117,23,.2);color:#f0b855;}
+.kw-ctx-chip.inv{background:rgba(59,109,17,.2);color:#7ecf3f;}
+.kw-ctx-chip.offer{background:rgba(83,74,183,.2);color:#CECBF6;}
+.kw-ctx-chip.know{background:rgba(15,110,86,.2);color:#3fcfa0;}
+.kw-ctx-chip.cust{background:rgba(153,60,29,.2);color:#f08060;}
+.kw-ctx-body{flex:1;min-width:0;}
+.kw-ctx-title{font-size:12px;font-weight:500;color:var(--text);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kw-ctx-sub{font-size:10px;color:var(--text-secondary);}
+.kw-ctx-sep{height:1px;background:var(--border);margin:2px 15px;}
+.kw-center{flex:1;display:flex;flex-direction:column;background:var(--bg-raised);overflow:hidden;}
+.kw-cbar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
+.kw-cbar-mode{font-size:11px;padding:3px 9px;border-radius:5px;background:rgba(83,74,183,.2);color:#CECBF6;font-weight:600;}
+.kw-cbar-title{font-size:13px;font-weight:500;color:var(--text);}
+.kw-cbar-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(128,128,128,.12);color:var(--text-secondary);}
+.kw-cbar-provider{font-size:10px;color:var(--muted);margin-left:auto;display:flex;align-items:center;gap:4px;}
+.kw-cbar-provider-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;}
+.kw-cbar-acts{display:flex;gap:4px;}
+.kw-cbar-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;}
+.kw-cbar-btn:hover{border-color:var(--accent-border);color:var(--text);}
+.kw-quick-bar{padding:7px 16px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.kw-quick-lbl{font-size:10px;color:var(--muted);align-self:center;margin-right:3px;}
+.kw-qb{font-size:10px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s;}
+.kw-qb:hover{border-color:rgba(83,74,183,.45);color:#CECBF6;}
+.kw-tools{width:240px;min-width:240px;border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg);}
+.kw-tools.collapsed{display:none;}
+.kw-tools-hdr{padding:12px 14px 9px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.kw-tools-t{font-size:12px;font-weight:700;color:var(--text);}
+.kw-tools-close{font-size:11px;color:var(--muted);cursor:pointer;padding:2px 5px;border-radius:4px;}
+.kw-tools-close:hover{color:var(--text);background:rgba(128,128,128,.1);}
+.kw-tools-sec{padding:11px 14px;}
+.kw-tools-sh{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px;}
+.kw-tools-sep{height:1px;background:var(--border);margin:0 14px;}
+.kw-t-item{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 11px;margin-bottom:5px;font-size:11px;color:var(--text);cursor:pointer;transition:border-color .12s;}
+.kw-t-item:hover{border-color:var(--accent-border);}
+.kw-t-item-h{font-weight:600;margin-bottom:2px;}
+.kw-t-item-sub{font-size:10px;color:var(--text-secondary);}
+.kw-t-rule{background:rgba(15,110,86,.1);border:1px solid rgba(15,110,86,.25);border-radius:6px;padding:8px 11px;margin-bottom:4px;font-size:11px;color:#3fcfa0;line-height:1.4;}
+.kw-t-rule-h{font-weight:600;margin-bottom:2px;color:#5fe8b8;}
+.kw-t-next{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:7px 11px;margin-bottom:4px;font-size:11px;cursor:pointer;color:var(--text-secondary);transition:border-color .12s,color .12s;}
+.kw-t-next:hover{border-color:rgba(83,74,183,.4);color:#CECBF6;}
+.kw-t-att{display:flex;align-items:center;gap:6px;padding:7px 11px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:11px;color:var(--text-secondary);cursor:pointer;}
+.kira-chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;}
+.kira-chat-area{flex:1;overflow-y:auto;padding:16px 20px;}
+.kw-input-area{background:var(--bg);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:flex-end;gap:8px;flex-shrink:0;}
+.kw-input-box{flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:var(--fs-base);line-height:1.5;resize:none;font-family:inherit;min-height:42px;max-height:120px;overflow-y:auto;}
+.kw-input-box:focus{outline:none;border-color:var(--accent-border);}
+.kw-input-acts{display:flex;gap:5px;flex-shrink:0;align-items:center;}
+.kw-ia{width:32px;height:32px;border-radius:7px;border:1px solid var(--border);background:var(--bg-raised);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--text-secondary);}
+.kw-ia:hover{border-color:var(--accent-border);color:var(--text);}
+.kw-ia.send{background:#534AB7;border-color:#534AB7;color:#fff;}
+.kw-ia.send:hover{background:#6358cc;}
+.kw-mode-sel{font-size:10px;padding:4px 9px;border-radius:6px;border:1px solid rgba(83,74,183,.4);background:rgba(83,74,183,.12);color:#CECBF6;cursor:pointer;}
 /* Legacy compat */
 .kira-ph-title{font-size:15px;font-weight:900;color:var(--accent);}
 .kira-ph-sub{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}
@@ -3869,24 +5669,13 @@ a:hover{text-decoration:underline;}
 @keyframes kiraPulse{0%,100%{box-shadow:0 3px 15px rgba(0,0,0,.3);}50%{box-shadow:0 3px 25px rgba(220,74,74,.5);}}
 .kira-card-title{font-size:var(--fs-base);font-weight:700;margin-bottom:3px;}
 .kira-card-meta{font-size:var(--fs-sm);color:var(--muted);}
-
-/* Kira Chat */
-.kira-content.kira-chat-mode{overflow:hidden;padding:0;}
-.kira-chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;}
-.kira-chat-area{flex:1;overflow-y:auto;padding:13px 14px;}
-.kira-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);
-  background:var(--bg-raised);flex-shrink:0;align-items:flex-end;}
-.kira-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);
-  border-radius:var(--radius-lg);padding:9px 12px;font-size:var(--fs-base);line-height:1.5;resize:none;
-  font-family:inherit;min-height:38px;max-height:120px;overflow-y:auto;}
+.kira-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-raised);flex-shrink:0;align-items:flex-end;}
+.kira-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-lg);padding:9px 12px;font-size:var(--fs-base);line-height:1.5;resize:none;font-family:inherit;min-height:38px;max-height:120px;overflow-y:auto;}
 .kira-input:focus{outline:none;border-color:var(--accent-border);}
-.kira-send-btn{background:var(--accent);border:none;border-radius:50%;
-  width:38px;height:38px;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.kira-send-btn{background:var(--accent);border:none;border-radius:50%;width:38px;height:38px;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .kira-send-btn:hover{transform:scale(1.06);box-shadow:0 2px 12px rgba(0,0,0,.25);}
 .kira-send-btn:disabled{opacity:.4;cursor:default;transform:none;}
-.kira-msg{padding:9px 12px;border-radius:12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.6;
-  max-width:88%;word-wrap:break-word;animation:kiraFadeIn .25s ease;}
+.kira-msg{padding:9px 12px;border-radius:12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.6;max-width:88%;word-wrap:break-word;animation:kiraFadeIn .25s ease;}
 @keyframes kiraFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .kira-msg-user{background:var(--accent-bg);color:var(--text);margin-left:auto;border-bottom-right-radius:4px;border:1px solid var(--accent-border);}
 .kira-msg-kira{background:rgba(128,128,128,.08);color:var(--text);border-bottom-left-radius:4px;}
@@ -3895,20 +5684,16 @@ a:hover{text-decoration:underline;}
 .kira-msg-error{background:rgba(220,74,74,.08);color:#d06060;border:1px solid rgba(220,74,74,.18);}
 .kira-msg-system{background:var(--accent-bg);color:var(--accent);font-size:var(--fs-sm);text-align:center;max-width:100%;}
 .kira-tools-used{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;}
-.kira-tool-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--accent-bg);
-  color:var(--accent);border:1px solid var(--accent-border);}
+.kira-tool-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
 .kira-typing{display:flex;gap:4px;padding:10px 14px;align-items:center;}
-.kira-typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.4;
-  animation:kiraTypingDot 1.4s infinite ease-in-out;}
+.kira-typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.4;animation:kiraTypingDot 1.4s infinite ease-in-out;}
 .kira-typing span:nth-child(2){animation-delay:.2s;}
 .kira-typing span:nth-child(3){animation-delay:.4s;}
 @keyframes kiraTypingDot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
 .kira-welcome{text-align:center;padding:40px 20px;}
-.kira-welcome-icon{width:56px;height:56px;background:var(--accent);
-  border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
-  font-size:22px;font-weight:900;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.kira-welcome-icon{width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:20px;font-weight:900;color:#fff;box-shadow:0 4px 20px rgba(83,74,183,.3);}
 .kira-welcome-text{color:var(--muted);font-size:var(--fs-base);line-height:1.7;}
-#kc-aufgaben,#kc-muster,#kc-kwissen,#kc-historie{overflow-y:auto;padding:13px 14px;flex:1;}
+#kc-aufgaben,#kc-muster,#kc-kwissen,#kc-historie{overflow-y:auto;padding:13px 16px;flex:1;}
 
 /* Kommunikationsfenster */
 .komm-block{background:rgba(128,128,128,.04);border:1px solid var(--border);border-radius:var(--radius);padding:11px;margin-bottom:9px;}
@@ -3996,6 +5781,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif self.path.startswith('/api/loeschhistorie'):
+            db = get_db()
+            try:
+                rows = db.execute("""
+                    SELECT id, geloescht_am, task_id, konto, absender, betreff,
+                           datum_mail, anhaenge_info, grund, referenz_task_id, referenz_konto
+                    FROM loeschhistorie
+                    ORDER BY geloescht_am DESC LIMIT 100
+                """).fetchall()
+                self._json([dict(r) for r in rows])
+            except:
+                self._json([])
+            finally:
+                db.close()
+
         elif self.path == '/api/geschaeft':
             db = get_db()
             try:
@@ -4046,6 +5846,76 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
+
+        elif self.path.startswith('/api/aktivitaeten'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            limit   = int(qs.get('limit',  ['200'])[0])
+            offset  = int(qs.get('offset', ['0'])[0])
+            bereich = qs.get('bereich', [''])[0]
+            status  = qs.get('status',  [''])[0]
+            entries = alog_entries(min(limit,500), offset, bereich or None, status or None)
+            stats   = alog_stats()
+            self._json({'entries': entries, 'stats': stats})
+
+        elif self.path.startswith('/api/runtime/events'):
+            qs          = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            limit       = min(int(qs.get('limit',  ['50'])[0]),  500)
+            offset      = int(qs.get('offset', ['0'])[0])
+            event_type  = qs.get('event_type', [''])[0]
+            modul       = qs.get('modul',      [''])[0]
+            status      = qs.get('status',     [''])[0]
+            action      = qs.get('action',     [''])[0]
+            search      = qs.get('search',     [''])[0]
+            session_id  = qs.get('session_id', [''])[0]
+            try:
+                data = rlog_get(limit=limit, offset=offset,
+                                event_type=event_type or None, modul=modul or None,
+                                status=status or None, action=action or None,
+                                search=search or None, session_id=session_id or None)
+            except Exception as ex:
+                data = {'entries': [], 'total': 0, '_err': str(ex)}
+            self._json(data)
+
+        elif self.path == '/api/runtime/stats':
+            try:
+                self._json(rlog_stats())
+            except Exception as ex:
+                self._json({'error': str(ex)})
+
+        elif self.path.startswith('/api/runtime/event/') and self.path.endswith('/payload'):
+            eid = self.path[len('/api/runtime/event/'):-len('/payload')]
+            try:
+                self._json(rlog_payload(eid))
+            except Exception as ex:
+                self._json({'error': str(ex)})
+
+        elif self.path.startswith('/api/changelog'):
+            qs       = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            limit    = min(int(qs.get('limit',  ['50'])[0]), 1000)
+            offset   = int(qs.get('offset', ['0'])[0])
+            modul    = qs.get('modul',      [''])[0]
+            feature  = qs.get('feature_id', [''])[0]
+            result_f = qs.get('result',     [''])[0]
+            action_f = qs.get('action',     [''])[0]
+            search   = qs.get('search',     [''])[0]
+            try:
+                from change_log import get_entries as _cl_get, get_stats as _cl_stats
+                data  = _cl_get(limit=limit, offset=offset, modul=modul,
+                                feature_id=feature, result=result_f,
+                                action=action_f, search=search)
+                stats = _cl_stats()
+                data['stats'] = stats
+            except Exception as ex:
+                data = {'entries': [], 'total': 0, 'total_raw': 0, 'stats': {}, '_err': str(ex)}
+            self._json(data)
+
+        elif self.path == '/api/server/version':
+            import hashlib
+            try:
+                h = hashlib.md5(Path(__file__).read_bytes()).hexdigest()[:8]
+            except Exception:
+                h = 'unknown'
+            self._json({'version': h, 'ts': datetime.now().isoformat()})
 
         elif self.path == '/api/kira/briefing':
             try:
@@ -4377,6 +6247,60 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
         body   = json.loads(self.rfile.read(length) or b'{}')
+
+        # Server-Neustart: alle Port-8765-Instanzen beenden, dann neu starten
+        if self.path == '/api/server/neustart':
+            alog("Server", "Neustart", "Nutzer-initiiert via UI", "ok")
+            self._json({'ok': True, 'message': 'Server wird neu gestartet …'})
+            import subprocess, threading, sys, os
+            exe = sys.executable
+            script = os.path.abspath(__file__)
+            _NO_WIN = 0x08000000  # CREATE_NO_WINDOW — kein Terminalfenster
+            def _restart():
+                import time; time.sleep(0.5)
+                # Kill ALLE Prozesse auf Port 8765 (inkl. eigene)
+                r = subprocess.run(['netstat','-ano'], capture_output=True,
+                                   text=True, encoding='utf-8', errors='replace',
+                                   creationflags=_NO_WIN)
+                my_pid = os.getpid()
+                for line in r.stdout.splitlines():
+                    if f':{PORT}' in line:
+                        parts = line.split()
+                        if parts and parts[-1].isdigit():
+                            pid = int(parts[-1])
+                            if pid != my_pid:
+                                subprocess.run(['taskkill','/F','/PID',str(pid)],
+                                               capture_output=True, creationflags=_NO_WIN)
+                time.sleep(0.8)
+                subprocess.Popen([exe, script],
+                                 creationflags=0x00000008 | _NO_WIN,  # DETACHED + NO_WIN
+                                 close_fds=True)
+                time.sleep(0.2)
+                os.kill(my_pid, 9)
+            threading.Thread(target=_restart, daemon=True).start()
+            return
+
+        # Runtime-Log: UI-Ereignisse vom Browser empfangen
+        if self.path == '/api/runtime/event':
+            try:
+                rlog(
+                    body.get('event_type', 'ui'),
+                    body.get('action', 'ui_event'),
+                    body.get('summary', ''),
+                    session_id=body.get('session_id'),
+                    source=body.get('source', 'browser'),
+                    modul=body.get('modul', 'ui'),
+                    submodul=body.get('submodul'),
+                    actor_type=body.get('actor_type', 'user'),
+                    context_type=body.get('context_type'),
+                    context_id=body.get('context_id'),
+                    status=body.get('status', 'ok'),
+                    result=body.get('result'),
+                )
+                self._json({'ok': True})
+            except Exception as ex:
+                self._json({'ok': False, 'error': str(ex)})
+            return
 
         # Kira Chat (LLM)
         if self.path == '/api/kira/chat':
@@ -4720,17 +6644,136 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             if upd.get("base_url") is not None:
                                 prov_map[pid]["base_url"] = upd["base_url"]
                 config_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), 'utf-8')
+                rlog('settings', 'einstellungen_gespeichert', 'Einstellungen via UI gespeichert',
+                     source='server', modul='einstellungen', actor_type='user', status='ok',
+                     settings_after=json.dumps({k: v for k, v in merged.items()
+                                                if k not in ('llm',)}, ensure_ascii=False)[:2000])
                 self._json({'ok': True})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Kunden-Alias speichern
+        if self.path == '/api/kunden/alias':
+            alias_email = (body.get('alias_email','') or '').strip().lower()
+            haupt_email = (body.get('haupt_email','') or '').strip().lower()
+            if not alias_email or not haupt_email:
+                self._json({'ok': False, 'error': 'alias_email und haupt_email erforderlich'})
+                return
+            try:
+                db = get_db()
+                db.execute("DELETE FROM kunden_aliases WHERE alias_email=?", (alias_email,))
+                db.execute("INSERT INTO kunden_aliases (alias_email, haupt_email) VALUES (?,?)",
+                           (alias_email, haupt_email))
+                db.commit()
+                db.close()
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # WhatsApp Webhook
+        if self.path == '/api/webhook/whatsapp':
+            self._handle_channel_webhook(body, kanal='whatsapp')
+            return
+
+        # Instagram DM Webhook
+        if self.path == '/api/webhook/instagram':
+            self._handle_channel_webhook(body, kanal='instagram')
+            return
+
         self._respond(404, 'text/plain', b'Not found')
+
+    def _handle_channel_webhook(self, body: dict, kanal: str):
+        """
+        Empfängt WhatsApp/Instagram Nachrichten und legt Tasks an.
+        Erwartet X-Webhook-Secret Header.
+        Body: {from, text, timestamp, media_url (optional)}
+        HINWEIS: Die eigentliche WhatsApp/Instagram API-Registrierung
+        (Meta App Setup, Phone Number Registration) muss separat eingerichtet werden.
+        Dieser Endpoint ist der Empfangs-Hook nach erfolgreicher API-Integration.
+        """
+        # Auth-Check
+        try:
+            secrets = json.loads((SCRIPTS_DIR / "secrets.json").read_text('utf-8'))
+            webhook_secret = secrets.get("webhook_secret", "")
+        except:
+            webhook_secret = ""
+        provided_secret = self.headers.get('X-Webhook-Secret', '')
+        if webhook_secret and provided_secret != webhook_secret:
+            self._respond(401, 'application/json', json.dumps({'error': 'Unauthorized'}).encode())
+            return
+
+        sender = str(body.get('from', '') or '')
+        text   = str(body.get('text', '') or '')
+        ts     = str(body.get('timestamp', '') or datetime.now().isoformat())
+        konto  = kanal  # "whatsapp" oder "instagram"
+
+        if not sender or not text:
+            self._json({'error': 'from und text erforderlich'})
+            return
+
+        try:
+            from llm_classifier import classify_mail, kategorie_to_task_typ
+            cl = classify_mail(konto, sender, f"[{kanal.upper()}] {text[:80]}", text,
+                               folder='', is_sent=False, kanal=kanal)
+            kat      = cl["kategorie"]
+            task_typ = kategorie_to_task_typ(kat)
+
+            db = get_db()
+            db.execute("""INSERT INTO tasks
+                (typ, kategorie, titel, zusammenfassung, beschreibung,
+                 kunden_email, kunden_name, absender_rolle, empfohlene_aktion,
+                 kategorie_grund, betreff, konto, datum_mail,
+                 prioritaet, antwort_noetig, konfidenz)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (task_typ, kat, text[:120],
+                 cl.get("zusammenfassung", text[:100]),
+                 text[:1000],
+                 sender, "", cl.get("absender_rolle", ""),
+                 cl.get("empfohlene_aktion", ""),
+                 cl.get("kategorie_grund", f"{kanal}-Eingang"),
+                 f"[{kanal.upper()}] {text[:80]}", konto, ts,
+                 cl.get("prioritaet", "mittel"),
+                 1 if cl.get("antwort_noetig") else 0,
+                 cl.get("konfidenz", "mittel")))
+            db.commit()
+            task_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            db.close()
+            self._json({'status': 'ok', 'task_id': task_id, 'kategorie': kat})
+        except Exception as e:
+            self._json({'error': str(e)})
 
     def _handle_task_action(self, task_id, action, body):
         if action == 'status':
             from task_manager import update_task_status
-            ok = update_task_status(task_id, body.get('status',''), body.get('notiz',''))
+            status = body.get('status', '')
+            kat    = body.get('kat', '')   # optional: ursprüngliche Kategorie für KI-Lernen
+            ok = update_task_status(task_id, status, body.get('notiz', ''))
+            alog("Task", f"Status → {status}", f"ID {task_id} | Kat: {kat}", "ok" if ok else "fehler", task_id=task_id)
+            rlog('system', 'task_status_changed', f"Task {task_id}: {kat} -> {status}",
+                 source='server', modul='aufgaben', actor_type='user',
+                 context_type='task', context_id=str(task_id),
+                 status='ok' if ok else 'fehler')
+            # KI-Lern-Eintrag: jede bewusste Entscheidung einzeln speichern
+            if ok and kat and status in ('erledigt', 'zur_kenntnis', 'ignorieren'):
+                try:
+                    db = get_db()
+                    # Lern-Mapping: status → neuer_typ für corrections-Tabelle
+                    lern_map = {
+                        'erledigt':      'Abgeschlossen',
+                        'zur_kenntnis':  'Zur Kenntnis',
+                        'ignorieren':    'Ignorieren',
+                    }
+                    db.execute(
+                        "INSERT INTO corrections (task_id, alter_typ, neuer_typ, notiz) VALUES (?,?,?,?)",
+                        (task_id, kat, lern_map[status],
+                         f'Nutzer-Aktion: {status}')
+                    )
+                    db.commit()
+                    db.close()
+                except Exception:
+                    pass
             self._json({'ok': ok})
 
         elif action == 'korrektur':
@@ -4739,12 +6782,187 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 alter = body.get('alter_typ','')
                 neu   = body.get('neuer_typ','')
                 notiz = body.get('notiz','')
+                alog("Task", "Korrektur", f"ID {task_id}: {alter} → {neu}", "ok", task_id=task_id)
                 db.execute("INSERT INTO corrections (task_id,alter_typ,neuer_typ,notiz) VALUES (?,?,?,?)",
                            (task_id, alter, neu, notiz))
                 if neu and neu != alter:
                     db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neu, task_id))
                 db.commit()
-                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+                db.close()
+                return
+            finally:
+                db.close()
+            # Kira gibt aktives Feedback zur Korrektur
+            kira_antwort = 'Korrektur gespeichert und wird beim nächsten Klassifizierungs-Scan berücksichtigt.'
+            try:
+                kat_info  = f' von „{alter}" nach „{neu}"' if neu and neu != alter else ''
+                notiz_info = f' Deine Notiz: „{notiz}"' if notiz else ''
+                kira_prompt = (
+                    f'Ich habe soeben eine Korrektur für Aufgabe #{task_id} gespeichert{kat_info}.{notiz_info} '
+                    f'Bestätige kurz in 1–2 Sätzen (auf Deutsch), dass du das aufgenommen hast, '
+                    f'wo du es abgelegt hast (wissen_regeln / Lernhistorie) und wie du es beim nächsten Scan anwendest.')
+                kira_result = kira_chat(kira_prompt)
+                kira_antwort = kira_result.get('antwort', kira_antwort)
+            except Exception:
+                pass
+            self._json({'ok': True, 'kira_antwort': kira_antwort})
+
+        elif action == 'spaeter':
+            wann_text = body.get('wann', '').strip()
+            if not wann_text:
+                self._json({'ok': False, 'error': 'Kein Zeitpunkt angegeben'})
+                return
+            now      = datetime.now()
+            now_str  = now.strftime('%A, %d. %B %Y, %H:%M Uhr')
+            fallback = (now + timedelta(hours=24)).isoformat()
+            naechste = fallback
+            kira_antwort = f'Ich erinnere dich am {(now + timedelta(hours=24)).strftime("%d.%m.%Y um %H:%M Uhr")}.'
+            try:
+                kira_prompt = (
+                    f'Heute ist {now_str}. '
+                    f'Der Nutzer möchte diese Aufgabe verschieben und hat eingegeben: "{wann_text}". '
+                    f'Antworte NUR mit diesem JSON-Objekt (kein anderer Text, kein Markdown): '
+                    f'{{"datetime": "YYYY-MM-DDTHH:MM:00", "bestaetigung": "OK, ich erinnere dich am [ausgeschriebener Termin auf Deutsch]."}}')
+                kira_result = kira_chat(kira_prompt)
+                raw = kira_result.get('antwort', '')
+                m = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
+                if m:
+                    import json as _j
+                    data = _j.loads(m.group(0))
+                    naechste     = data.get('datetime', fallback)
+                    kira_antwort = data.get('bestaetigung', kira_antwort)
+                elif raw:
+                    kira_antwort = raw
+            except Exception:
+                pass
+            if not naechste:
+                naechste = fallback
+            db = get_db()
+            try:
+                db.execute(
+                    "UPDATE tasks SET status='offen', naechste_erinnerung=? WHERE id=?",
+                    (naechste, task_id))
+                db.commit()
+                self._json({'ok': True, 'kira_antwort': kira_antwort, 'naechste_erinnerung': naechste})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            finally:
+                db.close()
+
+        elif action == 'thread':
+            db = get_db()
+            try:
+                row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+                if not row:
+                    self._json({'thread': [], 'error': 'nicht gefunden'}); return
+                t = dict(row)
+                thread_id    = t.get('thread_id','') or ''
+                kunden_email = t.get('kunden_email','') or ''
+                konto        = t.get('konto','') or ''
+                messages = []
+                if thread_id:
+                    rows = db.execute(
+                        "SELECT id,betreff,kunden_email,konto,datum_mail,beschreibung,absender_rolle,status "
+                        "FROM tasks WHERE thread_id=? ORDER BY datum_mail ASC LIMIT 30",
+                        (thread_id,)).fetchall()
+                    messages = [dict(r) for r in rows]
+                if not messages and kunden_email:
+                    rows = db.execute(
+                        "SELECT id,betreff,kunden_email,konto,datum_mail,beschreibung,absender_rolle,status "
+                        "FROM tasks WHERE kunden_email=? AND konto=? ORDER BY datum_mail DESC LIMIT 15",
+                        (kunden_email, konto)).fetchall()
+                    messages = [dict(r) for r in rows]
+                for m in messages:
+                    if m.get('beschreibung'):
+                        m['beschreibung'] = m['beschreibung'][:500]
+                self._json({'thread': messages, 'current_id': task_id})
+            except Exception as e:
+                self._json({'thread': [], 'error': str(e)})
+            finally:
+                db.close()
+
+        elif action == 'loeschen':
+            db = get_db()
+            try:
+                row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+                if not row:
+                    self._json({'ok': False, 'error': 'Task nicht gefunden'})
+                    return
+                t = dict(row)
+                alog("Task", "Löschen", f"ID {task_id}: {(t.get('betreff','') or '')[:80]}", "ok", task_id=task_id)
+                msgid  = t.get('message_id', '') or ''
+                pfad   = t.get('mail_folder_pfad', '') or ''
+                betr   = t.get('betreff', '') or ''
+                konto  = t.get('konto', '') or ''
+                absnd  = t.get('kunden_email', '') or ''
+                datum  = t.get('datum_mail', '') or ''
+                grund      = body.get('grund', 'Nutzer gelöscht') or 'Nutzer gelöscht'
+                analysiere = body.get('analysiere', False)
+                kat        = t.get('kategorie', '') or ''
+                text_raw   = t.get('beschreibung', '') or ''
+                absender_r = t.get('absender_rolle', '') or ''
+
+                # Permanent block in loeschhistorie (message_id als Sperre)
+                db.execute(
+                    "INSERT INTO loeschhistorie (konto, absender, betreff, datum_mail, grund, message_id) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (konto, absnd, betr, datum,
+                     f'Nutzer gelöscht – {grund}', msgid))
+
+                # Archive-Datei löschen
+                archiv_geloescht = False
+                if pfad:
+                    mail_json = Path(pfad) / 'mail.json'
+                    for allowed_root in ALLOWED_ROOTS:
+                        if str(mail_json).startswith(allowed_root):
+                            try:
+                                if mail_json.exists():
+                                    mail_json.unlink()
+                                    archiv_geloescht = True
+                            except Exception:
+                                pass
+                            break
+
+                # Task aus DB entfernen
+                db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+                db.commit()
+
+                # Kira analysiert und lernt
+                kira_antwort = ''
+                regel_gespeichert = False
+                if analysiere:
+                    try:
+                        preview = text_raw[:600].replace('\n',' ')
+                        kira_prompt = (
+                            f'Aufgabe #{task_id} wurde vom Nutzer gelöscht.\n'
+                            f'Grund: "{grund}"\n'
+                            f'Betreff: "{betr}"\n'
+                            f'Konto: {konto} | Absender: {absnd} | Kategorie: {kat}\n'
+                            f'Mailinhalt (Ausschnitt): {preview}\n\n'
+                            f'Analysiere kurz (2-3 Sätze): Was ist das für ein Mailtyp, warum wurde er gelöscht, '
+                            f'und welche EINE konkrete Erkennungsregel solltest du daraus ableiten? '
+                            f'Antworte auf Deutsch. Formuliere die Regel als klaren Satz für dein Regelwerk.')
+                        kira_result = kira_chat(kira_prompt)
+                        kira_antwort = kira_result.get('antwort', '')
+                        if kira_antwort:
+                            # Als Lernregel in wissen_regeln speichern
+                            regel_titel  = f'Lernregel: {grund[:60]}'
+                            regel_inhalt = f'Kontext: Betreff "{betr[:80]}", Konto {konto}. {kira_antwort}'
+                            db2 = get_db()
+                            db2.execute(
+                                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, status) VALUES (?,?,?,?)",
+                                ('gelernt', regel_titel, regel_inhalt, 'aktiv'))
+                            db2.commit()
+                            db2.close()
+                            regel_gespeichert = True
+                    except Exception:
+                        pass
+
+                self._json({'ok': True, 'archiv_geloescht': archiv_geloescht,
+                            'kira_antwort': kira_antwort,
+                            'regel_gespeichert': regel_gespeichert})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             finally:
@@ -4881,11 +7099,51 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
         self.end_headers()
         self.wfile.write(body)
 
 
 # ── Start ─────────────────────────────────────────────────────────────────────
+def _kill_old_instances(port):
+    """Beendet alle anderen Prozesse auf diesem Port und wartet, bis der Port frei ist."""
+    import subprocess, os, socket, time
+    _NO_WIN = 0x08000000  # CREATE_NO_WINDOW
+    my_pid = os.getpid()
+    killed = []
+    try:
+        r = subprocess.run(['netstat', '-ano'], capture_output=True, text=True,
+                           encoding='utf-8', errors='replace', creationflags=_NO_WIN)
+        for line in r.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and f':{port}' in parts[1]:
+                try:
+                    pid = int(parts[-1])
+                    if pid and pid != my_pid:
+                        subprocess.run(['taskkill', '/F', '/PID', str(pid)],
+                                       capture_output=True, creationflags=_NO_WIN)
+                        killed.append(pid)
+                except (ValueError, IndexError):
+                    pass
+        if killed:
+            print(f"[Kira] {len(killed)} alte Instanz(en) beendet: {killed}")
+    except Exception as e:
+        print(f"[Kira] Cleanup-Fehler: {e}")
+    # Warten bis Port wirklich frei ist (max 3 Sekunden)
+    for _ in range(6):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(('127.0.0.1', port))
+            s.close()
+            break  # Port frei!
+        except OSError:
+            time.sleep(0.5)
+    else:
+        time.sleep(1.0)  # letzter Versuch
+
+
 def run_server(open_browser=True):
     config = {}
     try:
@@ -4894,6 +7152,12 @@ def run_server(open_browser=True):
 
     port      = config.get("server", {}).get("port", PORT)
     auto_open = config.get("server", {}).get("auto_open_browser", True)
+
+    _kill_old_instances(port)
+    rlog_ensure_cfg()
+    alog("Server", "Start", f"Port {port} | Python {__import__('sys').version.split()[0]}", "ok")
+    rlog('system', 'server_started', f"Kira Dashboard gestartet auf Port {port}",
+         source='server', modul='server', actor_type='system', status='ok')
 
     httpd = ThreadedHTTPServer(('127.0.0.1', port), DashboardHandler)
     url   = f"http://localhost:{port}"

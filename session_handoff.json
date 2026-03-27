@@ -1,0 +1,28 @@
+{
+  "last_session": "session-2026-03-27-h",
+  "date": "2026-03-27",
+  "what_was_done": [
+    "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
+    "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus)",
+    "session-h: kira_llm.py erweitert (elog in execute_tool + chat + runtime_log_suchen Tool)",
+    "session-h: server.py vollständig integriert (API-Endpunkte, elog an 4 Stellen, JS _rtlog(), Einstellungen-UI-Section)"
+  ],
+  "completed_features": [
+    "kira-workspace-ui-rebuild",
+    "runtime-log-system",
+    "runtime-log-server-integration"
+  ],
+  "open_tasks": [
+    "mail_monitor.py: runtime_log Integration (elog bei Mail-Klassifizierung + Task-Erstellung)",
+    "daily_check.py: runtime_log Integration (elog für Job-Start/-Ende mit Ergebnissen)",
+    "Einstellungen: Aktivitätsprotokoll-Section noch ohne rlog()-Verknüpfung (nur change_log Stats)",
+    "Test: Gesamter Server-Start nach Rebuild",
+    "KIRA_KOMPLETT_UEBERSICHT.md aktualisieren (Stand noch 25.03.2026)"
+  ],
+  "next_step": "mail_monitor.py und daily_check.py mit runtime_log integrieren, dann vollständigen Test des Servers durchführen",
+  "critical_notes": [
+    "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht",
+    "secrets.json niemals committen",
+    "runtime_events.db wird automatisch beim ersten Server-Start erstellt (ensure_config_defaults + _ensure_db)"
+  ]
+}

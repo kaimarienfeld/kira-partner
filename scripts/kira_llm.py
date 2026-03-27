@@ -1,0 +1,1722 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+kira_llm.py — Kira's Multi-LLM-Gehirn
+Unterstützt: Anthropic, OpenAI, OpenRouter, Ollama, Custom (OpenAI-kompatibel).
+Automatischer Fallback bei Ausfall oder leerem Guthaben.
+Einheitlicher System-Prompt mit allen rauMKult-Geschäftsdaten für JEDES Modell.
+"""
+import json, sqlite3, os, uuid, time
+from pathlib import Path
+from datetime import datetime, date
+try:
+    from activity_log import log as _alog
+except Exception:
+    def _alog(*a, **k): pass
+
+try:
+    from runtime_log import elog as _elog
+except Exception:
+    def _elog(*a, **k): return ""
+
+SCRIPTS_DIR   = Path(__file__).parent
+KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
+TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
+KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
+SECRETS_FILE  = SCRIPTS_DIR / "secrets.json"
+CONFIG_FILE   = SCRIPTS_DIR / "config.json"
+
+# ── Provider-Registry ─────────────────────────────────────────────────────────
+PROVIDER_TYPES = {
+    "anthropic": {
+        "name": "Anthropic (Claude)",
+        "models": [
+            ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+            ("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+            ("claude-opus-4-6", "Claude Opus 4.6"),
+        ],
+        "default_model": "claude-sonnet-4-20250514",
+        "pip_package": "anthropic",
+        "supports_tools": True,
+        "needs_key": True,
+    },
+    "openai": {
+        "name": "OpenAI",
+        "models": [
+            ("gpt-4o", "GPT-4o"),
+            ("gpt-4o-mini", "GPT-4o Mini"),
+            ("gpt-4.1-2025-04-14", "GPT-4.1"),
+            ("o3-mini", "o3-mini"),
+        ],
+        "default_model": "gpt-4o",
+        "pip_package": "openai",
+        "supports_tools": True,
+        "needs_key": True,
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "models": [
+            ("anthropic/claude-sonnet-4", "Claude Sonnet 4"),
+            ("openai/gpt-4o", "GPT-4o"),
+            ("google/gemini-2.5-pro-preview", "Gemini 2.5 Pro"),
+            ("deepseek/deepseek-r1", "DeepSeek R1"),
+            ("meta-llama/llama-4-maverick", "Llama 4 Maverick"),
+        ],
+        "default_model": "anthropic/claude-sonnet-4",
+        "pip_package": "openai",
+        "base_url": "https://openrouter.ai/api/v1",
+        "supports_tools": True,
+        "needs_key": True,
+    },
+    "ollama": {
+        "name": "Ollama (Lokal)",
+        "models": [
+            ("llama3.1", "Llama 3.1"),
+            ("mistral", "Mistral"),
+            ("qwen2.5", "Qwen 2.5"),
+            ("deepseek-r1", "DeepSeek R1"),
+        ],
+        "default_model": "llama3.1",
+        "pip_package": "openai",
+        "base_url": "http://localhost:11434/v1",
+        "supports_tools": False,
+        "needs_key": False,
+    },
+    "custom": {
+        "name": "Benutzerdefiniert (OpenAI-kompatibel)",
+        "models": [],
+        "default_model": "",
+        "pip_package": "openai",
+        "supports_tools": True,
+        "needs_key": True,
+    },
+}
+
+
+class ProviderUnavailableError(Exception):
+    """Provider nicht erreichbar — Fallback auf nächsten."""
+    pass
+
+
+# ── Config & Secrets ──────────────────────────────────────────────────────────
+def _load_secrets():
+    try:
+        return json.loads(SECRETS_FILE.read_text('utf-8'))
+    except:
+        return {}
+
+
+def _save_secrets(data):
+    SECRETS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), 'utf-8')
+
+
+def get_config():
+    """Lädt LLM-Konfiguration. Migriert altes Format automatisch."""
+    defaults = {
+        "internet_recherche": False,
+        "geschaeftsdaten_teilen": True,
+        "konversationen_speichern": True,
+        "max_kontext_items": 50,
+        "auto_wissen_extrahieren": True,
+    }
+    try:
+        c = json.loads(CONFIG_FILE.read_text('utf-8'))
+        llm = c.get("llm", {})
+    except:
+        llm = {}
+
+    for k, v in defaults.items():
+        if k not in llm:
+            llm[k] = v
+
+    # Migration: altes Format (single model) → providers list
+    if "providers" not in llm:
+        old_model = llm.pop("model", "claude-sonnet-4-20250514")
+        llm["providers"] = [{
+            "id": "default-anthropic",
+            "typ": "anthropic",
+            "name": "Claude (Anthropic)",
+            "model": old_model,
+            "aktiv": True,
+            "prioritaet": 1,
+        }]
+
+    return llm
+
+
+def get_providers():
+    """Gibt aktive Provider sortiert nach Priorität zurück."""
+    config = get_config()
+    providers = config.get("providers", [])
+    active = [p for p in providers if p.get("aktiv", True)]
+    active.sort(key=lambda p: p.get("prioritaet", 99))
+    return active
+
+
+def get_all_providers():
+    """Gibt ALLE Provider zurück (auch inaktive)."""
+    config = get_config()
+    providers = config.get("providers", [])
+    providers.sort(key=lambda p: p.get("prioritaet", 99))
+    return providers
+
+
+def _get_provider_key(provider):
+    """Holt den API Key für einen Provider."""
+    secrets = _load_secrets()
+    pid = provider.get("id", "")
+    typ = provider.get("typ", "")
+
+    # 1. Provider-spezifischer Key
+    per_provider = secrets.get("provider_keys", {})
+    if per_provider.get(pid):
+        return per_provider[pid]
+
+    # 2. Typ-basierter Key (Abwärtskompatibilität)
+    type_keys = {
+        "anthropic": "anthropic_api_key",
+        "openai": "openai_api_key",
+        "google": "google_api_key",
+    }
+    if typ in type_keys and secrets.get(type_keys[typ]):
+        return secrets[type_keys[typ]]
+
+    # 3. ENV-Variablen
+    env_keys = {
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+    }
+    if typ in env_keys:
+        return os.environ.get(env_keys[typ], "")
+
+    # Ollama braucht keinen Key
+    ptype = PROVIDER_TYPES.get(typ, {})
+    if not ptype.get("needs_key", True):
+        return "not-needed"
+
+    return ""
+
+
+def save_provider_key(provider_id, api_key):
+    """Speichert einen API Key für einen Provider."""
+    secrets = _load_secrets()
+    if "provider_keys" not in secrets:
+        secrets["provider_keys"] = {}
+    secrets["provider_keys"][provider_id] = api_key
+    _save_secrets(secrets)
+
+
+def get_api_key():
+    """Legacy: Gibt den Key des ersten aktiven Providers zurück."""
+    providers = get_providers()
+    if providers:
+        return _get_provider_key(providers[0])
+    return ""
+
+
+def check_provider_status(provider):
+    """Prüft ob ein Provider nutzbar ist (Key vorhanden, Paket installiert)."""
+    typ = provider.get("typ", "")
+    ptype = PROVIDER_TYPES.get(typ, {})
+
+    # Key prüfen
+    if ptype.get("needs_key", True):
+        key = _get_provider_key(provider)
+        if not key:
+            return {"status": "no_key", "message": "Kein API Key"}
+
+    # Paket prüfen
+    pkg = ptype.get("pip_package", "")
+    if pkg:
+        try:
+            __import__(pkg)
+        except ImportError:
+            return {"status": "no_package", "message": f"pip install {pkg}"}
+
+    return {"status": "ok", "message": "Bereit"}
+
+
+# ── DB Initialisierung ───────────────────────────────────────────────────────
+def init_conversations_db():
+    db = sqlite3.connect(str(TASKS_DB))
+    db.execute("""CREATE TABLE IF NOT EXISTS kira_konversationen (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        rolle TEXT NOT NULL,
+        nachricht TEXT,
+        tool_calls_json TEXT,
+        tool_results_json TEXT,
+        provider_used TEXT,
+        token_input INTEGER DEFAULT 0,
+        token_output INTEGER DEFAULT 0,
+        erstellt_am TEXT DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE INDEX IF NOT EXISTS idx_kira_konv_session
+        ON kira_konversationen(session_id)""")
+    # provider_used Spalte nachrüsten falls alt
+    try:
+        db.execute("SELECT provider_used FROM kira_konversationen LIMIT 1")
+    except:
+        try:
+            db.execute("ALTER TABLE kira_konversationen ADD COLUMN provider_used TEXT")
+        except:
+            pass
+    db.commit()
+    db.close()
+
+
+# ── System-Prompt Builder ────────────────────────────────────────────────────
+def build_system_prompt(config=None):
+    config = config or get_config()
+    today = date.today().isoformat()
+
+    prompt = f"""Du bist Kira, die KI-Assistentin von rauMKult® Sichtbeton.
+Du arbeitest direkt mit Kai Marienfeld, dem Inhaber.
+
+HEUTE: {today}
+
+DEINE ROLLE:
+- Du bist Kais rechte Hand für alles Geschäftliche
+- Du kennst alle offenen Rechnungen, Angebote, Kunden, Muster
+- Du schlägst proaktiv Handlungen vor und führst sie nach Bestätigung aus
+- Du sprichst Deutsch, klar und direkt, kein Corporate-Sprech
+- Du speicherst wichtige Erkenntnisse im Wissenspeicher für die Zukunft
+- Wenn Kai etwas erledigt, fragst du gezielt nach Details (warum, wann, wie viel) um daraus zu lernen
+
+KOMMUNIKATIONSSTIL:
+- Kurz, klar, sachlich — wie ein guter Kollege
+- Keine überflüssigen Höflichkeitsfloskeln
+- Konkrete Vorschläge statt vager Empfehlungen
+- Beträge immer in EUR mit 2 Dezimalstellen
+- Datums-Format: TT.MM.JJJJ
+
+WICHTIG:
+- Geschäftsdaten sind VERTRAULICH — nie an Dritte weitergeben
+- Bei Unsicherheit lieber nachfragen als raten
+- Immer Kontext aus den Daten nutzen, nie erfinden
+"""
+    if config.get("geschaeftsdaten_teilen", True):
+        prompt += "\n" + _build_data_context(config)
+
+    return prompt
+
+
+def _build_data_context(config):
+    max_items = config.get("max_kontext_items", 50)
+    today = date.today().isoformat()
+    ctx = "AKTUELLE GESCHÄFTSDATEN:\n"
+
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+
+    try:
+        rows = db.execute("SELECT * FROM ausgangsrechnungen ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+        offen = [r for r in rows if r['status'] == 'offen']
+        bezahlt = [r for r in rows if r['status'] == 'bezahlt']
+        ctx += f"\n=== AUSGANGSRECHNUNGEN ({len(rows)} gesamt, {len(offen)} offen) ===\n"
+        for r in offen:
+            ctx += f"  [{r['id']}] {r['re_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | {r['betrag_brutto'] or 0:,.2f} EUR | OFFEN"
+            if r['mahnung_count'] and r['mahnung_count'] > 0:
+                ctx += f" | {r['mahnung_count']}x gemahnt"
+            ctx += "\n"
+        if bezahlt:
+            ctx += f"  ({len(bezahlt)} bezahlt, älteste: {bezahlt[-1]['datum'] if bezahlt else '-'})\n"
+    except: pass
+
+    try:
+        rows = db.execute("SELECT * FROM angebote ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+        ang_offen = [r for r in rows if r['status'] == 'offen']
+        ctx += f"\n=== ANGEBOTE ({len(rows)} gesamt, {len(ang_offen)} offen) ===\n"
+        for r in ang_offen:
+            nf = r['nachfass_count'] or 0
+            nn = r['naechster_nachfass'] or ''
+            ctx += f"  [{r['id']}] {r['a_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | Nachfass: {nf}/3"
+            if nn and nn <= today:
+                ctx += f" | NACHFASS FÄLLIG ({nn})"
+            ctx += "\n"
+    except: pass
+
+    try:
+        rows = db.execute("SELECT * FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt') ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+        if rows:
+            ctx += f"\n=== OFFENE EINGANGSRECHNUNGEN ({len(rows)}) ===\n"
+            for r in rows:
+                ctx += f"  [{r['id']}] {r['gegenpartei'] or r['gegenpartei_email'] or '?'} | {r['betreff'][:50]} | {r['betrag'] or 0:,.2f} EUR | {r['datum']}\n"
+    except: pass
+
+    try:
+        rows = db.execute("SELECT kategorie, COUNT(*) as n FROM tasks GROUP BY kategorie ORDER BY n DESC").fetchall()
+        ctx += "\n=== KOMMUNIKATION (Posteingang) ===\n"
+        for r in rows:
+            ctx += f"  {r['kategorie']}: {r['n']} Einträge\n"
+    except: pass
+
+    try:
+        ddb = sqlite3.connect(str(DETAIL_DB))
+        ddb.row_factory = sqlite3.Row
+        for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent, skonto_betrag, zahlungsziel_datum FROM rechnungen_detail WHERE skonto_datum >= ? OR zahlungsziel_datum >= ?", (today, today)):
+            ctx += f"  Frist: {r['re_nummer']} — Skonto {r['skonto_prozent']}% bis {r['skonto_datum']}, Ziel bis {r['zahlungsziel_datum']}\n"
+        ddb.close()
+    except: pass
+
+    try:
+        rows = db.execute("SELECT titel, inhalt FROM wissen_regeln WHERE kategorie='gelernt' ORDER BY id DESC LIMIT 20").fetchall()
+        if rows:
+            ctx += f"\n=== GELERNTE ERKENNTNISSE ({len(rows)}) ===\n"
+            for r in rows:
+                ctx += f"  • {r['titel']}: {r['inhalt'][:100]}\n"
+    except: pass
+
+    try:
+        zahlungsdauern = []
+        for s in db.execute("SELECT daten_json FROM geschaeft_statistik WHERE ereignis='status_bezahlt' AND daten_json IS NOT NULL"):
+            d = json.loads(s[0]) if s[0] else {}
+            if d.get('zahlungsdauer_tage'):
+                zahlungsdauern.append(d['zahlungsdauer_tage'])
+        if zahlungsdauern:
+            avg = sum(zahlungsdauern) / len(zahlungsdauern)
+            ctx += f"\n=== MUSTER ===\n  Ø Zahlungsdauer: {avg:.0f} Tage (Basis: {len(zahlungsdauern)} Rechnungen)\n"
+    except: pass
+
+    db.close()
+    return ctx
+
+
+# ── Tool-Definitionen (Anthropic-Format = Canonical) ─────────────────────────
+def get_tools(config=None):
+    config = config or get_config()
+    tools = [
+        {
+            "name": "rechnung_bezahlt",
+            "description": "Markiert eine Ausgangsrechnung als bezahlt. Fragt automatisch nach Details.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "rechnung_id": {"type": "integer", "description": "ID der Rechnung in der Datenbank"},
+                    "bezahlt_am": {"type": "string", "description": "Datum der Zahlung (YYYY-MM-DD)"},
+                    "voller_betrag": {"type": "boolean", "description": "Wurde der volle Betrag bezahlt?"},
+                    "betrag": {"type": "number", "description": "Bezahlter Betrag (nur wenn nicht voller Betrag)"},
+                    "notiz": {"type": "string", "description": "Zusätzliche Notizen"}
+                },
+                "required": ["rechnung_id", "bezahlt_am", "voller_betrag"]
+            }
+        },
+        {
+            "name": "angebot_status",
+            "description": "Ändert den Status eines Angebots (angenommen/abgelehnt/keine_antwort).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "angebot_id": {"type": "integer", "description": "ID des Angebots"},
+                    "status": {"type": "string", "enum": ["angenommen", "abgelehnt", "keine_antwort"]},
+                    "grund": {"type": "string", "description": "Grund für den Status"}
+                },
+                "required": ["angebot_id", "status"]
+            }
+        },
+        {
+            "name": "eingangsrechnung_erledigt",
+            "description": "Markiert eine Eingangsrechnung als erledigt/bezahlt.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "geschaeft_id": {"type": "integer", "description": "ID des Geschäftsvorgangs"},
+                    "bezahlt_am": {"type": "string", "description": "Datum der Zahlung (YYYY-MM-DD)"},
+                    "notiz": {"type": "string", "description": "Notizen"}
+                },
+                "required": ["geschaeft_id", "bezahlt_am"]
+            }
+        },
+        {
+            "name": "kunde_nachschlagen",
+            "description": "Sucht Kundendaten in der Datenbank. Gibt alle bekannten Interaktionen zurück.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "suchbegriff": {"type": "string", "description": "Name, E-Mail oder Firma des Kunden"}
+                },
+                "required": ["suchbegriff"]
+            }
+        },
+        {
+            "name": "nachfass_email_entwerfen",
+            "description": "Entwirft eine Nachfass-E-Mail für ein offenes Angebot.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "angebot_id": {"type": "integer", "description": "ID des Angebots"},
+                    "ton": {"type": "string", "enum": ["freundlich", "bestimmt", "letzte_chance"], "description": "Tonfall"}
+                },
+                "required": ["angebot_id"]
+            }
+        },
+        {
+            "name": "wissen_speichern",
+            "description": "Speichert eine Erkenntnis oder Information im Wissenspeicher für zukünftige Nutzung.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "titel": {"type": "string", "description": "Kurzer Titel der Erkenntnis"},
+                    "inhalt": {"type": "string", "description": "Ausführlicher Inhalt"},
+                    "kategorie": {"type": "string", "enum": ["gelernt", "kunde", "prozess", "markt"]}
+                },
+                "required": ["titel", "inhalt", "kategorie"]
+            }
+        },
+        {
+            "name": "rechnungsdetails_abrufen",
+            "description": "Gibt vollständige Details einer Rechnung zurück (Positionen, Beträge, Zahlungsziel, Skonto).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "re_nummer": {"type": "string", "description": "Rechnungsnummer (z.B. RE-SB260104)"}
+                },
+                "required": ["re_nummer"]
+            }
+        },
+    ]
+
+    tools.append({
+        "name": "angebot_pruefen",
+        "description": "Prüft den Status eines Angebots: sucht nach Kundenantworten und gibt Handlungsempfehlung.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "a_nummer": {"type": "string", "description": "Angebotsnummer (z.B. A-SB260094)"}
+            },
+            "required": ["a_nummer"]
+        }
+    })
+
+    tools.append({
+        "name": "duplikate_suchen",
+        "description": (
+            "Scannt alle offenen Aufgaben nach Duplikaten und ähnlichen Mails. "
+            "Erkennt z.B. 1 Mail mit vielen Anhängen + X Mails mit je 1 Anhang aber gleichem Betreff/Body. "
+            "Gibt Cluster mit Task-IDs, Betreffs und Anhang-Infos zurück. "
+            "Nutze dies um dem Nutzer proaktiv Bereinigungsvorschläge zu machen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "min_aehnlichkeit": {
+                    "type": "number",
+                    "description": "Minimale Ähnlichkeit 0.0–1.0 (Standard: 0.75)",
+                    "default": 0.75
+                }
+            },
+            "required": []
+        }
+    })
+    tools.append({
+        "name": "task_erledigen",
+        "description": (
+            "Markiert eine oder mehrere Aufgaben als erledigt/abgelegt OHNE sie zu löschen. "
+            "Benutze dies für: erledigte Rechnungen, abgelegte Belege, bestätigte Informationen, "
+            "bearbeitete Anfragen. BEVORZUGE dieses Tool gegenüber tasks_loeschen! "
+            "Die Aufgaben bleiben im Archiv auffindbar."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Liste der zu erledigenden Task-IDs"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["erledigt", "zur_kenntnis", "ignorieren"],
+                    "description": "erledigt = bearbeitet/abgelegt; zur_kenntnis = gelesen/abgehakt; ignorieren = nicht relevant"
+                },
+                "notiz": {
+                    "type": "string",
+                    "description": "Optionale Notiz / Erkenntniss (wird als Lernregel gespeichert)"
+                }
+            },
+            "required": ["task_ids", "status"]
+        }
+    })
+
+    tools.append({
+        "name": "tasks_loeschen",
+        "description": (
+            "DAUERHAFTES Löschen — Aufgaben werden unwiderruflich aus DB UND Mail-Archiv entfernt. "
+            "NUR verwenden wenn Kai EXPLIZIT 'löschen' sagt! "
+            "Für erledigte Rechnungen, Belege oder abgeschlossene Vorgänge stattdessen task_erledigen nutzen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Liste der zu löschenden Task-IDs"
+                },
+                "grund": {
+                    "type": "string",
+                    "description": "Grund für die Löschung (wird als Lernregel gespeichert)"
+                }
+            },
+            "required": ["task_ids", "grund"]
+        }
+    })
+
+    # Kira darf Runtime-Log lesen wenn konfiguriert
+    try:
+        from runtime_log import _get_cfg as _rlcfg
+        if _rlcfg().get("kira_darf_lesen", True):
+            tools.append({
+                "name": "runtime_log_suchen",
+                "description": (
+                    "Durchsucht das Runtime-Ereignisprotokoll von Kira. "
+                    "Zeigt was der Nutzer zuletzt getan hat, welche Tools aufgerufen wurden, "
+                    "LLM-Kosten, Hintergrundjobs, Fehler und Einstellungsaenderungen. "
+                    "Nützlich um: 'Was habe ich heute alles erledigt?', 'Welche Fehler gab es?', "
+                    "'Wie viele Tokens habe ich heute verbraucht?' zu beantworten."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "event_type":   {"type": "string", "enum": ["ui","kira","llm","system","settings"], "description": "Nur bestimmten Event-Typ zeigen"},
+                        "action":       {"type": "string", "description": "Aktion filtern (z.B. 'chat_completed', 'tool_called')"},
+                        "modul":        {"type": "string", "description": "Modul filtern (z.B. 'kira', 'geschaeft')"},
+                        "context_type": {"type": "string", "description": "Kontext-Typ filtern (z.B. 'rechnung', 'angebot')"},
+                        "status":       {"type": "string", "enum": ["ok","fehler","partial_failure"], "description": "Status filtern"},
+                        "search":       {"type": "string", "description": "Freitextsuche in summary/result"},
+                        "limit":        {"type": "integer", "description": "Maximale Anzahl Eintraege (Standard: 20)", "default": 20}
+                    }
+                }
+            })
+    except Exception:
+        pass
+
+    if config.get("internet_recherche", False):
+        tools.append({
+            "name": "web_recherche",
+            "description": "Sucht im Internet nach Informationen. Nützlich für Firmeninfos, Bauvorschriften, Marktpreise etc.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Suchbegriff"},
+                    "max_results": {"type": "integer", "description": "Max. Ergebnisse (1-5)", "default": 3}
+                },
+                "required": ["query"]
+            }
+        })
+
+    return tools
+
+
+def _tools_to_openai(tools):
+    """Konvertiert Anthropic-Format Tools nach OpenAI Function-Calling Format."""
+    return [{
+        "type": "function",
+        "function": {
+            "name": t["name"],
+            "description": t["description"],
+            "parameters": t["input_schema"]
+        }
+    } for t in tools]
+
+
+def _tools_to_prompt(tools):
+    """Baut Tool-Beschreibungen als Text für Provider ohne Tool-Support."""
+    lines = ["Du hast folgende Werkzeuge. Wenn du eines nutzen willst, antworte EXAKT im Format:",
+             '{"tool": "TOOL_NAME", "params": {PARAMETER}}',
+             "Werkzeuge:"]
+    for t in tools:
+        params = ", ".join(f'{k} ({v.get("type","")})' for k, v in t["input_schema"].get("properties", {}).items())
+        lines.append(f'- {t["name"]}: {t["description"]} — Parameter: {params}')
+    return "\n".join(lines)
+
+
+# ── Tool-Ausführung ──────────────────────────────────────────────────────────
+def execute_tool(name, params):
+    t0 = time.monotonic()
+    try:
+        handlers = {
+            "rechnung_bezahlt": _tool_rechnung_bezahlt,
+            "angebot_status": _tool_angebot_status,
+            "eingangsrechnung_erledigt": _tool_eingangsrechnung_erledigt,
+            "kunde_nachschlagen": _tool_kunde_nachschlagen,
+            "nachfass_email_entwerfen": _tool_nachfass_email,
+            "wissen_speichern": _tool_wissen_speichern,
+            "rechnungsdetails_abrufen": _tool_rechnungsdetails,
+            "angebot_pruefen": _tool_angebot_pruefen,
+            "web_recherche": _tool_web_recherche,
+            "duplikate_suchen": _tool_duplikate_suchen,
+            "tasks_loeschen": _tool_tasks_loeschen,
+            "task_erledigen": _tool_task_erledigen,
+            "runtime_log_suchen": _tool_runtime_log_suchen,
+        }
+        handler = handlers.get(name)
+        if not handler:
+            _alog("Kira", f"Tool: {name}", "Unbekanntes Tool", "fehler", fehler=f"Unbekanntes Tool: {name}")
+            _elog("kira", f"tool_unknown", f"Unbekanntes Tool: {name}",
+                  source="kira_llm", modul="kira", submodul="tools",
+                  actor_type="kira", status="fehler",
+                  error_message=f"Unbekanntes Tool: {name}")
+            return {"error": f"Unbekanntes Tool: {name}"}
+        result = handler(params)
+        ms = int((time.monotonic() - t0) * 1000)
+        details = str(params)[:120] if params else ""
+        if result.get("error"):
+            _alog("Kira", f"Tool: {name}", details, "fehler", fehler=str(result.get("error",""))[:300], dauer_ms=ms)
+            _elog("kira", f"tool_called", f"Tool {name} fehlgeschlagen",
+                  source="kira_llm", modul="kira", submodul="tools",
+                  actor_type="kira", status="fehler", duration_ms=ms,
+                  error_message=str(result.get("error",""))[:500],
+                  context_snapshot=params,
+                  entity_snapshot=result)
+        else:
+            _alog("Kira", f"Tool: {name}", details, "ok", dauer_ms=ms)
+            _elog("kira", "tool_called", f"Tool {name}: {str(result.get('message','ok'))[:120]}",
+                  source="kira_llm", modul="kira", submodul="tools",
+                  actor_type="kira", status="ok", duration_ms=ms,
+                  result=str(result.get("message",""))[:200],
+                  context_snapshot=params,
+                  entity_snapshot=result)
+        return result
+    except Exception as e:
+        ms = int((time.monotonic() - t0) * 1000)
+        _alog("Kira", f"Tool: {name}", "", "fehler", fehler=str(e)[:300], dauer_ms=ms)
+        _elog("kira", "tool_exception", f"Tool {name} Exception: {str(e)[:200]}",
+              source="kira_llm", modul="kira", submodul="tools",
+              actor_type="kira", status="fehler", duration_ms=ms,
+              error_message=str(e)[:500],
+              context_snapshot=params)
+        return {"error": str(e)}
+
+
+def _tool_rechnung_bezahlt(p):
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    rid = p["rechnung_id"]
+    now = datetime.now().isoformat()
+    row = db.execute("SELECT * FROM ausgangsrechnungen WHERE id=?", (rid,)).fetchone()
+    if not row:
+        db.close()
+        return {"error": f"Rechnung #{rid} nicht gefunden"}
+    re_nr = row['re_nummer']
+    kunde = row['kunde_name'] or row['kunde_email'] or 'Unbekannt'
+    betrag_orig = row['betrag_brutto'] or 0
+    db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=?, notiz=? WHERE id=?",
+               (p["bezahlt_am"], p.get("notiz", ""), rid))
+    tage = None
+    try:
+        d1 = datetime.strptime(str(row['datum'])[:10], "%Y-%m-%d")
+        d2 = datetime.strptime(p["bezahlt_am"][:10], "%Y-%m-%d")
+        tage = (d2 - d1).days
+    except: pass
+    daten = {**p, "zeitstempel": now, "re_nummer": re_nr, "kunde": kunde, "zahlungsdauer_tage": tage}
+    db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
+               ('ausgangsrechnung', rid, 'status_bezahlt', json.dumps(daten, ensure_ascii=False), now))
+    wissen = f"Rechnung {re_nr} ({kunde}) am {p['bezahlt_am']} bezahlt."
+    if tage is not None:
+        wissen += f" Zahlungsdauer: {tage} Tage."
+    if not p.get("voller_betrag") and p.get("betrag"):
+        wissen += f" Reduzierter Betrag: {p['betrag']} EUR (statt {betrag_orig:,.2f} EUR)."
+    if p.get("notiz"):
+        wissen += f" {p['notiz']}"
+    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+               ('gelernt', f'{re_nr} ({kunde}): bezahlt', wissen, 'Kira-Chat', now))
+    db.commit()
+    db.close()
+    result = f"Rechnung {re_nr} als bezahlt markiert (am {p['bezahlt_am']})."
+    if tage is not None:
+        result += f" Zahlungsdauer: {tage} Tage."
+    return {"ok": True, "message": result}
+
+
+def _tool_angebot_status(p):
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    aid = p["angebot_id"]
+    now = datetime.now().isoformat()
+    row = db.execute("SELECT * FROM angebote WHERE id=?", (aid,)).fetchone()
+    if not row:
+        db.close()
+        return {"error": f"Angebot #{aid} nicht gefunden"}
+    a_nr = row['a_nummer']
+    kunde = row['kunde_name'] or row['kunde_email'] or 'Unbekannt'
+    new_status = p["status"]
+    db.execute("UPDATE angebote SET status=? WHERE id=?", (new_status, aid))
+    if new_status == 'abgelehnt' and p.get("grund"):
+        db.execute("UPDATE angebote SET grund_abgelehnt=? WHERE id=?", (p["grund"], aid))
+    elif new_status == 'angenommen' and p.get("grund"):
+        db.execute("UPDATE angebote SET grund_angenommen=? WHERE id=?", (p["grund"], aid))
+    daten = {**p, "zeitstempel": now, "a_nummer": a_nr, "kunde": kunde}
+    db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
+               ('angebot', aid, f'status_{new_status}', json.dumps(daten, ensure_ascii=False), now))
+    wissen = f"Angebot {a_nr} ({kunde}): {new_status}."
+    if p.get("grund"):
+        wissen += f" Grund: {p['grund']}"
+    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+               ('gelernt', f'{a_nr} ({kunde}): {new_status}', wissen, 'Kira-Chat', now))
+    db.commit()
+    db.close()
+    return {"ok": True, "message": f"Angebot {a_nr} als '{new_status}' markiert."}
+
+
+def _tool_eingangsrechnung_erledigt(p):
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    gid = p["geschaeft_id"]
+    now = datetime.now().isoformat()
+    row = db.execute("SELECT * FROM geschaeft WHERE id=?", (gid,)).fetchone()
+    if not row:
+        db.close()
+        return {"error": f"Geschäftsvorgang #{gid} nicht gefunden"}
+    partner = row['gegenpartei'] or row['gegenpartei_email'] or 'Unbekannt'
+    db.execute("UPDATE geschaeft SET bewertung='erledigt', bewertung_grund=? WHERE id=?",
+               (f"bezahlt am {p['bezahlt_am']}. {p.get('notiz','')}".strip(), gid))
+    daten = {**p, "zeitstempel": now, "partner": partner}
+    db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
+               ('geschaeft', gid, 'erledigt', json.dumps(daten, ensure_ascii=False), now))
+    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+               ('gelernt', f'Eingangsrechnung {partner}: erledigt',
+                f"Bezahlt am {p['bezahlt_am']}. {p.get('notiz','')}", 'Kira-Chat', now))
+    db.commit()
+    db.close()
+    return {"ok": True, "message": f"Eingangsrechnung von {partner} als erledigt markiert."}
+
+
+def _tool_kunde_nachschlagen(p):
+    suchbegriff = p["suchbegriff"].lower()
+    results = []
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    for table, fields in [
+        ("ausgangsrechnungen", "re_nummer, kunde_name, kunde_email, betrag_brutto, status, datum"),
+        ("angebote", "a_nummer, kunde_name, kunde_email, status, datum"),
+    ]:
+        try:
+            for r in db.execute(f"SELECT {fields} FROM {table} WHERE LOWER(kunde_name) LIKE ? OR LOWER(kunde_email) LIKE ?",
+                                (f'%{suchbegriff}%', f'%{suchbegriff}%')):
+                results.append(dict(r))
+        except: pass
+    db.close()
+    try:
+        kdb = sqlite3.connect(str(KUNDEN_DB))
+        kdb.row_factory = sqlite3.Row
+        for r in kdb.execute("SELECT DISTINCT absender_name, absender_email, COUNT(*) as interaktionen FROM interaktionen WHERE LOWER(absender_name) LIKE ? OR LOWER(absender_email) LIKE ? GROUP BY absender_email",
+                             (f'%{suchbegriff}%', f'%{suchbegriff}%')):
+            results.append({"name": r['absender_name'], "email": r['absender_email'], "interaktionen": r['interaktionen']})
+        kdb.close()
+    except: pass
+    if not results:
+        return {"message": f"Kein Kunde gefunden für '{p['suchbegriff']}'"}
+    return {"kunden": results, "anzahl": len(results)}
+
+
+def _tool_nachfass_email(p):
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    row = db.execute("SELECT * FROM angebote WHERE id=?", (p["angebot_id"],)).fetchone()
+    db.close()
+    if not row:
+        return {"error": f"Angebot #{p['angebot_id']} nicht gefunden"}
+    try:
+        from response_gen import generate_nachfass
+        stufe = {"freundlich": 1, "bestimmt": 2, "letzte_chance": 3}.get(p.get("ton", "freundlich"), 1)
+        entwurf = generate_nachfass(stufe, row['a_nummer'], row['kunde_name'] or 'Kunde',
+                                     row['kunde_email'] or '', row['betreff'] or '')
+        return {"entwurf": entwurf, "an": row['kunde_email'], "angebot": row['a_nummer']}
+    except Exception as e:
+        return {"error": f"Nachfass-Generierung fehlgeschlagen: {e}"}
+
+
+def _tool_wissen_speichern(p):
+    db = sqlite3.connect(str(TASKS_DB))
+    now = datetime.now().isoformat()
+    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+               (p["kategorie"], p["titel"], p["inhalt"], 'Kira-Chat', now))
+    db.commit()
+    db.close()
+    return {"ok": True, "message": f"Erkenntnis gespeichert: {p['titel']}"}
+
+
+def _tool_rechnungsdetails(p):
+    try:
+        ddb = sqlite3.connect(str(DETAIL_DB))
+        ddb.row_factory = sqlite3.Row
+        row = ddb.execute("SELECT * FROM rechnungen_detail WHERE re_nummer=?", (p["re_nummer"],)).fetchone()
+        if not row:
+            ddb.close()
+            return {"error": f"Rechnung {p['re_nummer']} nicht in Detail-DB"}
+        result = dict(row)
+        if result.get("positionen_json"):
+            result["positionen"] = json.loads(result["positionen_json"])
+            del result["positionen_json"]
+        result.pop("roh_text", None)
+        mahnungen = [dict(r) for r in ddb.execute("SELECT typ, stufe, datum, betrag FROM mahnungen_detail WHERE re_nummer=?", (p["re_nummer"],))]
+        if mahnungen:
+            result["mahnungen"] = mahnungen
+        ddb.close()
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_angebot_pruefen(p):
+    """Prüft Status eines Angebots via angebote_tracker."""
+    a_nr = p.get("a_nummer", "")
+    if not a_nr:
+        return {"error": "Keine Angebotsnummer angegeben"}
+    try:
+        from angebote_tracker import find_angebot_responses, classify_response_llm, suggest_next_action
+        import sqlite3
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        ang = db.execute("SELECT * FROM angebote WHERE a_nummer=?", (a_nr,)).fetchone()
+        db.close()
+        if not ang:
+            return {"error": f"Angebot {a_nr} nicht gefunden"}
+
+        responses = find_angebot_responses(a_nr, ang['kunde_email'] or "", ang['datum'] or "")
+        result = {"a_nummer": a_nr, "kunde": ang['kunde_name'], "betrag": ang['betrag_geschaetzt'],
+                  "status": ang['status'], "datum": ang['datum'], "nachfass_count": ang['nachfass_count'] or 0,
+                  "antworten_gefunden": len(responses)}
+        if responses:
+            best = responses[0]
+            cl = classify_response_llm(a_nr, best.get('text_plain', ''), best.get('betreff', ''))
+            result["letzte_antwort"] = {"betreff": best.get('betreff', ''), "datum": best.get('datum', ''),
+                                         "klassifizierung": cl}
+        if ang['status'] == 'offen' and ang['datum']:
+            from datetime import datetime
+            try:
+                tage = (datetime.now().date() - datetime.strptime(ang['datum'][:10], "%Y-%m-%d").date()).days
+                action = suggest_next_action(dict(ang), tage, ang['nachfass_count'] or 0)
+                if action:
+                    result["vorschlag"] = action
+                result["tage_offen"] = tage
+            except: pass
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_web_recherche(p):
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(p["query"], max_results=p.get("max_results", 3)))
+        return {"ergebnisse": [{"titel": r["title"], "url": r["href"], "text": r["body"][:200]} for r in results]}
+    except ImportError:
+        return {"error": "duckduckgo-search nicht installiert (pip install duckduckgo-search)"}
+    except Exception as e:
+        return {"error": f"Suche fehlgeschlagen: {e}"}
+
+
+def _tool_duplikate_suchen(p):
+    """Findet Cluster ähnlicher Mails in tasks.db (gleicher Betreff + Body, unterschiedliche Anhangzahl)."""
+    import difflib, json as _json
+    min_sim = float(p.get("min_aehnlichkeit", 0.75))
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    try:
+        rows = db.execute("""SELECT id, betreff, beschreibung, kunden_email, konto,
+                                    anhaenge_pfad, datum_mail, kategorie
+                             FROM tasks WHERE status='offen'
+                             ORDER BY datum_mail DESC LIMIT 200""").fetchall()
+    finally:
+        db.close()
+
+    if not rows:
+        return {"cluster": [], "hinweis": "Keine offenen Tasks gefunden."}
+
+    def _norm(s):
+        import re as _re
+        return _re.sub(r'\s+', ' ', (s or '').strip().lower())
+
+    def _anhang_count(pfad):
+        if not pfad: return 0
+        try:
+            from pathlib import Path as _P
+            d = _P(pfad)
+            if d.is_dir():
+                return len([f for f in d.iterdir() if f.suffix.lower() in
+                             ('.pdf','.png','.jpg','.jpeg','.xlsx','.docx','.zip')])
+        except Exception:
+            pass
+        return 1 if pfad else 0
+
+    tasks = [dict(r) for r in rows]
+    used = set()
+    clusters = []
+
+    for i, t1 in enumerate(tasks):
+        if t1['id'] in used:
+            continue
+        b1 = _norm(t1.get('betreff', ''))
+        cluster = [t1]
+        for j, t2 in enumerate(tasks):
+            if i == j or t2['id'] in used:
+                continue
+            b2 = _norm(t2.get('betreff', ''))
+            sim = difflib.SequenceMatcher(None, b1, b2).ratio()
+            if sim >= min_sim:
+                cluster.append(t2)
+
+        if len(cluster) < 2:
+            continue
+
+        for t in cluster:
+            used.add(t['id'])
+
+        # Analyse: Anhangzahlen pro Task
+        cluster_info = []
+        for t in cluster:
+            ac = _anhang_count(t.get('anhaenge_pfad', ''))
+            cluster_info.append({
+                "id": t['id'],
+                "betreff": (t.get('betreff') or '')[:80],
+                "konto": t.get('konto', ''),
+                "datum": (t.get('datum_mail') or '')[:10],
+                "anhaenge": ac,
+                "kategorie": t.get('kategorie', ''),
+            })
+
+        cluster_info.sort(key=lambda x: x['anhaenge'], reverse=True)
+        max_anh = cluster_info[0]['anhaenge']
+        rest_ids = [c['id'] for c in cluster_info[1:]]
+
+        clusters.append({
+            "cluster_groesse": len(cluster_info),
+            "betreff": cluster_info[0]['betreff'],
+            "original_verdacht": cluster_info[0],
+            "duplikate_verdacht": cluster_info[1:],
+            "empfehlung": (
+                f"1 Mail mit {max_anh} Anhängen ist vermutlich das Original. "
+                f"{len(rest_ids)} Mails mit je weniger Anhängen sind mögliche Duplikate. "
+                f"Duplikat-IDs: {rest_ids}"
+            ) if max_anh > 1 else (
+                f"{len(cluster_info)} Mails mit sehr ähnlichem Betreff. IDs: {[c['id'] for c in cluster_info]}"
+            )
+        })
+
+    if not clusters:
+        return {"cluster": [], "hinweis": f"Keine Duplikat-Cluster gefunden (Schwellwert: {min_sim:.0%})."}
+    return {"cluster": clusters, "gesamt_cluster": len(clusters)}
+
+
+def _tool_task_erledigen(p):
+    """Setzt Tasks auf erledigt/zur_kenntnis/ignorieren. Keine Datei-Löschung."""
+    task_ids = p.get("task_ids", [])
+    status   = p.get("status", "erledigt")
+    notiz    = p.get("notiz", "")
+    if not task_ids:
+        return {"error": "Keine Task-IDs angegeben"}
+    valid = {"erledigt", "zur_kenntnis", "ignorieren"}
+    if status not in valid:
+        return {"error": f"Ungültiger Status '{status}'. Erlaubt: {', '.join(valid)}"}
+
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    now = datetime.now().isoformat()
+    erledigt = []
+    fehler = []
+    try:
+        for tid in task_ids:
+            row = db.execute("SELECT id, betreff, kategorie FROM tasks WHERE id=?", (tid,)).fetchone()
+            if not row:
+                fehler.append(f"#{tid}: nicht gefunden")
+                continue
+            db.execute("UPDATE tasks SET status=? WHERE id=?", (status, tid))
+            erledigt.append({"id": tid, "betreff": (row["betreff"] or "")[:60]})
+
+        if erledigt and notiz:
+            betreffs = ", ".join(f'"{e["betreff"]}"' for e in erledigt[:3])
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie,titel,inhalt,status,quelle,erstellt_am) VALUES (?,?,?,?,?,?)",
+                ('gelernt',
+                 f'Kira erledigt: {notiz[:60]}',
+                 f'Kira hat {len(erledigt)} Task(s) als {status} markiert. {notiz} Beispiele: {betreffs}.',
+                 'aktiv', 'Kira-Chat', now))
+
+        db.commit()
+    finally:
+        db.close()
+
+    label_map = {"erledigt": "erledigt", "zur_kenntnis": "zur Kenntnis genommen", "ignorieren": "ignoriert"}
+    return {
+        "ok": True,
+        "erledigt": len(erledigt),
+        "details": erledigt,
+        "fehler": fehler,
+        "message": f"{len(erledigt)} Task(s) als '{label_map.get(status, status)}' markiert."
+    }
+
+
+def _tool_tasks_loeschen(p):
+    """Löscht Tasks inkl. Archivdatei und speichert Lernregel. Nur nach Nutzer-OK aufrufen!"""
+    from pathlib import Path as _P
+    ARCHIV_ROOT = _P(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
+    ALLOWED = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
+
+    task_ids = p.get("task_ids", [])
+    grund    = p.get("grund", "Kira gelöscht")
+    if not task_ids:
+        return {"error": "Keine Task-IDs angegeben"}
+
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    geloescht = []
+    fehler = []
+    now = datetime.now().isoformat()
+
+    try:
+        for tid in task_ids:
+            try:
+                row = db.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+                if not row:
+                    fehler.append(f"#{tid}: nicht gefunden")
+                    continue
+                t = dict(row)
+                msgid = t.get('message_id', '') or ''
+                pfad  = t.get('mail_folder_pfad', '') or ''
+                betr  = t.get('betreff', '') or ''
+                konto = t.get('konto', '') or ''
+                absnd = t.get('kunden_email', '') or ''
+                datum = t.get('datum_mail', '') or ''
+
+                # Permanent block
+                db.execute(
+                    "INSERT INTO loeschhistorie (konto, absender, betreff, datum_mail, grund, message_id) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (konto, absnd, betr, datum, f'Kira gelöscht – {grund}', msgid))
+
+                # Archiv löschen
+                archiv_ok = False
+                if pfad:
+                    mail_json = _P(pfad) / 'mail.json'
+                    for allowed in ALLOWED:
+                        if str(mail_json).startswith(allowed):
+                            try:
+                                if mail_json.exists():
+                                    mail_json.unlink()
+                                    archiv_ok = True
+                            except Exception:
+                                pass
+                            break
+
+                db.execute("DELETE FROM tasks WHERE id=?", (tid,))
+                geloescht.append({"id": tid, "betreff": betr[:60], "archiv": archiv_ok})
+            except Exception as e:
+                fehler.append(f"#{tid}: {e}")
+
+        # Lernregel
+        if geloescht:
+            betreffs = ", ".join(f'"{g["betreff"]}"' for g in geloescht[:3])
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, status, erstellt_am) VALUES (?,?,?,?,?)",
+                ('gelernt',
+                 f'Kira-Löschung: {grund[:60]}',
+                 f'Kira hat {len(geloescht)} Tasks gelöscht. Grund: {grund}. Beispiele: {betreffs}.',
+                 'aktiv', now))
+
+        db.commit()
+    finally:
+        db.close()
+
+    return {
+        "geloescht": len(geloescht),
+        "details": geloescht,
+        "fehler": fehler,
+        "message": f"{len(geloescht)} Task(s) gelöscht, Lernregel gespeichert."
+    }
+
+
+def _tool_runtime_log_suchen(p):
+    """Kira liest das Runtime-Ereignisprotokoll."""
+    try:
+        from runtime_log import eget, estats
+        limit = min(int(p.get("limit", 20)), 100)
+        data = eget(
+            limit=limit,
+            event_type=p.get("event_type") or None,
+            modul=p.get("modul") or None,
+            action=p.get("action") or None,
+            context_type=p.get("context_type") or None,
+            status=p.get("status") or None,
+            search=p.get("search") or None,
+        )
+        entries = data.get("entries", [])
+        total = data.get("total", 0)
+        stats = estats()
+        # Kompakte Textdarstellung für Kira
+        lines = [f"Runtime-Log: {total} Eintraege gefunden (gesamt: {stats.get('total',0)}), "
+                 f"davon {stats.get('heute',0)} heute, {stats.get('fehler',0)} Fehler",
+                 f"Tokens gesamt heute: LLM-Events mit token_in/out in Eintraegen"]
+        for e in entries:
+            ts = (e.get("ts") or "")[:16]
+            et = e.get("event_type","?")
+            act = e.get("action","?")
+            summ = e.get("summary","")
+            st = e.get("status","ok")
+            ctx = f" [{e['context_type']}:{e['context_id']}]" if e.get("context_type") and e.get("context_id") else ""
+            tok = f" | {e['token_in']}->{e['token_out']} Tok" if e.get("token_in") else ""
+            prov = f" [{e.get('provider','')}]" if e.get("provider") else ""
+            line = f"{ts} [{et}] {act}{ctx}{prov}: {summ}{tok}"
+            if st not in ("ok","success"): line += f" !{st}"
+            lines.append(line)
+        return {"ok": True, "message": "\n".join(lines), "total": total}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ── Provider-Adapter ─────────────────────────────────────────────────────────
+def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048):
+    """Anthropic Claude API Aufruf mit Tool-Loop."""
+    import anthropic
+
+    key = _get_provider_key(provider)
+    client = anthropic.Anthropic(api_key=key)
+    model = provider.get("model", "claude-sonnet-4-20250514")
+
+    messages = [{"role": "user", "content": user_message}]
+    final_text = ""
+    all_tool_results = []
+    response = None
+
+    for _ in range(5):
+        try:
+            response = client.messages.create(
+                model=model, max_tokens=max_tokens,
+                system=system_prompt, tools=tools, messages=messages
+            )
+        except anthropic.AuthenticationError:
+            raise ProviderUnavailableError("API Key ungültig")
+        except anthropic.RateLimitError:
+            raise ProviderUnavailableError("Rate Limit / Guthaben leer")
+        except anthropic.APIStatusError as e:
+            if e.status_code in (502, 503, 529):
+                raise ProviderUnavailableError(f"Server überlastet ({e.status_code})")
+            raise
+        except Exception as e:
+            if any(x in str(e).lower() for x in ("overloaded", "timeout", "connection")):
+                raise ProviderUnavailableError(str(e))
+            raise
+
+        has_tool_use = any(b.type == "tool_use" for b in response.content)
+        for b in response.content:
+            if b.type == "text":
+                final_text += b.text
+
+        if not has_tool_use:
+            break
+
+        messages.append({"role": "assistant", "content": response.content})
+        tool_results_msg = []
+        for b in response.content:
+            if b.type == "tool_use":
+                result = execute_tool(b.name, b.input)
+                all_tool_results.append({"tool": b.name, "input": b.input, "result": result})
+                tool_results_msg.append({
+                    "type": "tool_result",
+                    "tool_use_id": b.id,
+                    "content": json.dumps(result, ensure_ascii=False, default=str)
+                })
+        messages.append({"role": "user", "content": tool_results_msg})
+
+    return {
+        "text": final_text,
+        "tools": all_tool_results,
+        "tokens_in": response.usage.input_tokens if response else 0,
+        "tokens_out": response.usage.output_tokens if response else 0,
+    }
+
+
+def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens=2048):
+    """OpenAI-kompatible API (OpenAI, OpenRouter, Ollama, Custom) mit Tool-Loop."""
+    import openai
+
+    key = _get_provider_key(provider)
+    typ = provider.get("typ", "openai")
+    ptype = PROVIDER_TYPES.get(typ, {})
+    base_url = provider.get("base_url") or ptype.get("base_url")
+
+    kwargs = {"api_key": key or "not-needed"}
+    if base_url:
+        kwargs["base_url"] = base_url
+    client = openai.OpenAI(**kwargs)
+    model = provider.get("model", ptype.get("default_model", "gpt-4o"))
+
+    supports_tools = ptype.get("supports_tools", True) and provider.get("supports_tools", True)
+    oai_tools = _tools_to_openai(tools) if (tools and supports_tools) else None
+
+    sys_content = system_prompt
+    if tools and not supports_tools:
+        sys_content += "\n\n" + _tools_to_prompt(tools)
+
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user", "content": user_message}
+    ]
+
+    final_text = ""
+    all_tool_results = []
+    response = None
+
+    for _ in range(5):
+        try:
+            call_kwargs = {"model": model, "messages": messages, "max_tokens": max_tokens}
+            if oai_tools:
+                call_kwargs["tools"] = oai_tools
+            response = client.chat.completions.create(**call_kwargs)
+        except openai.AuthenticationError:
+            raise ProviderUnavailableError("API Key ungültig")
+        except openai.RateLimitError:
+            raise ProviderUnavailableError("Rate Limit / Guthaben leer")
+        except Exception as e:
+            err = str(e).lower()
+            if any(x in err for x in ("overloaded", "503", "502", "timeout", "connection", "refused")):
+                raise ProviderUnavailableError(str(e))
+            raise
+
+        choice = response.choices[0]
+        msg = choice.message
+
+        if msg.content:
+            final_text += msg.content
+
+        if not msg.tool_calls:
+            # Check for text-based tool calls (for providers without tool support)
+            if not supports_tools and msg.content:
+                tool_call = _parse_text_tool_call(msg.content)
+                if tool_call:
+                    result = execute_tool(tool_call["tool"], tool_call["params"])
+                    all_tool_results.append({"tool": tool_call["tool"], "input": tool_call["params"], "result": result})
+                    messages.append({"role": "assistant", "content": msg.content})
+                    messages.append({"role": "user", "content": f"Tool-Ergebnis: {json.dumps(result, ensure_ascii=False, default=str)}"})
+                    continue
+            break
+
+        # Process tool calls
+        messages.append(msg.model_dump())
+        for tc in msg.tool_calls:
+            fn = tc.function
+            try:
+                params = json.loads(fn.arguments)
+            except:
+                params = {}
+            result = execute_tool(fn.name, params)
+            all_tool_results.append({"tool": fn.name, "input": params, "result": result})
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str)
+            })
+
+    usage = response.usage if response else None
+    return {
+        "text": final_text,
+        "tools": all_tool_results,
+        "tokens_in": usage.prompt_tokens if usage else 0,
+        "tokens_out": usage.completion_tokens if usage else 0,
+    }
+
+
+def _parse_text_tool_call(text):
+    """Versucht einen Tool-Call aus Freitext zu extrahieren (für Provider ohne Tool-Support)."""
+    import re
+    match = re.search(r'\{[^{}]*"tool"\s*:\s*"([^"]+)"[^{}]*"params"\s*:\s*(\{[^}]+\})', text)
+    if match:
+        try:
+            return {"tool": match.group(1), "params": json.loads(match.group(2))}
+        except:
+            pass
+    return None
+
+
+# ── Leichtgewichtiger Klassifizierungs-Aufruf (kein System-Prompt, Haiku) ───
+def classify_direct(prompt: str, max_tokens: int = 512) -> dict:
+    """
+    Direkter, günstiger LLM-Aufruf NUR für Mail-Klassifizierung.
+    Wählt automatisch das günstigste verfügbare Modell je Provider:
+      Anthropic  → claude-haiku-4-5-20251001  (~10× billiger als Sonnet)
+      OpenAI     → gpt-4o-mini               (~10× billiger als gpt-4o)
+      OpenRouter → openai/gpt-4o-mini        (günstig + gut)
+      Ollama/Custom → konfiguriertes Modell  (lokal = kostenlos)
+    Kein System-Prompt, keine Tools → minimaler Token-Verbrauch.
+    """
+    # Günstigstes Modell je Provider-Typ
+    _BUDGET_MODELS = {
+        "anthropic":  "claude-haiku-4-5-20251001",
+        "openai":     "gpt-4o-mini",
+        "openrouter": "openai/gpt-4o-mini",
+        # ollama / custom: behalten ihr konfiguriertes Modell (lokal = kein Cost)
+    }
+
+    providers = get_providers()
+    if not providers:
+        return {"error": "Kein Provider konfiguriert", "antwort": ""}
+
+    # Budget-Provider bauen: günstigstes Modell für den ersten verfügbaren Typ
+    budget_provider = None
+    fallback_provider = providers[0]
+
+    for p in providers:
+        typ = p.get("typ", "")
+        if typ in _BUDGET_MODELS:
+            budget_provider = dict(p)
+            budget_provider["model"] = _BUDGET_MODELS[typ]
+            break
+        elif typ in ("ollama", "custom"):
+            # Lokal = kostenlos, direkt nehmen
+            budget_provider = p
+            break
+
+    provider = budget_provider or fallback_provider
+
+    try:
+        if provider.get("typ") == "anthropic":
+            result = _call_anthropic(provider, prompt, "", [], max_tokens=max_tokens)
+        else:
+            result = _call_openai_compat(provider, prompt, "", [], max_tokens=max_tokens)
+        return {"antwort": result.get("text", ""),
+                "tokens_in":  result.get("tokens_in", 0),
+                "tokens_out": result.get("tokens_out", 0),
+                "model": provider.get("model", "?")}
+    except Exception as e:
+        return {"error": str(e), "antwort": ""}
+
+
+# ── Haupt-Chat-Funktion ─────────────────────────────────────────────────────
+def chat(user_message, session_id=None, history=None):
+    """Chat mit automatischem Provider-Fallback."""
+    config = get_config()
+    providers = get_providers()
+
+    if not providers:
+        return {
+            "error": "Kein LLM-Provider konfiguriert. Bitte in Einstellungen mindestens einen Provider einrichten.",
+            "needs_setup": True
+        }
+
+    system_prompt = build_system_prompt(config)
+    tools = get_tools(config)
+    session_id = session_id or str(uuid.uuid4())
+
+    if config.get("konversationen_speichern", True):
+        _save_message(session_id, "user", user_message)
+
+    last_error = None
+    result = None
+    used_provider = None
+    tried = []
+
+    for provider in providers:
+        pid = provider.get("id", "?")
+        pname = provider.get("name", provider.get("typ", "?"))
+        typ = provider.get("typ", "")
+
+        # Vorab-Check: Key vorhanden?
+        status = check_provider_status(provider)
+        if status["status"] != "ok":
+            tried.append(f"{pname}: {status['message']}")
+            continue
+
+        try:
+            if typ == "anthropic":
+                result = _call_anthropic(provider, user_message, system_prompt, tools)
+            else:
+                result = _call_openai_compat(provider, user_message, system_prompt, tools)
+            used_provider = provider
+            break
+        except ProviderUnavailableError as e:
+            last_error = str(e)
+            tried.append(f"{pname}: {last_error}")
+            continue
+        except Exception as e:
+            last_error = str(e)
+            tried.append(f"{pname}: {last_error}")
+            continue
+    else:
+        # Alle Provider fehlgeschlagen
+        error_detail = "\n".join(f"  • {t}" for t in tried) if tried else "Keine Provider konfiguriert"
+        _alog("LLM", "Chat fehlgeschlagen", error_detail[:300], "fehler", fehler=error_detail[:300])
+        _elog("llm", "chat_failed", "Alle LLM-Provider nicht erreichbar",
+              source="kira_llm", modul="kira", submodul="chat",
+              session_id=session_id, actor_type="kira",
+              status="fehler", error_message=error_detail[:500],
+              user_input=user_message)
+        return {
+            "error": f"Alle Provider nicht erreichbar:\n{error_detail}",
+            "needs_api_key": any("Key" in t for t in tried),
+        }
+
+    # Antwort speichern
+    final_text = result["text"]
+    all_tool_results = result["tools"]
+    provider_name = used_provider.get("name", used_provider.get("typ", "?"))
+    model_name    = used_provider.get("model", "")
+    tin, tout = result.get("tokens_in", 0), result.get("tokens_out", 0)
+    _alog("LLM", "Chat", f"{provider_name} | {tin}→{tout} Tokens | {len(all_tool_results)} Tools", "ok")
+    _elog("llm", "chat_completed",
+          f"{provider_name} | {tin}\u2192{tout} Tokens | {len(all_tool_results)} Tools",
+          source="kira_llm", modul="kira", submodul="chat",
+          session_id=session_id, actor_type="kira",
+          status="ok",
+          provider=provider_name, model=model_name,
+          token_in=tin, token_out=tout,
+          user_input=user_message,
+          assistant_output=final_text,
+          entity_snapshot={"tools": [t.get("tool") for t in all_tool_results],
+                           "fallback": tried if tried else None})
+
+    if config.get("konversationen_speichern", True):
+        _save_message(session_id, "assistant", final_text,
+                      tool_calls=all_tool_results if all_tool_results else None,
+                      tokens_in=result.get("tokens_in", 0),
+                      tokens_out=result.get("tokens_out", 0),
+                      provider=provider_name)
+
+    response = {
+        "antwort": final_text,
+        "session_id": session_id,
+        "provider": provider_name,
+        "model": used_provider.get("model", ""),
+        "tools_verwendet": [t["tool"] for t in all_tool_results],
+        "tool_ergebnisse": all_tool_results,
+        "tokens": {
+            "input": result.get("tokens_in", 0),
+            "output": result.get("tokens_out", 0)
+        }
+    }
+
+    # Fallback-Info wenn nicht der erste Provider genutzt wurde
+    if tried:
+        response["fallback_info"] = tried
+
+    return response
+
+
+# ── Konversations-Verwaltung ─────────────────────────────────────────────────
+def _save_message(session_id, rolle, nachricht, tool_calls=None, tokens_in=0, tokens_out=0, provider=None):
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""INSERT INTO kira_konversationen
+            (session_id, rolle, nachricht, tool_calls_json, token_input, token_output, provider_used)
+            VALUES (?,?,?,?,?,?,?)""",
+            (session_id, rolle, nachricht,
+             json.dumps(tool_calls, ensure_ascii=False, default=str) if tool_calls else None,
+             tokens_in, tokens_out, provider))
+        db.commit()
+        db.close()
+    except: pass
+
+
+def get_conversations(limit=20):
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute("""
+            SELECT session_id,
+                   MIN(erstellt_am) as gestartet,
+                   MAX(erstellt_am) as letzte_nachricht,
+                   COUNT(*) as nachrichten,
+                   SUM(token_input) as total_input,
+                   SUM(token_output) as total_output
+            FROM kira_konversationen
+            GROUP BY session_id
+            ORDER BY MAX(erstellt_am) DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        result = []
+        for r in rows:
+            first = db.execute("SELECT nachricht FROM kira_konversationen WHERE session_id=? AND rolle='user' ORDER BY id LIMIT 1",
+                               (r['session_id'],)).fetchone()
+            vorschau = (first['nachricht'][:80] + '...') if first and first['nachricht'] and len(first['nachricht']) > 80 else (first['nachricht'] if first and first['nachricht'] else '')
+            result.append({
+                "session_id": r['session_id'],
+                "gestartet": r['gestartet'],
+                "letzte_nachricht": r['letzte_nachricht'],
+                "nachrichten": r['nachrichten'],
+                "vorschau": vorschau,
+                "tokens": {"input": r['total_input'] or 0, "output": r['total_output'] or 0}
+            })
+        db.close()
+        return result
+    except:
+        return []
+
+
+def get_conversation_messages(session_id):
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute("SELECT * FROM kira_konversationen WHERE session_id=? ORDER BY id", (session_id,)).fetchall()
+        db.close()
+        return [dict(r) for r in rows]
+    except:
+        return []
+
+
+# ── Tagesbriefing ────────────────────────────────────────────────────────────
+def generate_daily_briefing():
+    """Generiert ein Tagesbriefing via LLM. Fallback auf Statistik-basiert."""
+    config = get_config()
+    today = date.today().isoformat()
+
+    # Cache prüfen (nur 1x pro Tag)
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        cached = db.execute(
+            "SELECT inhalt_json FROM kira_briefings WHERE datum=?", (today,)
+        ).fetchone()
+        if cached:
+            db.close()
+            return json.loads(cached['inhalt_json'])
+    except:
+        pass
+
+    # Briefing-Tabelle erstellen falls nötig
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS kira_briefings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            datum TEXT UNIQUE,
+            inhalt_json TEXT,
+            provider_used TEXT,
+            erstellt_am TEXT DEFAULT CURRENT_TIMESTAMP
+        )""")
+        db.commit()
+    except:
+        pass
+
+    # Daten sammeln für Kontext
+    stats = _build_briefing_stats(db)
+
+    # LLM-Briefing versuchen
+    briefing = None
+    provider_used = "statistik"
+    try:
+        providers = get_providers()
+        if providers:
+            prompt = f"""Erstelle ein kurzes Tagesbriefing für Kai (rauMKult® Sichtbeton).
+Heute: {today}
+
+AKTUELLE GESCHÄFTSDATEN:
+{json.dumps(stats, ensure_ascii=False, indent=2)}
+
+FORMAT (als JSON):
+{{
+  "zusammenfassung": "2-3 Sätze: Was ist heute wichtig?",
+  "prioritaeten": [
+    {{"typ": "rechnung|angebot|aufgabe", "text": "Konkrete Handlungsaufforderung", "prio": 1}},
+    ...max 5
+  ],
+  "vorschlaege": ["Konkrete Vorschläge was Kai heute tun sollte"],
+  "kennzahlen": {{
+    "offenes_volumen": 12345.67,
+    "angebote_offen": 5,
+    "nachfass_faellig": 2,
+    "avg_zahlungsdauer": 34
+  }}
+}}
+
+Sei direkt, keine Floskeln. Fokus auf Handlung."""
+
+            result = chat(f"[SYSTEM: Tagesbriefing generieren]\n\n{prompt}", session_id=None)
+            if not result.get("error"):
+                m = __import__('re').search(r'\{[\s\S]*\}', result.get("antwort", ""))
+                if m:
+                    briefing = json.loads(m.group(0))
+                    provider_used = result.get("provider", "llm")
+    except:
+        pass
+
+    # Fallback: Statistik-basiert
+    if not briefing:
+        briefing = _build_stats_briefing(stats)
+
+    # Cache speichern
+    try:
+        db.execute("INSERT OR REPLACE INTO kira_briefings (datum, inhalt_json, provider_used) VALUES (?,?,?)",
+                   (today, json.dumps(briefing, ensure_ascii=False), provider_used))
+        db.commit()
+    except:
+        pass
+
+    try:
+        db.close()
+    except:
+        pass
+    return briefing
+
+
+def _build_briefing_stats(db):
+    """Sammelt aktuelle Geschäftsdaten für das Briefing."""
+    stats = {}
+    try:
+        # Offene Rechnungen
+        r = db.execute("SELECT COUNT(*) as cnt, COALESCE(SUM(betrag_brutto),0) as vol FROM ausgangsrechnungen WHERE status='offen'").fetchone()
+        stats["rechnungen_offen"] = {"anzahl": r['cnt'], "volumen": r['vol']}
+
+        # Offene Angebote
+        a = db.execute("SELECT COUNT(*) as cnt, COALESCE(SUM(betrag_geschaetzt),0) as vol FROM angebote WHERE status='offen'").fetchone()
+        stats["angebote_offen"] = {"anzahl": a['cnt'], "volumen": a['vol']}
+
+        # Offene Aufgaben
+        t = db.execute("SELECT COUNT(*) as cnt FROM tasks WHERE status='offen'").fetchone()
+        stats["aufgaben_offen"] = t['cnt']
+
+        # Antwort nötig
+        an = db.execute("SELECT COUNT(*) as cnt FROM tasks WHERE status='offen' AND antwort_noetig=1").fetchone()
+        stats["antwort_noetig"] = an['cnt']
+
+        # Überfällige Mahnungen
+        m = db.execute("SELECT COUNT(*) as cnt FROM ausgangsrechnungen WHERE status='offen' AND mahnung_count > 0").fetchone()
+        stats["gemahnt"] = m['cnt']
+
+        # Nachfass fällig (vereinfacht)
+        from angebote_tracker import check_all_open_angebote
+        tracker = check_all_open_angebote()
+        stats["nachfass_faellig"] = len(tracker.get("nachfass_faellig", []))
+        stats["nachfass_details"] = [
+            {"a_nummer": n["a_nummer"], "kunde": n["kunde"], "tage": n["tage_offen"]}
+            for n in tracker.get("nachfass_faellig", [])[:5]
+        ]
+    except:
+        pass
+    return stats
+
+
+def _build_stats_briefing(stats):
+    """Fallback-Briefing aus reinen Statistiken."""
+    parts = []
+    ro = stats.get("rechnungen_offen", {})
+    ao = stats.get("angebote_offen", {})
+    an = stats.get("antwort_noetig", 0)
+
+    if an:
+        parts.append(f"{an} Mail(s) warten auf Antwort")
+    if ro.get("anzahl"):
+        parts.append(f"{ro['anzahl']} offene Rechnungen ({ro['volumen']:.0f} EUR)")
+    if ao.get("anzahl"):
+        parts.append(f"{ao['anzahl']} offene Angebote ({ao['volumen']:.0f} EUR)")
+
+    nf = stats.get("nachfass_faellig", 0)
+    if nf:
+        parts.append(f"{nf} Nachfass-Aktionen fällig")
+
+    return {
+        "zusammenfassung": ". ".join(parts) + "." if parts else "Keine dringenden Punkte heute.",
+        "prioritaeten": [],
+        "vorschlaege": [],
+        "kennzahlen": {
+            "offenes_volumen": ro.get("volumen", 0),
+            "angebote_offen": ao.get("anzahl", 0),
+            "nachfass_faellig": nf,
+            "avg_zahlungsdauer": 0,
+        }
+    }
+
+
+# Init DB bei Import
+init_conversations_db()
