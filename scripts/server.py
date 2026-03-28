@@ -7945,6 +7945,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/kira/insights':
             self._api_kira_insights()
 
+        elif self.path == '/api/kira/proaktiv/status':
+            self._api_kira_proaktiv_status()
+
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
 
@@ -8634,6 +8637,39 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_kira_proaktiv_status(self):
+        """GET /api/kira/proaktiv/status — Status des letzten proaktiven Scans."""
+        try:
+            import kira_proaktiv as _p
+            state = _p._load_state()
+            letzter_scan = state.get("letzter_scan", "noch kein Scan")
+            aktionen_heute = {k: v for k, v in state.items()
+                              if k.startswith("proaktiv_") and str(datetime.now().date()) in str(v)}
+            self._json({
+                "ok": True,
+                "letzter_scan": letzter_scan,
+                "aktionen_heute": len(aktionen_heute),
+                "proaktiv_aktiv": True
+            })
+        except ImportError:
+            self._json({"ok": False, "error": "kira_proaktiv nicht verfügbar", "proaktiv_aktiv": False})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_kira_proaktiv_scan(self):
+        """POST /api/kira/proaktiv/scan — Startet proaktiven Scan manuell."""
+        try:
+            import kira_proaktiv as _p
+            import threading as _t
+            def _run():
+                _p.run_proaktiver_scan()
+            _t.Thread(target=_run, daemon=True, name="ProaktivScanManual").start()
+            self._json({"ok": True, "msg": "Proaktiver Scan gestartet"})
+        except ImportError:
+            self._json({"ok": False, "error": "kira_proaktiv nicht verfügbar"})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _api_mail_archiv_status(self):
         """GET /api/mail/archiv/status — Archiv-Pfad + Mailanzahl."""
         try:
@@ -8837,6 +8873,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json(result)
             except Exception as e:
                 self._json({'error': f'Chat-Fehler: {str(e)}'})
+            return
+
+        # Kira Proaktiver Scan (manuell auslösen)
+        if self.path == '/api/kira/proaktiv/scan':
+            self._api_kira_proaktiv_scan()
             return
 
         # Kira API Key speichern (Legacy-Compat + neuer Weg)

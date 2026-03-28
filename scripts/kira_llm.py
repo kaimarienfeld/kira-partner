@@ -460,6 +460,27 @@ def _build_data_context(config):
             ctx += f"\n=== MUSTER ===\n  Ø Zahlungsdauer: {avg:.0f} Tage (Basis: {len(zahlungsdauern)} Rechnungen)\n"
     except: pass
 
+    # Proaktiver Scan: letzte Findings einbeziehen
+    try:
+        import kira_proaktiv as _p
+        state = _p._load_state()
+        today_str = date.today().isoformat()
+        findings = []
+        for key, val in state.items():
+            if not key.startswith("proaktiv_"):
+                continue
+            # Format: proaktiv_<typ>_<id> = {datum, text, aktion, ...}
+            if isinstance(val, dict) and val.get("datum", "")[:10] == today_str:
+                txt = val.get("text", "")
+                if txt:
+                    findings.append(f"  ⚡ {txt}")
+        if findings:
+            ctx += f"\n=== PROAKTIVE KIRA-FINDINGS HEUTE ({len(findings)}) ===\n"
+            ctx += "\n".join(findings[:20]) + "\n"
+            ctx += "(Weitere Findings in knowledge/proaktiv_state.json)\n"
+    except Exception:
+        pass
+
     db.close()
     return ctx
 

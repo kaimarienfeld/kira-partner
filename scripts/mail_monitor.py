@@ -18,6 +18,13 @@ except Exception:
     def _alog(*a, **k): pass
 
 try:
+    import kira_proaktiv as _proaktiv
+    PROAKTIV_OK = True
+except Exception:
+    _proaktiv = None
+    PROAKTIV_OK = False
+
+try:
     from runtime_log import elog as _elog
 except Exception:
     def _elog(*a, **k): return ""
@@ -949,6 +956,10 @@ def run_monitor(interval_sec=300):
     _update_status(running=True)
     log.info(f"Mail-Monitor gestartet (Intervall: {interval_sec}s)")
 
+    _poll_count = 0
+    # Proaktiver Scan alle 15 Min — bei 300s-Intervall jeder 3. Poll, sonst jeder Poll
+    _proaktiv_every = max(1, 900 // interval_sec)
+
     while not _stop_event.is_set():
         try:
             new_tasks = poll_all_accounts()
@@ -957,6 +968,16 @@ def run_monitor(interval_sec=300):
         except Exception as e:
             log.error(f"Monitor-Fehler: {e}")
             _update_status(last_error=str(e))
+
+        # Proaktiver Business-Scan alle ~15 Min
+        _poll_count += 1
+        if PROAKTIV_OK and _poll_count % _proaktiv_every == 0:
+            try:
+                result = _proaktiv.run_proaktiver_scan()
+                if result.get("ergebnisse"):
+                    log.info(f"Proaktiver Scan: {list(result['ergebnisse'].keys())}")
+            except Exception as e:
+                log.error(f"Proaktiver Scan Fehler: {e}")
 
         # Warten mit Stop-Check
         _stop_event.wait(timeout=interval_sec)
