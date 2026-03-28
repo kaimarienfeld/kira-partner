@@ -1473,7 +1473,7 @@ def _build_mahnung_section(gemahnt, ar_offen, mahnung_details=None):
 def _rtlog_type_row(typ, label, cfg_id, checked, count):
     dot = '#5cb85c' if checked else '#888'
     chk = 'checked' if checked else ''
-    cnt = f'<span style="font-size:10px;color:var(--muted);margin-left:auto;margin-right:8px">{count} Eintr.</span>' if count else ''
+    cnt = f'<span id="rl-type-cnt-{typ}" style="font-size:10px;color:var(--muted);margin-left:auto;margin-right:8px">{count} Eintr.</span>' if count else f'<span id="rl-type-cnt-{typ}" style="font-size:10px;color:var(--muted);margin-left:auto;margin-right:8px"></span>'
     return f'''<div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="width:7px;height:7px;border-radius:50%;background:{dot};display:inline-block"></span>
@@ -1498,6 +1498,13 @@ def build_einstellungen():
     llm   = get_llm_config()
     proto = config.get("protokoll", {})
     rtlog_cfg = config.get("runtime_log", {})
+    kira_cfg  = config.get("kira", {})
+    launcher_variant = kira_cfg.get("launcher_variant", "B")
+    kira_size        = kira_cfg.get("size", 112)
+    kira_prox_radius = kira_cfg.get("prox_radius", 0.5)
+    kira_bounce_dist = kira_cfg.get("bounce_dist", 130)
+    kira_idle        = kira_cfg.get("idle_mode", True)
+    kira_idle_delay  = kira_cfg.get("idle_delay", 10)
     # Runtime-Log Stats
     try:
         _rl_s = rlog_stats()
@@ -1571,7 +1578,7 @@ def build_einstellungen():
             key_row = f'''<div class="settings-row" style="margin-top:4px">
               <label style="font-size:11px">API Key</label>
               <div style="display:flex;gap:4px;align-items:center">
-                <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Key eingeben..." style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+                <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Key eingeben..." style="width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
                 <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--kl);color:#000;border:none;border-radius:4px;cursor:pointer" onclick="saveProviderKey('{js_esc(pid)}')">Speichern</button>
               </div>
             </div>'''
@@ -1581,22 +1588,22 @@ def build_einstellungen():
             base_url_val = esc(prov.get("base_url", ""))
             base_url_row = f'''<div class="settings-row" style="margin-top:4px">
               <label style="font-size:11px">Base URL</label>
-              <input type="text" id="purl-{esc(pid)}" value="{base_url_val}" placeholder="https://api.example.com/v1" style="width:220px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+              <input type="text" id="purl-{esc(pid)}" value="{base_url_val}" placeholder="https://api.example.com/v1" style="width:220px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
             </div>'''
         if ptyp == "custom":
             model_row = f'''<div class="settings-row" style="margin-top:4px">
               <label style="font-size:11px">Modell-ID</label>
-              <input type="text" id="pmodel-{esc(pid)}" value="{esc(pmodel)}" placeholder="model-name" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+              <input type="text" id="pmodel-{esc(pid)}" value="{esc(pmodel)}" placeholder="model-name" style="width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
             </div>'''
         else:
             model_row = f'''<div class="settings-row" style="margin-top:4px">
               <label style="font-size:11px">Modell</label>
-              <select id="pmodel-{esc(pid)}" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+              <select id="pmodel-{esc(pid)}" style="width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
                 {model_options}
               </select>
             </div>'''
 
-        provider_cards += f'''<div class="provider-card" id="pcard-{esc(pid)}" style="{opacity}border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:#111;">
+        provider_cards += f'''<div class="provider-card" id="pcard-{esc(pid)}" style="{opacity}border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:14px">{status_icon}</span>
@@ -1622,340 +1629,814 @@ def build_einstellungen():
     for tkey, tval in PROVIDER_TYPES.items():
         add_type_options += f'<option value="{esc(tkey)}">{esc(tval["name"])}</option>'
 
-    html = f"""
-    <div class="section">
-      <div class="section-title">Erscheinungsbild</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>Farbschema</label>
-          <select id="cfg-theme" onchange="applyTheme(this.value)">
-            <option value="dark">Dunkel</option>
-            <option value="light">Hell</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>Akzentfarbe</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="color" id="cfg-accent" value="#4f7df9" onchange="applyAccent(this.value)">
-            <span id="cfg-accent-hex" style="font-size:var(--fs-sm);color:var(--muted)">#4f7df9</span>
-            <button class="btn btn-xs btn-muted" onclick="resetAccent()">Zur&uuml;cksetzen</button>
-          </div>
-        </div>
-        <div class="settings-row">
-          <label>Schriftgr&ouml;&szlig;e</label>
-          <select id="cfg-fontsize" onchange="applyFontSize(this.value)">
-            <option value="">Normal</option>
-            <option value="small">Klein</option>
-            <option value="large">Gro&szlig;</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>Dichte</label>
-          <select id="cfg-density" onchange="applyDensity(this.value)">
-            <option value="">Normal</option>
-            <option value="compact">Kompakt</option>
-            <option value="comfortable">Komfortabel</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>Firmenname</label>
-          <input type="text" id="cfg-company-name" placeholder="z.B. Meine Firma" oninput="applyCompanyName(this.value)">
-        </div>
-        <div class="settings-row">
-          <label>Logo (URL oder Emoji)</label>
-          <input type="text" id="cfg-logo" placeholder="z.B. https://... oder K" oninput="applyLogo(this.value)">
-        </div>
-        <div class="settings-row">
-          <label>Kartenradius</label>
-          <select id="cfg-card-radius" onchange="applyCardRadius(this.value)">
-            <option value="">Normal (12px)</option>
-            <option value="4px">Eckig (4px)</option>
-            <option value="8px">Leicht (8px)</option>
-            <option value="16px">Rund (16px)</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>Schatten</label>
-          <select id="cfg-shadow" onchange="applyShadow(this.value)">
-            <option value="">Normal</option>
-            <option value="none">Keine Schatten</option>
-            <option value="strong">Stark</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>Animationen reduzieren</label>
-          <input type="checkbox" id="cfg-reduce-motion" onchange="applyReduceMotion(this.checked)">
-        </div>
-        <div class="settings-row">
-          <label>Hoher Kontrast</label>
-          <input type="checkbox" id="cfg-high-contrast" onchange="applyHighContrast(this.checked)">
-        </div>
-        <div style="margin-top:8px">
-          <button class="btn btn-sm btn-gold" onclick="saveDesignSettings()">Design speichern</button>
-          <span id="design-status" style="margin-left:10px;color:var(--muted);font-size:var(--fs-sm)"></span>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Push-Benachrichtigungen (ntfy.sh)</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>Aktiv</label>
-          <input type="checkbox" id="cfg-ntfy-aktiv" {'checked' if ntfy.get("aktiv") else ''}>
-        </div>
-        <div class="settings-row">
-          <label>Topic-Name</label>
-          <input type="text" id="cfg-ntfy-topic" value="{esc(ntfy.get('topic_name',''))}" placeholder="raumkult-...">
-        </div>
-        <div class="settings-row">
-          <label>Server</label>
-          <input type="text" id="cfg-ntfy-server" value="{esc(ntfy.get('server','https://ntfy.sh'))}" placeholder="https://ntfy.sh">
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Aufgaben & Erinnerungen</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>Erinnerungsintervall (Stunden)</label>
-          <input type="number" id="cfg-erinnerung-h" value="{aufg.get('erinnerung_intervall_stunden', 24)}" min="1" max="168">
-        </div>
-        <div class="settings-row">
-          <label>Unbeantwortete Mails prüfen (Tage zurück)</label>
-          <input type="number" id="cfg-unanswered-days" value="{aufg.get('unanswered_check_days', 14)}" min="1" max="90">
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Nachfass-Intervalle (Angebote)</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>1. Nachfass (Tage nach Angebot)</label>
-          <input type="number" id="cfg-nf-1" value="{nf.get('intervall_1_tage', 10)}" min="1" max="60">
-        </div>
-        <div class="settings-row">
-          <label>2. Nachfass (Tage nach 1. Nachfass)</label>
-          <input type="number" id="cfg-nf-2" value="{nf.get('intervall_2_tage', 21)}" min="1" max="90">
-        </div>
-        <div class="settings-row">
-          <label>3. Nachfass (Tage nach 2. Nachfass)</label>
-          <input type="number" id="cfg-nf-3" value="{nf.get('intervall_3_tage', 45)}" min="1" max="120">
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Dashboard</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>Server-Port</label>
-          <input type="number" id="cfg-server-port" value="{srv.get('port', 8765)}" min="1024" max="65535">
-        </div>
-        <div class="settings-row">
-          <label>Browser automatisch öffnen</label>
-          <input type="checkbox" id="cfg-auto-browser" {'checked' if srv.get("auto_open_browser", True) else ''}>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">KI-Assistent (Kira Multi-LLM)</div>
-      <div class="section-body">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
-          Provider werden in Priorit&auml;tsreihenfolge durchlaufen. F&auml;llt einer aus, springt Kira automatisch auf den n&auml;chsten.
-        </div>
-        <div id="provider-list">
-          {provider_cards}
-        </div>
-        <div style="margin-top:8px;padding:10px 14px;border:1px dashed var(--border);border-radius:8px;background:#0a0a0a">
-          <div style="font-size:12px;font-weight:700;color:var(--kl);margin-bottom:6px">+ Provider hinzuf&uuml;gen</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="add-provider-typ" style="width:200px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
-              {add_type_options}
-            </select>
-            <input type="text" id="add-provider-name" placeholder="Name (z.B. &quot;OpenAI Backup&quot;)" style="width:180px;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
-            <button class="btn btn-sm btn-gold" onclick="addProvider()">Hinzuf&uuml;gen</button>
-          </div>
-        </div>
-        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
-          <div style="font-size:12px;font-weight:700;margin-bottom:6px">Allgemeine KI-Einstellungen</div>
-          <div class="settings-row">
-            <label>Internet-Recherche erlauben</label>
-            <input type="checkbox" id="cfg-llm-internet" {'checked' if llm.get('internet_recherche') else ''}>
-          </div>
-          <div class="settings-row">
-            <label>Gesch&auml;ftsdaten im Kontext teilen</label>
-            <input type="checkbox" id="cfg-llm-geschaeft" {'checked' if llm.get('geschaeftsdaten_teilen', True) else ''}>
-          </div>
-          <div class="settings-row">
-            <label>Konversationen speichern</label>
-            <input type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konversationen_speichern', True) else ''}>
-          </div>
-        </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:8px">
-          API Keys: <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--kl)">Anthropic</a>
-          &middot; <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--kl)">OpenAI</a>
-          &middot; <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--kl)">OpenRouter</a>
-          &middot; <a href="https://ollama.com" target="_blank" style="color:var(--kl)">Ollama</a>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Aktivit&auml;tsprotokoll</div>
-      <div class="section-body">
-        <div class="settings-row">
-          <label>Max. Eintr&auml;ge <span style="color:var(--muted);font-weight:400">(0 = unbegrenzt)</span></label>
-          <input type="number" id="cfg-proto-max" value="{proto.get('max_eintraege', 0)}" min="0" max="100000" style="width:100px">
-        </div>
-        <div class="settings-row">
-          <label>Eintr&auml;ge behalten (Tage) <span style="color:var(--muted);font-weight:400">(0 = nie l&ouml;schen)</span></label>
-          <input type="number" id="cfg-proto-tage" value="{proto.get('tage', 0)}" min="0" max="3650" style="width:100px">
-        </div>
-        <div class="settings-row">
-          <label>Datenbankgr&ouml;&szlig;e (tasks.db)</label>
-          <span style="font-size:13px;color:var(--text-secondary)">{db_size_str}</span>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">&Auml;nderungsverlauf (Mikro-Log)</div>
-      <div class="section-body">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
-          Mikrogranulares append-only Log aller Code-, CSS-, JS- und Konfigurations&auml;nderungen
-          (<code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">change_log.jsonl</code>).
-          Jeder Micro-Schritt = eigene Zeile. Nie &uuml;berschreiben, nie umsortieren.
-        </div>
-        <div class="settings-row">
-          <label>Eintr&auml;ge gesamt</label>
-          <span style="font-size:13px;color:var(--text-secondary)">{change_log_count}</span>
-        </div>
-        <div class="settings-row">
-          <label>Letzter Eintrag</label>
-          <span style="font-size:13px;color:var(--text-secondary)">{change_log_last or "&ndash;"}</span>
-        </div>
-        <div class="settings-row">
-          <label>Ergebnis-Verteilung</label>
-          <span style="font-size:12px;color:var(--text-secondary)">{" &middot; ".join(f'{k}: {v}' for k,v in change_log_by_res.items()) or "&ndash;"}</span>
-        </div>
-        <div class="settings-row">
-          <label>Speicherort</label>
-          <span style="font-size:11px;color:var(--muted);font-family:monospace">memory/change_log.jsonl</span>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="cl-filter-modul" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Module</option>
-            {"".join(f'<option value="{m}">{m}</option>' for m in change_log_moduls)}
-          </select>
-          <select id="cl-filter-result" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Ergebnisse</option>
-            {"".join(f'<option value="{r}">{r}</option>' for r in change_log_results)}
-          </select>
-          <select id="cl-filter-feature" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Features</option>
-            {"".join(f'<option value="{f}">{f}</option>' for f in change_log_features)}
-          </select>
-          <select id="cl-filter-action" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Actions</option>
-            {"".join(f'<option value="{a}">{a}</option>' for a in change_log_actions)}
-          </select>
-          <input id="cl-filter-search" type="text" placeholder="Suche in summary / details / location&hellip;"
-            style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:200px">
-          <button class="btn btn-xs btn-sec" onclick="loadChangeLog(false)">Anzeigen</button>
-          <button class="btn btn-xs btn-sec" onclick="exportChangeLog()">Export JSONL</button>
-        </div>
-        <div id="changelog-entries" style="margin-top:10px;display:none;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
-      </div>
-    </div>
-    <div class="section" id="sec-rtlog">
-      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Runtime-Log &amp; Telemetrie</span>
-        <span id="rtlog-live-dot" style="width:8px;height:8px;border-radius:50%;background:{'#5cb85c' if rtlog_cfg.get('aktiv',True) else '#888'};display:inline-block" title="{'Aktiv' if rtlog_cfg.get('aktiv',True) else 'Inaktiv'}"></span>
-      </div>
-      <div class="section-body">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-          L&uuml;ckenloses Protokoll aller UI-, Kira- und System-Ereignisse.
-          Kira kann damit auf Verlauf und Fehler zugreifen.
-          DB: <code style="font-size:10px;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">knowledge/runtime_events.db</code>
-        </div>
+    # Aktiver Provider für Status-Bar
+    active_provider = next((p.get("name", p.get("typ", "?")) for p in providers if p.get("aktiv", True)), "–")
 
-        <!-- Master-Toggle -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#111;border-radius:8px;margin-bottom:10px;border:1px solid var(--border)">
-          <div>
-            <span style="font-weight:700;font-size:13px">Logging aktiv</span>
-            <span style="font-size:11px;color:var(--muted);margin-left:8px">Haupt-Schalter</span>
-          </div>
-          <input type="checkbox" id="cfg-rl-aktiv" {'checked' if rtlog_cfg.get('aktiv', True) else ''} style="width:16px;height:16px;cursor:pointer">
-        </div>
+    html = f"""<style>
+#panel-einstellungen{{padding:0!important;max-width:none!important;width:100%;overflow:hidden;}}
+#panel-einstellungen.active{{display:flex!important;flex-direction:column;height:calc(100vh - 52px);}}
+.es-shell{{display:flex;flex-direction:column;flex:1;overflow:hidden;}}
+.es-mh{{background:var(--bg-raised);border-bottom:0.5px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}}
+.es-mt{{font-size:17px;font-weight:600;color:var(--text);white-space:nowrap;}}
+.es-mstats{{display:flex;gap:14px;flex-wrap:wrap;}}
+.es-ms{{font-size:12px;color:var(--text-secondary);white-space:nowrap;}}
+.es-ms b{{font-weight:600;color:var(--text);}}
+.es-macts{{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}}
+.es-ma{{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.12s;}}
+.es-ma:hover{{background:var(--bg-overlay);color:var(--text);}}
+.es-ma.es-pri{{background:#444441;border-color:#444441;color:#fff;}}
+.es-ct{{display:flex;flex:1;overflow:hidden;min-height:0;}}
+.es-snav{{width:220px;min-width:220px;background:var(--bg-raised);border-right:0.5px solid var(--border);padding:12px 0;overflow-y:auto;flex-shrink:0;}}
+.es-snav-h{{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:10px 18px 5px;}}
+.es-sn{{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:var(--text-secondary);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s;user-select:none;}}
+.es-sn:hover{{background:var(--bg-overlay);}}
+.es-sn.act{{background:var(--accent-bg,rgba(68,68,65,.08));border-left-color:var(--accent,#444441);color:var(--text);font-weight:600;}}
+.es-sico{{width:18px;text-align:center;font-size:12px;opacity:0.5;flex-shrink:0;}}
+.es-sn.act .es-sico{{opacity:0.8;}}
+.es-scnt{{font-size:9px;background:var(--bg-overlay);color:var(--muted);padding:1px 6px;border-radius:8px;margin-left:auto;}}
+.es-sn.es-plan{{opacity:0.55;}}
+.es-pb{{font-size:8px;background:var(--bg-overlay);color:var(--muted);padding:1px 5px;border-radius:3px;margin-left:auto;}}
+.es-sn-sep{{height:0.5px;background:var(--border);margin:8px 18px;}}
+.es-main{{flex:1;overflow-y:auto;padding:24px 28px;background:var(--bg);}}
+.es-sec-panel{{display:none;}}
+.es-sec-panel.es-active{{display:block;}}
+.es-sec-h{{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;}}
+.es-sec-sub{{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.5;}}
+.es-grp{{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:12px;}}
+.es-grp-h{{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}}
+.es-grp-sub{{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.4;}}
+.es-row{{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border);}}
+.es-row:last-child{{border-bottom:none;}}
+.es-rl{{font-size:13px;color:var(--text);flex:1;min-width:0;}}
+.es-rd{{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4;}}
+.es-toggle-wrap{{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;}}
+.es-toggle-inp{{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}}
+.es-toggle-vis{{display:inline-block;width:38px;height:20px;background:var(--border-strong,#888);border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;}}
+.es-toggle-vis::after{{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s;}}
+.es-toggle-inp:checked ~ .es-toggle-vis{{background:#1D9E75;}}
+.es-toggle-inp:checked ~ .es-toggle-vis::after{{transform:translateX(18px);}}
+.es-sel{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;}}
+.es-inp{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;width:200px;}}
+.es-inp-sm{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;width:100px;}}
+.es-badge{{font-size:10px;padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0;white-space:nowrap;}}
+.es-badge.on{{background:#EAF3DE;color:#3B6D11;}}
+.es-badge.off{{background:var(--bg-overlay);color:var(--muted);}}
+.es-badge.plan{{background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border);}}
+.es-btn{{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.12s;}}
+.es-btn:hover{{background:var(--bg-overlay);}}
+.es-btn.es-btn-pri{{background:#444441;border-color:#444441;color:#fff;}}
+.es-btn.es-btn-green{{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11;}}
+.es-btn.es-btn-red{{background:transparent;border-color:#e84545;color:#e84545;}}
+.es-intg{{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border:0.5px solid var(--border);border-radius:8px;margin-bottom:6px;}}
+.es-intg-ico{{width:32px;height:32px;border-radius:8px;background:var(--bg-overlay);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}}
+.es-intg-body{{flex:1;min-width:0;}}
+.es-intg-name{{font-size:13px;font-weight:600;color:var(--text);}}
+.es-intg-sub{{font-size:10px;color:var(--muted);margin-top:1px;}}
+.es-save-bar{{margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px;}}
+.es-proto-tabs{{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);}}
+.es-proto-tab{{padding:8px 16px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
+.es-proto-tab.act{{color:var(--accent,#444441);border-bottom-color:var(--accent,#444441);}}
+.es-proto-tab-panel{{display:none;}}
+.es-proto-tab-panel.act{{display:block;}}
+.es-preview{{background:var(--bg-overlay);border:0.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-top:10px;}}
+.es-prev-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}}
+.es-prev-card{{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:8px;padding:10px;}}
+.es-prev-card .pc-label{{font-size:9px;color:var(--muted);}}
+.es-prev-card .pc-val{{font-size:16px;font-weight:600;color:var(--text);margin-top:2px;}}
+</style>
+<script>
+function esShowSec(id) {{
+  document.querySelectorAll('.es-sec-panel').forEach(function(p){{p.classList.remove('es-active');}});
+  document.querySelectorAll('.es-sn').forEach(function(n){{n.classList.remove('act');}});
+  var panel = document.getElementById('es-sec-'+id);
+  if(panel) panel.classList.add('es-active');
+  var nav = document.querySelector('.es-sn[data-essec="'+id+'"]');
+  if(nav) nav.classList.add('act');
+}}
+function esShowProtoTab(id) {{
+  document.querySelectorAll('.es-proto-tab-panel').forEach(function(p){{p.classList.remove('act');}});
+  document.querySelectorAll('.es-proto-tab').forEach(function(t){{t.classList.remove('act');}});
+  var panel = document.getElementById('es-ptab-'+id);
+  if(panel) panel.classList.add('act');
+  var tab = document.querySelector('.es-proto-tab[data-ptab="'+id+'"]');
+  if(tab) tab.classList.add('act');
+}}
+</script>
+<div class="es-shell">
 
-        <!-- Typ-Toggles mit Live-Stats -->
-        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
-          <div style="padding:6px 10px;background:#0d0d0d;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ereignis-Typen</div>
-          {_rtlog_type_row('ui',       'UI-Klicks &amp; Navigation',      'cfg-rl-ui',       rtlog_cfg.get('ui_events',True),       rl_by_type.get('ui',0))}
-          {_rtlog_type_row('kira',     'Kira Tools &amp; Kontext',        'cfg-rl-kira',     rtlog_cfg.get('kira_events',True),     rl_by_type.get('kira',0))}
-          {_rtlog_type_row('llm',      'LLM Provider / Token / Dauer',   'cfg-rl-llm',      rtlog_cfg.get('llm_events',True),      rl_by_type.get('llm',0))}
-          {_rtlog_type_row('system',   'System &amp; Hintergrund-Jobs',  'cfg-rl-bg',       rtlog_cfg.get('hintergrund_events',True),rl_by_type.get('system',0))}
-          {_rtlog_type_row('settings', 'Einstellungs&auml;nderungen',    'cfg-rl-settings', rtlog_cfg.get('settings_events',True), rl_by_type.get('settings',0))}
-        </div>
+<!-- MODULE HEADER -->
+<div class="es-mh">
+  <span class="es-mt">Einstellungen</span>
+  <div class="es-mstats">
+    <span class="es-ms">Provider: <b>{active_provider}</b></span>
+    <span class="es-ms">Push: <b>{'aktiv' if ntfy.get('aktiv') else 'inaktiv'}</b></span>
+    <span class="es-ms">Runtime-Log: <b>{'aktiv' if rtlog_cfg.get('aktiv', True) else 'inaktiv'}</b></span>
+    <span class="es-ms">Log-Eintr.: <b>{rl_total}</b></span>
+  </div>
+  <div class="es-macts">
+    <button class="es-ma" onclick="showToast('Export: In Vorbereitung')">&#x2197; Export</button>
+    <button class="es-ma" onclick="showToast('Import: In Vorbereitung')">&#x2199; Import</button>
+    <button class="es-ma es-pri" onclick="saveSettings()">Speichern</button>
+    <span id="settings-status" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+</div>
 
-        <!-- Spezial-Optionen -->
-        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
-          <div style="padding:6px 10px;background:#0d0d0d;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Optionen</div>
-          <div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
-            <label style="font-size:12px">Fehler immer loggen <span style="color:var(--muted);font-size:10px">(auch wenn Typ deaktiviert)</span></label>
-            <input type="checkbox" id="cfg-rl-fehler" {'checked' if rtlog_cfg.get('fehler_immer_loggen', True) else ''}>
-          </div>
-          <div class="settings-row" style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)">
-            <label style="font-size:12px">Vollkontext speichern <span style="color:var(--muted);font-size:10px">(User-Fragen + Kira-Antworten vollst&auml;ndig)</span></label>
-            <input type="checkbox" id="cfg-rl-vollkontext" {'checked' if rtlog_cfg.get('vollkontext_speichern', True) else ''}>
-          </div>
-          <div class="settings-row" style="padding:6px 10px">
-            <label style="font-size:12px">Kira darf Logs lesen <span style="color:var(--muted);font-size:10px">(Tool: runtime_log_suchen aktiv)</span></label>
-            <input type="checkbox" id="cfg-rl-kira-lesen" {'checked' if rtlog_cfg.get('kira_darf_lesen', True) else ''}>
-          </div>
-        </div>
+<!-- CONTENT AREA -->
+<div class="es-ct">
 
-        <!-- Live-Stats -->
-        <div id="rtlog-stats-box" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#0a0a0a;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Live-Statistiken</span>
-            <button class="btn btn-xs btn-sec" onclick="refreshRtLogStats()" style="font-size:10px;padding:2px 8px">&#x21BB; Aktualisieren</button>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px" id="rtlog-stats-grid">
-            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">{rl_total}</div><div style="font-size:10px;color:var(--muted)">Gesamt</div></div>
-            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:var(--kl)">{rl_today}</div><div style="font-size:10px;color:var(--muted)">Heute</div></div>
-            <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:{'#e84545' if rl_fehler else 'var(--kl)'}">{rl_fehler}</div><div style="font-size:10px;color:var(--muted)">Fehler</div></div>
-          </div>
-          <div style="margin-top:8px;font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">
-            <span>Sitzungen: <strong style="color:var(--text)">{rl_sessions}</strong></span>
-            <span>DB-Gr&ouml;&szlig;e: <strong style="color:var(--text)">{rl_db_size}</strong></span>
-            <span>Typen: <strong style="color:var(--text)">{" · ".join(f'{k}:{v}' for k,v in rl_by_type.items()) or "–"}</strong></span>
-          </div>
-        </div>
+<!-- SECONDARY NAV -->
+<div class="es-snav">
+  <div class="es-snav-h">Konfiguration</div>
+  <div class="es-sn act" data-essec="design" onclick="esShowSec('design')"><span class="es-sico">&#x25D0;</span>Design</div>
+  <div class="es-sn" data-essec="benachrichtigungen" onclick="esShowSec('benachrichtigungen')"><span class="es-sico">&#x1F514;</span>Benachrichtigungen</div>
+  <div class="es-sn" data-essec="aufgaben" onclick="esShowSec('aufgaben')"><span class="es-sico">&#x2611;</span>Aufgabenlogik</div>
+  <div class="es-sn" data-essec="nachfass" onclick="esShowSec('nachfass')"><span class="es-sico">&#x21BB;</span>Nachfass-Intervalle</div>
+  <div class="es-sn" data-essec="dashboard" onclick="esShowSec('dashboard')"><span class="es-sico">&#x229E;</span>Dashboard</div>
+  <div class="es-sn-sep"></div>
+  <div class="es-snav-h">System</div>
+  <div class="es-sn" data-essec="provider" onclick="esShowSec('provider')"><span class="es-sico">&#x25C8;</span>Kira / LLM / Provider<span class="es-scnt">{len(providers)}</span></div>
+  <div class="es-sn" data-essec="mail" onclick="esShowSec('mail')"><span class="es-sico">&#x2709;</span>Mail &amp; Konten</div>
+  <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
+  <div class="es-sn es-plan" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen<span class="es-pb">Geplant</span></div>
+  <div class="es-sn-sep"></div>
+  <div class="es-snav-h">Protokoll</div>
+  <div class="es-sn" data-essec="protokoll" onclick="esShowSec('protokoll')"><span class="es-sico">&#x2630;</span>Protokoll &amp; Logs<span class="es-scnt">{rl_total}</span></div>
+</div>
 
-        <!-- Viewer -->
-        <div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <select id="rl-filter-type" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Typen</option>
-            <option value="ui">ui</option><option value="kira">kira</option>
-            <option value="llm">llm</option><option value="system">system</option>
-            <option value="settings">settings</option>
-          </select>
-          <select id="rl-filter-status" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit">
-            <option value="">Alle Status</option><option value="ok">ok</option><option value="fehler">fehler</option>
-          </select>
-          <input id="rl-filter-search" type="text" placeholder="Suche&hellip;" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;width:140px">
-          <button class="btn btn-xs btn-sec" onclick="loadRuntimeLog(false)">Anzeigen</button>
-          <button class="btn btn-xs" style="background:#e84545;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer" onclick="loadRuntimeLog(false,true)">Nur Fehler</button>
-          <button class="btn btn-xs btn-sec" onclick="exportRtLog()" style="margin-left:auto">Export CSV</button>
-          <button class="btn btn-xs" style="background:transparent;color:#e84545;border:1px solid #e84545;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer" onclick="clearRtLog()">DB leeren</button>
-        </div>
-        <div id="runtimelog-entries" style="display:none;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#080808"></div>
+<!-- MAIN CONTENT -->
+<div class="es-main">
+
+<!-- ── SECTION: DESIGN ─────────────────────────────────────────────────── -->
+<div class="es-sec-panel es-active" id="es-sec-design">
+  <div class="es-sec-h">Design</div>
+  <div class="es-sec-sub">Erscheinungsbild, Farben, Schrift und visuelle Darstellung der Oberfläche.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Farbschema &amp; Akzent</div>
+    <div class="es-row">
+      <div class="es-rl">Farbschema<div class="es-rd">Hell- oder Dunkel-Modus</div></div>
+      <select class="es-sel" id="cfg-theme" onchange="applyTheme(this.value)">
+        <option value="dark">Dunkel</option>
+        <option value="light">Hell</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Akzentfarbe<div class="es-rd">Hauptfarbe für Buttons, Links und Highlights</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="color" id="cfg-accent" value="#4f7df9" onchange="applyAccent(this.value)">
+        <span id="cfg-accent-hex" style="font-size:11px;color:var(--muted)">#4f7df9</span>
+        <button class="es-btn" onclick="resetAccent()">Zur&uuml;cksetzen</button>
       </div>
     </div>
-    <div style="margin-top:14px">
-      <button class="btn btn-sm btn-gold" onclick="saveSettings()">Einstellungen speichern</button>
-      <span id="settings-status" style="margin-left:10px;color:var(--muted);font-size:12px"></span>
-    </div>"""
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Typografie &amp; Dichte</div>
+    <div class="es-row">
+      <div class="es-rl">Schriftgr&ouml;&szlig;e<div class="es-rd">Basis-Schriftgr&ouml;&szlig;e der Oberfläche</div></div>
+      <select class="es-sel" id="cfg-fontsize" onchange="applyFontSize(this.value)">
+        <option value="">Normal</option>
+        <option value="small">Klein</option>
+        <option value="large">Gro&szlig;</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Schriftfamilie<div class="es-rd">Serifenlose, Mono oder System-Schrift</div></div>
+      <select class="es-sel" id="cfg-font-family" onchange="applyFontFamily(this.value)">
+        <option value="">Sans-Serif (Standard)</option>
+        <option value="mono">Monospace</option>
+        <option value="system">System-Font</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Dichte<div class="es-rd">Abstände zwischen Elementen</div></div>
+      <select class="es-sel" id="cfg-density" onchange="applyDensity(this.value)">
+        <option value="">Normal</option>
+        <option value="compact">Kompakt</option>
+        <option value="comfortable">Komfortabel</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Sidebar &amp; Navigation</div>
+    <div class="es-row">
+      <div class="es-rl">Sidebar-Breite<div class="es-rd">Standard-Breite der linken Navigation (px). Ziehen an der Kante &uuml;berschreibt diesen Wert.</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="es-inp-sm" type="number" id="cfg-sidebar-width" min="160" max="400" step="10" value="220" oninput="applySidebarWidth(this.value)">
+        <span style="font-size:11px;color:var(--muted)">px</span>
+      </div>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Toast-Position<div class="es-rd">Position der Statusmeldungen auf dem Bildschirm</div></div>
+      <select class="es-sel" id="cfg-toast-pos" onchange="applyToastPos(this.value)">
+        <option value="">Unten rechts (Standard)</option>
+        <option value="top-right">Oben rechts</option>
+        <option value="bottom-left">Unten links</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Tabellen &amp; Listen</div>
+    <div class="es-row">
+      <div class="es-rl">Tabellen-Zeilenhöhe<div class="es-rd">Abstands-Modus in Protokoll- und Datentabellen</div></div>
+      <select class="es-sel" id="cfg-row-height" onchange="applyRowHeight(this.value)">
+        <option value="">Normal</option>
+        <option value="compact">Kompakt</option>
+        <option value="comfortable">Komfortabel</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Zebrastreifen<div class="es-rd">Abwechselnde Hintergrundfarbe in Tabellen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-table-zebra" onchange="applyTableZebra(this.checked)">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Branding</div>
+    <div class="es-row">
+      <div class="es-rl">Firmenname<div class="es-rd">Wird in der Kopfzeile angezeigt</div></div>
+      <input class="es-inp" type="text" id="cfg-company-name" placeholder="z.B. Meine Firma" oninput="applyCompanyName(this.value)">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Logo (URL oder Emoji)<div class="es-rd">Kleines Logo links oben</div></div>
+      <input class="es-inp" type="text" id="cfg-logo" placeholder="z.B. https://... oder K" oninput="applyLogo(this.value)">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Karten &amp; Schatten</div>
+    <div class="es-row">
+      <div class="es-rl">Kartenradius<div class="es-rd">Abrundung der Karten-Ecken</div></div>
+      <select class="es-sel" id="cfg-card-radius" onchange="applyCardRadius(this.value)">
+        <option value="">Normal (12px)</option>
+        <option value="4px">Eckig (4px)</option>
+        <option value="20px">Rund (20px)</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Schatten<div class="es-rd">Tiefenwirkung der Karten</div></div>
+      <select class="es-sel" id="cfg-shadow" onchange="applyShadow(this.value)">
+        <option value="">Normal</option>
+        <option value="none">Kein Schatten</option>
+        <option value="strong">Stark</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Barrierefreiheit</div>
+    <div class="es-row">
+      <div class="es-rl">Animationen reduzieren<div class="es-rd">Weniger Bewegung f&uuml;r Personen mit Empfindlichkeit</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-reduce-motion" onchange="applyReduceMotion(this.checked)">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Hoher Kontrast<div class="es-rd">Stärkere Kontraste f&uuml;r bessere Lesbarkeit</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-high-contrast" onchange="applyHighContrast(this.checked)">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-grp es-preview">
+    <div class="es-grp-h">Vorschau</div>
+    <span id="design-status" style="font-size:11px;color:var(--muted)"></span>
+    <div class="es-prev-cards" style="margin-top:10px">
+      <div class="es-prev-card"><div class="pc-label">Farbschema</div><div class="pc-val" id="prev-theme">–</div></div>
+      <div class="es-prev-card"><div class="pc-label">Schrift</div><div class="pc-val" id="prev-font">Normal</div></div>
+      <div class="es-prev-card"><div class="pc-label">Dichte</div><div class="pc-val" id="prev-density">Normal</div></div>
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+    <span style="font-size:11px;color:var(--muted)">Design-Einstellungen werden lokal gespeichert</span>
+  </div>
+</div>
+
+<!-- ── SECTION: BENACHRICHTIGUNGEN ────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-benachrichtigungen">
+  <div class="es-sec-h">Benachrichtigungen</div>
+  <div class="es-sec-sub">Push-Benachrichtigungen via ntfy.sh. Erhalte Hinweise auf neue Mails, Aufgaben und Deadlines.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Push-Kanal (ntfy.sh)</div>
+    <div class="es-grp-sub">Verbinde einen ntfy-Kanal um Benachrichtigungen auf Dein Gerät zu erhalten.</div>
+    <div class="es-row">
+      <div class="es-rl">Push aktiv<div class="es-rd">Benachrichtigungen senden</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-ntfy-aktiv" {'checked' if ntfy.get('aktiv') else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+      <span class="es-badge {'on' if ntfy.get('aktiv') else 'off'}">{'Aktiv' if ntfy.get('aktiv') else 'Inaktiv'}</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kanal (Topic)<div class="es-rd">Eindeutiger Name des ntfy-Kanals</div></div>
+      <input class="es-inp" type="text" id="cfg-ntfy-topic" value="{esc(ntfy.get('topic',''))}" placeholder="mein-kanal">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Server-URL<div class="es-rd">Standard: https://ntfy.sh</div></div>
+      <input class="es-inp" type="text" id="cfg-ntfy-server" value="{esc(ntfy.get('server','https://ntfy.sh'))}" placeholder="https://ntfy.sh">
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="es-btn es-btn-green" onclick="testPush()">Test-Push senden</button>
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<!-- ── SECTION: AUFGABENLOGIK ──────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-aufgaben">
+  <div class="es-sec-h">Aufgabenlogik</div>
+  <div class="es-sec-sub">Steuerung der automatischen Aufgabenerstellung, Erinnerungen und unbeantworteter Mails.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Erinnerungen &amp; Fristen</div>
+    <div class="es-row">
+      <div class="es-rl">Erinnerungs-Vorlauf (Stunden)<div class="es-rd">Wie viele Stunden vor Deadline erinnert werden soll</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-erinnerung-h" value="{aufg.get('erinnerung_h', 24)}" min="1" max="168">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Unbeantwortete Mails (Tage)<div class="es-rd">Ab wann eine Mail als unbeantwortete gilt</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-unanswered-days" value="{aufg.get('unanswered_days', 3)}" min="1" max="30">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Server-Einstellungen</div>
+    <div class="es-row">
+      <div class="es-rl">Port<div class="es-rd">Port auf dem der Kira-Server läuft</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-server-port" value="{srv.get('port', 8484)}" min="1024" max="65535">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Browser automatisch &ouml;ffnen<div class="es-rd">Browser beim Server-Start automatisch &ouml;ffnen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-auto-browser" {'checked' if srv.get('auto_browser', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<!-- ── SECTION: NACHFASS-INTERVALLE ───────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-nachfass">
+  <div class="es-sec-h">Nachfass-Intervalle</div>
+  <div class="es-sec-sub">Definiere nach wie vielen Tagen automatisch an Angebote und Anfragen erinnert wird.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Erinnerungsstufen</div>
+    <div class="es-grp-sub">Drei aufeinanderfolgende Erinnerungsstufen, die bei unbeantworteten Angeboten ausgelöst werden.</div>
+    <div class="es-row">
+      <div class="es-rl">Stufe 1 (Tage)<div class="es-rd">Erste Erinnerung nach X Tagen</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-1" value="{nf.get('stufe1', 7)}" min="1" max="90">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Stufe 2 (Tage)<div class="es-rd">Zweite Erinnerung nach X Tagen</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-2" value="{nf.get('stufe2', 14)}" min="1" max="90">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Stufe 3 (Tage)<div class="es-rd">Letzte Erinnerung nach X Tagen</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-3" value="{nf.get('stufe3', 30)}" min="1" max="90">
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<!-- ── SECTION: DASHBOARD ─────────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-dashboard">
+  <div class="es-sec-h">Dashboard</div>
+  <div class="es-sec-sub">Konfiguration der Dashboard-Ansicht und Aufgaben-Protokollierung.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Aufgaben-Protokoll</div>
+    <div class="es-row">
+      <div class="es-rl">Maximale Eintr&auml;ge<div class="es-rd">Wie viele Protokoll-Eintr&auml;ge gespeichert werden</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-proto-max" value="{proto.get('max_eintraege', 500)}" min="50" max="5000">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Eintr&auml;ge nach X Tagen l&ouml;schen<div class="es-rd">Automatisches Ausr&auml;umen alter Eintr&auml;ge</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-proto-tage" value="{proto.get('aufbewahrung_tage', 90)}" min="7" max="365">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">LLM-Kontext</div>
+    <div class="es-row">
+      <div class="es-rl">Internet-Kontext aktivieren<div class="es-rd">Kira darf externe Informationen einbeziehen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-internet" {'checked' if llm.get('internet', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Gesch&auml;fts-Kontext<div class="es-rd">Firmendaten in Kira-Prompts einbetten</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-geschaeft" {'checked' if llm.get('geschaeft', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Konversations-Kontext<div class="es-rd">Verlauf der letzten Nachrichten einbeziehen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<!-- ── SECTION: PROVIDER / KIRA / LLM ────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-provider">
+  <div class="es-sec-h">Kira / LLM / Provider</div>
+  <div class="es-sec-sub">KI-Provider, Modelle und Kira-Assistent konfigurieren.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Kira Assistent</div>
+    <div class="es-grp-sub">Erscheinungsbild und Verhalten des Kira-Launchers.</div>
+    <div class="es-row">
+      <div class="es-rl">Launcher-Stil<div class="es-rd">A = Minimal · B = Charakter · C = Orb/Tech</div></div>
+      <select class="es-sel" id="cfg-kira-variant" onchange="switchKiraVariant(this.value)">
+        <option value="A" {'selected' if launcher_variant=='A' else ''}>A — Minimal</option>
+        <option value="B" {'selected' if launcher_variant=='B' else ''}>B — Charakter</option>
+        <option value="C" {'selected' if launcher_variant=='C' else ''}>C — Orb / Tech</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Gr&ouml;&szlig;e (px)<div class="es-rd">Durchmesser des Launcher-Buttons</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-kira-size" value="{kira_size}" min="48" max="200" onchange="(function(v){{var el=document.getElementById('kira-fab');if(el){{el.style.width=v+'px';el.style.height=v+'px';}}}})(this.value)">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Proximity-Radius (0–1)<div class="es-rd">Aktionsbereich f&uuml;r Augen-Tracking (Anteil Bildschirm)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-kira-prox" value="{kira_prox_radius}" min="0.1" max="1.0" step="0.05">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Bounce-Distanz (px)<div class="es-rd">Abstand f&uuml;r Excited-Animation</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-kira-bounce" value="{kira_bounce_dist}" min="50" max="400">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Bored-Modus<div class="es-rd">Kira reagiert auf lange Inaktivit&auml;t mit Animation</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-kira-idle" {'checked' if kira_idle else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Wartezeit Bored-Modus (Sek.)<div class="es-rd">Nach wie vielen Sekunden Bored-Animation startet</div></div>
+      <select class="es-sel" id="cfg-kira-idle-delay">
+        <option value="10" {'selected' if kira_idle_delay==10 else ''}>10 Sekunden</option>
+        <option value="30" {'selected' if kira_idle_delay==30 else ''}>30 Sekunden</option>
+        <option value="60" {'selected' if kira_idle_delay==60 else ''}>1 Minute</option>
+        <option value="120" {'selected' if kira_idle_delay==120 else ''}>2 Minuten</option>
+        <option value="300" {'selected' if kira_idle_delay==300 else ''}>5 Minuten</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">KI-Provider</div>
+    <div class="es-grp-sub">Verbundene Sprachmodell-Provider. Der erste aktive Provider mit g&uuml;ltigem API-Key wird verwendet.</div>
+    <div id="provider-list">
+      {provider_cards}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select class="es-sel" id="add-provider-typ" style="min-width:160px">
+        {add_type_options}
+      </select>
+      <input class="es-inp-sm" type="text" id="add-provider-name" placeholder="Name (optional)" style="width:140px">
+      <button class="es-btn es-btn-green" onclick="addProvider()">+ Provider hinzuf&uuml;gen</button>
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<!-- ── SECTION: MAIL & KONTEN ─────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-mail">
+  <div class="es-sec-h">Mail &amp; Konten</div>
+  <div class="es-sec-sub">E-Mail-Konten, IMAP-Verbindung und Mail-Monitor-Einstellungen.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Mail-Verbindung</div>
+    <div class="es-grp-sub">IMAP-Zugangsdaten werden in <code>secrets.json</code> gespeichert (nicht im Git-Repository).</div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x2709;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">IMAP-Konto</div>
+        <div class="es-intg-sub">Verbindung zu E-Mail-Server &uuml;ber IMAP-Protokoll</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x1F504;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">Mail-Monitor</div>
+        <div class="es-intg-sub">Automatisches Polling und Klassifizierung eingehender Mails</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Mail-Klassifizierung</div>
+    <div class="es-grp-sub">Einstellungen f&uuml;r die KI-basierte E-Mail-Klassifizierung werden in config.json gespeichert.</div>
+    <div class="es-row">
+      <div class="es-rl">Klassifizierung (LLM)<div class="es-rd">Eingehende Mails automatisch kategorisieren</div></div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Aufgaben automatisch erstellen<div class="es-rd">Aus relevanten Mails Aufgaben generieren</div></div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: INTEGRATIONEN ─────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-integrationen">
+  <div class="es-sec-h">Integrationen</div>
+  <div class="es-sec-sub">Externe Dienste und Datenquellen verbinden.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Verf&uuml;gbare Integrationen</div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x1F4C5;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">Google Calendar</div>
+        <div class="es-intg-sub">Termine und Deadlines synchronisieren</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x1F4DD;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">CRM-Export</div>
+        <div class="es-intg-sub">Kundendaten in externes CRM exportieren</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x1F517;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">Webhook</div>
+        <div class="es-intg-sub">Ereignisse an externe URLs senden</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-intg">
+      <div class="es-intg-ico">&#x1F4C8;</div>
+      <div class="es-intg-body">
+        <div class="es-intg-name">Buchhaltungs-Export</div>
+        <div class="es-intg-sub">Rechnungsdaten exportieren (CSV/DATEV)</div>
+      </div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: AUTOMATIONEN ──────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-automationen">
+  <div class="es-sec-h">Automationen</div>
+  <div class="es-sec-sub">Automatische Workflows und regelbasierte Aktionen. Diese Funktion befindet sich in Planung.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Geplante Funktionen</div>
+    <div class="es-row">
+      <div class="es-rl">Automatische Nachfass-Mails<div class="es-rd">Erinnerungen automatisch per Mail versenden</div></div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Regelbasierte Aufgaben<div class="es-rd">Aufgaben automatisch nach Regeln erstellen</div></div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Zeitgesteuerte Berichte<div class="es-rd">W&ouml;chentliche/monatliche Zusammenfassungen</div></div>
+      <span class="es-badge plan">In Planung</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: PROTOKOLL & LOGS ──────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-protokoll">
+  <div class="es-sec-h">Protokoll &amp; Logs</div>
+  <div class="es-sec-sub">Runtime-Log, &Auml;nderungsverlauf und Konfigurationsbackup.</div>
+
+  <div class="es-proto-tabs">
+    <div class="es-proto-tab act" data-ptab="runtime" onclick="esShowProtoTab('runtime')">Runtime-Log</div>
+    <div class="es-proto-tab" data-ptab="changelog" onclick="esShowProtoTab('changelog')">&Auml;nderungsverlauf</div>
+    <div class="es-proto-tab" data-ptab="konfiguration" onclick="esShowProtoTab('konfiguration')">Konfiguration</div>
+  </div>
+
+  <!-- TAB: RUNTIME-LOG -->
+  <div class="es-proto-tab-panel act" id="es-ptab-runtime">
+    <div class="es-grp">
+      <div class="es-grp-h">Runtime-Log Einstellungen</div>
+      <div class="es-row">
+        <div class="es-rl">Runtime-Log aktivieren<div class="es-rd">Systemereignisse in SQLite-Datenbank protokollieren</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-aktiv" {'checked' if rtlog_cfg.get('aktiv', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+        <span id="rtlog-live-dot" style="width:8px;height:8px;border-radius:50%;background:{'#5cb85c' if rtlog_cfg.get('aktiv',True) else '#888'};display:inline-block;margin-left:4px"></span>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">UI-Ereignisse loggen<div class="es-rd">Panel-Wechsel, Kira-Aktionen etc.</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-ui" {'checked' if rtlog_cfg.get('log_ui', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Kira-Interaktionen loggen<div class="es-rd">Kira-Chat-Anfragen und Antworten</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-kira" {'checked' if rtlog_cfg.get('log_kira', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">LLM-Aufrufe loggen<div class="es-rd">API-Anfragen an Sprachmodelle</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-llm" {'checked' if rtlog_cfg.get('log_llm', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Hintergrund-Jobs loggen<div class="es-rd">Mail-Monitor, Daily-Check etc.</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-bg" {'checked' if rtlog_cfg.get('log_bg', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Einstellungs-&Auml;nderungen loggen<div class="es-rd">Speichern von Konfigurationsänderungen</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-settings" {'checked' if rtlog_cfg.get('log_settings', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Fehler immer loggen<div class="es-rd">Fehler unabh&auml;ngig von anderen Einstellungen</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-fehler" {'checked' if rtlog_cfg.get('log_fehler', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Vollkontext speichern<div class="es-rd">Vollst&auml;ndige Payloads in event_payloads-Tabelle</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-vollkontext" {'checked' if rtlog_cfg.get('vollkontext_speichern', False) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Kira liest Runtime-Log<div class="es-rd">Kira hat Zugriff auf aktuelle System-Ereignisse</div></div>
+        <label class="es-toggle-wrap">
+          <input class="es-toggle-inp" type="checkbox" id="cfg-rl-kira-lesen" {'checked' if rtlog_cfg.get('kira_lesen', True) else ''}>
+          <div class="es-toggle-vis"></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="es-grp">
+      <div class="es-grp-h">Log-Typen Filter</div>
+      <div style="margin-bottom:8px">
+        {_rtlog_type_row("ui","UI-Ereignisse","cfg-rl-type-ui",rtlog_cfg.get("log_ui",True),rl_by_type.get("ui",0))}
+        {_rtlog_type_row("kira","Kira-Chat","cfg-rl-type-kira",rtlog_cfg.get("log_kira",True),rl_by_type.get("kira",0))}
+        {_rtlog_type_row("llm","LLM-Aufrufe","cfg-rl-type-llm",rtlog_cfg.get("log_llm",True),rl_by_type.get("llm",0))}
+        {_rtlog_type_row("system","System/BG","cfg-rl-type-system",rtlog_cfg.get("log_bg",True),rl_by_type.get("system",0))}
+        {_rtlog_type_row("settings","Einstellungen","cfg-rl-type-settings",rtlog_cfg.get("log_settings",True),rl_by_type.get("settings",0))}
+      </div>
+    </div>
+
+    <div class="es-grp" id="rtlog-stats-box">
+      <div class="es-grp-h">Statistiken &amp; Aktionen</div>
+      <div id="rtlog-stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+        <div class="es-prev-card"><div class="pc-label">Gesamt</div><div class="pc-val">{rl_total}</div></div>
+        <div class="es-prev-card"><div class="pc-label">Heute</div><div class="pc-val">{rl_today}</div></div>
+        <div class="es-prev-card"><div class="pc-label">Fehler</div><div class="pc-val" style="color:{'#e84545' if rl_fehler else 'inherit'}">{rl_fehler}</div></div>
+        <div class="es-prev-card"><div class="pc-label">DB-Gr&ouml;&szlig;e</div><div class="pc-val" style="font-size:12px">{rl_db_size}</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+        Typen: <strong id="rtlog-typen-summary" style="color:var(--text)">{" · ".join(f'{k}:{v}' for k,v in rl_by_type.items()) or "–"}</strong>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="es-btn" onclick="refreshRtLogStats()">&#x21BB; Aktualisieren</button>
+        <button class="es-btn" onclick="exportRtLog()">&#x2197; Export CSV</button>
+        <button class="es-btn es-btn-red" onclick="clearRtLog()">DB leeren</button>
+      </div>
+    </div>
+
+    <div class="es-grp">
+      <div class="es-grp-h">Log-Viewer</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <select id="rl-filter-type" class="es-sel" style="min-width:110px">
+          <option value="">Alle Typen</option>
+          <option value="ui">ui</option>
+          <option value="kira">kira</option>
+          <option value="llm">llm</option>
+          <option value="system">system</option>
+          <option value="settings">settings</option>
+        </select>
+        <select id="rl-filter-status" class="es-sel" style="min-width:110px">
+          <option value="">Alle Status</option>
+          <option value="ok">ok</option>
+          <option value="fehler">fehler</option>
+        </select>
+        <input id="rl-filter-search" type="text" class="es-inp" placeholder="Suche&hellip;" style="width:140px">
+        <button class="es-btn" onclick="loadRuntimeLog(false)">Anzeigen</button>
+        <button class="es-btn es-btn-red" style="margin-left:auto" onclick="loadRuntimeLog(false,true)">Nur Fehler</button>
+      </div>
+      <div id="runtimelog-entries" style="display:none;max-height:360px;overflow-y:auto;border:0.5px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+    </div>
+
+    <div class="es-save-bar">
+      <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+    </div>
+  </div>
+
+  <!-- TAB: ÄNDERUNGSVERLAUF -->
+  <div class="es-proto-tab-panel" id="es-ptab-changelog">
+    <div class="es-grp">
+      <div class="es-grp-h">&Auml;nderungsverlauf</div>
+      <div class="es-grp-sub">Protokoll aller gespeicherten Einstellungs- und Konfigurationsänderungen.</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+        <div class="es-prev-card"><div class="pc-label">Eintr&auml;ge</div><div class="pc-val">{change_log_count}</div></div>
+        <div class="es-prev-card"><div class="pc-label">Letzter Eintrag</div><div class="pc-val" style="font-size:11px">{change_log_last or "–"}</div></div>
+        <div class="es-prev-card"><div class="pc-label">Module</div><div class="pc-val">{len(change_log_moduls)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <select id="cl-filter-modul" class="es-sel" style="min-width:110px">
+          <option value="">Alle Module</option>
+          {"".join(f'<option value="{esc(m)}">{esc(m)}</option>' for m in change_log_moduls)}
+        </select>
+        <select id="cl-filter-result" class="es-sel" style="min-width:110px">
+          <option value="">Alle Resultate</option>
+          {"".join(f'<option value="{esc(r)}">{esc(r)}</option>' for r in change_log_results)}
+        </select>
+        <select id="cl-filter-feature" class="es-sel" style="min-width:130px">
+          <option value="">Alle Features</option>
+          {"".join(f'<option value="{esc(f)}">{esc(f)}</option>' for f in change_log_features)}
+        </select>
+        <select id="cl-filter-action" class="es-sel" style="min-width:110px">
+          <option value="">Alle Aktionen</option>
+          {"".join(f'<option value="{esc(a)}">{esc(a)}</option>' for a in change_log_actions)}
+        </select>
+        <input id="cl-filter-search" type="text" class="es-inp" placeholder="Suche&hellip;" style="width:130px">
+        <button class="es-btn" onclick="loadChangeLog()">Anzeigen</button>
+      </div>
+      <div id="changelog-entries" style="display:none;max-height:400px;overflow-y:auto;border:0.5px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+    </div>
+  </div>
+
+  <!-- TAB: KONFIGURATION -->
+  <div class="es-proto-tab-panel" id="es-ptab-konfiguration">
+    <div class="es-grp">
+      <div class="es-grp-h">Konfigurationsbackup</div>
+      <div class="es-grp-sub">Exportiere oder importiere die gesamte Systemkonfiguration.</div>
+      <div class="es-row">
+        <div class="es-rl">Datenbank-Gr&ouml;&szlig;e<div class="es-rd">Aktuelle Gr&ouml;&szlig;e der Aufgaben-Datenbank</div></div>
+        <span style="font-size:12px;color:var(--text);font-weight:600">{db_size_str}</span>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Runtime-Log-DB<div class="es-rd">Gr&ouml;&szlig;e der Runtime-Events-Datenbank</div></div>
+        <span style="font-size:12px;color:var(--text);font-weight:600">{rl_db_size}</span>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="es-btn" onclick="showToast('Export: In Vorbereitung')">&#x2197; Config exportieren</button>
+        <button class="es-btn" onclick="showToast('Import: In Vorbereitung')">&#x2199; Config importieren</button>
+        <button class="es-btn es-btn-red" onclick="showToast('Reset: Bitte manuell config.json bearbeiten')">Zur&uuml;cksetzen</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /es-sec-protokoll -->
+
+</div><!-- /es-main -->
+</div><!-- /es-ct -->
+</div><!-- /es-shell -->"""
     return html
-
 
 # ── WISSEN Panel ──────────────────────────────────────────────────────────────
 def build_wissen(db):
@@ -1988,13 +2469,13 @@ def build_wissen(db):
 
     def _wissen_card(r, editable=True, with_id=True):
         rid = r['id']
-        id_attr = f' id="wr-{rid}"' if with_id else ""
-        wi_id_attr = f' id="wi-{rid}"' if with_id else ""
         edit_btn = f"""<button class="btn btn-korr" style="margin-left:8px;font-size:11px;padding:2px 8px;" onclick="editRegel({rid},'{js_esc(r['titel'])}','{js_esc(r['inhalt'])}','{js_esc(r.get('kategorie',''))}')">Bearbeiten</button>""" if editable else ""
         del_btn = f"""<button class="btn btn-ignore" style="margin-left:4px;font-size:11px;padding:2px 8px;" onclick="wissenAction({rid},'loeschen')">Entfernen</button>""" if editable else ""
+        id_attr = f' id="wr-{rid}"' if with_id else ""
+        iid_attr = f' id="wi-{rid}"' if with_id else ""
         return f"""<div class="wissen-card"{id_attr}>
           <div class="wissen-titel">{esc(r['titel'])}</div>
-          <div class="wissen-inhalt"{wi_id_attr}>{esc(r['inhalt'])}</div>
+          <div class="wissen-inhalt"{iid_attr}>{esc(r['inhalt'])}</div>
           <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{edit_btn}{del_btn}</div>
         </div>"""
 
@@ -2020,6 +2501,7 @@ def build_wissen(db):
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'regelsteuerung')">Regelsteuerung ({n_regeln})</div>
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'neu')">+ Neue Regel</div>
     </div>"""
+
 
     # ── Bibliothek-Panel ──
     biblio_tabs = ""
@@ -2170,6 +2652,28 @@ def generate_html() -> str:
     wissen_html    = build_wissen(db)
     einstell_html  = build_einstellungen()
     db.close()
+
+    # Kira Launcher — SVG-Varianten
+    try:
+        _kcfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+        _kira_cfg2   = _kcfg.get("kira", {})
+        _kv          = _kira_cfg2.get("launcher_variant", "B")
+        kira_size        = _kira_cfg2.get("size", 112)
+        kira_prox_radius = _kira_cfg2.get("prox_radius", 0.5)
+        kira_bounce_dist = _kira_cfg2.get("bounce_dist", 130)
+        kira_idle        = _kira_cfg2.get("idle_mode", True)
+        kira_idle_delay  = _kira_cfg2.get("idle_delay", 10)
+    except Exception:
+        _kv = "B"
+        kira_size = 112
+        kira_prox_radius = 0.5
+        kira_bounce_dist = 130
+        kira_idle = True
+        kira_idle_delay = 10
+    _kira_svg_a = '<svg class="kira-char-svg" id="kiraCharSVG" width="96" height="96" viewBox="0 0 100 100" style="overflow:visible"><defs><radialGradient id="kFGA" cx="35%" cy="28%" r="72%"><stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#EAE8FF"/><stop offset="100%" stop-color="#C8C2F8"/></radialGradient><radialGradient id="kPGA" cx="30%" cy="28%" r="72%"><stop offset="0%" stop-color="#7B6FE8"/><stop offset="100%" stop-color="#3A2F9E"/></radialGradient></defs><circle cx="50" cy="50" r="56" fill="none" stroke="#7B68EE" stroke-width="2.5" opacity="0" id="kiraGlowHalo"/><ellipse id="kiraShadow" cx="50" cy="97" rx="28" ry="4.5" fill="#3A2A9E" opacity="0.12"><animate attributeName="rx" values="28;22;28" dur="4s" repeatCount="indefinite"/></ellipse><g class="kira-float" id="kiraFloatGroup"><circle cx="50" cy="50" r="42" fill="url(#kFGA)" stroke="#D4D0FF" stroke-width="0.8"/><ellipse cx="34" cy="46" rx="9" ry="9.5" fill="#E8E5FF" id="kiraIrisL"/><ellipse cx="66" cy="46" rx="9" ry="9.5" fill="#E8E5FF" id="kiraIrisR"/><circle cx="34" cy="47" r="5" fill="url(#kPGA)" id="kiraPupilL"/><circle cx="66" cy="47" r="5" fill="url(#kPGA)" id="kiraPupilR"/><circle cx="31.5" cy="44.5" r="1.9" fill="#fff" opacity="0.85"/><circle cx="63.5" cy="44.5" r="1.9" fill="#fff" opacity="0.85"/><path d="M38 62 Q50 70 62 62" fill="none" stroke="#A8A0F0" stroke-width="2" stroke-linecap="round" id="kiraMouth"/></g></svg>'
+    _kira_svg_b = '<svg class="kira-char-svg" id="kiraCharSVG" width="96" height="96" viewBox="0 0 100 100" style="overflow:visible"><defs><radialGradient id="kFG" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="#ffffff"/><stop offset="40%" stop-color="#F0EEFF"/><stop offset="75%" stop-color="#C4BCFF"/><stop offset="100%" stop-color="#9B8FE8"/></radialGradient><radialGradient id="kHG" cx="30%" cy="22%" r="45%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient><radialGradient id="kPG" cx="28%" cy="25%" r="75%"><stop offset="0%" stop-color="#8B7AEE"/><stop offset="45%" stop-color="#5340C8"/><stop offset="100%" stop-color="#2A1F7A"/></radialGradient><radialGradient id="kIG" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#E0DCFF"/><stop offset="100%" stop-color="#B8B0F5"/></radialGradient><radialGradient id="kSG" cx="50%" cy="15%" r="85%"><stop offset="0%" stop-color="#1a1040" stop-opacity="0"/><stop offset="70%" stop-color="#1a1040" stop-opacity="0"/><stop offset="100%" stop-color="#1a1040" stop-opacity="0.28"/></radialGradient></defs><circle cx="50" cy="50" r="56" fill="none" stroke="#7B68EE" stroke-width="3" opacity="0" id="kiraGlowHalo"/><ellipse id="kiraShadow" cx="50" cy="97" rx="30" ry="5" fill="#3A2A9E" opacity="0.15"><animate attributeName="rx" values="30;24;30" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0.07;0.15" dur="4s" repeatCount="indefinite"/></ellipse><g class="kira-float" id="kiraFloatGroup"><ellipse cx="50" cy="49" rx="43" ry="45" fill="url(#kFG)" stroke="#D0CAFF" stroke-width="0.8"/><ellipse cx="37" cy="32" rx="18" ry="12" fill="url(#kHG)"/><ellipse cx="22" cy="63" rx="10" ry="5.5" fill="#FF9EC8" opacity="0.22"/><ellipse cx="78" cy="63" rx="10" ry="5.5" fill="#FF9EC8" opacity="0.22"/><ellipse cx="33" cy="46" rx="13" ry="14" fill="url(#kIG)" id="kiraIrisL"/><ellipse cx="67" cy="46" rx="13" ry="14" fill="url(#kIG)" id="kiraIrisR"/><circle cx="33" cy="47" r="8.5" fill="url(#kPG)" id="kiraPupilL"/><circle cx="67" cy="47" r="8.5" fill="url(#kPG)" id="kiraPupilR"/><circle cx="29.5" cy="43" r="3.2" fill="#fff" opacity="0.85"/><circle cx="63.5" cy="43" r="3.2" fill="#fff" opacity="0.85"/><circle cx="34.5" cy="49.5" r="1.4" fill="#fff" opacity="0.45"/><circle cx="68.5" cy="49.5" r="1.4" fill="#fff" opacity="0.45"/><path d="M36 67 Q50 78 64 67" fill="none" stroke="#9B8FE8" stroke-width="2.5" stroke-linecap="round" id="kiraMouth"/><ellipse cx="50" cy="49" rx="43" ry="45" fill="url(#kSG)"/></g></svg>'
+    _kira_svg_c = '<svg class="kira-char-svg" id="kiraCharSVG" width="96" height="96" viewBox="0 0 100 100" style="overflow:visible"><defs><radialGradient id="kFGC" cx="32%" cy="25%" r="75%"><stop offset="0%" stop-color="#4A45A8"/><stop offset="50%" stop-color="#1E1B5A"/><stop offset="100%" stop-color="#0A0820"/></radialGradient><radialGradient id="kEGC" cx="28%" cy="22%" r="75%"><stop offset="0%" stop-color="#A0EDFF"/><stop offset="55%" stop-color="#48C8F0"/><stop offset="100%" stop-color="#1A8EC4"/></radialGradient><radialGradient id="kHGC" cx="28%" cy="20%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs><circle cx="50" cy="50" r="56" fill="none" stroke="#5588CC" stroke-width="3" opacity="0" id="kiraGlowHalo"/><circle cx="50" cy="50" r="46" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.35"><animate attributeName="r" values="46;51;46" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.35;0.08;0.35" dur="2.5s" repeatCount="indefinite"/></circle><ellipse id="kiraShadow" cx="50" cy="97" rx="28" ry="5" fill="#0A0820" opacity="0.3"><animate attributeName="rx" values="28;22;28" dur="4s" repeatCount="indefinite"/></ellipse><g class="kira-float" id="kiraFloatGroup"><circle cx="50" cy="50" r="42" fill="url(#kFGC)"/><ellipse cx="34" cy="32" rx="18" ry="10" fill="url(#kHGC)"/><ellipse cx="35" cy="47" rx="8" ry="8.5" fill="#2A4080" opacity="0.4" id="kiraIrisL"/><ellipse cx="65" cy="47" rx="8" ry="8.5" fill="#2A4080" opacity="0.4" id="kiraIrisR"/><circle cx="35" cy="47.5" r="6" fill="url(#kEGC)" id="kiraPupilL"/><circle cx="65" cy="47.5" r="6" fill="url(#kEGC)" id="kiraPupilR"/><circle cx="32" cy="44.5" r="2.5" fill="#fff" opacity="0.75"/><circle cx="62" cy="44.5" r="2.5" fill="#fff" opacity="0.75"/><path d="M38 63 Q50 71 62 63" fill="none" stroke="#5B9BD4" stroke-width="2" stroke-linecap="round" id="kiraMouth"/></g></svg>'
+    _kira_svg_init = _kira_svg_b if _kv == 'B' else (_kira_svg_a if _kv == 'A' else _kira_svg_c)
 
     return f"""<!DOCTYPE html>
 <html lang="de" data-theme="light">
@@ -2440,12 +2944,15 @@ def generate_html() -> str:
   </div>
 </div>
 
-<!-- Kira Launcher (Modus A) -->
-<button class="kira-fab" onclick="toggleKiraQuick()" title="Kira Assistenz">
-  <span class="kira-fab-k">K</span>
-  <span class="kira-fab-label">Kira</span>
+<!-- Kira Launcher -->
+<button class="kira-fab" id="kiraFab" onclick="toggleKiraQuick()" title="Kira Assistenz" data-variant="{_kv}" data-size="{kira_size}" data-prox-radius="{kira_prox_radius}" data-bounce-dist="{kira_bounce_dist}" data-idle-enabled="{'true' if kira_idle else 'false'}" data-idle-delay="{kira_idle_delay}">
+  {_kira_svg_init}
   <span class="kira-fab-status" id="kiraFabStatus"></span>
 </button>
+<!-- Kira SVG-Vorlagen (alle 3 Varianten für JS-Wechsel) -->
+<div id="kira-tmpl-A" style="display:none">{_kira_svg_a}</div>
+<div id="kira-tmpl-B" style="display:none">{_kira_svg_b}</div>
+<div id="kira-tmpl-C" style="display:none">{_kira_svg_c}</div>
 
 <!-- Kira Quick Panel (Modus B) -->
 <div class="kq-panel" id="kiraQuick">
@@ -2508,7 +3015,7 @@ def generate_html() -> str:
       <div class="kw-header-left">
         <div class="kw-logo">K</div>
         <div>
-          <div class="kw-title">Kira Workspace</div>
+          <div class="kw-title">Kira</div>
           <div class="kw-sub">KI-Assistenz &middot; Anthropic Claude</div>
         </div>
       </div>
@@ -2526,7 +3033,7 @@ def generate_html() -> str:
           <input class="kw-ctx-search" type="text" placeholder="&#x2315; Kontext suchen&hellip;">
         </div>
         <div class="kw-ctx-section">
-          <div class="kw-ctx-sec-h">Navigation</div>
+          <div class="kw-ctx-sec-h">Modus</div>
           <div class="kw-ctx-item active" onclick="showKTab('chat')" data-tab="chat">
             <span class="kw-ctx-chip offer">Chat</span>
             <div class="kw-ctx-body"><div class="kw-ctx-title">Freier Chat</div><div class="kw-ctx-sub">Direkt mit Kira sprechen</div></div>
@@ -2675,8 +3182,8 @@ def generate_html() -> str:
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
       <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Als Alias merken (optional):</label>
       <div style="display:flex;gap:6px;align-items:center">
-        <input type="email" id="korr-alias-email" placeholder="alias@email.de" style="flex:1;background:#111;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
-        <input type="email" id="korr-haupt-email" placeholder="haupt@email.de" style="flex:1;background:#111;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
+        <input type="email" id="korr-alias-email" placeholder="alias@email.de" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
+        <input type="email" id="korr-haupt-email" placeholder="haupt@email.de" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
         <button class="btn btn-sec" onclick="saveAlias()" style="font-size:11px;padding:5px 10px">Alias merken</button>
       </div>
       <div style="font-size:10px;color:var(--muted);margin-top:3px">Alias-E-Mail wird bei allen Suchen auf Haupt-E-Mail gemappt</div>
@@ -2704,7 +3211,7 @@ def generate_html() -> str:
       <button class="loeschen-grund-btn" onclick="setLoeschGrund(this,'Bereits erledigt')">Bereits erledigt</button>
     </div>
     <input type="text" id="lm-grund" placeholder="Eigener Grund (oder oben klicken) …"
-      style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
       onkeydown="if(event.key==='Enter')saveLoeschen()">
     <div id="lm-kira-resp" style="display:none;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);margin-bottom:10px;line-height:1.5;max-height:160px;overflow-y:auto"></div>
     <div class="modal-actions">
@@ -2721,7 +3228,7 @@ def generate_html() -> str:
     <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Kira fragt dich wann &mdash; schreib einfach nat&uuml;rlich, z.B. <em>morgen 10 Uhr</em>, <em>n&auml;chste Woche Montag</em>, <em>in 3 Stunden</em>.</p>
     <input type="hidden" id="sp-tid">
     <input type="text" id="sp-wann" placeholder="morgen 10 Uhr …"
-      style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px;margin-bottom:10px;box-sizing:border-box"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px;margin-bottom:10px;box-sizing:border-box"
       onkeydown="if(event.key==='Enter')saveSpaeter()">
     <div id="sp-kira-resp" style="display:none;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5"></div>
     <div class="modal-actions">
@@ -2737,7 +3244,7 @@ def generate_html() -> str:
     <h3>Regel bearbeiten</h3>
     <input type="hidden" id="er-id">
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Kategorie:</label>
-    <select id="er-kat" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
+    <select id="er-kat" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
       <option value="fest">Feste Regel</option>
       <option value="stil">Stil &amp; Tonalit&auml;t</option>
       <option value="preis">Preise &amp; Kalkulation</option>
@@ -2747,12 +3254,31 @@ def generate_html() -> str:
       <option value="vorschlag">Vorschlag</option>
     </select>
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Titel:</label>
-    <input type="text" id="er-titel" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
+    <input type="text" id="er-titel" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;margin-bottom:9px;">
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Inhalt:</label>
-    <textarea id="er-inhalt" rows="5" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:9px;"></textarea>
+    <textarea id="er-inhalt" rows="5" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:9px;"></textarea>
     <div class="modal-actions">
       <button class="btn btn-done" onclick="saveRegelEdit()">Speichern</button>
       <button class="btn btn-ignore" onclick="closeEditRegel()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kritisch-Bestätigung Modal (3-Schritt) -->
+<div class="modal-ov" id="kritischModal">
+  <div class="modal" style="max-width:440px">
+    <h3 id="km-title" style="margin:0 0 6px;color:#d06060">Bestätigung erforderlich</h3>
+    <p id="km-msg" style="font-size:12px;color:var(--text-secondary);margin:0 0 14px;line-height:1.55"></p>
+    <div style="background:var(--bg-overlay);border:0.5px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.5">
+      Tippe <strong id="km-word" style="color:var(--text);font-family:monospace;font-size:13px;letter-spacing:.5px"></strong> zur Bestätigung:
+    </div>
+    <input type="text" id="km-inp" placeholder="" autocomplete="off"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box;font-family:monospace"
+      oninput="km_check()" onkeydown="if(event.key==='Enter')km_confirm()">
+    <p id="km-note" style="font-size:11px;color:var(--muted);margin:0 0 12px;display:none"></p>
+    <div class="modal-actions">
+      <button class="btn btn-loeschen" id="km-btn" onclick="km_confirm()" disabled style="opacity:.45;transition:opacity .15s">Bestätigen</button>
+      <button class="btn btn-ignore" onclick="km_cancel()">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -2937,6 +3463,47 @@ function applyHighContrast(checked) {{
   document.documentElement.dataset.highContrast = checked ? 'true' : '';
   localStorage.setItem('kira_high_contrast', checked ? '1' : '0');
 }}
+function applyKiraSize(px) {{
+  const fab=document.getElementById('kiraFab');
+  if(fab){{fab.style.width=px+'px';fab.style.height=px+'px';}}
+  // QP-Panel bottom anpassen: FAB-Größe + 36px Abstand
+  const qp=document.querySelector('.kq-panel');
+  if(qp){{qp.style.bottom=(parseInt(px)+36)+'px';}}
+}}
+function applyKiraProx(v) {{ window._kiraProxRadius=parseFloat(v); }}
+function applyKiraBounce(v) {{ window._kiraBounce=parseInt(v); }}
+function applyKiraIdle(v) {{ window._kiraIdleEnabled=!!v; }}
+function applyKiraIdleDelay(v) {{ window._kiraIdleDelay=parseInt(v); }}
+function applySidebarWidth(px) {{
+  const v = Math.max(160, Math.min(400, parseInt(px)||220));
+  document.documentElement.style.setProperty('--sidebar-w', v+'px');
+  const ma = document.querySelector('.main-area');
+  const sb = document.getElementById('sidebar');
+  if(ma && sb && !sb.classList.contains('collapsed')) ma.style.marginLeft = v+'px';
+  localStorage.setItem('kira_sidebar_width', v);
+  const inp = document.getElementById('cfg-sidebar-width');
+  if(inp && inp.value != v) inp.value = v;
+}}
+function applyFontFamily(val) {{
+  const html = document.documentElement;
+  if(val) html.dataset.fontFamily = val; else delete html.dataset.fontFamily;
+  localStorage.setItem('kira_font_family', val||'');
+}}
+function applyRowHeight(val) {{
+  const html = document.documentElement;
+  if(val) html.dataset.rowHeight = val; else delete html.dataset.rowHeight;
+  localStorage.setItem('kira_row_height', val||'');
+}}
+function applyToastPos(val) {{
+  const html = document.documentElement;
+  if(val) html.dataset.toastPos = val; else delete html.dataset.toastPos;
+  localStorage.setItem('kira_toast_pos', val||'');
+}}
+function applyTableZebra(checked) {{
+  const html = document.documentElement;
+  if(checked) html.dataset.tableZebra = 'true'; else delete html.dataset.tableZebra;
+  localStorage.setItem('kira_table_zebra', checked ? '1' : '0');
+}}
 function saveDesignSettings() {{
   showToast('Design gespeichert');
   const st = document.getElementById('design-status');
@@ -2983,6 +3550,22 @@ function restoreDesign() {{
     const sb=document.getElementById('sidebar');
     sb.classList.add('collapsed');
     document.getElementById('appShell').classList.add('sb-collapsed');
+  }}
+  // Sidebar width (user setting)
+  const sbwUser = localStorage.getItem('kira_sidebar_width');
+  if(sbwUser) {{ applySidebarWidth(sbwUser); const inp=document.getElementById('cfg-sidebar-width'); if(inp) inp.value=sbwUser; }}
+  // Font family
+  const ff = localStorage.getItem('kira_font_family')||'';
+  if(ff) {{ applyFontFamily(ff); const sel=document.getElementById('cfg-font-family'); if(sel) sel.value=ff; }}
+  // Row height
+  const rh = localStorage.getItem('kira_row_height')||'';
+  if(rh) {{ applyRowHeight(rh); const sel=document.getElementById('cfg-row-height'); if(sel) sel.value=rh; }}
+  // Toast position
+  const tp = localStorage.getItem('kira_toast_pos')||'';
+  if(tp) {{ applyToastPos(tp); const sel=document.getElementById('cfg-toast-pos'); if(sel) sel.value=tp; }}
+  // Table zebra
+  if(localStorage.getItem('kira_table_zebra')==='1') {{
+    applyTableZebra(true); const cb=document.getElementById('cfg-table-zebra'); if(cb) cb.checked=true;
   }}
 }}
 
@@ -3576,17 +4159,17 @@ function openKiraInterakt(type, id, action, title, fields) {{
     if (f.condition) wrap.dataset.condition = f.condition;
     let input = '';
     if (f.type === 'text') {{
-      input = '<input type="text" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+      input = '<input type="text" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
     }} else if (f.type === 'number') {{
-      input = '<input type="number" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" step="0.01" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+      input = '<input type="number" id="'+f.id+'" placeholder="'+(f.placeholder||'')+'" step="0.01" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
     }} else if (f.type === 'date') {{
-      input = '<input type="date" id="'+f.id+'" value="'+(f.value||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+      input = '<input type="date" id="'+f.id+'" value="'+(f.value||'')+'" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
     }} else if (f.type === 'select') {{
-      input = '<select id="'+f.id+'" onchange="updateKiraFields()" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
+      input = '<select id="'+f.id+'" onchange="updateKiraFields()" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px">';
       f.options.forEach(o => {{ input += '<option value="'+o[0]+'">'+o[1]+'</option>'; }});
       input += '</select>';
     }} else if (f.type === 'textarea') {{
-      input = '<textarea id="'+f.id+'" rows="3" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:#0b0b0b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>';
+      input = '<textarea id="'+f.id+'" rows="3" placeholder="'+(f.placeholder||'')+'" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>';
     }}
     wrap.innerHTML = '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px">'+f.label+'</label>' + input;
     container.appendChild(wrap);
@@ -3704,6 +4287,14 @@ function saveSettings() {{
       fehler_immer_loggen:    document.getElementById('cfg-rl-fehler')?.checked ?? true,
       vollkontext_speichern:  document.getElementById('cfg-rl-vollkontext')?.checked ?? true,
       kira_darf_lesen:        document.getElementById('cfg-rl-kira-lesen')?.checked ?? true
+    }},
+    kira: {{
+      launcher_variant: document.getElementById('cfg-kira-variant')?.value || 'B',
+      size:        parseInt(document.getElementById('cfg-kira-size')?.value       || '112'),
+      prox_radius: parseFloat(document.getElementById('cfg-kira-prox')?.value    || '0.5'),
+      bounce_dist: parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
+      idle_mode:   document.getElementById('cfg-kira-idle')?.checked              ?? true,
+      idle_delay:  parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10')
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -3779,8 +4370,14 @@ function refreshRtLogStats() {{
       <div style="text-align:center;padding:6px;background:#111;border-radius:6px"><div style="font-size:18px;font-weight:700;color:${{d.fehler>0?'#e84545':'var(--kl)'}};">${{d.fehler||0}}</div><div style="font-size:10px;color:var(--muted)">Fehler</div></div>`;
     const dot = document.getElementById('rtlog-live-dot');
     if(dot) dot.style.background = '#5cb85c';
-    // Update type dot colors
-    const types = {{'ui':'cfg-rl-ui','kira':'cfg-rl-kira','llm':'cfg-rl-llm','system':'cfg-rl-bg','settings':'cfg-rl-settings'}};
+    // Update type count badges
+    ['ui','kira','llm','system','settings'].forEach(t=>{{
+      const el=document.getElementById('rl-type-cnt-'+t);
+      if(el){{const c=byType[t]||0; el.textContent=c?c+' Eintr.':'';}};
+    }});
+    // Update typen summary line
+    const ts=document.getElementById('rtlog-typen-summary');
+    if(ts){{ts.textContent=Object.entries(byType).filter(([,v])=>v>0).map(([k,v])=>k+':'+v).join(' · ')||'–';}}
   }}).catch(()=>{{}});
 }}
 
@@ -3806,13 +4403,54 @@ function exportRtLog() {{
   }});
 }}
 
+// Kritisch-Bestätigung — 3-Schritt Modal
+let _km_fn = null, _km_word = '';
+function showKritischModal(title, msg, word, fn, note) {{
+  document.getElementById('km-title').textContent = title;
+  document.getElementById('km-msg').textContent = msg;
+  document.getElementById('km-word').textContent = word;
+  const inp = document.getElementById('km-inp');
+  inp.value = ''; inp.placeholder = word;
+  const noteEl = document.getElementById('km-note');
+  if(note) {{ noteEl.textContent = note; noteEl.style.display = ''; }}
+  else noteEl.style.display = 'none';
+  const btn = document.getElementById('km-btn');
+  btn.disabled = true; btn.style.opacity = '.45';
+  _km_word = word; _km_fn = fn;
+  document.getElementById('kritischModal').classList.add('open');
+  setTimeout(()=>inp.focus(), 60);
+}}
+function km_check() {{
+  const match = document.getElementById('km-inp').value === _km_word;
+  const btn = document.getElementById('km-btn');
+  btn.disabled = !match; btn.style.opacity = match ? '1' : '.45';
+}}
+function km_confirm() {{
+  if(document.getElementById('km-inp').value !== _km_word) return;
+  document.getElementById('kritischModal').classList.remove('open');
+  const fn = _km_fn; _km_fn = null;
+  if(fn) fn();
+}}
+function km_cancel() {{
+  document.getElementById('kritischModal').classList.remove('open');
+  _km_fn = null;
+}}
+
 function clearRtLog() {{
-  if(!confirm('Runtime-Log-Datenbank wirklich leeren? Alle Einträge werden gelöscht.')) return;
-  fetch('/api/runtime/clear',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
-    .then(r=>r.json()).then(d=>{{
-      if(d.ok){{showToast('Runtime-Log geleert'); refreshRtLogStats(); document.getElementById('runtimelog-entries').innerHTML=''; document.getElementById('runtimelog-entries').style.display='none';}}
-      else showToast(d.error||'Fehler');
-    }}).catch(()=>showToast('Fehler'));
+  showKritischModal(
+    '\uD83D\uDDD1 Runtime-Log leeren',
+    'Alle Eintr\u00e4ge der Runtime-Log-Datenbank werden unwiderruflich gel\u00f6scht. Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.',
+    'LEEREN',
+    function() {{
+      fetch('/api/runtime/clear',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          if(d.ok){{showToast('Runtime-Log geleert'); refreshRtLogStats();
+            const el=document.getElementById('runtimelog-entries');
+            if(el){{el.innerHTML='';el.style.display='none';}}}}
+          else showToast(d.error||'Fehler');
+        }}).catch(()=>showToast('Fehler'));
+    }}
+  );
 }}
 
 // Änderungsverlauf laden / toggle
@@ -3982,14 +4620,20 @@ function moveProvider(pid, direction) {{
 
 // Provider löschen
 function deleteProvider(pid) {{
-  if(!confirm('Provider wirklich entfernen?')) return;
-  fetch('/api/kira/provider/delete',{{
-    method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{provider_id:pid}})
-  }}).then(r=>r.json()).then(d=>{{
-    if(d.ok) {{ showToast('Provider entfernt'); setTimeout(()=>location.reload(),400); }}
-    else showToast(d.error||'Fehler');
-  }}).catch(()=>showToast('Fehler'));
+  showKritischModal(
+    '\u26A0\uFE0F Provider entfernen',
+    'Der LLM-Provider wird aus der Konfiguration gel\u00f6scht. Alle API-Key-Einstellungen gehen verloren.',
+    'ENTFERNEN',
+    function() {{
+      fetch('/api/kira/provider/delete',{{
+        method:'POST',headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{provider_id:pid}})
+      }}).then(r=>r.json()).then(d=>{{
+        if(d.ok) {{ showToast('Provider entfernt'); setTimeout(()=>location.reload(),400); }}
+        else showToast(d.error||'Fehler');
+      }}).catch(()=>showToast('Fehler'));
+    }}
+  );
 }}
 
 // Wissen level switching (Bibliothek / Regelsteuerung / Neu)
@@ -4010,16 +4654,28 @@ function showWissenTab(name, ns) {{
 
 // Wissen actions
 function wissenAction(regelId, aktion) {{
-  _rtlog('ui','wissen_action',aktion+' Regel '+regelId,{{submodul:'wissen',context_type:'regel',context_id:String(regelId)}});
-  fetch('/api/wissen/'+regelId+'/'+aktion,{{method:'POST'}}).then(r=>r.json()).then(d=>{{
-    if(d.ok) {{
-      const labels = {{bestaetigen:'Regel bestätigt',ablehnen:'Regel abgelehnt',loeschen:'Regel entfernt'}};
-      showToast(labels[aktion]||'Aktualisiert');
-      const el = document.getElementById('wr-'+regelId);
-      if(el && aktion==='loeschen') {{ el.style.opacity='0.2'; setTimeout(()=>el.remove(),300); }}
-      else setTimeout(()=>location.reload(),600);
-    }}
-  }}).catch(()=>showToast('Fehler'));
+  const doIt = function() {{
+    _rtlog('ui','wissen_action',aktion+' Regel '+regelId,{{submodul:'wissen',context_type:'regel',context_id:String(regelId)}});
+    fetch('/api/wissen/'+regelId+'/'+aktion,{{method:'POST'}}).then(r=>r.json()).then(d=>{{
+      if(d.ok) {{
+        const labels = {{bestaetigen:'Regel best\u00e4tigt',ablehnen:'Regel abgelehnt',loeschen:'Regel entfernt'}};
+        showToast(labels[aktion]||'Aktualisiert');
+        const el = document.getElementById('wr-'+regelId);
+        if(el && aktion==='loeschen') {{ el.style.opacity='0.2'; setTimeout(()=>el.remove(),300); }}
+        else setTimeout(()=>location.reload(),600);
+      }}
+    }}).catch(()=>showToast('Fehler'));
+  }};
+  if(aktion === 'loeschen') {{
+    showKritischModal(
+      '\uD83D\uDDD1 Wissensregel l\u00f6schen',
+      'Diese Lernregel wird unwiderruflich gel\u00f6scht. Kira verliert das damit verbundene Wissen.',
+      'L\u00d6SCHEN',
+      doIt
+    );
+  }} else {{
+    doIt();
+  }}
 }}
 
 // Regel bearbeiten
@@ -4068,12 +4724,15 @@ function neueRegel() {{
 // Kira 3-Modi
 function toggleKiraQuick() {{
   const qp = document.getElementById('kiraQuick');
+  const fab = document.getElementById('kiraFab');
   if(qp.classList.contains('open')) closeKiraQuick();
-  else {{ qp.classList.add('open'); kiraOpen=true; }}
+  else {{ qp.classList.add('open'); kiraOpen=true; if(fab) fab.classList.add('kira-fab-active'); }}
 }}
 function closeKiraQuick() {{
+  const fab = document.getElementById('kiraFab');
   document.getElementById('kiraQuick').classList.remove('open');
   kiraOpen=false;
+  if(fab) fab.classList.remove('kira-fab-active');
 }}
 function openKiraWorkspace(context) {{
   closeKiraQuick();
@@ -4096,6 +4755,193 @@ function closeKiraWorkspace() {{
   kiraOpen=false;
   localStorage.setItem('kira_dismissed', Date.now());
 }}
+// Kira Launcher — globales Augen-Tracking + Proximity-Reaktion (3 Varianten)
+(function kiraLauncher() {{
+  // Konfiguration je Variante: LC/RC=Pupillen-Zentrum, ER=Augen-Radius, IRY=Iris-ry, PR=Pupillen-r
+  const VCFG = {{
+    'A': {{LC:[34,47],   RC:[66,47],   ER:4,   IRY:9.5, PR:5,   mn:'M38 62 Q50 70 62 62', ms:'M36 60 Q50 72 64 60'}},
+    'B': {{LC:[33,47],   RC:[67,47],   ER:6.5, IRY:14,  PR:8.5, mn:'M36 67 Q50 78 64 67', ms:'M34 65 Q50 82 66 65'}},
+    'C': {{LC:[35,47.5], RC:[65,47.5], ER:5,   IRY:8.5, PR:6,   mn:'M38 63 Q50 71 62 63', ms:'M36 61 Q50 74 64 61'}}
+  }};
+  let _mx=window.innerWidth/2, _my=window.innerHeight/2;
+  let _bLastAct=Date.now();
+  document.addEventListener('mousemove', e=>{{ _mx=e.clientX; _my=e.clientY; _bLastAct=Date.now(); }});
+
+  // ── Gelangweilter Modus ─────────────────────────────────────────────────
+  const _BSEQ=['blink','drowsy','blink','drowsy','yawn','drowsy','eye-roll','drowsy','blink','sleep'];
+  const _BDUR={{blink:280,drowsy:4000,yawn:2600,'eye-roll':2400,sleep:999999}};
+  const _BGAP={{blink:500,drowsy:0,yawn:300,'eye-roll':600,sleep:0}};
+  let _bIdx=0, _bStart=0, _bActive=false;
+
+  function _lerp(a,b,t){{return a+(b-a)*Math.min(1,Math.max(0,t));}}
+
+  function _wakeUp(cfg){{
+    _bActive=false; _bIdx=0; _bStart=0;
+    const iL=document.getElementById('kiraIrisL'), iR=document.getElementById('kiraIrisR');
+    const pL=document.getElementById('kiraPupilL'), pR=document.getElementById('kiraPupilR');
+    const mth=document.getElementById('kiraMouth');
+    if(iL)iL.setAttribute('ry',cfg.IRY);
+    if(iR)iR.setAttribute('ry',cfg.IRY);
+    if(pL){{pL.setAttribute('r',cfg.PR);pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);}}
+    if(pR){{pR.setAttribute('r',cfg.PR);pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);}}
+    if(mth)mth.setAttribute('d',cfg.mn);
+  }}
+
+  function _doBoredFrame(now,cfg){{
+    const iL=document.getElementById('kiraIrisL'), iR=document.getElementById('kiraIrisR');
+    const pL=document.getElementById('kiraPupilL'), pR=document.getElementById('kiraPupilR');
+    const mth=document.getElementById('kiraMouth');
+    // Gap: wenn _bStart in der Zukunft liegt, warten
+    if(now<_bStart) return;
+    const phase=_BSEQ[_bIdx%_BSEQ.length];
+    const dur=_BDUR[phase];
+    const t=(now-_bStart)/dur;
+
+    if(phase==='blink'){{
+      // Schnelles Blinzeln: auf→zu→auf
+      const f=t<0.5?1-t*2:(t-0.5)*2;
+      const ry=Math.max(0.3,cfg.IRY*f), pr=Math.max(0,cfg.PR*f);
+      if(iL)iL.setAttribute('ry',ry.toFixed(2));
+      if(iR)iR.setAttribute('ry',ry.toFixed(2));
+      if(pL){{pL.setAttribute('r',pr.toFixed(2));pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);}}
+      if(pR){{pR.setAttribute('r',pr.toFixed(2));pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);}}
+      if(t>=1){{
+        if(iL)iL.setAttribute('ry',cfg.IRY);if(iR)iR.setAttribute('ry',cfg.IRY);
+        if(pL)pL.setAttribute('r',cfg.PR);if(pR)pR.setAttribute('r',cfg.PR);
+        _bIdx++;_bStart=now+_BGAP.blink;
+      }}
+    }}else if(phase==='drowsy'){{
+      // Schwere Lider: Augen gleiten auf 32% zu, Blick sinkt
+      const ct=Math.min(1,t/0.7);
+      const ry=_lerp(cfg.IRY,cfg.IRY*0.32,ct);
+      const py=_lerp(cfg.LC[1],cfg.LC[1]+4,ct);
+      if(iL)iL.setAttribute('ry',ry.toFixed(2));
+      if(iR)iR.setAttribute('ry',ry.toFixed(2));
+      if(pL){{pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',py.toFixed(2));pL.setAttribute('r',cfg.PR);}}
+      if(pR){{pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',py.toFixed(2));pR.setAttribute('r',cfg.PR);}}
+      if(t>=1){{_bIdx++;_bStart=now;}}
+    }}else if(phase==='yawn'){{
+      // Mund weit auf, Augen kneifen zusammen
+      const op=Math.min(1,t<0.4?t/0.4:1);
+      const cl=t>0.75?(t-0.75)/0.25:0;
+      const ry=cfg.IRY*_lerp(0.32,0.12,op);
+      if(iL)iL.setAttribute('ry',ry.toFixed(2));
+      if(iR)iR.setAttribute('ry',ry.toFixed(2));
+      if(pL){{pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);pL.setAttribute('r',cfg.PR);}}
+      if(pR){{pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);pR.setAttribute('r',cfg.PR);}}
+      if(mth){{const qy=_lerp(78,102,op);mth.setAttribute('d','M32 67 Q50 '+qy.toFixed(0)+' 68 67');}}
+      if(t>=1){{if(mth)mth.setAttribute('d',cfg.mn);_bIdx++;_bStart=now+_BGAP.yawn;}}
+    }}else if(phase==='eye-roll'){{
+      // Augen öffnen sich leicht + Pupillen kreisen
+      const openT=Math.min(1,t*4);
+      const ry=_lerp(cfg.IRY*0.32,cfg.IRY*0.65,openT);
+      if(iL)iL.setAttribute('ry',ry.toFixed(2));
+      if(iR)iR.setAttribute('ry',ry.toFixed(2));
+      const angle=(now%2400)/2400*Math.PI*2;
+      const rr=cfg.ER*0.72;
+      if(pL){{pL.setAttribute('cx',(cfg.LC[0]+Math.sin(angle)*rr*0.6).toFixed(2));pL.setAttribute('cy',(cfg.LC[1]-Math.cos(angle)*rr*0.4).toFixed(2));pL.setAttribute('r',cfg.PR);}}
+      if(pR){{pR.setAttribute('cx',(cfg.RC[0]+Math.sin(angle)*rr*0.6).toFixed(2));pR.setAttribute('cy',(cfg.RC[1]-Math.cos(angle)*rr*0.4).toFixed(2));pR.setAttribute('r',cfg.PR);}}
+      if(t>=1){{
+        if(pL){{pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);}}
+        if(pR){{pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);}}
+        _bIdx++;_bStart=now+_BGAP['eye-roll'];
+      }}
+    }}else if(phase==='sleep'){{
+      // Vollständig zu — schläft
+      if(iL)iL.setAttribute('ry','0.4');if(iR)iR.setAttribute('ry','0.4');
+      if(pL){{pL.setAttribute('r','0');pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);}}
+      if(pR){{pR.setAttribute('r','0');pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);}}
+      // Kurzes Schlaf-Zucken alle ~6s
+      const zt=(now%6300)/6300;
+      if(zt<0.04){{if(iL)iL.setAttribute('ry',(cfg.IRY*0.15).toFixed(2));if(iR)iR.setAttribute('ry',(cfg.IRY*0.15).toFixed(2));}}
+    }}
+  }}
+
+  // ── rAF-Hauptschleife ───────────────────────────────────────────────────
+  function _frame(){{
+    const fab=document.getElementById('kiraFab');
+    if(!fab){{requestAnimationFrame(_frame);return;}}
+    const r=fab.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const dx=_mx-cx, dy=_my-cy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const v=fab.dataset.variant||'B', cfg=VCFG[v]||VCFG['B'];
+    const pL=document.getElementById('kiraPupilL'), pR=document.getElementById('kiraPupilR');
+    const halo=document.getElementById('kiraGlowHalo'), svg=document.getElementById('kiraCharSVG');
+    const D_FAR=Math.min(window.innerWidth,window.innerHeight)*(window._kiraProxRadius||0.5);
+    const D_NEAR=window._kiraBounce!==undefined?window._kiraBounce:130;
+    const prox=Math.max(0,1-dist/D_FAR);
+    const proxNear=D_NEAR>0?Math.max(0,1-dist/D_NEAR):0;
+    const now=Date.now();
+    const idleSec=(now-_bLastAct)/1000;
+    const idleEnabled=window._kiraIdleEnabled!==false;
+    const idleDelay=window._kiraIdleDelay||10;
+
+    if(idleEnabled && idleSec>idleDelay){{
+      // ── Gelangweilter Modus ──
+      if(!_bActive){{_bActive=true;_bIdx=0;_bStart=now;fab.classList.add('kira-bored');}}
+      _doBoredFrame(now,cfg);
+      if(halo)halo.setAttribute('opacity','0');
+      if(svg&&!fab.classList.contains('kira-fab-active'))svg.style.transform='scale(1)';
+      fab.classList.remove('kira-excited');
+    }}else{{
+      // ── Aktiv-Modus ──
+      if(_bActive){{_wakeUp(cfg);fab.classList.remove('kira-bored');}}
+      if(pL&&pR&&dist>1){{
+        const er=cfg.ER, nx=dx/dist, ny=dy/dist;
+        pL.setAttribute('cx',String((cfg.LC[0]+nx*er).toFixed(2)));
+        pL.setAttribute('cy',String((cfg.LC[1]+ny*er).toFixed(2)));
+        pR.setAttribute('cx',String((cfg.RC[0]+nx*er).toFixed(2)));
+        pR.setAttribute('cy',String((cfg.RC[1]+ny*er).toFixed(2)));
+      }}
+      if(halo)halo.setAttribute('opacity',String((prox*0.8).toFixed(3)));
+      if(svg&&!fab.classList.contains('kira-fab-active'))svg.style.transform='scale('+(1+prox*0.2)+')';
+      if(proxNear>0.35)fab.classList.add('kira-excited');
+      else fab.classList.remove('kira-excited');
+    }}
+    requestAnimationFrame(_frame);
+  }}
+
+  function addFabListeners(fab){{
+    fab.addEventListener('mousedown',()=>{{
+      const v=fab.dataset.variant||'B', cfg=VCFG[v]||VCFG['B'];
+      const svg=document.getElementById('kiraCharSVG'), mth=document.getElementById('kiraMouth');
+      if(svg){{svg.style.transition='transform .09s';svg.style.transform='scale(0.82)';}}
+      if(mth){{mth.setAttribute('d',cfg.ms);setTimeout(()=>mth.setAttribute('d',cfg.mn),750);}}
+      setTimeout(()=>{{const s=document.getElementById('kiraCharSVG');if(s){{s.style.transition='transform .3s cubic-bezier(.18,.89,.32,1.28)';s.style.transform='scale(1.12)';}}}},110);
+    }});
+  }}
+
+  window.switchKiraVariant=function(v){{
+    const fab=document.getElementById('kiraFab'), tmpl=document.getElementById('kira-tmpl-'+v);
+    if(!fab||!tmpl)return;
+    const oldSvg=fab.querySelector('.kira-char-svg');
+    if(oldSvg){{
+      const div=document.createElement('div');
+      div.innerHTML=tmpl.innerHTML;
+      const newSvg=div.firstElementChild;
+      if(newSvg)fab.replaceChild(newSvg,oldSvg);
+    }}
+    fab.dataset.variant=v;
+    const cfg=VCFG[v]||VCFG['B'];
+    const pL=document.getElementById('kiraPupilL'), pR=document.getElementById('kiraPupilR');
+    if(pL){{pL.setAttribute('cx',cfg.LC[0]);pL.setAttribute('cy',cfg.LC[1]);}}
+    if(pR){{pR.setAttribute('cx',cfg.RC[0]);pR.setAttribute('cy',cfg.RC[1]);}}
+  }};
+
+  const fab=document.getElementById('kiraFab');
+  if(fab){{
+    window._kiraProxRadius  = parseFloat(fab.dataset.proxRadius||'0.5');
+    window._kiraBounce      = parseInt(fab.dataset.bounceDist||'130');
+    window._kiraIdleEnabled = fab.dataset.idleEnabled!=='false';
+    window._kiraIdleDelay   = parseInt(fab.dataset.idleDelay||'10');
+    const _ksz=parseInt(fab.dataset.size||'112');
+    fab.style.width=_ksz+'px'; fab.style.height=_ksz+'px';
+    addFabListeners(fab);
+    if(!window._kiraRafRunning){{window._kiraRafRunning=true;_frame();}}
+  }}
+}})();
+
 // Legacy compat
 function toggleKira(){{ toggleKiraQuick(); }}
 function openKiraNaked(){{ openKiraWorkspace('chat'); }}
@@ -4155,7 +5001,7 @@ function renderKiraAufgaben(data) {{
   let html = '';
   aufgaben.forEach(a => {{
     const pcls = a.prio >= 3 ? 'kira-prio-high' : a.prio >= 2 ? 'kira-prio-med' : 'kira-prio-low';
-    html += '<div class="kira-card kira-task-card '+pcls+'" onclick="'+a.action+';closeKira()" style="cursor:pointer"><div class="kira-card-meta">'+a.text+'</div></div>';
+    html += '<div class="kira-card kira-task-card '+pcls+'" onclick="'+a.action+';showKTab(\\'chat\\');kiraSetQuickActions(\\'aufgabe\\')" style="cursor:pointer"><div class="kira-card-meta">'+a.text+'</div></div>';
   }});
   el.innerHTML = html;
 }}
@@ -4255,35 +5101,42 @@ function appendKiraMsg(rolle, text, tools, providerInfo, fallbackInfo) {{
   const area = document.getElementById('kiraChatArea');
   const welcome = area.querySelector('.kira-welcome');
   if(welcome) welcome.remove();
-  const div = document.createElement('div');
+  const now = new Date().toLocaleTimeString('de-DE',{{hour:'2-digit',minute:'2-digit'}});
+  const wrap = document.createElement('div');
   if(rolle==='user') {{
-    div.className = 'kira-msg kira-msg-user';
-    div.textContent = text;
+    wrap.className = 'msg user';
+    wrap.innerHTML = '<div class="msg-head"><span class="msg-name u">Du</span><span class="msg-time">'+now+'</span></div>'
+      +'<div class="msg-bubble">'+escH(text).replace(/\\n/g,'<br>')+'</div>';
   }} else if(rolle==='assistant') {{
-    div.className = 'kira-msg kira-msg-kira';
-    div.innerHTML = kiraFormatText(text);
+    wrap.className = 'msg kira';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = kiraFormatText(text);
     if(tools && tools.length) {{
       const ti = document.createElement('div');
       ti.className = 'kira-tools-used';
       ti.innerHTML = tools.map(t=>'<span class="kira-tool-badge">'+escH(t)+'</span>').join(' ');
-      div.appendChild(ti);
+      bubble.appendChild(ti);
     }}
-    // Provider-Info anzeigen
-    const meta = document.createElement('div');
-    meta.style.cssText = 'font-size:10px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap';
-    if(providerInfo) meta.innerHTML = '<span style="opacity:.7">via '+escH(providerInfo)+'</span>';
-    if(fallbackInfo && fallbackInfo.length) {{
-      meta.innerHTML += '<span style="color:#e8a545;opacity:.8" title="'+escH(fallbackInfo.join(', '))+'">⚡ Fallback</span>';
+    if(providerInfo || (fallbackInfo && fallbackInfo.length)) {{
+      const meta = document.createElement('div');
+      meta.style.cssText = 'font-size:10px;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+      if(providerInfo) meta.innerHTML = '<span style="opacity:.65">via '+escH(providerInfo)+'</span>';
+      if(fallbackInfo && fallbackInfo.length) {{
+        meta.innerHTML += '<span style="color:#e8a545;opacity:.8" title="'+escH(fallbackInfo.join(', '))+'">⚡ Fallback</span>';
+      }}
+      bubble.appendChild(meta);
     }}
-    if(meta.innerHTML) div.appendChild(meta);
+    wrap.innerHTML = '<div class="msg-head"><span class="msg-name">Kira</span><span class="msg-time">'+now+'</span></div>';
+    wrap.appendChild(bubble);
   }} else if(rolle==='error') {{
-    div.className = 'kira-msg kira-msg-error';
-    div.textContent = text;
+    wrap.className = 'msg error';
+    wrap.innerHTML = '<div class="msg-bubble">'+escH(text)+'</div>';
   }} else {{
-    div.className = 'kira-msg kira-msg-system';
-    div.textContent = text;
+    wrap.className = 'msg system';
+    wrap.innerHTML = '<div class="msg-bubble">'+escH(text)+'</div>';
   }}
-  area.appendChild(div);
+  area.appendChild(wrap);
   scrollKiraChat();
 }}
 
@@ -4548,7 +5401,7 @@ function kiraSetQuickActions(typ) {{
 function kiraAddPrompt(text) {{
   const inp = document.getElementById('kiraInput');
   if(!inp) return;
-  inp.value = inp.value ? inp.value + '\n' + text : text;
+  inp.value = inp.value ? inp.value + '\\n' + text : text;
   inp.style.height = 'auto';
   inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
   inp.focus();
@@ -4639,6 +5492,7 @@ function openKira(taskId){{
   if(!ctx){{ showToast('Kein Kontext'); return; }}
   openKiraNaked();
   showKTab('chat');
+  kiraSetQuickActions('frage');
   // Pre-fill chat with task context
   const input = document.getElementById('kiraInput');
   if(input) {{
@@ -4850,7 +5704,7 @@ function silentRefreshDashboard() {{
   if(kiraSending) return; // nie unterbrechen wenn Chat aktiv
   const active = document.querySelector('.panel.active');
   if(!active || active.id !== 'panel-dashboard') return; // nur wenn Dashboard sichtbar
-  fetch('/api/tasks').then(r=>r.json()).then(data=>{{
+  fetch('/api/tasks/open').then(r=>r.json()).then(data=>{{
     const badge = document.getElementById('headerBadgeCount');
     if(badge && data.tasks) badge.textContent = data.tasks.length;
   }}).catch(()=>{{}});
@@ -4930,6 +5784,20 @@ CSS = """
 /* Font size override */
 [data-fontsize="small"]{font-size:12px;}
 [data-fontsize="large"]{font-size:15px;}
+/* Font family */
+[data-font-family="mono"] body{font-family:'Fira Mono','Cascadia Code','Courier New',monospace!important;}
+[data-font-family="system"] body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif!important;}
+/* Row height */
+[data-row-height="compact"] .proto-table td,[data-row-height="compact"] .proto-table th{padding:4px 10px!important;}
+[data-row-height="comfortable"] .proto-table td,[data-row-height="comfortable"] .proto-table th{padding:14px 10px!important;}
+/* Toast position */
+[data-toast-pos="top-right"] .status-toast{bottom:auto!important;top:24px;}
+[data-toast-pos="bottom-left"] .status-toast{right:auto!important;left:24px;bottom:82px;}
+/* Table zebra */
+[data-table-zebra="true"] .proto-table tbody tr:nth-child(even) td{background:var(--bg-overlay);}
+/* Global form element theming — prevents hardcoded black backgrounds in light mode */
+input:not([type="color"]):not([type="checkbox"]):not([type="radio"]),select,textarea{
+  background:var(--bg-raised);color:var(--text);}
 
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -5002,6 +5870,19 @@ a:hover{text-decoration:underline;}
 
 .sidebar-bottom{border-top:0.5px solid rgba(0,0,0,.08);padding:8px;}
 .sidebar-toggle{display:none!important;} /* legacy, jetzt sb-toggle-btn */
+/* Sidebar dark mode overrides */
+[data-theme="dark"] .sidebar{background:#101012;border-right-color:rgba(255,255,255,.06);}
+[data-theme="dark"] .sidebar-brand{border-bottom-color:rgba(255,255,255,.06);}
+[data-theme="dark"] .sidebar-brand-name{color:var(--text);}
+[data-theme="dark"] .sidebar-brand-sub{color:var(--text-secondary);}
+[data-theme="dark"] .sidebar-group-label{color:var(--muted);}
+[data-theme="dark"] .sidebar-item{color:var(--text-secondary);}
+[data-theme="dark"] .sidebar-item:hover{background:rgba(255,255,255,.06);color:var(--text);}
+[data-theme="dark"] .sidebar-item.active{background:var(--bg-overlay);color:var(--accent);box-shadow:none;}
+[data-theme="dark"] .sb-toggle-btn{color:var(--muted);}
+[data-theme="dark"] .sb-toggle-btn:hover{background:rgba(255,255,255,.06);color:var(--text);}
+[data-theme="dark"] .sidebar-bottom{border-top-color:rgba(255,255,255,.06);}
+[data-theme="dark"] .sidebar.collapsed .sidebar-item::after{background:var(--bg-overlay);color:var(--text);}
 
 /* Main content */
 .main-area{flex:1;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
@@ -5613,178 +6494,180 @@ a:hover{text-decoration:underline;}
   box-shadow:0 4px 20px rgba(0,0,0,.25);}
 .status-toast.show{transform:translateY(0);opacity:1;}
 
-/* ═══ Kira FAB ═══ */
-.kira-fab{position:fixed;bottom:22px;right:22px;z-index:200;
-  background:#534AB7;border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;
-  flex-direction:column;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);
-  transition:transform .2s,box-shadow .2s;border:none;color:#fff;}
-.kira-fab:hover{transform:scale(1.07);box-shadow:0 6px 26px rgba(83,74,183,.5);}
-.kira-fab-k{color:#fff;font-size:16px;font-weight:600;line-height:1;}
-.kira-fab-label{color:#CECBF6;font-size:8px;margin-top:1px;line-height:1;}
-.kira-fab-status{position:absolute;top:1px;right:1px;width:12px;height:12px;
-  background:#1D9E75;border-radius:50%;border:2px solid var(--bg);}
+/* ═══ Kira FAB — Animierter Launcher ═══ */
+.kira-fab{position:fixed;bottom:20px;right:20px;z-index:200;
+  width:112px;height:112px;border-radius:50%;
+  background:transparent;border:none;box-shadow:none;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:0;outline:none;}
+.kira-fab.kira-fab-active .kira-char-svg{filter:drop-shadow(0 0 12px rgba(123,104,238,.6));}
+.kira-fab.kira-bored .kira-float{animation-duration:6s;animation-timing-function:ease-in-out;}
+.kira-char-svg{display:block;transition:transform .25s ease-out;overflow:visible;}
+.kira-float{animation:kiraFloat 4s ease-in-out infinite;transform-origin:50% 50%;}
+@keyframes kiraFloat{0%,100%{transform:translateY(0) rotate(0deg);}25%{transform:translateY(-9px) rotate(1.2deg);}50%{transform:translateY(-13px) rotate(0deg);}75%{transform:translateY(-7px) rotate(-0.9deg);}}
+.kira-excited .kira-float{animation:kiraFloatExcited 1s ease-in-out infinite;}
+@keyframes kiraFloatExcited{0%,100%{transform:translateY(0) scaleY(1);}35%{transform:translateY(-17px) scaleY(1.06);}65%{transform:translateY(-4px) scaleY(0.96);}}
+.kira-fab-status{position:absolute;top:10px;right:10px;width:14px;height:14px;
+  background:#1D9E75;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 6px rgba(29,158,117,.5);}
+.kira-fab-pulse{animation:kiraPulse 2s ease-in-out infinite;}
+@keyframes kiraPulse{0%,100%{opacity:1;}50%{opacity:.6;}}
 
 /* ═══ Kira Quick Panel (kq-*) ═══ */
-.kq-panel{position:fixed;bottom:82px;right:22px;z-index:250;width:340px;
-  background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
-  box-shadow:0 8px 40px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;}
+.kq-panel{position:fixed;bottom:148px;right:20px;z-index:250;width:340px;
+  background:var(--bg-raised);border:0.5px solid var(--border);border-radius:14px;
+  box-shadow:0 8px 40px rgba(0,0,0,.15);display:none;flex-direction:column;overflow:hidden;}
 .kq-panel.open{display:flex;}
-.kq-header{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--border);}
-.kq-logo{width:34px;height:34px;background:#534AB7;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;}
-.kq-logo-k{color:#fff;font-size:14px;font-weight:600;line-height:1;}
+.kq-header{display:flex;align-items:center;gap:10px;padding:18px 20px 14px;border-bottom:0.5px solid var(--border);}
+.kq-logo{width:36px;height:36px;background:#534AB7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;}
+.kq-logo-k{color:#fff;font-size:15px;font-weight:500;line-height:1;}
 .kq-logo-l{color:#CECBF6;font-size:7px;margin-top:1px;}
 .kq-htext{flex:1;}
-.kq-htitle{font-size:14px;font-weight:600;color:var(--text);}
-.kq-hstatus{font-size:10px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;margin-top:2px;}
+.kq-htitle{font-size:16px;font-weight:500;color:var(--text);}
+.kq-hstatus{font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;margin-top:2px;}
 .kq-hstatus-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0;}
-.kq-close{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg);
-  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+.kq-close{width:28px;height:28px;border-radius:6px;border:0.5px solid var(--border);background:var(--bg);
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 .kq-close:hover{color:var(--text);border-color:var(--border-strong);}
-.kq-actions{padding:8px 10px;}
-.kq-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;
-  transition:background .12s,border-color .12s;border:1px solid transparent;margin-bottom:2px;}
-.kq-item:hover{background:var(--accent-bg);border-color:var(--accent-border);}
-.kq-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.kq-icon.purple{background:rgba(83,74,183,.18);color:#CECBF6;}
-.kq-icon.amber{background:rgba(186,117,23,.18);color:#f0b855;}
-.kq-icon.green{background:rgba(59,109,17,.2);color:#7ecf3f;}
-.kq-icon.blue{background:rgba(24,95,165,.2);color:#6db3f2;}
-.kq-icon.coral{background:rgba(153,60,29,.2);color:#f08060;}
-.kq-icon.teal{background:rgba(15,110,86,.2);color:#3fcfa0;}
-.kq-icon.gray{background:rgba(128,128,128,.12);color:var(--text-secondary);}
+.kq-actions{padding:10px 12px;}
+.kq-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;cursor:pointer;
+  transition:background .12s,border-color .12s;border:0.5px solid transparent;margin-bottom:2px;}
+.kq-item:hover{background:var(--accent-bg);border-color:var(--border);}
+.kq-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.kq-icon.purple{background:rgba(83,74,183,.12);color:#534AB7;}
+.kq-icon.amber{background:rgba(186,117,23,.12);color:#BA7517;}
+.kq-icon.green{background:rgba(59,109,17,.12);color:#3B6D11;}
+.kq-icon.blue{background:rgba(24,95,165,.12);color:#185FA5;}
+.kq-icon.coral{background:rgba(153,60,29,.12);color:#993C1D;}
+.kq-icon.teal{background:rgba(15,110,86,.12);color:#0F6E56;}
+.kq-icon.gray{background:rgba(128,128,128,.1);color:var(--text-secondary);}
 .kq-body{flex:1;min-width:0;}
 .kq-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:1px;}
 .kq-sub{font-size:11px;color:var(--text-secondary);}
-.kq-arrow{font-size:14px;color:var(--border-strong);flex-shrink:0;transition:color .12s;}
-.kq-item:hover .kq-arrow{color:#CECBF6;}
-.kq-footer{padding:9px 14px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;}
-.kq-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 11px;
+.kq-arrow{font-size:13px;color:var(--border-strong);flex-shrink:0;transition:color .12s;}
+.kq-item:hover .kq-arrow{color:#534AB7;}
+.kq-footer{padding:10px 16px 14px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:8px;}
+.kq-input{flex:1;background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:8px 12px;
   font-size:12px;color:var(--text);font-family:inherit;}
-.kq-input:focus{outline:none;border-color:var(--accent-border);}
-.kq-send{width:30px;height:30px;border-radius:8px;background:#534AB7;border:none;
+.kq-input:focus{outline:none;border-color:#534AB7;}
+.kq-send{width:32px;height:32px;border-radius:8px;background:#534AB7;border:none;
   display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;flex-shrink:0;}
 .kq-send:hover{background:#6358cc;}
 
 /* ═══ Kira Workspace (kw-*) ═══ */
-.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:16px;}
+.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(28,28,26,.45);align-items:center;justify-content:center;padding:16px;}
 .kira-workspace-overlay.open{display:flex;}
-.kw-shell{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
-  width:96vw;max-width:1260px;height:87vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.6);overflow:hidden;}
-.kw-header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.kw-shell{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:14px;
+  width:96vw;max-width:1280px;height:88vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.2);overflow:hidden;}
+.kw-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:0.5px solid var(--border);flex-shrink:0;}
 .kw-header-left{display:flex;align-items:center;gap:10px;}
-.kw-logo{width:30px;height:30px;background:#534AB7;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0;}
-.kw-title{font-size:14px;font-weight:700;color:#CECBF6;}
+.kw-logo{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:500;flex-shrink:0;}
+.kw-title{font-size:15px;font-weight:500;color:var(--text);}
 .kw-sub{font-size:11px;color:var(--muted);margin-top:1px;}
 .kw-header-right{display:flex;gap:6px;align-items:center;}
 .kw-body{display:flex;flex:1;overflow:hidden;}
-.kw-ctx-panel{width:240px;min-width:240px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg);}
-.kw-ctx-hdr{padding:12px 15px 9px;border-bottom:1px solid var(--border);}
-.kw-ctx-hdr-t{font-size:12px;font-weight:700;color:var(--text);margin-bottom:7px;}
-.kw-ctx-search{width:100%;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:11px;color:var(--text);font-family:inherit;}
-.kw-ctx-search:focus{outline:none;border-color:var(--accent-border);}
-.kw-ctx-section{padding:9px 0;}
-.kw-ctx-sec-h{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:0 15px 5px;}
-.kw-ctx-item{display:flex;align-items:flex-start;gap:7px;padding:7px 15px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
+.kw-ctx-panel{width:260px;min-width:260px;border-right:0.5px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg-raised);}
+.kw-ctx-hdr{padding:16px 18px 12px;border-bottom:0.5px solid var(--border);}
+.kw-ctx-hdr-t{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px;}
+.kw-ctx-search{width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--muted);font-family:inherit;}
+.kw-ctx-search:focus{outline:none;border-color:#534AB7;}
+.kw-ctx-section{padding:12px 0;}
+.kw-ctx-sec-h{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:0 18px 6px;}
+.kw-ctx-item{display:flex;align-items:flex-start;gap:8px;padding:8px 18px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
 .kw-ctx-item:hover{background:var(--accent-bg);}
-.kw-ctx-item.active{background:rgba(83,74,183,.1);border-left-color:#534AB7;}
-.kw-ctx-chip{font-size:8px;padding:2px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
-.kw-ctx-chip.mail{background:rgba(24,95,165,.2);color:#6db3f2;}
-.kw-ctx-chip.task{background:rgba(186,117,23,.2);color:#f0b855;}
-.kw-ctx-chip.inv{background:rgba(59,109,17,.2);color:#7ecf3f;}
-.kw-ctx-chip.offer{background:rgba(83,74,183,.2);color:#CECBF6;}
-.kw-ctx-chip.know{background:rgba(15,110,86,.2);color:#3fcfa0;}
-.kw-ctx-chip.cust{background:rgba(153,60,29,.2);color:#f08060;}
+.kw-ctx-item.active{background:var(--accent-bg);border-left-color:#534AB7;}
+.kw-ctx-chip{font-size:8px;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.kw-ctx-chip.mail{background:rgba(24,95,165,.1);color:#185FA5;}
+.kw-ctx-chip.task{background:rgba(186,117,23,.1);color:#854F0B;}
+.kw-ctx-chip.inv{background:rgba(59,109,17,.1);color:#3B6D11;}
+.kw-ctx-chip.offer{background:rgba(83,74,183,.1);color:#3C3489;}
+.kw-ctx-chip.know{background:rgba(15,110,86,.1);color:#085041;}
+.kw-ctx-chip.cust{background:rgba(153,60,29,.1);color:#712B13;}
 .kw-ctx-body{flex:1;min-width:0;}
 .kw-ctx-title{font-size:12px;font-weight:500;color:var(--text);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.kw-ctx-sub{font-size:10px;color:var(--text-secondary);}
-.kw-ctx-sep{height:1px;background:var(--border);margin:2px 15px;}
-.kw-center{flex:1;display:flex;flex-direction:column;background:var(--bg-raised);overflow:hidden;}
-.kw-cbar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
-.kw-cbar-mode{font-size:11px;padding:3px 9px;border-radius:5px;background:rgba(83,74,183,.2);color:#CECBF6;font-weight:600;}
+.kw-ctx-sub{font-size:10px;color:var(--muted);}
+.kw-ctx-sep{height:0.5px;background:var(--border);margin:0 18px;}
+.kw-center{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
+.kw-cbar{background:var(--bg-raised);border-bottom:0.5px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
+.kw-cbar-mode{font-size:11px;padding:4px 10px;border-radius:5px;background:rgba(83,74,183,.1);color:#534AB7;font-weight:500;}
 .kw-cbar-title{font-size:13px;font-weight:500;color:var(--text);}
-.kw-cbar-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(128,128,128,.12);color:var(--text-secondary);}
+.kw-cbar-tag{font-size:9px;padding:2px 7px;border-radius:4px;background:var(--bg);color:var(--text-secondary);}
 .kw-cbar-provider{font-size:10px;color:var(--muted);margin-left:auto;display:flex;align-items:center;gap:4px;}
 .kw-cbar-provider-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;}
 .kw-cbar-acts{display:flex;gap:4px;}
-.kw-cbar-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;}
-.kw-cbar-btn:hover{border-color:var(--accent-border);color:var(--text);}
-.kw-quick-bar{padding:7px 16px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
-.kw-quick-lbl{font-size:10px;color:var(--muted);align-self:center;margin-right:3px;}
-.kw-qb{font-size:10px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s;}
-.kw-qb:hover{border-color:rgba(83,74,183,.45);color:#CECBF6;}
-.kw-tools{width:240px;min-width:240px;border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg);}
-.kw-tools.collapsed{display:none;}
-.kw-tools-hdr{padding:12px 14px 9px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.kw-tools-t{font-size:12px;font-weight:700;color:var(--text);}
-.kw-tools-close{font-size:11px;color:var(--muted);cursor:pointer;padding:2px 5px;border-radius:4px;}
-.kw-tools-close:hover{color:var(--text);background:rgba(128,128,128,.1);}
-.kw-tools-sec{padding:11px 14px;}
-.kw-tools-sh{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px;}
-.kw-tools-sep{height:1px;background:var(--border);margin:0 14px;}
-.kw-t-item{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 11px;margin-bottom:5px;font-size:11px;color:var(--text);cursor:pointer;transition:border-color .12s;}
-.kw-t-item:hover{border-color:var(--accent-border);}
-.kw-t-item-h{font-weight:600;margin-bottom:2px;}
-.kw-t-item-sub{font-size:10px;color:var(--text-secondary);}
-.kw-t-rule{background:rgba(15,110,86,.1);border:1px solid rgba(15,110,86,.25);border-radius:6px;padding:8px 11px;margin-bottom:4px;font-size:11px;color:#3fcfa0;line-height:1.4;}
-.kw-t-rule-h{font-weight:600;margin-bottom:2px;color:#5fe8b8;}
-.kw-t-next{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:7px 11px;margin-bottom:4px;font-size:11px;cursor:pointer;color:var(--text-secondary);transition:border-color .12s,color .12s;}
-.kw-t-next:hover{border-color:rgba(83,74,183,.4);color:#CECBF6;}
-.kw-t-att{display:flex;align-items:center;gap:6px;padding:7px 11px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:11px;color:var(--text-secondary);cursor:pointer;}
+.kw-cbar-btn{font-size:10px;padding:3px 9px;border-radius:4px;border:0.5px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;}
+.kw-cbar-btn:hover{border-color:#534AB7;color:var(--text);}
 .kira-chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;}
-.kira-chat-area{flex:1;overflow-y:auto;padding:16px 20px;}
-.kw-input-area{background:var(--bg);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:flex-end;gap:8px;flex-shrink:0;}
-.kw-input-box{flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:var(--fs-base);line-height:1.5;resize:none;font-family:inherit;min-height:42px;max-height:120px;overflow-y:auto;}
-.kw-input-box:focus{outline:none;border-color:var(--accent-border);}
-.kw-input-acts{display:flex;gap:5px;flex-shrink:0;align-items:center;}
-.kw-ia{width:32px;height:32px;border-radius:7px;border:1px solid var(--border);background:var(--bg-raised);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--text-secondary);}
-.kw-ia:hover{border-color:var(--accent-border);color:var(--text);}
+.kira-chat-area{flex:1;overflow-y:auto;padding:20px 24px;}
+.kw-quick-bar{padding:8px 20px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:0.5px solid var(--border);background:var(--bg-raised);flex-shrink:0;}
+.kw-quick-lbl{font-size:10px;color:var(--muted);margin-right:4px;align-self:center;}
+.kw-qb{font-size:10px;padding:5px 12px;border-radius:14px;border:0.5px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s;}
+.kw-qb:hover{border-color:#534AB7;color:#534AB7;}
+.kw-tools{width:260px;min-width:260px;border-left:0.5px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;background:var(--bg-raised);}
+.kw-tools.collapsed{display:none;}
+.kw-tools-hdr{padding:14px 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.kw-tools-t{font-size:13px;font-weight:500;color:var(--text);}
+.kw-tools-close{font-size:11px;color:var(--muted);cursor:pointer;}
+.kw-tools-close:hover{color:var(--text);}
+.kw-tools-sec{padding:14px 16px;}
+.kw-tools-sh{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
+.kw-tools-sep{height:0.5px;background:var(--border);margin:0 16px;}
+.kw-t-item{background:var(--bg);border:0.5px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px;font-size:11px;color:var(--text);cursor:pointer;transition:border-color .12s;}
+.kw-t-item:hover{border-color:#534AB7;}
+.kw-t-item-h{font-weight:500;margin-bottom:2px;}
+.kw-t-item-sub{font-size:10px;color:var(--text-secondary);}
+.kw-t-rule{background:rgba(15,110,86,.07);border:0.5px solid rgba(15,110,86,.2);border-radius:6px;padding:8px 12px;margin-bottom:4px;font-size:11px;color:#085041;line-height:1.4;}
+.kw-t-rule-h{font-weight:500;margin-bottom:2px;}
+.kw-t-next{background:var(--bg);border:0.5px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px;font-size:11px;cursor:pointer;color:var(--text-secondary);transition:border-color .12s,color .12s;}
+.kw-t-next:hover{border-color:#534AB7;color:#534AB7;}
+.kw-t-att{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border:0.5px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:11px;color:var(--text-secondary);cursor:pointer;}
+.kw-input-area{background:var(--bg-raised);border-top:0.5px solid var(--border);padding:14px 20px;display:flex;align-items:flex-end;gap:10px;flex-shrink:0;}
+.kw-input-box{flex:1;background:var(--bg);color:var(--text);border:0.5px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.5;resize:none;font-family:inherit;min-height:48px;max-height:120px;overflow-y:auto;}
+.kw-input-box:focus{outline:none;border-color:#534AB7;}
+.kw-input-acts{display:flex;gap:6px;flex-shrink:0;align-items:center;}
+.kw-ia{width:34px;height:34px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--muted);}
+.kw-ia:hover{border-color:#534AB7;color:#534AB7;}
 .kw-ia.send{background:#534AB7;border-color:#534AB7;color:#fff;}
-.kw-ia.send:hover{background:#6358cc;}
-.kw-mode-sel{font-size:10px;padding:4px 9px;border-radius:6px;border:1px solid rgba(83,74,183,.4);background:rgba(83,74,183,.12);color:#CECBF6;cursor:pointer;}
-/* Legacy compat */
-.kira-ph-title{font-size:15px;font-weight:900;color:var(--accent);}
-.kira-ph-sub{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}
-.kira-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;}
-.kira-close:hover{color:var(--text);background:rgba(128,128,128,.12);}
-.kira-content{flex:1;overflow-y:auto;padding:13px 14px;}
-.kira-sec{margin-bottom:14px;}
-.kira-sec-title{font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px;opacity:.8;}
-.kira-card{background:rgba(128,128,128,.06);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;margin-bottom:7px;cursor:default;}
+.kw-ia.send:hover{background:#6358cc;border-color:#6358cc;}
+.kw-mode-sel{font-size:10px;padding:5px 10px;border-radius:6px;border:0.5px solid rgba(83,74,183,.3);background:rgba(83,74,183,.07);color:#534AB7;cursor:pointer;}
+/* ═══ Kira Nachrichten ═══ */
+.msg{margin-bottom:16px;max-width:90%;}
+.msg.kira{margin-right:auto;}
+.msg.user{margin-left:auto;}
+.msg-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.msg-name{font-size:11px;font-weight:500;color:#534AB7;}
+.msg-name.u{color:var(--text);}
+.msg-time{font-size:10px;color:var(--muted);}
+.msg-bubble{font-size:13px;line-height:1.6;color:var(--text);padding:14px 18px;border-radius:10px;}
+.msg.kira .msg-bubble{background:var(--bg-raised);border:0.5px solid var(--border);border-bottom-left-radius:4px;}
+.msg.user .msg-bubble{background:rgba(83,74,183,.1);border:0.5px solid rgba(83,74,183,.25);border-bottom-right-radius:4px;}
+.msg.error .msg-bubble{background:rgba(220,74,74,.07);color:#c05050;border:0.5px solid rgba(220,74,74,.18);}
+.msg.system .msg-bubble{background:rgba(83,74,183,.07);color:#534AB7;text-align:center;font-size:12px;}
+.msg-bubble strong{color:#534AB7;}
+.msg-bubble code{background:rgba(128,128,128,.1);padding:1px 4px;border-radius:3px;font-size:12px;}
+.kira-tools-used{margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;}
+.kira-tool-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(83,74,183,.1);color:#534AB7;border:0.5px solid rgba(83,74,183,.2);}
+/* Legacy kira-msg compat */
+.kira-card{background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:default;}
 .kira-card.clickable{cursor:pointer;}
-.kira-card.clickable:hover{border-color:var(--accent-border);background:var(--accent-bg);}
+.kira-card.clickable:hover{border-color:#534AB7;}
 .kira-task-card{cursor:pointer;transition:all .2s;}
-.kira-task-card:hover{border-color:var(--accent-border);background:var(--accent-bg);transform:translateX(-2px);}
+.kira-task-card:hover{border-color:#534AB7;transform:translateX(-2px);}
 .kira-prio-high{border-left:3px solid var(--danger);}
 .kira-prio-med{border-left:3px solid var(--warn);}
 .kira-prio-low{border-left:3px solid rgba(128,128,128,.3);}
-.kira-fab-pulse{animation:kiraPulse 2s ease-in-out infinite;}
-@keyframes kiraPulse{0%,100%{box-shadow:0 3px 15px rgba(0,0,0,.3);}50%{box-shadow:0 3px 25px rgba(220,74,74,.5);}}
-.kira-card-title{font-size:var(--fs-base);font-weight:700;margin-bottom:3px;}
+.kira-card-title{font-size:var(--fs-base);font-weight:500;margin-bottom:3px;}
 .kira-card-meta{font-size:var(--fs-sm);color:var(--muted);}
-.kira-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-raised);flex-shrink:0;align-items:flex-end;}
-.kira-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-lg);padding:9px 12px;font-size:var(--fs-base);line-height:1.5;resize:none;font-family:inherit;min-height:38px;max-height:120px;overflow-y:auto;}
-.kira-input:focus{outline:none;border-color:var(--accent-border);}
-.kira-send-btn{background:var(--accent);border:none;border-radius:50%;width:38px;height:38px;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
-.kira-send-btn:hover{transform:scale(1.06);box-shadow:0 2px 12px rgba(0,0,0,.25);}
-.kira-send-btn:disabled{opacity:.4;cursor:default;transform:none;}
-.kira-msg{padding:9px 12px;border-radius:12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.6;max-width:88%;word-wrap:break-word;animation:kiraFadeIn .25s ease;}
-@keyframes kiraFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.kira-msg-user{background:var(--accent-bg);color:var(--text);margin-left:auto;border-bottom-right-radius:4px;border:1px solid var(--accent-border);}
-.kira-msg-kira{background:rgba(128,128,128,.08);color:var(--text);border-bottom-left-radius:4px;}
-.kira-msg-kira strong{color:var(--accent);}
-.kira-msg-kira code{background:rgba(128,128,128,.12);padding:1px 4px;border-radius:3px;font-size:var(--fs-sm);}
-.kira-msg-error{background:rgba(220,74,74,.08);color:#d06060;border:1px solid rgba(220,74,74,.18);}
-.kira-msg-system{background:var(--accent-bg);color:var(--accent);font-size:var(--fs-sm);text-align:center;max-width:100%;}
-.kira-tools-used{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;}
-.kira-tool-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
-.kira-typing{display:flex;gap:4px;padding:10px 14px;align-items:center;}
-.kira-typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.4;animation:kiraTypingDot 1.4s infinite ease-in-out;}
+.kira-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;}
+.kira-close:hover{color:var(--text);background:rgba(128,128,128,.1);}
+.kira-typing{display:flex;gap:4px;padding:14px 24px;align-items:center;}
+.kira-typing span{width:7px;height:7px;border-radius:50%;background:#534AB7;opacity:.35;animation:kiraTypingDot 1.4s infinite ease-in-out;}
 .kira-typing span:nth-child(2){animation-delay:.2s;}
 .kira-typing span:nth-child(3){animation-delay:.4s;}
 @keyframes kiraTypingDot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
-.kira-welcome{text-align:center;padding:40px 20px;}
-.kira-welcome-icon{width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:20px;font-weight:900;color:#fff;box-shadow:0 4px 20px rgba(83,74,183,.3);}
-.kira-welcome-text{color:var(--muted);font-size:var(--fs-base);line-height:1.7;}
+@keyframes kiraFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.kira-welcome{text-align:center;padding:48px 24px;}
+.kira-welcome-icon{width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:20px;font-weight:500;color:#fff;box-shadow:0 4px 20px rgba(83,74,183,.25);}
+.kira-welcome-text{color:var(--muted);font-size:13px;line-height:1.7;}
 #kc-aufgaben,#kc-muster,#kc-kwissen,#kc-historie{overflow-y:auto;padding:13px 16px;flex:1;}
 
 /* Kommunikationsfenster */

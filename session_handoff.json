@@ -1,13 +1,20 @@
 {
-  "last_session": "session-2026-03-27-l",
+  "last_session": "session-2026-03-27-s",
   "date": "2026-03-27",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
     "session-i: Memory-System komplett ausgebaut: server_map.md, architecture_decisions.md (7 ADRs), known_issues.json (5 Issues), user_briefs.md mit Briefs für g/h/i, KIRA_KOMPLETT_UEBERSICHT.md auf Stand 27.03. gebracht, Regeln für user_briefs aufgenommen",
     "session-j: Vollständiges Runtime-Logging + Kira Log-Zugriff: mail_monitor.py (5 elog-Calls), daily_check.py (Start/Ende), kira_llm.py (get_recent_for_kira in System-Prompt + DEINE ROLLE Instruktion), server.py (13 neue _rtlog-Calls, _rtlog_type_row(), reichhaltige Einstellungen-Karte, refreshRtLogStats/exportRtLog/clearRtLog, POST /api/runtime/clear), runtime_log.py (_clear_all())",
-    "session-k: Bugfixes + Server-Test: ISS-007 _html() UnicodeEncodeError gefixt (errors='replace'), ISS-008 elog() summary-Doppelarg in mail_monitor gefixt. ISS-001/002/006 per HTTP-Test verifiziert — kq-*/kw-* OK, Runtime-Log OK, HTTP 200, kiraSendBtn als <button> OK. Atomares Mikro-Logging (diff_to_changelog.py + pre-commit Hook) eingerichtet. JS SyntaxError line 5059 (exportRtLog \\n) gefixt. 47 duplicate form field IDs behoben: _build_ar_table(scope=), _wissen_card(with_id=), Bibliothek-Panels auf wbp-* umgestellt, showWissenTab(ns). favicon.ico 404 gefixt (70-byte ICO).",
-    "session-l: CRASH-DIAGNOSE + FIX: ISS-009 — _ensure_db() in runtime_log.py rief db.commit() bei jedem elog()/eget()/estats()-Aufruf auf, auch ohne Schema-Änderung. WAL wuchs auf 4,8 MB (bei 981 Events). Beim nächsten Server-Start blockierender Checkpoint → Seite lud nicht → Chrome + PC hingen. Fix: _db_initialized-Flag (Schema-Setup nur beim ersten Aufruf), PRAGMA wal_autocheckpoint=100 (400 KB statt 4 MB). WAL danach: 0 bytes nach page load. Getestet: Server startet, Page 582 KB, WAL sauber."
+    "session-k: Bugfixes + Server-Test: ISS-007 _html() UnicodeEncodeError gefixt (errors='replace'), ISS-008 elog() summary-Doppelarg in mail_monitor gefixt. ISS-001/002/006 per HTTP-Test verifiziert. Atomares Mikro-Logging eingerichtet. JS SyntaxError (exportRtLog \\n) gefixt. 47 duplicate form field IDs behoben. favicon.ico 404 gefixt.",
+    "session-l: CRASH-DIAGNOSE + FIX: ISS-009 — WAL-Wachstum durch redundante _ensure_db()-Commits → Chrome/PC-Crash. Fix: _db_initialized-Flag + PRAGMA wal_autocheckpoint=100.",
+    "session-m: MCP Playwright Browser-Testing + ISS-010 + ISS-011 gefixt. Alle 4 interaktiven Tests bestanden.",
+    "session-n: Kira UI visueller Komplettumbau nach 05er-Referenzdateien + animierter Kira-Launcher (SVG-Charakter, Augen-Tracking, Glow-Halo, Klick-Animation).",
+    "session-o: Vollständiger Kira-Funktionstest via Playwright (20+ Funktionen). ISS-012/013/014 dokumentiert.",
+    "session-p: ISS-012/013/014 + 2 UX-Gaps gefixt. Kira Launcher Redesign: 3 Varianten (A: Minimal, B: Charakter/Default, C: Orb/Tech) — SVG mit radialGradient + 3D-Tiefe + kira-float CSS-Animation. switchKiraVariant(v) für Echtzeit-Wechsel. Einstellungen > Kira Assistent > Launcher-Stil Dropdown. config.json kira.launcher_variant. ISS-012-Quote-Fix (\\' → \\\\' in f-string). Alle Tests via Playwright bestanden: JS läuft (✓), Quick Panel öffnet, Save speichert kira.launcher_variant=B in config.json, alle 3 Varianten wechseln korrekt.",
+    "session-q: Launcher-Upgrade auf User-Feedback: 60px→112px, stärkere 3D-Gradients (5 Schichten in Variante B: Tiefe+Specular+Iris+Pupil+Rim), deutlichere Float-Animation (Y-18px + Rotation), globales Augen-Tracking via rAF-Loop (half-screen Radius = min(W,H)*0.5), .kira-excited Bounce bei Nähe <130px, Scale 1+prox*0.2. QP-Panel bottom: 84px→148px. Server-Test via Playwright: 0 JS-Fehler, FAB 112×112px, rAF aktiv, QP öffnet korrekt. Augen-Tracking-Fix: er=cfg.ER statt er=cfg.ER*prox. 4 neue Einstellungen: Größe/Prox-Radius/Bounce/Bored. Bored-Mode: Sequenz blink→drowsy→yawn→eye-roll→sleep, IRY+PR in VCFG, kiraIrisL/R IDs in SVG, _wakeUp() + _doBoredFrame(). Aktivierbar in Einstellungen + Wartezeit-Auswahl.",
+    "session-r: Einstellungen-UI Komplett-Redesign nach arbeitsanweisung 06. Neue 3-Spalten-Architektur: Module-Header (Status-Stats + Export/Import/Speichern), Secondary-Nav (10 Sektionen: Design/Benachrichtigungen/Aufgabenlogik/Nachfass/Dashboard/Provider/Mail/Integrationen/Automationen/Protokoll), Hauptbereich mit es-* CSS-Klassen. Protokoll mit 3 Sub-Tabs (Runtime-Log/Änderungsverlauf/Konfiguration). Toggle-Switches, Gruppen-Karten, Badge-System. build_wissen() _wissen_card() um with_id=True erweitert. Playwright-Test: 0 JS-Fehler, alle Sektionen wechseln, Sub-Tabs aktiv, Speichern-Button → Toast.",
+    "session-s: Hell/Dunkel-Fixes + 5 neue Design-Einstellungen + 3-Schritt-Bestätigung. (1) Globale Form-Input-Theming-Regel (input/select/textarea → var(--bg-raised)). (2) Alle hardcoded #0b0b0b/#111/#080808 in Provider-Karten, Modal-Inputs, Log-Viewer, Korrespondenz-Alias, Kira-Interakt-Modal durch CSS-Variablen ersetzt. (3) Sidebar Dunkel-Modus: [data-theme='dark'] .sidebar → #101012, alle Texte/Borders auf CSS-Variablen. (4) showKritischModal() — 3-Schritt Bestätigung mit Texteingabe: clearRtLog()=LEEREN, deleteProvider()=ENTFERNEN, wissenAction('loeschen')=LÖSCHEN. (5) 5 neue Design-Einstellungen: Schriftfamilie (cfg-font-family), Sidebar-Breite (cfg-sidebar-width), Toast-Position (cfg-toast-pos), Tabellen-Zeilenhöhe (cfg-row-height), Zebrastreifen (cfg-table-zebra) — je apply*() + CSS [data-*] + restoreDesign() + localStorage. Playwright-Test: 0 JS-Fehler, alle Funktionen verifiziert."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -19,27 +26,47 @@
     "runtime-log-daily-check-integration",
     "runtime-log-full-ui-coverage",
     "runtime-log-rich-settings-card",
-    "kira-log-context-injection"
+    "kira-log-context-injection",
+    "browser-testing-complete",
+    "kira-ui-visual-redesign",
+    "kira-launcher-animated",
+    "kira-full-function-test",
+    "kira-launcher-3-variants",
+    "iss-012-013-014-fixed",
+    "kira-launcher-upgrade-112px-3d-proximity",
+    "einstellungen-ui-komplett-redesign",
+    "theme-conflict-fixes-all-inputs",
+    "sidebar-dark-mode",
+    "kritisch-modal-3-step-confirmation",
+    "design-settings-5-new"
   ],
   "open_tasks": [
-    "Interaktives Browser-Testing noch ausstehend: Kira Quick Panel öffnen/schließen, Workspace 3-Spalten visuell, clearRtLog Toast, exportRtLog CSV",
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
-    "ISS-003: SyntaxWarnings (pre-existing, niedrige Prio) — JS-Regex in Python-Strings, raw-strings wenn berührt"
+    "ISS-003: SyntaxWarnings (pre-existing, niedrige Prio) — JS-Regex in Python-Strings, raw-strings wenn berührt",
+    "UX-Gap: 'Mit Kira bearbeiten' (Dashboard) öffnet generellen Aufgaben-Tab — openKiraWorkspace('aufgabe', taskId) wäre besser",
+    "Einstellungen > Konfiguration: Export/Import/Zurücksetzen-Buttons sind Platzhalter (showToast only, keine echte Implementierung)"
   ],
-  "next_step": "Server neu starten (neustart_kira.vbs) → http://localhost:8765/ öffnen. Crash sollte behoben sein. Dann interaktiv testen: Quick Panel, Chat, clearRtLog Toast, exportRtLog CSV.",
+  "next_step": "session-s abgeschlossen: Theme-Konflikte behoben, 5 Design-Einstellungen ergänzt, 3-Schritt-Bestätigung für kritische Aktionen. Mögliche nächste Schritte: (A) Mail & Konten IMAP-Einstellungen mit UI, (B) Config-Export/Import echte Implementierung, (C) Kunden-Modul, (D) Kira-LLM-Verbindungen (Persönlichkeit, Name, Kontext-Steuerung).",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
     "runtime_events.db wird automatisch beim ersten Server-Start erstellt",
     "activity_log.py NICHT anfassen — Backward-Compat (ADR-001)",
-    "server.py hat ~7200 Zeilen — vor Arbeit server_map.md lesen!",
-    "ISS-003: SyntaxWarnings in server.py Zeilen ~4789-4791 (pre-existing, raw-strings verwenden wenn angefasst)"
+    "server.py hat ~8500 Zeilen — vor Arbeit server_map.md lesen!",
+    "build_einstellungen() gibt ~55KB HTML zurück (neue es-* Architektur). esShowSec(id) wechselt Sektionen, esShowProtoTab(id) wechselt Protokoll-Tabs.",
+    "ISS-003: SyntaxWarnings in server.py (pre-existing, raw-strings verwenden wenn angefasst)",
+    "neustart_kira.vbs liegt in memory/scripts/ — Windows-Error beim Start ist harmlos",
+    "Launcher-Varianten: switchKiraVariant(v) — VCFG-Objekt hat LC/RC/ER/mn/ms pro Variante. Neue Variante: VCFG + Template-Div + Python _kira_svg_x var nötig",
+    "JS in Python-f-string: Einfache Anführungszeichen in JS-Strings MÜSSEN als \\\\' geschrieben werden (→ \\' im Output). Nicht als \\' (→ ' im Output → bricht JS-String).",
+    "showKritischModal(title, msg, word, fn, note): word = Bestätigungswort das User eintippen muss. Für neue kritische Aktionen immer nutzen.",
+    "Design-Theming: Alle neuen form inputs MÜSSEN var(--bg-raised)/var(--bg)/var(--text) nutzen — KEIN hardcoded #0b0b0b/#111/#080808 mehr!"
   ],
   "tracking_files": {
     "user_briefs": "user_briefs.md — Original-Aufträge (session-g bis j eingetragen)",
-    "feature_registry": "feature_registry.json — 26 Features (5 neu in session-j)",
-    "known_issues": "known_issues.json — ISS-001..008 (ISS-004/005/007/008 fixed, ISS-001/002/006 verified)",
+    "feature_registry": "feature_registry.json — 26+ Features",
+    "known_issues": "known_issues.json — ISS-001..014 (ISS-012/013/014 in session-p gefixt)",
     "server_map": "server_map.md — alle Funktionen mit Zeilennummern",
-    "arch_decisions": "architecture_decisions.md — 7 ADRs"
+    "arch_decisions": "architecture_decisions.md — 7 ADRs",
+    "einstellungen_checkliste": "knowledge/einstellungen_checkliste.md — vollständige Einstellungs-Checkliste mit Session-s-Update"
   }
 }
