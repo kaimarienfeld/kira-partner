@@ -8100,8 +8100,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
             sid = params.get('session_id', [''])[0]
             self._json(kira_get_messages(sid) if sid else [])
 
+        elif self.path.startswith('/api/webhook/whatsapp'):
+            self._handle_whatsapp_verify()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
+
+    def _handle_whatsapp_verify(self):
+        """GET /api/webhook/whatsapp — Meta Hub-Verifizierung für WhatsApp Business Cloud API."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        mode      = qs.get('hub.mode', [''])[0]
+        token     = qs.get('hub.verify_token', [''])[0]
+        challenge = qs.get('hub.challenge', [''])[0]
+        try:
+            secrets = json.loads((SCRIPTS_DIR / "secrets.json").read_text('utf-8'))
+            verify_token = secrets.get("whatsapp_verify_token", "")
+        except Exception:
+            verify_token = ""
+        if mode == 'subscribe' and verify_token and token == verify_token:
+            self._respond(200, 'text/plain', challenge.encode())
+        else:
+            self._respond(403, 'text/plain', b'Forbidden')
 
     def _api_kira_insights(self):
         """GET /api/kira/insights — Muster-Analyse aus allen gesammelten Daten."""
@@ -8833,7 +8852,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
-        body   = json.loads(self.rfile.read(length) or b'{}')
+        raw_body = self.rfile.read(length) or b'{}'
+        self._raw_post_body = raw_body  # für HMAC-Prüfung (WhatsApp)
+        body   = json.loads(raw_body)
 
         if self.path == '/api/mail/oauth/connect':
             self._api_mail_oauth_connect(body)
@@ -9412,9 +9433,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
-        # WhatsApp Webhook
+        # WhatsApp Webhook (Meta Business Cloud API)
         if self.path == '/api/webhook/whatsapp':
-            self._handle_channel_webhook(body, kanal='whatsapp')
+            self._handle_whatsapp_webhook(self._raw_post_body, body)
             return
 
         # Instagram DM Webhook
@@ -9423,6 +9444,77 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         self._respond(404, 'text/plain', b'Not found')
+
+    def _handle_whatsapp_webhook(self, raw_body: bytes, body: dict):
+        """
+        POST /api/webhook/whatsapp — Meta WhatsApp Business Cloud API.
+        Validiert X-Hub-Signature-256 (HMAC-SHA256) mit whatsapp_app_secret aus secrets.json.
+        Parst Meta-Format: entry[0].changes[0].value.messages[...].
+        Ruft verarbeite_kanal_eingang() für jede eingehende Text-Nachricht auf.
+        """
+        import hmac, hashlib
+
+        # HMAC-Signatur prüfen (wenn app_secret konfiguriert)
+        try:
+            secrets = json.loads((SCRIPTS_DIR / "secrets.json").read_text('utf-8'))
+            app_secret = secrets.get("whatsapp_app_secret", "")
+        except Exception:
+            app_secret = ""
+
+        if app_secret:
+            sig_header = self.headers.get('X-Hub-Signature-256', '')
+            mac = hmac.new(app_secret.encode(), raw_body, hashlib.sha256)
+            expected = 'sha256=' + mac.hexdigest()
+            if not hmac.compare_digest(sig_header, expected):
+                self._respond(401, 'application/json',
+                              json.dumps({'error': 'Invalid signature'}).encode())
+                return
+
+        # Meta erwartet immer 200 OK — bei Fehler trotzdem 200 senden
+        if body.get('object') != 'whatsapp_business_account':
+            self._json({'status': 'ok', 'note': 'ignored'})
+            return
+
+        processed = 0
+        errors = []
+        for entry in body.get('entry', []):
+            for change in entry.get('changes', []):
+                value = change.get('value', {})
+                for msg in value.get('messages', []):
+                    msg_type = msg.get('type', '')
+                    sender   = msg.get('from', '')
+                    msg_id   = msg.get('id', '')
+                    ts       = msg.get('timestamp', '')
+
+                    # Text extrahieren (text- oder interactive-Nachrichten)
+                    if msg_type == 'text':
+                        text = msg.get('text', {}).get('body', '')
+                    elif msg_type == 'interactive':
+                        # Button-Antworten etc.
+                        interactive = msg.get('interactive', {})
+                        text = (interactive.get('button_reply', {}).get('title', '')
+                                or interactive.get('list_reply', {}).get('title', ''))
+                    else:
+                        # Audio, Bild etc. → Typ als Platzhalter
+                        text = f"[{msg_type.upper()}-Nachricht]"
+
+                    if not sender or not text:
+                        continue
+
+                    try:
+                        import kira_proaktiv
+                        kira_proaktiv.verarbeite_kanal_eingang(
+                            kanal='whatsapp',
+                            absender=sender,
+                            text=text,
+                            meta={'id': msg_id, 'datum': ts, 'konto': 'whatsapp'},
+                        )
+                        processed += 1
+                    except Exception as e:
+                        errors.append(str(e))
+
+        self._json({'status': 'ok', 'processed': processed,
+                    'errors': errors if errors else None})
 
     def _handle_channel_webhook(self, body: dict, kanal: str):
         """
