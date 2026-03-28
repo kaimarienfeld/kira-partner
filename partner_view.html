@@ -289,8 +289,45 @@ body{
 .b-planned{background:var(--blue-dim);  color:var(--blue)}
 .b-leni   {background:var(--pink-dim);  color:var(--pink)}
 .b-gold   {background:var(--gold-dim);  color:var(--gold)}
-.b-new    {background:var(--orange-dim);color:var(--orange);animation:newpulse 2s infinite}
-@keyframes newpulse{0%,100%{opacity:1}50%{opacity:.55}}
+.b-new    {background:var(--accent-dim);color:var(--accent);animation:newpulse 1.8s infinite}
+@keyframes newpulse{0%,100%{opacity:1}50%{opacity:.45}}
+/* Neue Kachel — prominente Hervorhebung */
+.tile.is-new{
+  border-color:rgba(124,77,255,.35)!important;
+  box-shadow:0 0 0 2px rgba(124,77,255,.10),0 2px 14px rgba(0,0,0,.09);
+}
+[data-theme="light"] .tile.is-new{
+  border-color:rgba(108,61,224,.35)!important;
+  box-shadow:0 0 0 2px rgba(108,61,224,.12),0 3px 14px rgba(0,0,0,.08);
+}
+/* Neuigkeiten-Banner */
+.new-banner{
+  display:none;padding:14px 24px;
+  background:linear-gradient(135deg,rgba(124,77,255,.10) 0%,rgba(255,152,0,.06) 100%);
+  border-bottom:2px solid var(--accent);
+  flex-direction:row;align-items:center;gap:14px;
+  animation:slideDown .35s ease;
+}
+[data-theme="light"] .new-banner{
+  background:linear-gradient(135deg,rgba(108,61,224,.07) 0%,rgba(255,152,0,.04) 100%);
+}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.new-banner-text{flex:1;min-width:0}
+.new-banner-title{font-size:15px;font-weight:700;color:var(--text)}
+.new-banner-sub  {font-size:12px;color:var(--text-dim);margin-top:2px}
+.btn-new-show{
+  background:var(--accent);color:#fff;border:none;padding:8px 16px;
+  border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
+  font-family:inherit;white-space:nowrap;flex-shrink:0;
+  transition:filter var(--trans);
+}
+.btn-new-show:hover{filter:brightness(1.12)}
+.btn-new-dismiss{
+  background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);
+  padding:4px 6px;border-radius:6px;flex-shrink:0;
+  transition:color var(--trans);
+}
+.btn-new-dismiss:hover{color:var(--text)}
 .tile-name{font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text);letter-spacing:-.1px}
 .leni-done-box{
   background:var(--gold-dim);border:1px solid rgba(255,215,0,.2);
@@ -598,6 +635,16 @@ body{
       <button class="btn-logout" onclick="doLogout()">Abmelden</button>
     </div>
   </header>
+
+  <div class="new-banner" id="new-banner">
+    <span style="font-size:26px;flex-shrink:0">✨</span>
+    <div class="new-banner-text">
+      <div class="new-banner-title" id="new-banner-title">Neuigkeiten für dich!</div>
+      <div class="new-banner-sub" id="new-banner-sub">Kai und Kira haben fleißig gebaut — schau mal rein.</div>
+    </div>
+    <button class="btn-new-show" onclick="showNewFeatures()">🔥 Jetzt anzeigen</button>
+    <button class="btn-new-dismiss" onclick="dismissNewBanner()" title="Schließen">✕</button>
+  </div>
 
   <div class="welcome-banner">
     <div class="welcome-ava" id="welcome-ava">🌸</div>
@@ -1315,6 +1362,15 @@ function notifyKai(featureName,react,text) {
   const msg=[featureName?`Funktion: ${featureName}`:'',react?`Reaktion: ${react}`:'',text?`"${text}"`:''].filter(Boolean).join('\n');
   sendNtfy(s.ntfy_kai,'📬 Leni hat Feedback gegeben',msg||'(ohne Text)',3);
 }
+function dismissNewBanner() {
+  document.getElementById('new-banner').style.display='none';
+  localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
+}
+function showNewFeatures() {
+  dismissNewBanner();
+  setFilter('new',document.getElementById('fb-new'));
+}
+
 function sendNtfyLeni(customMsg) {
   const s=loadAdminSettings();
   if (!s.ntfy_leni){showToast('Kein ntfy-Topic für Leni konfiguriert','⚠️');return;}
@@ -1492,7 +1548,20 @@ function startApp() {
 
   updateCounts();renderTiles('all');
   if (isLeni&&!localStorage.getItem('kira_pv_tour')) startTour();
-  localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
+
+  // Neuigkeiten-Banner: nur für Leni, nur wenn neue Features da
+  if (isLeni && newCount>0) {
+    const nb=document.getElementById('new-banner');
+    nb.style.display='flex';
+    document.getElementById('new-banner-title').textContent=
+      newCount===1?'1 neue Funktion seit deinem letzten Besuch!'
+                 :`${newCount} neue Funktionen seit deinem letzten Besuch!`;
+    document.getElementById('new-banner-sub').textContent=
+      `Stand ${new Date().toLocaleDateString('de-DE',{day:'numeric',month:'long'})} — schau mal rein, Leni!`;
+  } else {
+    // Kein Banner nötig → lastVisit sofort aktualisieren
+    localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1517,6 +1586,11 @@ function renderTiles(filter) {
   if (filter==='planned') list=FEATURES.filter(f=>f.status==='planned');
   if (filter==='leni')    list=FEATURES.filter(f=>f.status.startsWith('leni'));
   if (filter==='new')     list=FEATURES.filter(f=>f.added>lastVisit);
+  // Neue Funktionen immer ganz oben (nur bei 'all'-Ansicht)
+  if (filter==='all') list=[...FEATURES].sort((a,b)=>{
+    const aN=a.added>lastVisit?1:0, bN=b.added>lastVisit?1:0;
+    return bN-aN;
+  });
   document.getElementById('tiles-meta-txt').textContent=list.length===1?'1 Funktion':`${list.length} Funktionen`;
   const grid=document.getElementById('tiles-grid');
   if (!list.length){grid.innerHTML='<div class="tiles-empty"><div class="tiles-empty-icon">🔍</div><div>Nichts in dieser Kategorie — noch nicht!</div></div>';return;}
@@ -1524,8 +1598,9 @@ function renderTiles(filter) {
     const isNew=f.added>lastVisit;
     const hasFb=!!feedbacks[f.id];
     const newBadge=isNew?'<span class="badge b-new">✦ Neu</span>':'';
+    const newClass=isNew?' is-new':'';
     const leniDoneBox=f.status==='leni_done'?`<div class="leni-done-box">🎉 <strong>Deine Idee wurde umgesetzt!</strong><br>Schau es dir an und sag uns, ob es so passt!</div>`:'';
-    return `<div class="tile" data-s="${f.status}" onclick="openFeedbackModal('${f.id}')">
+    return `<div class="tile${newClass}" data-s="${f.status}" onclick="openFeedbackModal('${f.id}')">
       <div class="tile-head"><span class="tile-icon">${f.icon}</span><div class="tile-badges">${newBadge}${statusBadge(f.status)}</div></div>
       <div class="tile-name">${f.name}</div>
       ${leniDoneBox}
