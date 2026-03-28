@@ -1144,6 +1144,33 @@ const FEATURES = [
     "leni_note": null
   },
   {
+    "id": "sprachmodul",
+    "icon": "🎤",
+    "name": "Zu Kira diktieren statt tippen",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Einfach ins Mikrofon sprechen — Kira schreibt mit, überprüft das Transkript und fügt es in den Chat ein. Erst nach Bestätigung wird es abgeschickt. Praktisch wie bei ChatGPT, nur direkt in der App.",
+    "leni_note": null
+  },
+  {
+    "id": "dokument-export",
+    "icon": "📑",
+    "name": "Dokumente direkt in Kira erstellen & drucken",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Was Kira im Chat erarbeitet — Angebote, Auswertungen, Berichte — kann direkt als PDF, Word oder Textdatei gespeichert und ausgedruckt werden. Alles bleibt in der App, kein Export in externe Programme nötig.",
+    "leni_note": null
+  },
+  {
+    "id": "urlaubsmodus-smart",
+    "icon": "🏖️",
+    "name": "Kira hält während des Urlaubs die Stellung",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Im Urlaubsmodus sendet Kira automatisch intelligente Abwesenheitsmeldungen — angepasst an den Inhalt der Mail (kein generischer Text). Nach dem Urlaub gibt es einen Kurzbrief: Was ist passiert? Welche Mails wurden beantwortet? Was ist neu?",
+    "leni_note": null
+  },
+  {
     "id": "crm-pipeline",
     "icon": "🎯",
     "name": "Vom ersten Kontakt bis zur Rechnung",
@@ -1464,7 +1491,7 @@ function startApp() {
   if (leniCount>0){document.getElementById('fb-leni').style.display='flex';}
 
   updateCounts();renderTiles('all');
-  // Tour deaktiviert -- kann manuell per startTour() ausgeloest werden
+  if (isLeni&&!localStorage.getItem('kira_pv_tour')) startTour();
   localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
 }
 
