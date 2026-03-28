@@ -424,7 +424,13 @@ def _process_mail(mail_data, konto_label, folder_name):
 
     # Nur handlungsrelevante Kategorien als Task anlegen
     skip_kategorien = ["Ignorieren", "Newsletter / Werbung", "Abgeschlossen"]
-    if kategorie in skip_kategorien:
+    skip_task = kategorie in skip_kategorien
+
+    # In mail_index.db speichern — IMMER, unabhängig von Kategorie
+    _index_mail(mail_data, konto_label, folder_name)
+
+    # Gefilterte Mails (Newsletter, Spam etc.) → kein Task, aber indexiert
+    if skip_task:
         db.close()
         return result
 
@@ -502,9 +508,6 @@ def _process_mail(mail_data, konto_label, folder_name):
         kdb.close()
     except:
         pass
-
-    # In mail_index.db speichern (zentraler Index aller Mails)
-    _index_mail(mail_data, konto_label, folder_name)
 
     return result
 
