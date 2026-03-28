@@ -1,0 +1,82 @@
+03 - Geschäft  Firefly Prompt
+
+Create a premium enterprise finance and business module UI for the same Kira product system and the same visual language as the existing dashboard and communication reference files.
+
+Important:
+This must look like the same product family as the dashboard reference and the communication module reference.
+Use the same app shell, same collapsible left sidebar, same top utility bar, same spacing system, same card language, same typography feeling, same premium neutral SaaS aesthetic.
+
+This is the “Geschäft” module of the same Kira software.
+
+Page layout:
+full-width desktop application,
+same left navigation as the dashboard reference,
+same top utility bar,
+below that a strong module header for “Geschäft” with compact live business metrics and utility actions,
+below that a secondary tab navigation for:
+Übersicht, Ausgangsrechnungen, Angebote, Eingangsrechnungen, Zahlungen, Mahnungen, Auswertung,
+and additional muted “planned” tabs with subtle badges:
+Kalkulation, Preispositionen, Cashflow, Kunden-360.
+
+Visual structure for the overview page:
+top section with large hero KPI cards for:
+offenes Rechnungsvolumen,
+offene Eingangsrechnungen,
+Angebote offen,
+Nachfass fällig,
+ungeklärte Zahlungen,
+Mahnfälle.
+
+Below that a two-zone business cockpit:
+left = current business cases and active items,
+right = warnings, anomalies, risk signals, manual review items.
+
+Below that a structured analytics or summary area with elegant compact metric panels.
+
+Visual style:
+must feel like high-end business software from 2026,
+financial cockpit,
+clean, readable, executive but operational,
+not like a mail page,
+not like an accounting export,
+not like a generic ERP screenshot,
+not like a spreadsheet dump.
+
+Use:
+large readable typography,
+strong but elegant hierarchy,
+white and soft neutral surfaces,
+dark readable text,
+subtle restrained accent colors only for emphasis,
+high clarity tables and lists,
+refined shadows,
+premium spacing,
+full-width usage without narrow central compression.
+
+Important visual cues:
+overview should feel strategic,
+invoice and offer tabs should feel operational,
+warnings should feel clearly important but not alarming in a cheap way,
+tables must look polished and readable,
+filters should look real and useful,
+small charts only where they help,
+not too many charts.
+
+Do not show:
+email cards,
+raw inbox content,
+retro admin look,
+old accounting software look,
+dark gamer style,
+blurry pale interfaces,
+tiny fonts,
+thin unreadable tables,
+Windows 95 or Windows 98 aesthetics,
+hardcoded rauMKult branding,
+strong brand colors.
+
+Allowed:
+same subtle Kira launcher button in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS finance module, enterprise business cockpit, modern invoicing dashboard, polished admin product, high readability, refined business analytics UI, operational finance workspace, elegant list and table design, same visual system as the Kira dashboard and communication references.

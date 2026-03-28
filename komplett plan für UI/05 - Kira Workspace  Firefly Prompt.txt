@@ -1,0 +1,124 @@
+05 - Kira Workspace  Firefly Prompt
+
+Create a premium enterprise AI assistant workspace UI for the same Kira product system and the same visual family as the existing Kira reference pages, especially matching the style of “04_kira_wissen_modul_v1.html” and the previously created dashboard, communication, and business pages.
+
+Important:
+This must look like the same product family.
+Use the same elegant light SaaS app shell, the same collapsible left sidebar navigation, the same top utility bar, the same refined neutral palette, the same spacing rhythm, the same typography feel, and the same high-end enterprise product design language.
+
+This is the full “Kira Workspace” of the same software, not a generic chatbot page.
+
+Layout:
+full-width desktop application,
+same left collapsible navigation as the reference pages,
+same top utility bar,
+main content becomes a dedicated AI assistant workspace.
+
+The Kira Workspace should be clearly divided into three zones:
+
+Left zone:
+contexts / threads / histories.
+This area should contain a refined list of:
+open tasks,
+recent conversations,
+active contexts,
+pinned items,
+search results,
+history items.
+This panel should feel structured and calm, not overloaded.
+
+Center zone:
+the main conversation and work area.
+This is the dominant visual area.
+It should look spacious, highly readable, and premium.
+It should support:
+assistant responses,
+draft cards,
+summaries,
+decision support,
+next-step suggestions,
+document or task cards,
+context-aware assistant collaboration.
+This is not a small chat column.
+It must feel like a serious work console for an executive assistant AI.
+
+Right zone:
+optional contextual tools and data panel.
+This should feel like a flexible support panel that can contain:
+attachments,
+customer data,
+invoice data,
+offer data,
+knowledge rules,
+suggestions,
+related tools.
+It should be visually lighter than the center but still clearly usable.
+
+At the top of the center area:
+a context bar showing:
+current mode,
+current context title,
+linked objects,
+provider,
+quick context actions.
+This bar should look precise and premium.
+
+At the bottom of the center area:
+a large modern input composer with:
+message input,
+attach context,
+attach file,
+mode switch,
+send button.
+No tiny input.
+No weak contrast.
+No consumer messenger look.
+
+Visual style:
+same design DNA as the Kira dashboard, communication, business, and knowledge pages,
+same elegant premium enterprise SaaS feeling,
+same light neutral surfaces,
+same dark readable typography,
+same subtle restrained accent usage,
+same clean shadows and balanced whitespace.
+
+Important visual direction:
+this should feel like a real assistant workspace for business operations,
+not like a generic chatbot,
+not like a narrow support chat,
+not like a floating modal,
+not like a side drawer,
+not like a consumer messenger,
+not like a retro admin panel.
+
+The workspace should feel:
+strategic,
+operational,
+context-aware,
+highly readable,
+calm,
+expensive,
+software-like.
+
+Include subtle visual affordances for:
+different context types such as Aufgabe, Kunde, Angebot, Rechnung, Dokument, Recherche, Marketing-Idee, Social-Nachricht.
+These should appear as elegant context chips, side labels, or entry markers.
+
+Important constraints:
+no dark mode,
+no rauMKult brand colors,
+no hardcoded branding,
+no neon,
+no gaming visuals,
+no generic AI chatbot landing page,
+no floating popup widget as the main experience.
+
+Allowed:
+same small Kira launcher in the bottom right in addition to the full workspace,
+but the main focus is the full-page workspace itself.
+
+Style keywords:
+premium AI workspace, enterprise copilot UI, business assistant console, modern SaaS assistant product, high readability, elegant context-based chat workspace, structured AI operations hub, refined enterprise software, same visual system as the existing Kira module references.
+
+Avoid: generic chatbot website, ChatGPT clone, support widget, floating chat popup, narrow side chat, consumer messenger UI, retro interface, Windows 95, Windows 98, gamer dashboard, dark cyber style, tiny text, pale weak contrast, mismatched design language, unrelated chatbot branding.
+

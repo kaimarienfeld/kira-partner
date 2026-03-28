@@ -1,0 +1,101 @@
+02 - Kommunikation - Plan für UI
+
+
+Create a premium enterprise communication module UI for the same product system and visual language as the existing file “kira_dashboard_v2_combined.html”.
+
+Important:
+Use the exact same visual family as that reference:
+same elegant light app shell,
+same left sidebar navigation style,
+same top utility bar,
+same surface language,
+same spacing rhythm,
+same card and panel feeling,
+same premium neutral SaaS product style.
+
+This is not a new app.
+It is the “Kommunikation” module of the same Kira product.
+
+Page layout:
+full-width desktop application,
+same dark left sidebar from the reference with the same navigation structure and planned module badges,
+same top bar with search and status chips,
+below that a full-width communication module header,
+below that a segmented navigation bar,
+below that a visible filter bar,
+below that the main communication workspace split into two zones:
+left = broad work list,
+right = large context / preview panel.
+
+Communication module header:
+title “Kommunikation”,
+small live status summary like:
+26 offen, 5 neue Leads, 3 Angebotsrückmeldungen, 2 manuelle Prüfungen,
+actions on the right:
+search, filter, view mode, bulk actions, manual note / manual task.
+
+Segment navigation:
+Antwort erforderlich,
+Neue Leads,
+Angebotsrückmeldungen,
+Zur Kenntnis,
+Newsletter / System,
+Abgeschlossen
+
+Filter bar:
+visible chips, toggles and dropdown filters for:
+offene Frage,
+mit Termin,
+mit Fotos,
+mit Anhängen,
+Kunde,
+Projektart,
+Quelle,
+Dringlichkeit,
+bereits beantwortet,
+manuelle Prüfung
+
+Main content:
+left side is a broad workflow list, not a raw inbox and not tiny email cards.
+Use elegant wide list rows or large horizontal workflow cards.
+Each row should show:
+title,
+one-line summary,
+reason for classification,
+sender role,
+timestamp,
+small markers like question, appointment, attachment, photo, invoice, urgency,
+and a few refined action buttons.
+This must feel like a decision and handling module, not like a mail client.
+
+Right side:
+large context / preview panel for the selected communication item.
+Show:
+large readable summary,
+current status,
+why it was classified that way,
+what is still open,
+what has already been answered,
+recommended next step,
+attachments block,
+short thread preview,
+and a compact action area.
+This must feel spacious and highly readable, not cramped.
+
+Important visual constraints:
+must match the style of kira_dashboard_v2_combined.html,
+must keep the same app shell and product DNA,
+must use the page width much better than a narrow center layout,
+must look like premium workflow software from 2026,
+must not look like Outlook, Gmail, a generic CRM, or a raw inbox.
+
+No open Kira workspace here.
+No giant modal.
+No floating chat window.
+No dark gamer aesthetic.
+No rauMKult brand colors.
+No new visual language.
+Only the same small Kira launcher button in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS communication workspace, enterprise workflow UI, elegant list-detail layout, modern business assistant software, high readability, broad working area, refined neutral product design, same visual system as the existing Kira dashboard HTML reference.

@@ -1,0 +1,310 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1040px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.plan{opacity:0.45}
+.sn.plan .pb{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.grp-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.intg{display:flex;gap:16px;padding:16px 18px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:10px;margin-bottom:10px;align-items:flex-start;transition:border-color 0.15s}
+.intg:hover{border-color:#D3D1C7}
+.intg.connected{border-color:#1D9E75;background:#FAFFFE}
+.intg-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.intg-icon.mail{background:#E6F1FB;color:#185FA5}
+.intg-icon.doc{background:#EEEDFE;color:#534AB7}
+.intg-icon.push{background:#EAF3DE;color:#3B6D11}
+.intg-icon.cal{background:#FAEEDA;color:#854F0B}
+.intg-icon.web{background:#E1F5EE;color:#0F6E56}
+.intg-icon.social{background:#FAECE7;color:#993C1D}
+.intg-icon.lex{background:#F1EFE8;color:#5F5E5A}
+.intg-body{flex:1;min-width:0}
+.intg-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.intg-name{font-size:14px;font-weight:500;color:#1C1C1A}
+.intg-badge{font-size:10px;padding:3px 10px;border-radius:5px;font-weight:500}
+.intg-badge.on{background:#EAF3DE;color:#3B6D11}
+.intg-badge.rdy{background:#E6F1FB;color:#0C447C}
+.intg-badge.plan{background:#F1EFE8;color:#888780}
+.intg-badge.off{background:#FCEBEB;color:#A32D2D}
+.intg-desc{font-size:12px;color:#5F5E5A;line-height:1.4;margin-bottom:6px}
+.intg-meta{display:flex;gap:12px;font-size:10px;color:#B4B2A9;flex-wrap:wrap}
+.intg-meta b{font-weight:500;color:#5F5E5A}
+.intg-modules{display:flex;gap:4px;margin-top:6px}
+.intg-mod{font-size:9px;padding:2px 7px;border-radius:4px;background:#F1EFE8;color:#5F5E5A}
+.intg-mod.active{background:#EEEDFE;color:#534AB7}
+.intg-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.intg-acts{display:flex;gap:4px}
+.btn{font-size:10px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#B4B2A9}
+.btn-t{background:#E1F5EE;border-color:#9FE1CB;color:#085041}
+.btn-d{background:#444441;border-color:#444441;color:#fff}
+.btn-k{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.flow-panel{background:#F9F8F6;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.flow-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:10px}
+.flow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.flow-card{background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:12px 14px;text-align:center}
+.flow-card-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 6px}
+.flow-card-name{font-size:12px;font-weight:500;color:#1C1C1A;margin-bottom:2px}
+.flow-card-status{display:flex;align-items:center;justify-content:center;gap:4px;font-size:10px}
+.flow-card-status.ok{color:#3B6D11}
+.flow-card-status.off{color:#888780}
+.flow-card-status.plan{color:#888780;opacity:0.5}
+.flow-arrow{display:flex;align-items:center;justify-content:center;font-size:16px;color:#D3D1C7}
+.plan-card{display:flex;gap:16px;padding:16px 18px;background:#FAFAF8;border:0.5px solid #EEEDE9;border-radius:10px;margin-bottom:8px;align-items:center;opacity:0.8}
+.plan-card .intg-icon{opacity:0.6}
+.plan-body{flex:1}
+.plan-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.plan-name{font-size:14px;font-weight:500;color:#5F5E5A}
+.plan-desc{font-size:12px;color:#888780;line-height:1.4;margin-bottom:4px}
+.plan-detail{font-size:10px;color:#B4B2A9}
+.help-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.help-card{background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:14px 16px}
+.help-card-h{font-size:12px;font-weight:500;color:#1C1C1A;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.help-card-desc{font-size:11px;color:#888780;line-height:1.4;margin-bottom:8px}
+.help-card-link{font-size:10px;color:#534AB7;cursor:pointer}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar"><div class="srch">⌕ Suche in allen Modulen…</div><div class="tpr"><div class="tc">⚡ Quick Actions</div><div class="tc ok"><span class="dot"></span>Verbunden</div><div class="tc">🔔 Offene Aufgaben</div><div class="av">KM</div></div></div>
+<div class="mh"><div class="mt">Einstellungen</div><div class="mstats"><div class="ms">Provider: <b>Anthropic</b></div><div class="ms">Theme: <b>Hell</b></div><div class="ms">Push: <b>aktiv</b></div><div class="ms">Zuletzt: <b>vor 2 Std.</b></div></div><div class="macts"><div class="ma">⌕ Suche</div><div class="ma">↺ Zurücksetzen</div><div class="ma">↗ Export</div><div class="ma">↙ Import</div><div class="ma primary">Speichern</div></div></div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn"><div class="sico">◐</div>Design</div>
+<div class="sn"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">5</span></div>
+<div class="sn act"><div class="sico">⇌</div>Integrationen<span class="cnt">6</span></div>
+<div class="sn plan"><div class="sico">⟳</div>Automationen<span class="pb">Geplant</span></div>
+</div>
+
+<div class="main-set">
+
+<!-- SECTION 1: Aktive Integrationen -->
+<div class="sec">
+<div class="sec-h">Integrationen</div>
+<div class="sec-sub">Verbundene externe Systeme und geplante Anbindungen — steuert welche Datenquellen Kira nutzen kann</div>
+
+<div class="grp">
+<div class="grp-h">Aktive Integrationen</div>
+<div class="grp-sub">Verbundene Dienste, die Kira aktiv für Datenfluss und Verarbeitung nutzt</div>
+
+<div class="intg connected">
+<div class="intg-icon mail">✉</div>
+<div class="intg-body">
+<div class="intg-top"><span class="intg-name">Mail (IMAP / SMTP)</span><span class="intg-badge on">Verbunden</span></div>
+<div class="intg-desc">Empfang und Versand von E-Mails über IMAP/SMTP. Kira überwacht den Posteingang, klassifiziert Nachrichten und bereitet Entwürfe vor.</div>
+<div class="intg-meta"><span><b>Konto:</b> info@raumkult.eu</span><span><b>Letzte Sync:</b> vor 8 Min.</span><span><b>Heute:</b> 14 neue Mails</span><span><b>Intervall:</b> alle 5 Min.</span></div>
+<div class="intg-modules"><span class="intg-mod active">Kommunikation</span><span class="intg-mod active">Geschäft</span><span class="intg-mod">Organisation</span><span class="intg-mod">Kira</span></div>
+</div>
+<div class="intg-right">
+<div class="intg-acts"><span class="btn btn-t">Testen</span><span class="btn">Konfigurieren</span><span class="btn">Sync jetzt</span></div>
+</div>
+</div>
+
+<div class="intg connected">
+<div class="intg-icon push">🔔</div>
+<div class="intg-body">
+<div class="intg-top"><span class="intg-name">Push-Benachrichtigungen (ntfy.sh)</span><span class="intg-badge on">Aktiv</span></div>
+<div class="intg-desc">Echtzeit-Benachrichtigungen über ntfy.sh an Smartphone und Desktop. Unterstützt Prioritätsstufen und stille Zustellung.</div>
+<div class="intg-meta"><span><b>Kanal:</b> kira-raumkult</span><span><b>Letzte:</b> vor 34 Min.</span><span><b>Heute:</b> 7 gesendet</span></div>
+<div class="intg-modules"><span class="intg-mod active">Alle Module</span></div>
+</div>
+<div class="intg-right">
+<div class="intg-acts"><span class="btn btn-t">Testen</span><span class="btn">Konfigurieren</span><span class="btn">Einrichtungshilfe</span></div>
+</div>
+</div>
+
+<div class="intg">
+<div class="intg-icon doc">📁</div>
+<div class="intg-body">
+<div class="intg-top"><span class="intg-name">OneDrive / Dokumente</span><span class="intg-badge rdy">Bereit</span></div>
+<div class="intg-desc">Zugriff auf Dokumente, Anhänge und Belege über OneDrive oder lokalen Dateispeicher. Ermöglicht Kira das Lesen und Verknüpfen von Dokumenten.</div>
+<div class="intg-meta"><span><b>Pfad:</b> konfigurierbar</span><span><b>Status:</b> nicht verbunden</span></div>
+<div class="intg-modules"><span class="intg-mod">Geschäft</span><span class="intg-mod">Kommunikation</span><span class="intg-mod">Kira</span></div>
+</div>
+<div class="intg-right">
+<div class="intg-acts"><span class="btn btn-d">Verbinden</span><span class="btn">Konfigurieren</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 2: Datenfluss -->
+<div class="sec">
+<div class="sec-h">Verbindungsstatus</div>
+<div class="sec-sub">Übersicht aller Datenquellen und ihr aktueller Zustand</div>
+
+<div class="flow-panel">
+<div class="flow-h">Datenfluss — Quellen → Kira → Module</div>
+<div class="flow-grid">
+<div class="flow-card">
+<div class="flow-card-icon" style="background:#E6F1FB;color:#185FA5">✉</div>
+<div class="flow-card-name">Mail</div>
+<div class="flow-card-status ok"><span class="sync-dot" style="background:#1D9E75"></span>Synchron</div>
+</div>
+<div class="flow-card">
+<div class="flow-card-icon" style="background:#EAF3DE;color:#3B6D11">🔔</div>
+<div class="flow-card-name">Push</div>
+<div class="flow-card-status ok"><span class="sync-dot" style="background:#1D9E75"></span>Aktiv</div>
+</div>
+<div class="flow-card">
+<div class="flow-card-icon" style="background:#EEEDFE;color:#534AB7">📁</div>
+<div class="flow-card-name">Dokumente</div>
+<div class="flow-card-status off"><span class="sync-dot" style="background:#D3D1C7"></span>Nicht verbunden</div>
+</div>
+<div class="flow-card">
+<div class="flow-card-icon" style="background:#FAEEDA;color:#854F0B">📅</div>
+<div class="flow-card-name">Kalender</div>
+<div class="flow-card-status plan"><span class="sync-dot" style="background:#D3D1C7"></span>In Planung</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 3: Geplante Integrationen -->
+<div class="sec">
+<div class="sec-h">Geplante Integrationen</div>
+<div class="sec-sub">Zukünftige Anbindungen, die strukturell vorbereitet sind — noch nicht aktiv</div>
+
+<div class="grp">
+<div class="plan-card">
+<div class="intg-icon cal">📅</div>
+<div class="plan-body">
+<div class="plan-top"><span class="plan-name">Kalender-Synchronisation</span><span class="intg-badge plan">In Planung</span></div>
+<div class="plan-desc">Termine aus externen Kalendern (Outlook, Google) abgleichen. Erkannte Termine aus Mails automatisch eintragen. Bidirektionale Sync geplant.</div>
+<div class="plan-detail">Betrifft: Organisation, Dashboard · Geplant für: Q3 2026</div>
+</div>
+</div>
+
+<div class="plan-card">
+<div class="intg-icon web">🌐</div>
+<div class="plan-body">
+<div class="plan-top"><span class="plan-name">Web-Recherche</span><span class="intg-badge plan">In Planung</span></div>
+<div class="plan-desc">Kira kann bei Bedarf aktuelle Informationen im Web recherchieren — Materialpreise, Wettbewerber, Produktdaten, Normen und Richtlinien.</div>
+<div class="plan-detail">Betrifft: Kira Workspace, Wissen · Geplant für: Q3 2026</div>
+</div>
+</div>
+
+<div class="plan-card">
+<div class="intg-icon social">💬</div>
+<div class="plan-body">
+<div class="plan-top"><span class="plan-name">Social / Messenger</span><span class="intg-badge plan">In Planung</span></div>
+<div class="plan-desc">Direktnachrichten von Instagram, Facebook und WhatsApp Business in Kira einlesen. Lead-Erkennung und Schnellantworten aus dem Kira-Workspace.</div>
+<div class="plan-detail">Betrifft: Kommunikation, Social / DMs · Geplant für: Q4 2026</div>
+</div>
+</div>
+
+<div class="plan-card">
+<div class="intg-icon lex">⚙</div>
+<div class="plan-body">
+<div class="plan-top"><span class="plan-name">Buchhaltungs-API (lexoffice / sevDesk)</span><span class="intg-badge plan">In Planung</span></div>
+<div class="plan-desc">Rechnungen, Belege und Zahlungsdaten direkt aus dem Buchhaltungssystem lesen. Automatischer Abgleich mit Geschäftsmodul.</div>
+<div class="plan-detail">Betrifft: Geschäft, Auswertung · Geplant für: Q4 2026</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 4: Hilfe -->
+<div class="sec">
+<div class="sec-h">Hilfe &amp; Dokumentation</div>
+<div class="sec-sub">Anleitungen und Einrichtungshilfen für aktive und geplante Integrationen</div>
+
+<div class="help-grid">
+<div class="help-card">
+<div class="help-card-h">✉ Mail einrichten</div>
+<div class="help-card-desc">IMAP/SMTP-Zugangsdaten konfigurieren, Abrufintervall einstellen und Testmail senden.</div>
+<div class="help-card-link">→ Anleitung öffnen</div>
+</div>
+<div class="help-card">
+<div class="help-card-h">🔔 Push einrichten (ntfy.sh)</div>
+<div class="help-card-desc">ntfy.sh-Kanal anlegen, App installieren, Verbindung testen und Prioritäten konfigurieren.</div>
+<div class="help-card-link">→ Anleitung öffnen</div>
+</div>
+<div class="help-card">
+<div class="help-card-h">📁 OneDrive verbinden</div>
+<div class="help-card-desc">Dokumentenpfad konfigurieren, Zugriff autorisieren und Dateitypen für Kira freigeben.</div>
+<div class="help-card-link">→ Anleitung öffnen</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab"><span class="k">K</span><span class="kl">Kira</span><span class="status"></span></div>
+</div>

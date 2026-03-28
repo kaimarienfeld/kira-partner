@@ -1,0 +1,198 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.wrap{font-family:'Anthropic Sans',-apple-system,sans-serif;padding:1.5rem 0}
+.variants{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.vcard{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:28px 24px;text-align:center;position:relative;min-height:400px;display:flex;flex-direction:column;align-items:center}
+.vcard-label{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.vcard-title{font-size:16px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px}
+.vcard-desc{font-size:12px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:28px;max-width:220px}
+.stage{width:260px;height:260px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.badge-row{display:flex;gap:6px;margin-top:auto;padding-top:16px}
+.vbadge{font-size:9px;padding:3px 8px;border-radius:4px}
+.vb-teal{background:#E1F5EE;color:#085041}
+.vb-blue{background:#E6F1FB;color:#0C447C}
+.vb-gray{background:#F1EFE8;color:#5F5E5A}
+</style>
+<div class="wrap">
+<div class="variants">
+
+<div class="vcard">
+<div class="vcard-label">Variante A</div>
+<div class="vcard-title">Minimalistisch-geometrisch</div>
+<div class="vcard-desc">Klare runde Form, dezenter Ring, zwei elegante Augenindikatoren. Sehr ruhig, fast abstrakt.</div>
+<div class="stage" id="sA">
+<svg width="100" height="100" viewBox="0 0 100 100" id="svgA">
+<circle cx="50" cy="50" r="46" fill="#F5F4F1" stroke="#D3D1C7" stroke-width="0.5" id="outerA"/>
+<circle cx="50" cy="50" r="42" fill="#fff" stroke="#E8E7E3" stroke-width="0.5" id="innerA">
+<animate attributeName="r" values="42;43;42" dur="4s" repeatCount="indefinite"/>
+</circle>
+<circle cx="50" cy="50" r="38" fill="none" stroke="#D3D1C7" stroke-width="0.3" opacity="0" id="glowRingA">
+<animate attributeName="r" values="38;40;38" dur="3s" repeatCount="indefinite"/>
+</circle>
+<ellipse cx="39" cy="44" rx="4" ry="4.5" fill="#E8E7E3" id="eyeBgLA"/>
+<ellipse cx="61" cy="44" rx="4" ry="4.5" fill="#E8E7E3" id="eyeBgRA"/>
+<circle cx="39" cy="44.5" r="2.2" fill="#444441" id="pLA"/>
+<circle cx="61" cy="44.5" r="2.2" fill="#444441" id="pRA"/>
+<path d="M42 58 Q50 62 58 58" fill="none" stroke="#D3D1C7" stroke-width="1.2" stroke-linecap="round" id="mA" opacity="0.6"/>
+</svg>
+</div>
+<div class="badge-row"><span class="vbadge vb-gray">Atem-Puls</span><span class="vbadge vb-blue">Blickverfolgung</span><span class="vbadge vb-teal">Sanfter Ring</span></div>
+</div>
+
+<div class="vcard">
+<div class="vcard-label">Variante B</div>
+<div class="vcard-title">Freundlich-warm</div>
+<div class="vcard-desc">Weiche Kapselform, ausdrucksvolle aber erwachsene Augen, leichtes Schweben. Sympathisch und vertrauenswürdig.</div>
+<div class="stage" id="sB">
+<svg width="96" height="110" viewBox="0 0 96 110" id="svgB">
+<g id="bodyB">
+<animateTransform attributeName="transform" type="translate" values="0,0;0,-3;0,0" dur="3.5s" repeatCount="indefinite"/>
+<rect x="8" y="14" width="80" height="76" rx="28" fill="#fff" stroke="#E8E7E3" stroke-width="0.5"/>
+<rect x="8" y="14" width="80" height="76" rx="28" fill="none" stroke="#D3D1C7" stroke-width="0.3" opacity="0" id="glowB"/>
+<rect x="28" y="4" width="10" height="16" rx="5" fill="#E8E7E3" stroke="#D3D1C7" stroke-width="0.3" id="antL"/>
+<rect x="58" y="4" width="10" height="16" rx="5" fill="#E8E7E3" stroke="#D3D1C7" stroke-width="0.3" id="antR"/>
+<circle cx="33" cy="46" r="7" fill="#F1EFE8" id="eyeBgLB"/>
+<circle cx="63" cy="46" r="7" fill="#F1EFE8" id="eyeBgRB"/>
+<circle cx="33" cy="46.5" r="3.2" fill="#444441" id="pLB"/>
+<circle cx="63" cy="46.5" r="3.2" fill="#444441" id="pRB"/>
+<circle cx="31" cy="44.5" r="1.2" fill="#fff" opacity="0.5"/>
+<circle cx="61" cy="44.5" r="1.2" fill="#fff" opacity="0.5"/>
+<path d="M38 66 Q48 72 58 66" fill="none" stroke="#D3D1C7" stroke-width="1.5" stroke-linecap="round" id="mB" opacity="0.6"/>
+</g>
+<ellipse cx="48" cy="100" rx="28" ry="4" fill="#1C1C1A" opacity="0.04">
+<animate attributeName="ry" values="4;3;4" dur="3.5s" repeatCount="indefinite"/>
+</ellipse>
+</svg>
+</div>
+<div class="badge-row"><span class="vbadge vb-gray">Schweben</span><span class="vbadge vb-blue">Große Augen</span><span class="vbadge vb-teal">Antennen</span></div>
+</div>
+
+<div class="vcard">
+<div class="vcard-label">Variante C</div>
+<div class="vcard-title">Technisch-präzise</div>
+<div class="vcard-desc">Dunkler neutraler Kern mit rotierendem Datenring, Fokusindikator folgt der Maus. Maschinenhafte Eleganz.</div>
+<div class="stage" id="sC">
+<svg width="100" height="100" viewBox="0 0 100 100" id="svgC">
+<circle cx="50" cy="50" r="46" fill="#F5F4F1" stroke="#E8E7E3" stroke-width="0.5"/>
+<circle cx="50" cy="50" r="40" fill="none" stroke="#B4B2A9" stroke-width="0.4" stroke-dasharray="5 4" id="dataRing" opacity="0.4">
+<animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="20s" repeatCount="indefinite"/>
+</circle>
+<circle cx="50" cy="50" r="34" fill="none" stroke="#D3D1C7" stroke-width="0.3" opacity="0.25"/>
+<line x1="20" y1="50" x2="80" y2="50" stroke="#D3D1C7" stroke-width="0.2" opacity="0.2"/>
+<line x1="50" y1="20" x2="50" y2="80" stroke="#D3D1C7" stroke-width="0.2" opacity="0.2"/>
+<circle cx="50" cy="50" r="14" fill="#2C2C2A" id="coreC"/>
+<circle cx="50" cy="50" r="20" fill="none" stroke="#888780" stroke-width="0.3" opacity="0" id="glowRingC"/>
+<circle cx="50" cy="50" r="4" fill="#888780" id="focusC" opacity="0.8"/>
+<circle cx="50" cy="50" r="1.5" fill="#D3D1C7" id="dotC"/>
+<line x1="16" y1="50" x2="84" y2="50" stroke="#B4B2A9" stroke-width="0.6" opacity="0.2" id="scanC">
+<animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="8s" repeatCount="indefinite"/>
+</line>
+<circle cx="50" cy="26" r="1.2" fill="#B4B2A9" opacity="0.3"><animate attributeName="opacity" values="0.3;0.1;0.3" dur="2.5s" repeatCount="indefinite"/></circle>
+<circle cx="68" cy="38" r="1" fill="#B4B2A9" opacity="0.2"><animate attributeName="opacity" values="0.2;0.05;0.2" dur="3s" repeatCount="indefinite"/></circle>
+<circle cx="32" cy="66" r="1" fill="#B4B2A9" opacity="0.25"><animate attributeName="opacity" values="0.25;0.08;0.25" dur="2s" repeatCount="indefinite"/></circle>
+</svg>
+</div>
+<div class="badge-row"><span class="vbadge vb-gray">Datenring</span><span class="vbadge vb-blue">Fokuspunkt</span><span class="vbadge vb-teal">Scan-Linie</span></div>
+</div>
+
+</div>
+</div>
+<script>
+function trackPupils(stageId, ids, centers, range) {
+  const stage = document.getElementById(stageId);
+  if (!stage) return;
+  const els = ids.map(id => document.getElementById(id));
+  if (els.some(e => !e)) return;
+  stage.addEventListener('mousemove', e => {
+    const r = stage.getBoundingClientRect();
+    const mx = (e.clientX - r.left) / r.width * 2 - 1;
+    const my = (e.clientY - r.top) / r.height * 2 - 1;
+    const dx = Math.max(-range, Math.min(range, mx * range));
+    const dy = Math.max(-range, Math.min(range, my * range));
+    for (let i = 0; i < els.length; i++) {
+      els[i].setAttribute('cx', centers[i][0] + dx);
+      els[i].setAttribute('cy', centers[i][1] + dy);
+    }
+  });
+  stage.addEventListener('mouseleave', () => {
+    for (let i = 0; i < els.length; i++) {
+      els[i].setAttribute('cx', centers[i][0]);
+      els[i].setAttribute('cy', centers[i][1]);
+    }
+  });
+}
+trackPupils('sA', ['pLA','pRA'], [[39,44.5],[61,44.5]], 2.5);
+trackPupils('sB', ['pLB','pRB'], [[33,46.5],[63,46.5]], 3);
+
+(function(){
+  const s=document.getElementById('sC'),f=document.getElementById('focusC'),d=document.getElementById('dotC'),c=document.getElementById('coreC');
+  if(!s||!f||!d) return;
+  s.addEventListener('mousemove',e=>{
+    const r=s.getBoundingClientRect();
+    const mx=(e.clientX-r.left)/r.width*2-1;
+    const my=(e.clientY-r.top)/r.height*2-1;
+    const dx=Math.max(-4,Math.min(4,mx*4));
+    const dy=Math.max(-4,Math.min(4,my*4));
+    f.setAttribute('cx',50+dx);f.setAttribute('cy',50+dy);
+    d.setAttribute('cx',50+dx);d.setAttribute('cy',50+dy);
+  });
+  s.addEventListener('mouseleave',()=>{
+    f.setAttribute('cx',50);f.setAttribute('cy',50);
+    d.setAttribute('cx',50);d.setAttribute('cy',50);
+  });
+})();
+
+function setupAnticipation(stageId, glowId, scaleTarget) {
+  const stage = document.getElementById(stageId);
+  const glow = document.getElementById(glowId);
+  if (!stage) return;
+  const parent = stage.closest('.vcard');
+  if (!parent) return;
+  let raf;
+  function onMove(e) {
+    const r = parent.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const dist = Math.sqrt((e.clientX - cx) ** 2 + (e.clientY - cy) ** 2);
+    const maxDist = 300;
+    const proximity = Math.max(0, 1 - dist / maxDist);
+    const svg = stage.querySelector('svg');
+    if (svg) {
+      const s = 1 + proximity * 0.12;
+      svg.style.transition = 'transform 0.4s ease-out';
+      svg.style.transform = 'scale(' + s + ')';
+    }
+    if (glow) {
+      glow.setAttribute('opacity', String(proximity * 0.5));
+    }
+  }
+  document.addEventListener('mousemove', onMove);
+}
+setupAnticipation('sA', 'glowRingA');
+setupAnticipation('sB', 'glowB');
+setupAnticipation('sC', 'glowRingC');
+
+document.querySelectorAll('.stage').forEach(s => {
+  s.addEventListener('mousedown', () => {
+    const svg = s.querySelector('svg');
+    if (!svg) return;
+    svg.style.transition = 'transform 0.1s';
+    svg.style.transform = 'scale(0.92)';
+    setTimeout(() => { svg.style.transition = 'transform 0.3s ease-out'; svg.style.transform = 'scale(1.06)'; }, 120);
+    if (s.id === 'sA') {
+      const m = document.getElementById('mA');
+      if (m) { m.setAttribute('d','M40 57 Q50 64 60 57'); m.setAttribute('opacity','0.9'); setTimeout(()=>{m.setAttribute('d','M42 58 Q50 62 58 58');m.setAttribute('opacity','0.6');},700); }
+    }
+    if (s.id === 'sB') {
+      const m = document.getElementById('mB');
+      if (m) { m.setAttribute('d','M36 65 Q48 75 60 65'); m.setAttribute('stroke-width','2'); m.setAttribute('opacity','0.9'); setTimeout(()=>{m.setAttribute('d','M38 66 Q48 72 58 66');m.setAttribute('stroke-width','1.5');m.setAttribute('opacity','0.6');},700); }
+    }
+    if (s.id === 'sC') {
+      const f = document.getElementById('focusC');
+      const dr = document.getElementById('dataRing');
+      if (f) { f.setAttribute('r','6'); f.setAttribute('fill','#5F5E5A'); setTimeout(()=>{f.setAttribute('r','4');f.setAttribute('fill','#888780');},500); }
+      if (dr) { dr.setAttribute('opacity','0.7'); setTimeout(()=>dr.setAttribute('opacity','0.4'),500); }
+    }
+  });
+});
+</script>

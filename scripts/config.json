@@ -4,7 +4,11 @@
     "aktiv": true,
     "_anleitung": "ntfy-App auf iOS installieren -> '+' -> Topic 'raumkult-kai-2026-x7k' abonnieren -> fertig",
     "topic_name": "raumkult-kai-2026-x7k",
-    "server": "https://ntfy.sh"
+    "server": "https://ntfy.sh",
+    "arbeitszeit_aktiv": true,
+    "arbeitszeit_von": "05:00",
+    "arbeitszeit_bis": "18:00",
+    "urlaub_modus": false
   },
   "email_notification": {
     "aktiv": false,
@@ -16,19 +20,82 @@
     "empfaenger_email": ""
   },
   "aufgaben": {
-    "unanswered_check_days": 14,
+    "unanswered_check_days": 3,
     "_kommentar": "Wie viele Tage zurück auf unbeantwortete Mails prüfen",
     "erinnerung_intervall_stunden": 24,
-    "_kommentar2": "Nach wie vielen Stunden an offene Aufgaben erinnern"
+    "_kommentar2": "Nach wie vielen Stunden an offene Aufgaben erinnern",
+    "deadline_warnung_tage": 1,
+    "erinnerung_typ": "beide",
+    "default_prioritaet": "normal",
+    "auto_archiv_tage": 1
   },
   "nachfass": {
-    "intervall_1_tage": 10,
-    "intervall_2_tage": 21,
-    "intervall_3_tage": 45,
-    "_kommentar": "Nachfass-Intervalle für offene Angebote (Tage)"
+    "intervall_1_tage": 7,
+    "intervall_2_tage": 14,
+    "intervall_3_tage": 30,
+    "_kommentar": "Nachfass-Intervalle für offene Angebote (Tage)",
+    "aktiv": true,
+    "benachrichtigung": "beide",
+    "kira_nachfass_text": true,
+    "rechnung_tage": 14
   },
   "server": {
     "port": 8765,
     "auto_open_browser": true
+  },
+  "protokoll": {
+    "max_eintraege": 0,
+    "tage": 90,
+    "_kommentar": "0 = niemals löschen. Aktivitätsprotokoll (aktivitaeten-Tabelle in tasks.db). change_log.jsonl ist davon unabhängig und wird nie automatisch bereinigt."
+  },
+  "mail_monitor": {
+    "aktiv": true,
+    "intervall_sekunden": 300,
+    "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
+  },
+  "llm": {
+    "_kommentar": "Kira KI-Assistent Einstellungen. API Key wird separat in secrets.json gespeichert.",
+    "model": "claude-sonnet-4-20250514",
+    "internet_recherche": true,
+    "geschaeftsdaten_teilen": true,
+    "konversationen_speichern": true,
+    "max_kontext_items": 50,
+    "auto_wissen_extrahieren": true,
+    "providers": [
+      {
+        "id": "openai-1-1774455440",
+        "typ": "openai",
+        "name": "KIRA Assiztenz Open AI",
+        "model": "gpt-4o-mini",
+        "aktiv": true,
+        "prioritaet": 1
+      }
+    ]
+  },
+  "runtime_log": {
+    "aktiv": true,
+    "ui_events": true,
+    "kira_events": true,
+    "llm_events": true,
+    "hintergrund_events": true,
+    "settings_events": true,
+    "fehler_immer_loggen": true,
+    "vollkontext_speichern": true,
+    "kira_darf_lesen": true
+  },
+  "kira": {
+    "launcher_variant": "B",
+    "size": 128,
+    "prox_radius": 1,
+    "bounce_dist": 200,
+    "idle_mode": true,
+    "idle_delay": 10
+  },
+  "benachrichtigungen": {
+    "inapp_mail": true,
+    "inapp_kira": true,
+    "inapp_aufgaben": true,
+    "inapp_bg": true,
+    "inapp_fehler": true
   }
 }

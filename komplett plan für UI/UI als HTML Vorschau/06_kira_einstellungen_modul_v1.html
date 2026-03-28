@@ -1,0 +1,353 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1020px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent;transition:background 0.12s}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.plan{opacity:0.45}
+.sn.plan .pbadge{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid #F1EFE8}
+.row:last-child{border-bottom:none}
+.row-label{font-size:13px;color:#1C1C1A;flex:1;min-width:0}
+.row-sub{font-size:10px;color:#B4B2A9;margin-top:1px}
+.toggle{width:38px;height:20px;background:#D3D1C7;border-radius:10px;position:relative;cursor:pointer;flex-shrink:0;transition:background 0.2s}
+.toggle.on{background:#1D9E75}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s}
+.toggle.on::after{transform:translateX(18px)}
+.sel{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:6px 12px;font-size:12px;color:#1C1C1A;min-width:140px;cursor:pointer;appearance:none;-webkit-appearance:none}
+.seg{display:flex;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;overflow:hidden}
+.seg-o{padding:5px 14px;font-size:11px;color:#5F5E5A;cursor:pointer;border-right:0.5px solid #D3D1C7}
+.seg-o:last-child{border-right:none}
+.seg-o.act{background:#fff;color:#1C1C1A;font-weight:500}
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider{flex:1;height:4px;background:#E8E7E3;border-radius:2px;position:relative}
+.slider-fill{height:4px;background:#888780;border-radius:2px}
+.slider-val{font-size:12px;color:#5F5E5A;min-width:36px;text-align:right}
+.color-row{display:flex;gap:6px}
+.color-dot{width:24px;height:24px;border-radius:6px;cursor:pointer;border:1.5px solid transparent}
+.color-dot.act{border-color:#444441}
+.input-sm{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:6px 12px;font-size:12px;color:#1C1C1A;width:200px}
+.preview{background:#F9F8F6;border:0.5px solid #E8E7E3;border-radius:10px;padding:16px 18px;margin-top:12px}
+.preview-h{font-size:11px;font-weight:500;color:#888780;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px}
+.prev-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.prev-card{background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:10px;height:52px}
+.prev-card .pc-label{font-size:9px;color:#B4B2A9}
+.prev-card .pc-val{font-size:16px;font-weight:500;color:#1C1C1A;margin-top:2px}
+.prev-text{font-size:11px;color:#5F5E5A;margin-top:8px;line-height:1.4}
+.provider-list{margin-top:8px}
+.prov{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;margin-bottom:6px}
+.prov.active{border-color:#1D9E75;background:#FAFFFE}
+.prov-icon{width:32px;height:32px;border-radius:8px;background:#F1EFE8;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#5F5E5A}
+.prov.active .prov-icon{background:#EAF3DE;color:#3B6D11}
+.prov-body{flex:1;min-width:0}
+.prov-name{font-size:13px;font-weight:500;color:#1C1C1A}
+.prov-meta{font-size:10px;color:#888780}
+.prov-status{display:flex;align-items:center;gap:4px;font-size:10px;flex-shrink:0}
+.prov-status .pdot{width:6px;height:6px;border-radius:50%}
+.prov-status.ok{color:#3B6D11}
+.prov-status.ok .pdot{background:#1D9E75}
+.prov-status.off{color:#888780}
+.prov-status.off .pdot{background:#D3D1C7}
+.prov-acts{display:flex;gap:4px;flex-shrink:0}
+.btn{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn-t{background:#E1F5EE;border-color:#9FE1CB;color:#085041}
+.btn-d{background:#444441;border-color:#444441;color:#fff}
+.intg{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;margin-bottom:6px}
+.intg-icon{width:28px;height:28px;border-radius:6px;background:#F1EFE8;display:flex;align-items:center;justify-content:center;font-size:12px;color:#5F5E5A}
+.intg-body{flex:1}
+.intg-name{font-size:12px;font-weight:500;color:#1C1C1A}
+.intg-sub{font-size:10px;color:#888780}
+.intg-stat{font-size:10px;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.intg-stat.on{background:#EAF3DE;color:#3B6D11}
+.intg-stat.plan{background:#F1EFE8;color:#888780}
+.intg-stat.ready{background:#E6F1FB;color:#0C447C}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar">
+<div class="srch">⌕ Suche in allen Modulen…</div>
+<div class="tpr">
+<div class="tc">⚡ Quick Actions</div>
+<div class="tc ok"><span class="dot"></span>Verbunden</div>
+<div class="tc">🔔 Offene Aufgaben</div>
+<div class="av">KM</div>
+</div>
+</div>
+
+<div class="mh">
+<div class="mt">Einstellungen</div>
+<div class="mstats">
+<div class="ms">Provider: <b>Anthropic</b></div>
+<div class="ms">Theme: <b>Hell</b></div>
+<div class="ms">Push: <b>aktiv</b></div>
+<div class="ms">Zuletzt: <b>vor 2 Std.</b></div>
+</div>
+<div class="macts">
+<div class="ma">⌕ Suche</div>
+<div class="ma">↺ Zurücksetzen</div>
+<div class="ma">↗ Export</div>
+<div class="ma">↙ Import</div>
+<div class="ma primary">Speichern</div>
+</div>
+</div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn act"><div class="sico">◐</div>Design</div>
+<div class="sn"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">3</span></div>
+<div class="sn"><div class="sico">⇌</div>Integrationen<span class="cnt">4</span></div>
+<div class="sn plan"><div class="sico">⟳</div>Automationen<span class="pbadge">Geplant</span></div>
+</div>
+
+<div class="main-set">
+
+<div class="sec">
+<div class="sec-h">Design</div>
+<div class="sec-sub">Erscheinungsbild der Oberfläche anpassen — Änderungen werden live wirksam</div>
+
+<div class="grp">
+<div class="grp-h">Farbschema &amp; Theme</div>
+<div class="row">
+<div class="row-label">Theme-Modus<div class="row-sub">Bestimmt die Grundfarben der Oberfläche</div></div>
+<div class="seg"><div class="seg-o act">Hell</div><div class="seg-o">Dunkel</div><div class="seg-o">Auto</div></div>
+</div>
+<div class="row">
+<div class="row-label">Akzentfarbe<div class="row-sub">Wird für aktive Elemente und Hervorhebungen verwendet</div></div>
+<div class="color-row">
+<div class="color-dot act" style="background:#444441"></div>
+<div class="color-dot" style="background:#185FA5"></div>
+<div class="color-dot" style="background:#0F6E56"></div>
+<div class="color-dot" style="background:#854F0B"></div>
+<div class="color-dot" style="background:#993C1D"></div>
+<div class="color-dot" style="background:#534AB7"></div>
+</div>
+</div>
+</div>
+
+<div class="grp">
+<div class="grp-h">Typografie &amp; Dichte</div>
+<div class="row">
+<div class="row-label">Schriftgröße<div class="row-sub">Beeinflusst die gesamte Textgröße in der Anwendung</div></div>
+<div class="seg"><div class="seg-o">Klein</div><div class="seg-o act">Standard</div><div class="seg-o">Groß</div></div>
+</div>
+<div class="row">
+<div class="row-label">Anzeigedichte<div class="row-sub">Steuert Abstände in Listen, Karten und Tabellen</div></div>
+<div class="seg"><div class="seg-o">Kompakt</div><div class="seg-o act">Standard</div><div class="seg-o">Entspannt</div></div>
+</div>
+<div class="row">
+<div class="row-label">Hoher Kontrast<div class="row-sub">Verstärkt Farben und Trennlinien für bessere Lesbarkeit</div></div>
+<div class="toggle"></div>
+</div>
+<div class="row">
+<div class="row-label">Animationen reduzieren<div class="row-sub">Deaktiviert Übergangseffekte und Bewegungen</div></div>
+<div class="toggle"></div>
+</div>
+</div>
+
+<div class="grp">
+<div class="grp-h">Marke &amp; Identität</div>
+<div class="row">
+<div class="row-label">Firmenname<div class="row-sub">Wird in der App-Leiste und in Dokumenten angezeigt</div></div>
+<input class="input-sm" value="rauMKult" disabled style="opacity:0.7">
+</div>
+<div class="row">
+<div class="row-label">Logo hochladen<div class="row-sub">PNG oder SVG, max. 2 MB, erscheint in der Sidebar</div></div>
+<div class="btn">Datei wählen…</div>
+</div>
+<div class="row">
+<div class="row-label">Kartenradius<div class="row-sub">Rundung der Ecken bei Karten und Panels</div></div>
+<div class="slider-row"><div class="slider"><div class="slider-fill" style="width:60%"></div></div><div class="slider-val">10 px</div></div>
+</div>
+<div class="row">
+<div class="row-label">Schattenstärke<div class="row-sub">Tiefenwirkung von Karten und Flächen</div></div>
+<div class="seg"><div class="seg-o">Keine</div><div class="seg-o act">Dezent</div><div class="seg-o">Mittel</div></div>
+</div>
+</div>
+
+<div class="preview">
+<div class="preview-h">Live-Vorschau</div>
+<div class="prev-cards">
+<div class="prev-card"><div class="pc-label">Antworten nötig</div><div class="pc-val">8</div></div>
+<div class="prev-card"><div class="pc-label">Neue Leads</div><div class="pc-val">5</div></div>
+<div class="prev-card"><div class="pc-label">Offenes Volumen</div><div class="pc-val">€ 24.800</div></div>
+</div>
+<div class="prev-text">So wirken sich deine Einstellungen auf Karten, Schriftgrößen und Abstände aus. Änderungen werden nach dem Speichern sofort sichtbar.</div>
+</div>
+</div>
+
+<div class="sec">
+<div class="sec-h">Kira / LLM / Provider</div>
+<div class="sec-sub">Verwalte KI-Provider, Fallback-Reihenfolge und Kira-Verhalten</div>
+
+<div class="grp">
+<div class="grp-h">Aktive Provider</div>
+<div class="provider-list">
+<div class="prov active">
+<div class="prov-icon">A</div>
+<div class="prov-body"><div class="prov-name">Anthropic Claude</div><div class="prov-meta">claude-sonnet-4-20250514 · Standard-Provider</div></div>
+<div class="prov-status ok"><span class="pdot"></span>Aktiv</div>
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Modell</span><span class="btn">Bearbeiten</span></div>
+</div>
+<div class="prov">
+<div class="prov-icon">O</div>
+<div class="prov-body"><div class="prov-name">OpenAI</div><div class="prov-meta">gpt-4o · Fallback #1</div></div>
+<div class="prov-status ok"><span class="pdot"></span>Bereit</div>
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Modell</span><span class="btn">Bearbeiten</span></div>
+</div>
+<div class="prov">
+<div class="prov-icon">G</div>
+<div class="prov-body"><div class="prov-name">Google Gemini</div><div class="prov-meta">gemini-2.5-pro · Fallback #2</div></div>
+<div class="prov-status off"><span class="pdot"></span>Inaktiv</div>
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Aktivieren</span></div>
+</div>
+</div>
+<div style="display:flex;gap:6px;margin-top:10px">
+<div class="btn">+ Provider hinzufügen</div>
+<div class="btn btn-d">Fallback-Reihenfolge speichern</div>
+</div>
+</div>
+
+<div class="grp">
+<div class="grp-h">Kira-Verhalten</div>
+<div class="row">
+<div class="row-label">Standard-Kontextmodus<div class="row-sub">Welcher Kontext wird beim Öffnen von Kira geladen</div></div>
+<select class="sel"><option>Automatisch</option></select>
+</div>
+<div class="row">
+<div class="row-label">Antwortlänge<div class="row-sub">Wie ausführlich Kira standardmäßig antwortet</div></div>
+<div class="seg"><div class="seg-o">Knapp</div><div class="seg-o act">Standard</div><div class="seg-o">Ausführlich</div></div>
+</div>
+<div class="row">
+<div class="row-label">Vorschläge automatisch anbieten<div class="row-sub">Kira zeigt proaktiv Folgeaktionen und Vorschläge</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Vorschlagsstärke<div class="row-sub">Wie offensiv Kira Empfehlungen gibt</div></div>
+<div class="seg"><div class="seg-o">Zurückhaltend</div><div class="seg-o act">Neutral</div><div class="seg-o">Offensiv</div></div>
+</div>
+<div class="row">
+<div class="row-label">Historie laden<div class="row-sub">Wie viele vergangene Nachrichten Kira beim Start lädt</div></div>
+<select class="sel"><option>Letzte 20 Nachrichten</option></select>
+</div>
+</div>
+</div>
+
+<div class="sec">
+<div class="sec-h">Integrationen</div>
+<div class="sec-sub">Verbundene und geplante Anbindungen an externe Systeme</div>
+
+<div class="grp">
+<div class="intg">
+<div class="intg-icon">✉</div>
+<div class="intg-body"><div class="intg-name">Mail (IMAP/SMTP)</div><div class="intg-sub">info@raumkult.eu · letzte Synchronisation vor 12 Min.</div></div>
+<div class="intg-stat on">Verbunden</div>
+<div class="btn">Konfigurieren</div>
+</div>
+<div class="intg">
+<div class="intg-icon">🔔</div>
+<div class="intg-body"><div class="intg-name">Push-Benachrichtigungen (ntfy.sh)</div><div class="intg-sub">Kanal aktiv · Windows Toast aktiviert</div></div>
+<div class="intg-stat on">Aktiv</div>
+<div class="btn">Konfigurieren</div>
+</div>
+<div class="intg">
+<div class="intg-icon">📁</div>
+<div class="intg-body"><div class="intg-name">OneDrive / Dokumente</div><div class="intg-sub">Dokumentenzugriff für Anhänge und Belege</div></div>
+<div class="intg-stat ready">Bereit</div>
+<div class="btn">Verbinden</div>
+</div>
+<div class="intg">
+<div class="intg-icon">📅</div>
+<div class="intg-body"><div class="intg-name">Kalender-Sync</div><div class="intg-sub">Termine mit externem Kalender abgleichen</div></div>
+<div class="intg-stat plan">In Planung</div>
+</div>
+<div class="intg">
+<div class="intg-icon">🌐</div>
+<div class="intg-body"><div class="intg-name">Web-Recherche</div><div class="intg-sub">Kira kann bei Bedarf im Web recherchieren</div></div>
+<div class="intg-stat plan">In Planung</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+</div>

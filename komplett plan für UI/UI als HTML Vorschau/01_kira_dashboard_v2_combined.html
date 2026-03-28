@@ -1,0 +1,270 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.dash{display:flex;min-height:900px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.sb-item.act{background:#2C2C2A;color:#fff}
+.sb-item .ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0.7}
+.sb-item.act .ico{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px 12px}
+.sb-item.plan{opacity:0.45}
+.sb-item.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bottom{padding:12px;border-top:0.5px solid #333}
+.sb-collapse{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.sb-collapse:hover{color:#B4B2A9}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.search{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.topbar-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.top-chip{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.top-chip.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.top-chip.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.avatar{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.content{flex:1;padding:20px 24px;overflow-y:auto}
+.briefing{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.b-title{font-size:14px;font-weight:500;color:#1C1C1A;white-space:nowrap}
+.b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#5F5E5A;white-space:nowrap}
+.b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:16px 18px;position:relative}
+.kpi-label{font-size:12px;color:#888780;margin-bottom:6px}
+.kpi-row{display:flex;align-items:baseline;gap:8px}
+.kpi-val{font-size:26px;font-weight:500;color:#1C1C1A}
+.kpi-change{font-size:12px;font-weight:500;padding:2px 8px;border-radius:4px}
+.kpi-change.up{background:#EAF3DE;color:#3B6D11}
+.kpi-change.warn{background:#FAEEDA;color:#854F0B}
+.kpi-change.danger{background:#FCEBEB;color:#A32D2D}
+.kpi-change.info{background:#E6F1FB;color:#185FA5}
+.kpi-spark{margin-top:10px;height:36px}
+.kpi-spark svg{width:100%;height:36px}
+.work{display:grid;grid-template-columns:63fr 37fr;gap:16px;margin-bottom:20px}
+.panel{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px}
+.panel-title{font-size:15px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.panel-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.prio-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;margin-bottom:8px;border-left:3px solid #ccc}
+.prio-item.red{border-left-color:#E24B4A}
+.prio-item.amber{border-left-color:#EF9F27}
+.prio-item.blue{border-left-color:#378ADD}
+.prio-item.gray{border-left-color:#B4B2A9}
+.prio-body{flex:1;min-width:0}
+.prio-title{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:3px}
+.prio-meta{font-size:11px;color:#888780;margin-bottom:5px}
+.prio-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.tag{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tag-red{background:#FCEBEB;color:#A32D2D}
+.tag-amber{background:#FAEEDA;color:#854F0B}
+.tag-blue{background:#E6F1FB;color:#185FA5}
+.tag-gray{background:#F1EFE8;color:#5F5E5A}
+.tag-green{background:#EAF3DE;color:#3B6D11}
+.prio-next{font-size:10px;color:#888780;margin-left:4px}
+.prio-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0;align-items:flex-start;padding-top:2px}
+.btn-sm{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn-kira{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.right-col{display:flex;flex-direction:column;gap:16px}
+.term-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;color:#1C1C1A}
+.term-item:nth-child(odd){background:#F9F8F6}
+.term-date{font-size:11px;font-weight:500;min-width:48px;flex-shrink:0}
+.term-date.urgent{color:#E24B4A}
+.term-date.soon{color:#EF9F27}
+.term-date.normal{color:#5F5E5A}
+.term-badge{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:auto;white-space:nowrap}
+.biz-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px;color:#1C1C1A}
+.biz-item:nth-child(odd){background:#F9F8F6}
+.biz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.biz-val{margin-left:auto;font-weight:500;font-size:12px;white-space:nowrap}
+.signals{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px}
+.sig-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.sig{padding:10px 14px;border-radius:8px;border:0.5px solid;display:flex;align-items:flex-start;gap:8px;font-size:11px;cursor:pointer}
+.sig .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.sig .arr{margin-left:auto;font-size:12px;opacity:0.5;flex-shrink:0}
+.sig.s-red{background:#FCEBEB;border-color:#F7C1C1;color:#791F1F}
+.sig.s-amber{background:#FAEEDA;border-color:#FAC775;color:#633806}
+.sig.s-blue{background:#E6F1FB;border-color:#B5D4F4;color:#0C447C}
+.sig.s-coral{background:#FAECE7;border-color:#F5C4B3;color:#712B13}
+.sig.s-teal{background:#E1F5EE;border-color:#9FE1CB;color:#085041}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="dash">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="sb-item act"><div class="ico">⌂</div>Start</div>
+<div class="sb-item"><div class="ico">✉</div>Kommunikation</div>
+<div class="sb-item"><div class="ico">☐</div>Organisation</div>
+<div class="sb-item"><div class="ico">€</div>Geschäft</div>
+<div class="sb-item"><div class="ico">☰</div>Wissen</div>
+<div class="sb-item"><div class="ico">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="sb-item plan"><div class="ico">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="sb-item plan"><div class="ico">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="sb-item plan"><div class="ico">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="sb-item plan"><div class="ico">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="sb-item plan"><div class="ico">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bottom"><div class="sb-collapse">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="main">
+<div class="topbar">
+<div class="search">⌕ Suche in allen Modulen…</div>
+<div class="topbar-r">
+<div class="top-chip">⚡ Quick Actions</div>
+<div class="top-chip ok"><span class="dot"></span>Verbunden</div>
+<div class="top-chip">🔔 Offene Aufgaben</div>
+<div class="avatar">KM</div>
+</div>
+</div>
+
+<div class="content">
+
+<div class="briefing">
+<div class="b-title">Tagesbriefing</div>
+<div class="b-item"><span class="b-dot" style="background:#E24B4A"></span>2 kritische Fristen</div>
+<div class="b-item"><span class="b-dot" style="background:#EF9F27"></span>3 Nachfass fällig</div>
+<div class="b-item"><span class="b-dot" style="background:#378ADD"></span>5 neue Leads</div>
+<div class="b-item"><span class="b-dot" style="background:#1D9E75"></span>€ 12.400 offenes Volumen</div>
+<div class="b-item"><span class="b-dot" style="background:#D85A30"></span>1 unklare Zahlung</div>
+</div>
+
+<div class="kpi-grid">
+<div class="kpi">
+<div class="kpi-label">Antworten nötig</div>
+<div class="kpi-row"><span class="kpi-val">8</span><span class="kpi-change danger">+3 neu</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><polyline points="0,30 30,26 60,22 90,28 120,18 150,12 170,8 200,14" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.5"/></svg></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Neue Leads</div>
+<div class="kpi-row"><span class="kpi-val">5</span><span class="kpi-change info">diese Woche</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><polyline points="0,32 30,28 60,30 90,24 120,20 150,16 170,18 200,10" fill="none" stroke="#378ADD" stroke-width="1.5" opacity="0.5"/></svg></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Offenes Rechnungsvolumen</div>
+<div class="kpi-row"><span class="kpi-val">€ 24.800</span><span class="kpi-change warn">3 überfällig</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><rect x="10" y="20" width="22" height="16" rx="2" fill="#EF9F27" opacity="0.3"/><rect x="42" y="14" width="22" height="22" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="74" y="8" width="22" height="28" rx="2" fill="#EF9F27" opacity="0.5"/><rect x="106" y="12" width="22" height="24" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="138" y="6" width="22" height="30" rx="2" fill="#EF9F27" opacity="0.6"/><rect x="170" y="10" width="22" height="26" rx="2" fill="#EF9F27" opacity="0.5"/></svg></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Nachfass fällig</div>
+<div class="kpi-row"><span class="kpi-val">3</span><span class="kpi-change warn">!! Angebote</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><polyline points="0,20 40,24 80,18 120,26 160,14 200,22" fill="none" stroke="#BA7517" stroke-width="1.5" opacity="0.4"/></svg></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Angebotsrückmeldungen</div>
+<div class="kpi-row"><span class="kpi-val">3</span><span class="kpi-change up">1 positiv</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><polyline points="0,28 40,24 80,20 120,16 160,18 200,12" fill="none" stroke="#639922" stroke-width="1.5" opacity="0.5"/></svg></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Termine / Fristen</div>
+<div class="kpi-row"><span class="kpi-val">6</span><span class="kpi-change danger">2 heute</span></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Eingangsrechnungen offen</div>
+<div class="kpi-row"><span class="kpi-val">4</span><span class="kpi-change warn">1 Skonto!</span></div>
+</div>
+<div class="kpi">
+<div class="kpi-label">Gesamt offen</div>
+<div class="kpi-row"><span class="kpi-val">26</span></div>
+<div class="kpi-spark"><svg viewBox="0 0 200 36"><polyline points="0,10 40,14 80,18 120,16 160,20 200,22" fill="none" stroke="#888780" stroke-width="1.5" opacity="0.35"/></svg></div>
+</div>
+</div>
+
+<div class="work">
+<div class="panel">
+<div class="panel-title">Heute priorisiert</div>
+<div class="panel-sub">Top 5 — modulübergreifend kuratiert</div>
+
+<div class="prio-item red">
+<div class="prio-body">
+<div class="prio-title">Fam. Krüger — Angebot überfällig seit 12 Tagen</div>
+<div class="prio-meta">Geschäft · Angebot #AG-2026-041 · € 8.200 · keine Rückmeldung</div>
+<div class="prio-tags"><span class="tag tag-red">dringend</span><span class="prio-next">→ Nachfass vorbereiten</span></div>
+</div>
+<div class="prio-actions"><span class="btn-sm">Öffnen</span><span class="btn-sm btn-kira">Mit Kira</span></div>
+</div>
+
+<div class="prio-item red">
+<div class="prio-body">
+<div class="prio-title">RE: Fassadenplanung Meier — offene Frage zur Farbwahl</div>
+<div class="prio-meta">Kommunikation · Antwort erforderlich · Fotos angehängt · 3 Tage offen</div>
+<div class="prio-tags"><span class="tag tag-amber">Frage</span><span class="tag tag-blue">Fotos</span><span class="prio-next">→ Antwort formulieren</span></div>
+</div>
+<div class="prio-actions"><span class="btn-sm">Öffnen</span><span class="btn-sm btn-kira">Mit Kira</span></div>
+</div>
+
+<div class="prio-item amber">
+<div class="prio-body">
+<div class="prio-title">Eingangsrechnung Baustoffhandel Schmidt — Skonto läuft morgen ab</div>
+<div class="prio-meta">Geschäft · Eingangsrechnung · € 1.840 · Zahlziel 30.03. · Skonto bis 27.03.</div>
+<div class="prio-tags"><span class="tag tag-amber">Skonto!</span><span class="prio-next">→ Zahlung prüfen</span></div>
+</div>
+<div class="prio-actions"><span class="btn-sm">Öffnen</span><span class="btn-sm btn-kira">Mit Kira</span></div>
+</div>
+
+<div class="prio-item blue">
+<div class="prio-body">
+<div class="prio-title">Neuer Lead — Weber, Umbau Dachterrasse</div>
+<div class="prio-meta">Kommunikation · Neuer Lead · Anfrage über Website · heute 08:14</div>
+<div class="prio-tags"><span class="tag tag-blue">neuer Lead</span><span class="prio-next">→ Erstreaktion senden</span></div>
+</div>
+<div class="prio-actions"><span class="btn-sm">Öffnen</span><span class="btn-sm btn-kira">Mit Kira</span></div>
+</div>
+
+<div class="prio-item gray">
+<div class="prio-body">
+<div class="prio-title">Rechnungsentwurf Projekt Hartmann — Freigabe ausstehend</div>
+<div class="prio-meta">Geschäft · Ausgangsrechnung · € 4.600 · Entwurf seit 2 Tagen</div>
+<div class="prio-tags"><span class="tag tag-gray">Freigabe</span><span class="prio-next">→ Prüfen und versenden</span></div>
+</div>
+<div class="prio-actions"><span class="btn-sm">Öffnen</span><span class="btn-sm btn-kira">Mit Kira</span></div>
+</div>
+</div>
+
+<div class="right-col">
+<div class="panel">
+<div class="panel-title">Nächste Termine &amp; Fristen</div>
+<div class="panel-sub">Kommende 7 Tage</div>
+<div class="term-item"><span class="term-date urgent">Heute</span>Baustellenbegehung Meier — 14:00<span class="term-badge tag-red">in 4h</span></div>
+<div class="term-item"><span class="term-date urgent">Morgen</span>Angebotsfrist Projekt Schulze<span class="term-badge tag-amber">1 Tag</span></div>
+<div class="term-item"><span class="term-date normal">28.03.</span>Kundentermin Weber — Erstgespräch</div>
+<div class="term-item"><span class="term-date normal">31.03.</span>Zahlungsziel RE-2026-018<span class="term-badge tag-gray">5 Tage</span></div>
+</div>
+
+<div class="panel">
+<div class="panel-title">Geschäft aktuell</div>
+<div class="panel-sub">Letzte Bewegungen</div>
+<div class="biz-item"><span class="biz-dot" style="background:#1D9E75"></span>Zahlung eingegangen: Projekt Hartmann<span class="biz-val" style="color:#1D9E75">+ € 3.200</span></div>
+<div class="biz-item"><span class="biz-dot" style="background:#E24B4A"></span>RE-2026-022 überfällig<span class="biz-val" style="color:#E24B4A">€ 5.400</span></div>
+<div class="biz-item"><span class="biz-dot" style="background:#EF9F27"></span>Nachfass: Angebot Kirchner 21 Tage<span class="biz-val" style="color:#BA7517">€ 6.800</span></div>
+<div class="biz-item"><span class="biz-dot" style="background:#D85A30"></span>Unklare Zahlung ohne Zuordnung<span class="biz-val" style="color:#D85A30">€ 780</span></div>
+</div>
+</div>
+</div>
+
+<div class="signals">
+<div class="panel-title">Signale / Auffälligkeiten</div>
+<div class="panel-sub">Automatisch erkannte Ausreißer und Prüfbedarf</div>
+<div class="sig-grid">
+<div class="sig s-red"><span class="dot" style="background:#E24B4A"></span>RE-2025-089 seit 94 Tagen offen — Mahnstufe?<span class="arr">→</span></div>
+<div class="sig s-amber"><span class="dot" style="background:#EF9F27"></span>Dokumentdatum weicht ab: ER 14.01. in Mail 22.03.<span class="arr">→</span></div>
+<div class="sig s-amber"><span class="dot" style="background:#EF9F27"></span>Doppelzuordnung möglich: € 1.200 → 2 Rechnungen<span class="arr">→</span></div>
+<div class="sig s-blue"><span class="dot" style="background:#378ADD"></span>Angebot Projekt Lang: 45 Tage ohne Rückmeldung<span class="arr">→</span></div>
+<div class="sig s-coral"><span class="dot" style="background:#D85A30"></span>Manuelle Prüfung: 2 Belege ohne Zuordnung<span class="arr">→</span></div>
+<div class="sig s-teal"><span class="dot" style="background:#1D9E75"></span>Kira-Vorschlag: Wissensregel „Skonto-Prüfung"<span class="arr">→</span></div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="kira-fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+</div>

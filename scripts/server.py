@@ -1495,6 +1495,7 @@ def build_einstellungen():
     aufg  = config.get("aufgaben", {})
     srv   = config.get("server", {})
     nf    = config.get("nachfass", {})
+    benachrichtigungen = config.get("benachrichtigungen", {})
     llm   = get_llm_config()
     proto = config.get("protokoll", {})
     rtlog_cfg = config.get("runtime_log", {})
@@ -1575,10 +1576,28 @@ def build_einstellungen():
 
         key_row = ""
         if needs_key:
-            key_row = f'''<div class="settings-row" style="margin-top:4px">
-              <label style="font-size:11px">API Key</label>
+            if pstatus.get('status') == 'ok':
+                # Key already set — show status with "Ändern" toggle
+                key_row = f'''<div class="settings-row" style="margin-top:4px">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:11px;color:var(--success,#3dae6a);font-weight:600">&#x2713; API Key hinterlegt &amp; aktiv</span>
+                <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer"
+                  onclick="toggleKeyInput('{js_esc(pid)}',this)">Schl&uuml;ssel &auml;ndern</button>
+              </div>
+              <div id="keyinp-{esc(pid)}" style="display:none;margin-top:6px">
+                <div style="display:flex;gap:4px;align-items:center">
+                  <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Neuen Key eingeben ..." style="width:190px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+                  <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--kl);color:#000;border:none;border-radius:4px;cursor:pointer" onclick="saveProviderKey('{js_esc(pid)}')">Speichern</button>
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">Neuer Key &uuml;berschreibt den vorhandenen.</div>
+              </div>
+            </div>'''
+            else:
+                # Key not set — show input prominently
+                key_row = f'''<div class="settings-row" style="margin-top:4px">
+              <label style="font-size:11px;color:var(--danger,#dc4a4a);font-weight:600">API Key fehlt &#x26a0;</label>
               <div style="display:flex;gap:4px;align-items:center">
-                <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Key eingeben..." style="width:180px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
+                <input type="password" id="pkey-{esc(pid)}" value="" placeholder="Key eingeben ..." style="width:190px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;">
                 <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--kl);color:#000;border:none;border-radius:4px;cursor:pointer" onclick="saveProviderKey('{js_esc(pid)}')">Speichern</button>
               </div>
             </div>'''
@@ -1624,6 +1643,25 @@ def build_einstellungen():
           {base_url_row}
         </div>'''
 
+    # Active budget model for classifier display
+    _BUDGET_DISPLAY = {
+        "anthropic":  "claude-haiku-4-5-20251001",
+        "openai":     "gpt-4o-mini",
+        "openrouter": "openai/gpt-4o-mini",
+    }
+    active_budget_model = "–"
+    for _p in providers:
+        if not _p.get("aktiv", True):
+            continue
+        _pst = check_provider_status(_p)
+        if _pst.get("status") == "ok":
+            _typ = _p.get("typ", "")
+            if _typ in _BUDGET_DISPLAY:
+                active_budget_model = _BUDGET_DISPLAY[_typ]
+            else:
+                active_budget_model = _p.get("model", "?") + " (lokal/custom)"
+            break
+
     # Provider-Typ-Optionen für "Hinzufügen"
     add_type_options = ""
     for tkey, tval in PROVIDER_TYPES.items():
@@ -1631,27 +1669,28 @@ def build_einstellungen():
 
     # Aktiver Provider für Status-Bar
     active_provider = next((p.get("name", p.get("typ", "?")) for p in providers if p.get("aktiv", True)), "–")
+    active_model    = next((p.get("model", "?") for p in providers if p.get("aktiv", True)), "–")
 
     html = f"""<style>
 #panel-einstellungen{{padding:0!important;max-width:none!important;width:100%;overflow:hidden;}}
 #panel-einstellungen.active{{display:flex!important;flex-direction:column;height:calc(100vh - 52px);}}
 .es-shell{{display:flex;flex-direction:column;flex:1;overflow:hidden;}}
 .es-mh{{background:var(--bg-raised);border-bottom:0.5px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}}
-.es-mt{{font-size:17px;font-weight:600;color:var(--text);white-space:nowrap;}}
+.es-mt{{font-size:var(--fs-lg);font-weight:600;color:var(--text);white-space:nowrap;}}
 .es-mstats{{display:flex;gap:14px;flex-wrap:wrap;}}
-.es-ms{{font-size:12px;color:var(--text-secondary);white-space:nowrap;}}
+.es-ms{{font-size:var(--fs-xs);color:var(--text-secondary);white-space:nowrap;}}
 .es-ms b{{font-weight:600;color:var(--text);}}
 .es-macts{{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}}
-.es-ma{{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.12s;}}
+.es-ma{{font-size:var(--fs-xs);padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.12s;}}
 .es-ma:hover{{background:var(--bg-overlay);color:var(--text);}}
 .es-ma.es-pri{{background:#444441;border-color:#444441;color:#fff;}}
 .es-ct{{display:flex;flex:1;overflow:hidden;min-height:0;}}
 .es-snav{{width:220px;min-width:220px;background:var(--bg-raised);border-right:0.5px solid var(--border);padding:12px 0;overflow-y:auto;flex-shrink:0;}}
-.es-snav-h{{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:10px 18px 5px;}}
-.es-sn{{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:var(--text-secondary);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s;user-select:none;}}
+.es-snav-h{{font-size:var(--fs-xs);font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:10px 18px 5px;}}
+.es-sn{{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:var(--fs-sm);color:var(--text-secondary);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s;user-select:none;}}
 .es-sn:hover{{background:var(--bg-overlay);}}
 .es-sn.act{{background:var(--accent-bg,rgba(68,68,65,.08));border-left-color:var(--accent,#444441);color:var(--text);font-weight:600;}}
-.es-sico{{width:18px;text-align:center;font-size:12px;opacity:0.5;flex-shrink:0;}}
+.es-sico{{width:18px;text-align:center;font-size:var(--fs-xs);opacity:0.5;flex-shrink:0;}}
 .es-sn.act .es-sico{{opacity:0.8;}}
 .es-scnt{{font-size:9px;background:var(--bg-overlay);color:var(--muted);padding:1px 6px;border-radius:8px;margin-left:auto;}}
 .es-sn.es-plan{{opacity:0.55;}}
@@ -1660,49 +1699,49 @@ def build_einstellungen():
 .es-main{{flex:1;overflow-y:auto;padding:24px 28px;background:var(--bg);}}
 .es-sec-panel{{display:none;}}
 .es-sec-panel.es-active{{display:block;}}
-.es-sec-h{{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;}}
-.es-sec-sub{{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.5;}}
+.es-sec-h{{font-size:var(--fs-lg);font-weight:600;color:var(--text);margin-bottom:4px;}}
+.es-sec-sub{{font-size:var(--fs-xs);color:var(--muted);margin-bottom:16px;line-height:1.5;}}
 .es-grp{{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:12px;}}
-.es-grp-h{{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}}
-.es-grp-sub{{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.4;}}
+.es-grp-h{{font-size:var(--fs-sm);font-weight:600;color:var(--text);margin-bottom:4px;}}
+.es-grp-sub{{font-size:var(--fs-xs);color:var(--muted);margin-bottom:12px;line-height:1.4;}}
 .es-row{{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border);}}
 .es-row:last-child{{border-bottom:none;}}
-.es-rl{{font-size:13px;color:var(--text);flex:1;min-width:0;}}
-.es-rd{{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4;}}
+.es-rl{{font-size:var(--fs-sm);color:var(--text);flex:1;min-width:0;}}
+.es-rd{{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;line-height:1.4;}}
 .es-toggle-wrap{{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;}}
 .es-toggle-inp{{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}}
 .es-toggle-vis{{display:inline-block;width:38px;height:20px;background:var(--border-strong,#888);border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;}}
 .es-toggle-vis::after{{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s;}}
 .es-toggle-inp:checked ~ .es-toggle-vis{{background:#1D9E75;}}
 .es-toggle-inp:checked ~ .es-toggle-vis::after{{transform:translateX(18px);}}
-.es-sel{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;}}
-.es-inp{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;width:200px;}}
-.es-inp-sm{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);font-family:inherit;width:100px;}}
-.es-badge{{font-size:10px;padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0;white-space:nowrap;}}
+.es-sel{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;}}
+.es-inp{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:200px;}}
+.es-inp-sm{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:100px;}}
+.es-badge{{font-size:var(--fs-xs);padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0;white-space:nowrap;}}
 .es-badge.on{{background:#EAF3DE;color:#3B6D11;}}
 .es-badge.off{{background:var(--bg-overlay);color:var(--muted);}}
 .es-badge.plan{{background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border);}}
-.es-btn{{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.12s;}}
+.es-btn{{font-size:var(--fs-xs);padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-strong);background:var(--bg);color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.12s;}}
 .es-btn:hover{{background:var(--bg-overlay);}}
 .es-btn.es-btn-pri{{background:#444441;border-color:#444441;color:#fff;}}
 .es-btn.es-btn-green{{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11;}}
 .es-btn.es-btn-red{{background:transparent;border-color:#e84545;color:#e84545;}}
 .es-intg{{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border:0.5px solid var(--border);border-radius:8px;margin-bottom:6px;}}
-.es-intg-ico{{width:32px;height:32px;border-radius:8px;background:var(--bg-overlay);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}}
+.es-intg-ico{{width:32px;height:32px;border-radius:8px;background:var(--bg-overlay);display:flex;align-items:center;justify-content:center;font-size:var(--fs-lg);flex-shrink:0;}}
 .es-intg-body{{flex:1;min-width:0;}}
-.es-intg-name{{font-size:13px;font-weight:600;color:var(--text);}}
-.es-intg-sub{{font-size:10px;color:var(--muted);margin-top:1px;}}
+.es-intg-name{{font-size:var(--fs-sm);font-weight:600;color:var(--text);}}
+.es-intg-sub{{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}}
 .es-save-bar{{margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px;}}
 .es-proto-tabs{{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);}}
-.es-proto-tab{{padding:8px 16px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
+.es-proto-tab{{padding:8px 16px;font-size:var(--fs-xs);font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
 .es-proto-tab.act{{color:var(--accent,#444441);border-bottom-color:var(--accent,#444441);}}
 .es-proto-tab-panel{{display:none;}}
 .es-proto-tab-panel.act{{display:block;}}
 .es-preview{{background:var(--bg-overlay);border:0.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-top:10px;}}
 .es-prev-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}}
 .es-prev-card{{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:8px;padding:10px;}}
-.es-prev-card .pc-label{{font-size:9px;color:var(--muted);}}
-.es-prev-card .pc-val{{font-size:16px;font-weight:600;color:var(--text);margin-top:2px;}}
+.es-prev-card .pc-label{{font-size:var(--fs-xs);color:var(--muted);}}
+.es-prev-card .pc-val{{font-size:var(--fs-lg);font-weight:600;color:var(--text);margin-top:2px;}}
 </style>
 <script>
 function esShowSec(id) {{
@@ -1729,6 +1768,7 @@ function esShowProtoTab(id) {{
   <span class="es-mt">Einstellungen</span>
   <div class="es-mstats">
     <span class="es-ms">Provider: <b>{active_provider}</b></span>
+    <span class="es-ms" title="Aktives Chat-Modell">Modell: <b>{active_model}</b></span>
     <span class="es-ms">Push: <b>{'aktiv' if ntfy.get('aktiv') else 'inaktiv'}</b></span>
     <span class="es-ms">Runtime-Log: <b>{'aktiv' if rtlog_cfg.get('aktiv', True) else 'inaktiv'}</b></span>
     <span class="es-ms">Log-Eintr.: <b>{rl_total}</b></span>
@@ -1831,8 +1871,11 @@ function esShowProtoTab(id) {{
       <div class="es-rl">Toast-Position<div class="es-rd">Position der Statusmeldungen auf dem Bildschirm</div></div>
       <select class="es-sel" id="cfg-toast-pos" onchange="applyToastPos(this.value)">
         <option value="">Unten rechts (Standard)</option>
-        <option value="top-right">Oben rechts</option>
+        <option value="bottom-center">Unten Mitte</option>
         <option value="bottom-left">Unten links</option>
+        <option value="top-right">Oben rechts</option>
+        <option value="top-center">Oben Mitte</option>
+        <option value="top-left">Oben links</option>
       </select>
     </div>
   </div>
@@ -1854,6 +1897,28 @@ function esShowProtoTab(id) {{
         <div class="es-toggle-vis"></div>
       </label>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Trennlinien zwischen Zeilen<div class="es-rd">Horizontale Linie zwischen Tabellenzeilen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-table-lines" onchange="applyTableLines(this.checked)">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;font-weight:600">&#x1F441; Vorschau</div>
+      <table class="proto-table" style="width:100%;border-collapse:collapse;background:var(--bg)">
+        <thead><tr style="background:var(--bg-overlay)">
+          <th style="padding:8px 10px;text-align:left;font-size:var(--fs-xs);font-weight:600;border-bottom:1px solid var(--border)">Datum</th>
+          <th style="padding:8px 10px;text-align:left;font-size:var(--fs-xs);font-weight:600;border-bottom:1px solid var(--border)">Ereignis</th>
+          <th style="padding:8px 10px;text-align:center;font-size:var(--fs-xs);font-weight:600;border-bottom:1px solid var(--border)">Status</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>28.03.2026</td><td>Mail klassifiziert</td><td style="text-align:center">&#x2713;</td></tr>
+          <tr><td>28.03.2026</td><td>Aufgabe erstellt</td><td style="text-align:center">&#x2713;</td></tr>
+          <tr><td>27.03.2026</td><td>Kira-Chat</td><td style="text-align:center">&#x2713;</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="es-grp">
@@ -1862,9 +1927,22 @@ function esShowProtoTab(id) {{
       <div class="es-rl">Firmenname<div class="es-rd">Wird in der Kopfzeile angezeigt</div></div>
       <input class="es-inp" type="text" id="cfg-company-name" placeholder="z.B. Meine Firma" oninput="applyCompanyName(this.value)">
     </div>
-    <div class="es-row">
-      <div class="es-rl">Logo (URL oder Emoji)<div class="es-rd">Kleines Logo links oben</div></div>
-      <input class="es-inp" type="text" id="cfg-logo" placeholder="z.B. https://... oder K" oninput="applyLogo(this.value)">
+    <div class="es-row" style="flex-wrap:wrap;gap:10px">
+      <div class="es-rl" style="min-width:180px">Logo<div class="es-rd">URL, Emoji oder Datei hochladen. Wird links oben angezeigt.</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input class="es-inp" type="text" id="cfg-logo" placeholder="https://... oder Emoji K" oninput="applyLogo(this.value)" style="width:180px">
+          <label class="es-btn" style="cursor:pointer;margin:0">
+            &#x2191; Datei
+            <input type="file" id="cfg-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp" style="display:none" onchange="handleLogoUpload(this)">
+          </label>
+          <button class="es-btn" onclick="applyLogo('');document.getElementById('cfg-logo').value='';localStorage.removeItem('kira_logo');updateLogoPreview('')">&#x2715; Reset</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="logo-upload-preview" style="width:40px;height:40px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-overlay);font-size:20px;flex-shrink:0"></div>
+          <span style="font-size:var(--fs-xs);color:var(--muted)">Vorschau (max. 200KB empfohlen)</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1925,11 +2003,11 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: BENACHRICHTIGUNGEN ────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-benachrichtigungen">
   <div class="es-sec-h">Benachrichtigungen</div>
-  <div class="es-sec-sub">Push-Benachrichtigungen via ntfy.sh. Erhalte Hinweise auf neue Mails, Aufgaben und Deadlines.</div>
+  <div class="es-sec-sub">Push-Benachrichtigungen via ntfy.sh und In-App Benachrichtigungen konfigurieren.</div>
 
   <div class="es-grp">
     <div class="es-grp-h">Push-Kanal (ntfy.sh)</div>
-    <div class="es-grp-sub">Verbinde einen ntfy-Kanal um Benachrichtigungen auf Dein Gerät zu erhalten.</div>
+    <div class="es-grp-sub">Verbinde einen ntfy-Kanal um Benachrichtigungen auf Dein Ger&auml;t zu erhalten.</div>
     <div class="es-row">
       <div class="es-rl">Push aktiv<div class="es-rd">Benachrichtigungen senden</div></div>
       <label class="es-toggle-wrap">
@@ -1940,14 +2018,95 @@ function esShowProtoTab(id) {{
     </div>
     <div class="es-row">
       <div class="es-rl">Kanal (Topic)<div class="es-rd">Eindeutiger Name des ntfy-Kanals</div></div>
-      <input class="es-inp" type="text" id="cfg-ntfy-topic" value="{esc(ntfy.get('topic',''))}" placeholder="mein-kanal">
+      <input class="es-inp" type="text" id="cfg-ntfy-topic" value="{esc(ntfy.get('topic_name',''))}" placeholder="mein-kanal">
     </div>
     <div class="es-row">
       <div class="es-rl">Server-URL<div class="es-rd">Standard: https://ntfy.sh</div></div>
       <input class="es-inp" type="text" id="cfg-ntfy-server" value="{esc(ntfy.get('server','https://ntfy.sh'))}" placeholder="https://ntfy.sh">
     </div>
-    <div style="margin-top:10px;display:flex;gap:8px">
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="es-btn es-btn-green" onclick="testPush()">Test-Push senden</button>
+      <a href="https://ntfy.sh" target="_blank" rel="noopener" class="es-btn" style="text-decoration:none">&#x1F4D6; ntfy.sh Doku</a>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:var(--bg-overlay);border-radius:6px;font-size:11px;color:var(--muted)">
+      <strong style="color:var(--text)">Einrichtung:</strong> ntfy-App installieren (iOS/Android) &rarr; + &rarr; Topic-Name eintragen &rarr; Fertig.<br>
+      Topic-Name frei w&auml;hlbar, z.B. <code>mein-kira-kanal-2026</code>. Server-URL nur bei eigenem ntfy-Server &auml;ndern.
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Arbeitszeiten &amp; Urlaubsmodus</div>
+    <div class="es-grp-sub">Push-Benachrichtigungen nur zu bestimmten Zeiten senden. Au&szlig;erhalb der Arbeitszeit werden Meldungen gepuffert.</div>
+    <div class="es-row">
+      <div class="es-rl">Arbeitszeiten-Filter aktiv<div class="es-rd">Push nur w&auml;hrend Arbeitszeit senden</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-ntfy-arbeitszeit-aktiv" {'checked' if ntfy.get('arbeitszeit_aktiv', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Arbeitszeit von<div class="es-rd">Fr&uuml;hester Push-Zeitpunkt (Uhrzeit)</div></div>
+      <input class="es-inp-sm" type="time" id="cfg-ntfy-az-von" value="{esc(ntfy.get('arbeitszeit_von','08:00'))}">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Arbeitszeit bis<div class="es-rd">Sp&auml;tester Push-Zeitpunkt (Uhrzeit)</div></div>
+      <input class="es-inp-sm" type="time" id="cfg-ntfy-az-bis" value="{esc(ntfy.get('arbeitszeit_bis','18:00'))}">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Urlaubsmodus<div class="es-rd">Alle Push-Benachrichtigungen deaktivieren</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-ntfy-urlaub" {'checked' if ntfy.get('urlaub_modus', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+      <span class="es-badge {'off' if ntfy.get('urlaub_modus', False) else 'on'}" id="urlaub-badge" style="{'background:var(--danger,#e84545);color:#fff' if ntfy.get('urlaub_modus', False) else ''}">{'&#x1F3D6; Urlaub aktiv' if ntfy.get('urlaub_modus', False) else 'Kein Urlaub'}</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Urlaub planen: von<div class="es-rd">Automatisch aktivieren ab Datum/Uhrzeit</div></div>
+      <input class="es-inp-sm" type="datetime-local" id="cfg-urlaub-von" value="{esc(ntfy.get('urlaub_von',''))}" style="width:180px">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Urlaub planen: bis<div class="es-rd">Automatisch deaktivieren am Datum/Uhrzeit</div></div>
+      <input class="es-inp-sm" type="datetime-local" id="cfg-urlaub-bis" value="{esc(ntfy.get('urlaub_bis',''))}" style="width:180px">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">In-App Benachrichtigungen</div>
+    <div class="es-grp-sub">Toast-Meldungen im Browser zeigen dir, was Kira im Hintergrund macht. So wei&szlig;t du immer was passiert.</div>
+    <div class="es-row">
+      <div class="es-rl">Mail-Eingang<div class="es-rd">Toast bei neuer klassifizierter Mail</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-mail" {'checked' if benachrichtigungen.get('inapp_mail', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kira-Antwort<div class="es-rd">Toast wenn Kira eine Antwort generiert</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-kira" {'checked' if benachrichtigungen.get('inapp_kira', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Aufgaben-Erinnerungen<div class="es-rd">Toast bei Deadline-Warnung und Nachfass</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-aufgaben" {'checked' if benachrichtigungen.get('inapp_aufgaben', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Hintergrund-Jobs<div class="es-rd">Toast bei Daily-Check / Mail-Monitor Aktionen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-bg" {'checked' if benachrichtigungen.get('inapp_bg', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Fehler-Meldungen<div class="es-rd">Toast bei Systemfehlern (empfohlen aktiv)</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-fehler" {'checked' if benachrichtigungen.get('inapp_fehler', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
     </div>
   </div>
 
@@ -1959,32 +2118,45 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: AUFGABENLOGIK ──────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-aufgaben">
   <div class="es-sec-h">Aufgabenlogik</div>
-  <div class="es-sec-sub">Steuerung der automatischen Aufgabenerstellung, Erinnerungen und unbeantworteter Mails.</div>
+  <div class="es-sec-sub">Steuerung der automatischen Aufgabenerstellung, Erinnerungen und Fristen.</div>
 
   <div class="es-grp">
     <div class="es-grp-h">Erinnerungen &amp; Fristen</div>
     <div class="es-row">
-      <div class="es-rl">Erinnerungs-Vorlauf (Stunden)<div class="es-rd">Wie viele Stunden vor Deadline erinnert werden soll</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-erinnerung-h" value="{aufg.get('erinnerung_h', 24)}" min="1" max="168">
+      <div class="es-rl">Erinnerungs-Vorlauf (Stunden)<div class="es-rd">Wie viele Stunden vor Deadline Kira erinnert</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-erinnerung-h" value="{aufg.get('erinnerung_intervall_stunden', 24)}" min="1" max="168">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Deadline-Warnung (Tage vorher)<div class="es-rd">Ab wie vielen Tagen vor Fälligkeit Push/Toast erscheint</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-deadline-warnung-tage" value="{aufg.get('deadline_warnung_tage', 1)}" min="0" max="14">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Erinnerungs-Typ<div class="es-rd">Wie wird erinnert</div></div>
+      <select class="es-sel" id="cfg-erinnerung-typ">
+        <option value="push" {'selected' if aufg.get('erinnerung_typ','push')=='push' else ''}>Push (ntfy)</option>
+        <option value="toast" {'selected' if aufg.get('erinnerung_typ','push')=='toast' else ''}>In-App Toast</option>
+        <option value="beide" {'selected' if aufg.get('erinnerung_typ','push')=='beide' else ''}>Push + Toast</option>
+      </select>
     </div>
     <div class="es-row">
       <div class="es-rl">Unbeantwortete Mails (Tage)<div class="es-rd">Ab wann eine Mail als unbeantwortete gilt</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-unanswered-days" value="{aufg.get('unanswered_days', 3)}" min="1" max="30">
+      <input class="es-inp-sm" type="number" id="cfg-unanswered-days" value="{aufg.get('unanswered_check_days', 3)}" min="1" max="30">
     </div>
   </div>
 
   <div class="es-grp">
-    <div class="es-grp-h">Server-Einstellungen</div>
+    <div class="es-grp-h">Aufgaben-Defaults</div>
     <div class="es-row">
-      <div class="es-rl">Port<div class="es-rd">Port auf dem der Kira-Server läuft</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-server-port" value="{srv.get('port', 8484)}" min="1024" max="65535">
+      <div class="es-rl">Standard-Priorität<div class="es-rd">Priorität bei manuell erstellten Aufgaben</div></div>
+      <select class="es-sel" id="cfg-default-prioritaet">
+        <option value="normal" {'selected' if aufg.get('default_prioritaet','normal')=='normal' else ''}>Normal</option>
+        <option value="hoch" {'selected' if aufg.get('default_prioritaet','normal')=='hoch' else ''}>Hoch</option>
+        <option value="kritisch" {'selected' if aufg.get('default_prioritaet','normal')=='kritisch' else ''}>Kritisch</option>
+      </select>
     </div>
     <div class="es-row">
-      <div class="es-rl">Browser automatisch &ouml;ffnen<div class="es-rd">Browser beim Server-Start automatisch &ouml;ffnen</div></div>
-      <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-auto-browser" {'checked' if srv.get('auto_browser', True) else ''}>
-        <div class="es-toggle-vis"></div>
-      </label>
+      <div class="es-rl">Erledigte auto-archivieren (Tage)<div class="es-rd">Erledigte Aufgaben nach X Tagen ausblenden. 0 = nie</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-auto-archiv-tage" value="{aufg.get('auto_archiv_tage', 0)}" min="0" max="365">
     </div>
   </div>
 
@@ -1996,22 +2168,59 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: NACHFASS-INTERVALLE ───────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-nachfass">
   <div class="es-sec-h">Nachfass-Intervalle</div>
-  <div class="es-sec-sub">Definiere nach wie vielen Tagen automatisch an Angebote und Anfragen erinnert wird.</div>
+  <div class="es-sec-sub">Definiere nach wie vielen Tagen automatisch an Angebote und Anfragen erinnert wird. Kira kann Nachfass-Texte vorschlagen.</div>
 
   <div class="es-grp">
-    <div class="es-grp-h">Erinnerungsstufen</div>
-    <div class="es-grp-sub">Drei aufeinanderfolgende Erinnerungsstufen, die bei unbeantworteten Angeboten ausgelöst werden.</div>
+    <div class="es-grp-h">Nachfass-Steuerung</div>
     <div class="es-row">
-      <div class="es-rl">Stufe 1 (Tage)<div class="es-rd">Erste Erinnerung nach X Tagen</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-nf-1" value="{nf.get('stufe1', 7)}" min="1" max="90">
+      <div class="es-rl">Nachfass aktiv<div class="es-rd">Automatische Erinnerungen f&uuml;r offene Angebote</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-aktiv" {'checked' if nf.get('aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+      <span class="es-badge {'on' if nf.get('aktiv', True) else 'off'}">{'Aktiv' if nf.get('aktiv', True) else 'Inaktiv'}</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Benachrichtigung via<div class="es-rd">Wie wird der Nachfass gemeldet</div></div>
+      <select class="es-sel" id="cfg-nf-typ">
+        <option value="push" {'selected' if nf.get('benachrichtigung','push')=='push' else ''}>Push (ntfy)</option>
+        <option value="toast" {'selected' if nf.get('benachrichtigung','push')=='toast' else ''}>In-App Toast</option>
+        <option value="beide" {'selected' if nf.get('benachrichtigung','push')=='beide' else ''}>Push + Toast</option>
+        <option value="aufgabe" {'selected' if nf.get('benachrichtigung','push')=='aufgabe' else ''}>Aufgabe erstellen (Kira LLM)</option>
+        <option value="alle" {'selected' if nf.get('benachrichtigung','push')=='alle' else ''}>Push + Toast + Aufgabe</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kira schreibt Nachfass-Text<div class="es-rd">Kira schl&auml;gt automatisch einen Nachfass-Mailtext vor (LLM)</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-kira-text" {'checked' if nf.get('kira_nachfass_text', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Erinnerungsstufen (Angebote)</div>
+    <div class="es-grp-sub">Drei aufeinanderfolgende Stufen bei unbeantworteten Angeboten. Stufe 3 = letzte Erinnerung.</div>
+    <div class="es-row">
+      <div class="es-rl">Stufe 1 (Tage)<div class="es-rd">Erste Erinnerung nach X Tagen ohne Antwort</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-1" value="{nf.get('intervall_1_tage', 7)}" min="1" max="90">
     </div>
     <div class="es-row">
       <div class="es-rl">Stufe 2 (Tage)<div class="es-rd">Zweite Erinnerung nach X Tagen</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-nf-2" value="{nf.get('stufe2', 14)}" min="1" max="90">
+      <input class="es-inp-sm" type="number" id="cfg-nf-2" value="{nf.get('intervall_2_tage', 14)}" min="1" max="90">
     </div>
     <div class="es-row">
       <div class="es-rl">Stufe 3 (Tage)<div class="es-rd">Letzte Erinnerung nach X Tagen</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-nf-3" value="{nf.get('stufe3', 30)}" min="1" max="90">
+      <input class="es-inp-sm" type="number" id="cfg-nf-3" value="{nf.get('intervall_3_tage', 30)}" min="1" max="90">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Rechnungs-Nachfass</div>
+    <div class="es-row">
+      <div class="es-rl">Offene Rechnungen (Tage)<div class="es-rd">Erinnerung bei &uuml;berf&auml;lligen Rechnungen nach X Tagen</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-rechnung" value="{nf.get('rechnung_tage', 14)}" min="1" max="60">
     </div>
   </div>
 
@@ -2023,7 +2232,7 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: DASHBOARD ─────────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-dashboard">
   <div class="es-sec-h">Dashboard</div>
-  <div class="es-sec-sub">Konfiguration der Dashboard-Ansicht und Aufgaben-Protokollierung.</div>
+  <div class="es-sec-sub">Konfiguration der Dashboard-Ansicht, Protokollierung und Server-Einstellungen.</div>
 
   <div class="es-grp">
     <div class="es-grp-h">Aufgaben-Protokoll</div>
@@ -2038,25 +2247,16 @@ function esShowProtoTab(id) {{
   </div>
 
   <div class="es-grp">
-    <div class="es-grp-h">LLM-Kontext</div>
+    <div class="es-grp-h">Server-Einstellungen</div>
+    <div class="es-grp-sub">Lokaler Webserver f&uuml;r die App-Oberfl&auml;che. &Auml;nderungen am Port erfordern einen Neustart.</div>
     <div class="es-row">
-      <div class="es-rl">Internet-Kontext aktivieren<div class="es-rd">Kira darf externe Informationen einbeziehen</div></div>
-      <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-internet" {'checked' if llm.get('internet', False) else ''}>
-        <div class="es-toggle-vis"></div>
-      </label>
+      <div class="es-rl">Port<div class="es-rd">TCP-Port des lokalen Servers (Standard: 8765)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-server-port" value="{srv.get('port', 8765)}" min="1024" max="65535">
     </div>
     <div class="es-row">
-      <div class="es-rl">Gesch&auml;fts-Kontext<div class="es-rd">Firmendaten in Kira-Prompts einbetten</div></div>
+      <div class="es-rl">Browser automatisch &ouml;ffnen<div class="es-rd">Browser beim Start der App &ouml;ffnen</div></div>
       <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-geschaeft" {'checked' if llm.get('geschaeft', True) else ''}>
-        <div class="es-toggle-vis"></div>
-      </label>
-    </div>
-    <div class="es-row">
-      <div class="es-rl">Konversations-Kontext<div class="es-rd">Verlauf der letzten Nachrichten einbeziehen</div></div>
-      <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konv', True) else ''}>
+        <input class="es-toggle-inp" type="checkbox" id="cfg-auto-browser" {'checked' if srv.get('auto_open_browser', True) else ''}>
         <div class="es-toggle-vis"></div>
       </label>
     </div>
@@ -2126,6 +2326,77 @@ function esShowProtoTab(id) {{
       </select>
       <input class="es-inp-sm" type="text" id="add-provider-name" placeholder="Name (optional)" style="width:140px">
       <button class="es-btn es-btn-green" onclick="addProvider()">+ Provider hinzuf&uuml;gen</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">LLM-Kontext</div>
+    <div class="es-grp-sub">Welche Kontextdaten Kira in jede Anfrage einbettet.</div>
+    <div class="es-row">
+      <div class="es-rl">Internet-Kontext<div class="es-rd">Kira darf externe Informationen einbeziehen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-internet" {'checked' if llm.get('internet_recherche', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Gesch&auml;fts-Kontext<div class="es-rd">Firmendaten in Kira-Prompts einbetten</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-geschaeft" {'checked' if llm.get('geschaeftsdaten_teilen', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Konversations-Kontext<div class="es-rd">Verlauf der letzten Nachrichten einbeziehen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konversationen_speichern', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Mail-Klassifizierung (Budget-Modell)</div>
+    <div class="es-grp-sub">Eingehende Mails werden automatisch mit einem g&uuml;nstigeren Modell klassifiziert &mdash; nicht mit dem Chat-Modell. Das spart bis zu 10&times; Kosten.</div>
+    <div style="overflow-x:auto;margin-bottom:12px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="background:var(--bg-overlay)">
+            <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">Modell</th>
+            <th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">Kosten (Input)</th>
+            <th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">Qualit&auml;t</th>
+            <th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">Empfehlung</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:5px 10px;border-bottom:1px solid var(--border)"><strong>Claude Haiku 4.5</strong></td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--success,#3dae6a)">~0.80&thinsp;$/1M</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)">Sehr gut f&uuml;r Klassifizierung</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)"><span class="es-badge on">Anthropic &#x2713;</span></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 10px;border-bottom:1px solid var(--border)"><strong>Claude Sonnet 4.5</strong></td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--warning,#e6a817)">~3.00&thinsp;$/1M</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)">Exzellent</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)"><span style="font-size:10px;color:var(--muted)">5&ndash;10&times; teurer</span></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 10px;border-bottom:1px solid var(--border)"><strong>GPT-4o-mini</strong></td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--success,#3dae6a)">~0.15&thinsp;$/1M</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)">Gut f&uuml;r Klassifizierung</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--border)"><span class="es-badge on">OpenAI &#x2713;</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Aktives Klassifizierungs-Modell<div class="es-rd">Wird derzeit f&uuml;r Mail-Klassifizierung verwendet</div></div>
+      <span style="font-size:var(--fs-xs);color:var(--success,#3dae6a);font-weight:700">&#x2713; {esc(active_budget_model)}</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Modell-Auswahl<div class="es-rd">Kira w&auml;hlt automatisch das g&uuml;nstigste Modell je Provider-Typ</div></div>
+      <span style="font-size:var(--fs-xs);color:var(--muted)">Auto-Budget &mdash; <span style="color:var(--text-secondary)">Admin-Konfiguration folgt mit Rollen-System</span></span>
     </div>
   </div>
 
@@ -2426,7 +2697,7 @@ function esShowProtoTab(id) {{
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="es-btn" onclick="showToast('Export: In Vorbereitung')">&#x2197; Config exportieren</button>
         <button class="es-btn" onclick="showToast('Import: In Vorbereitung')">&#x2199; Config importieren</button>
-        <button class="es-btn es-btn-red" onclick="showToast('Reset: Bitte manuell config.json bearbeiten')">Zur&uuml;cksetzen</button>
+        <button class="es-btn es-btn-red" onclick="resetConfig()">Zur&uuml;cksetzen</button>
       </div>
     </div>
   </div>
@@ -2620,6 +2891,12 @@ def generate_html() -> str:
     heute = datetime.now().strftime("%d.%m.%Y %H:%M")
     n_ges = len(tasks)
     n_antwort = sum(1 for t in tasks if t.get("kategorie") == "Antwort erforderlich")
+    try:
+        _cfg_h = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+        _ntfy_h = _cfg_h.get("ntfy", {})
+        ntfy_urlaub_modus = _ntfy_h.get("urlaub_modus", False)
+    except Exception:
+        ntfy_urlaub_modus = False
 
     alarm_dot = "<span class='alarm-dot'></span>" if n_antwort > 0 else ""
 
@@ -2765,6 +3042,7 @@ def generate_html() -> str:
     </div>
     <div class="header-right">
       <div class="top-chip" onclick="toggleKiraQuick()" title="Kira Quick Actions">&#x26A1; Quick Actions</div>
+      {'<div class="top-chip" style="background:#e84545;color:#fff;border-color:#c83030;font-weight:700" title="Urlaubsmodus aktiv — Push-Benachrichtigungen deaktiviert" onclick="esShowSec(\'benachrichtigungen\');showPanel(\'einstellungen\')">&#x1F3D6; Urlaub</div>' if ntfy_urlaub_modus else ''}
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
@@ -3434,6 +3712,30 @@ function applyCompanyName(name) {{
   if(el) el.textContent = name || 'Kira';
   localStorage.setItem('kira_company_name', name);
 }}
+function updateLogoPreview(val) {{
+  const pv = document.getElementById('logo-upload-preview');
+  if(!pv) return;
+  if(val && (val.startsWith('http')||val.startsWith('data:'))) {{
+    pv.innerHTML = '<img src="'+val+'" style="width:38px;height:38px;object-fit:contain">';
+  }} else {{
+    pv.textContent = val || '';
+  }}
+}}
+function handleLogoUpload(input) {{
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 512000) {{ showToast('Datei zu gro\u00df (max. 500KB)'); return; }}
+  const reader = new FileReader();
+  reader.onload = function(e) {{
+    const dataUrl = e.target.result;
+    const inp = document.getElementById('cfg-logo');
+    if(inp) inp.value = dataUrl;
+    applyLogo(dataUrl);
+    updateLogoPreview(dataUrl);
+    localStorage.setItem('kira_logo', dataUrl);
+  }};
+  reader.readAsDataURL(file);
+}}
 function applyLogo(val) {{
   const el = document.getElementById('sidebarLogo');
   if(!el) return;
@@ -3504,6 +3806,11 @@ function applyTableZebra(checked) {{
   if(checked) html.dataset.tableZebra = 'true'; else delete html.dataset.tableZebra;
   localStorage.setItem('kira_table_zebra', checked ? '1' : '0');
 }}
+function applyTableLines(checked) {{
+  const html = document.documentElement;
+  if(checked) html.dataset.tableLines = 'true'; else delete html.dataset.tableLines;
+  localStorage.setItem('kira_table_lines', checked ? '1' : '0');
+}}
 function saveDesignSettings() {{
   showToast('Design gespeichert');
   const st = document.getElementById('design-status');
@@ -3523,7 +3830,7 @@ function restoreDesign() {{
   const cn = localStorage.getItem('kira_company_name');
   if(cn) {{ applyCompanyName(cn); const inp=document.getElementById('cfg-company-name'); if(inp) inp.value=cn; }}
   const logo = localStorage.getItem('kira_logo');
-  if(logo) {{ applyLogo(logo); const inp=document.getElementById('cfg-logo'); if(inp) inp.value=logo; }}
+  if(logo) {{ applyLogo(logo); updateLogoPreview(logo); const inp=document.getElementById('cfg-logo'); if(inp) inp.value=logo; }}
   // Card radius
   const cr = localStorage.getItem('kira_card_radius') || '';
   if(cr) {{ applyCardRadius(cr); const sel=document.getElementById('cfg-card-radius'); if(sel) sel.value=cr; }}
@@ -3567,6 +3874,8 @@ function restoreDesign() {{
   if(localStorage.getItem('kira_table_zebra')==='1') {{
     applyTableZebra(true); const cb=document.getElementById('cfg-table-zebra'); if(cb) cb.checked=true;
   }}
+  const tl = localStorage.getItem('kira_table_lines');
+  if(tl) {{ applyTableLines(tl==='1'); const cb2=document.getElementById('cfg-table-lines'); if(cb2) cb2.checked=(tl==='1'); }}
 }}
 
 // KPI click -> jump to Kommunikation with filter
@@ -4250,32 +4559,53 @@ function saveSettings() {{
 
   const cfg = {{
     ntfy: {{
-      aktiv: document.getElementById('cfg-ntfy-aktiv').checked,
-      topic_name: document.getElementById('cfg-ntfy-topic').value.trim(),
-      server: document.getElementById('cfg-ntfy-server').value.trim() || 'https://ntfy.sh'
+      aktiv:              document.getElementById('cfg-ntfy-aktiv')?.checked ?? false,
+      topic_name:         document.getElementById('cfg-ntfy-topic')?.value.trim() || '',
+      server:             document.getElementById('cfg-ntfy-server')?.value.trim() || 'https://ntfy.sh',
+      arbeitszeit_aktiv:  document.getElementById('cfg-ntfy-arbeitszeit-aktiv')?.checked ?? false,
+      arbeitszeit_von:    document.getElementById('cfg-ntfy-az-von')?.value || '08:00',
+      arbeitszeit_bis:    document.getElementById('cfg-ntfy-az-bis')?.value || '18:00',
+      urlaub_modus:       document.getElementById('cfg-ntfy-urlaub')?.checked ?? false,
+      urlaub_von:         document.getElementById('cfg-urlaub-von')?.value || '',
+      urlaub_bis:         document.getElementById('cfg-urlaub-bis')?.value || ''
+    }},
+    benachrichtigungen: {{
+      inapp_mail:     document.getElementById('cfg-inapp-mail')?.checked ?? true,
+      inapp_kira:     document.getElementById('cfg-inapp-kira')?.checked ?? true,
+      inapp_aufgaben: document.getElementById('cfg-inapp-aufgaben')?.checked ?? true,
+      inapp_bg:       document.getElementById('cfg-inapp-bg')?.checked ?? false,
+      inapp_fehler:   document.getElementById('cfg-inapp-fehler')?.checked ?? true
     }},
     aufgaben: {{
-      erinnerung_intervall_stunden: parseInt(document.getElementById('cfg-erinnerung-h').value)||24,
-      unanswered_check_days: parseInt(document.getElementById('cfg-unanswered-days').value)||14
+      erinnerung_intervall_stunden: parseInt(document.getElementById('cfg-erinnerung-h')?.value)||24,
+      unanswered_check_days:        parseInt(document.getElementById('cfg-unanswered-days')?.value)||3,
+      deadline_warnung_tage:        parseInt(document.getElementById('cfg-deadline-warnung-tage')?.value)||1,
+      erinnerung_typ:               document.getElementById('cfg-erinnerung-typ')?.value || 'push',
+      default_prioritaet:           document.getElementById('cfg-default-prioritaet')?.value || 'normal',
+      auto_archiv_tage:             parseInt(document.getElementById('cfg-auto-archiv-tage')?.value)||0
     }},
     nachfass: {{
-      intervall_1_tage: parseInt(document.getElementById('cfg-nf-1').value)||10,
-      intervall_2_tage: parseInt(document.getElementById('cfg-nf-2').value)||21,
-      intervall_3_tage: parseInt(document.getElementById('cfg-nf-3').value)||45
+      aktiv:              document.getElementById('cfg-nf-aktiv')?.checked ?? true,
+      benachrichtigung:   document.getElementById('cfg-nf-typ')?.value || 'push',
+      kira_nachfass_text: document.getElementById('cfg-nf-kira-text')?.checked ?? true,
+      intervall_1_tage:   parseInt(document.getElementById('cfg-nf-1')?.value)||7,
+      intervall_2_tage:   parseInt(document.getElementById('cfg-nf-2')?.value)||14,
+      intervall_3_tage:   parseInt(document.getElementById('cfg-nf-3')?.value)||30,
+      rechnung_tage:      parseInt(document.getElementById('cfg-nf-rechnung')?.value)||14
     }},
     server: {{
-      port: parseInt(document.getElementById('cfg-server-port').value)||8765,
-      auto_open_browser: document.getElementById('cfg-auto-browser').checked
+      port:             parseInt(document.getElementById('cfg-server-port')?.value)||8765,
+      auto_open_browser: document.getElementById('cfg-auto-browser')?.checked ?? true
     }},
     llm: {{
-      internet_recherche: document.getElementById('cfg-llm-internet')?.checked || false,
-      geschaeftsdaten_teilen: document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
+      internet_recherche:      document.getElementById('cfg-llm-internet')?.checked ?? false,
+      geschaeftsdaten_teilen:  document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
       konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
       _provider_updates: providerUpdates
     }},
     protokoll: {{
       max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
-      tage: parseInt(document.getElementById('cfg-proto-tage')?.value)||0
+      tage:          parseInt(document.getElementById('cfg-proto-tage')?.value)||90
     }},
     runtime_log: {{
       aktiv:                  document.getElementById('cfg-rl-aktiv')?.checked ?? true,
@@ -4304,6 +4634,17 @@ function saveSettings() {{
     if(d.ok) showToast('Einstellungen gespeichert');
     else showToast(d.error||'Fehler');
   }}).catch(()=>showToast('Fehler'));
+}}
+
+function testPush() {{
+  const topic = document.getElementById('cfg-ntfy-topic')?.value.trim();
+  const server = document.getElementById('cfg-ntfy-server')?.value.trim() || 'https://ntfy.sh';
+  if(!topic) {{ showToast('Bitte zuerst einen Topic-Namen eingeben und speichern'); return; }}
+  fetch('/api/ntfy/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{topic,server}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok) showToast('\u2713 Test-Push gesendet! Check dein Ger\u00e4t.');
+      else showToast('Fehler: '+(d.error||'Unbekannt'));
+    }}).catch(()=>showToast('Fehler beim Senden'));
 }}
 
 // Runtime-Log: fire-and-forget helper (JS -> POST /api/runtime/event)
@@ -4453,6 +4794,22 @@ function clearRtLog() {{
   );
 }}
 
+function resetConfig() {{
+  showKritischModal(
+    'Konfiguration zur\u00fccksetzen',
+    'Die gesamte config.json wird auf Werkseinstellungen zur\u00fcckgesetzt. API-Keys in secrets.json bleiben erhalten. Ein Backup wird als config.json.bak angelegt.',
+    'ZUR\u00dcCKSETZEN',
+    function() {{
+      fetch('/api/config/reset',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          if(d.ok){{showToast('Konfiguration zur\u00fcckgesetzt \u2014 Seite wird neu geladen\u2026'); setTimeout(()=>location.reload(),1800);}}
+          else showToast(d.error||'Fehler beim Zur\u00fccksetzen');
+        }}).catch(()=>showToast('Fehler'));
+    }},
+    'Ein Backup der aktuellen Konfiguration wird als config.json.bak gespeichert.'
+  );
+}}
+
 // Änderungsverlauf laden / toggle
 function loadChangeLog(append) {{
   const box = document.getElementById('changelog-entries');
@@ -4564,6 +4921,14 @@ function exportChangeLog() {{
 }}
 
 // Provider Key speichern
+function toggleKeyInput(pid, btn) {{
+  const box = document.getElementById('keyinp-'+pid);
+  if(!box) return;
+  const open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? 'Schl\u00fcssel \u00e4ndern' : '\u00d7 Abbrechen';
+  if(!open) document.getElementById('pkey-'+pid)?.focus();
+}}
 function saveProviderKey(providerId) {{
   const key = document.getElementById('pkey-'+providerId)?.value.trim();
   if(!key) {{ showToast('Bitte API Key eingeben'); return; }}
@@ -5781,9 +6146,9 @@ CSS = """
 [data-shadow="none"] .task-card,[data-shadow="none"] .kpi-card,[data-shadow="none"] .dash-kpi,
 [data-shadow="none"] .modal,[data-shadow="none"] .kira-workspace,[data-shadow="none"] .kira-quick{box-shadow:none!important;}
 [data-shadow="strong"] .task-card,[data-shadow="strong"] .kpi-card,[data-shadow="strong"] .dash-kpi{box-shadow:0 2px 12px rgba(0,0,0,.15);}
-/* Font size override */
-[data-fontsize="small"]{font-size:12px;}
-[data-fontsize="large"]{font-size:15px;}
+/* Font size override — overrides CSS variables so all var(--fs-*) respond */
+[data-fontsize="small"]{--fs-xs:10px;--fs-sm:11px;--fs-base:12px;--fs-md:13px;--fs-lg:15px;--fs-xl:20px;--fs-xxl:26px;}
+[data-fontsize="large"]{--fs-xs:13px;--fs-sm:14px;--fs-base:16px;--fs-md:17px;--fs-lg:20px;--fs-xl:28px;--fs-xxl:34px;}
 /* Font family */
 [data-font-family="mono"] body{font-family:'Fira Mono','Cascadia Code','Courier New',monospace!important;}
 [data-font-family="system"] body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif!important;}
@@ -5793,8 +6158,14 @@ CSS = """
 /* Toast position */
 [data-toast-pos="top-right"] .status-toast{bottom:auto!important;top:24px;}
 [data-toast-pos="bottom-left"] .status-toast{right:auto!important;left:24px;bottom:82px;}
+[data-toast-pos="bottom-center"] .status-toast{right:50%!important;transform:translateX(50%) translateY(8px);bottom:82px;}
+[data-toast-pos="bottom-center"] .status-toast.show{transform:translateX(50%) translateY(0);}
+[data-toast-pos="top-center"] .status-toast{right:50%!important;bottom:auto!important;top:24px;transform:translateX(50%) translateY(-8px);}
+[data-toast-pos="top-center"] .status-toast.show{transform:translateX(50%) translateY(0);}
+[data-toast-pos="top-left"] .status-toast{right:auto!important;left:24px!important;bottom:auto!important;top:24px;}
 /* Table zebra */
 [data-table-zebra="true"] .proto-table tbody tr:nth-child(even) td{background:var(--bg-overlay);}
+[data-table-lines="true"] .proto-table tbody tr td{border-bottom:0.5px solid var(--border);}
 /* Global form element theming — prevents hardcoded black backgrounds in light mode */
 input:not([type="color"]):not([type="checkbox"]):not([type="radio"]),select,textarea{
   background:var(--bg-raised);color:var(--text);}
@@ -7655,6 +8026,63 @@ class DashboardHandler(BaseHTTPRequestHandler):
                      source='server', modul='einstellungen', actor_type='user', status='ok',
                      settings_after=json.dumps({k: v for k, v in merged.items()
                                                 if k not in ('llm',)}, ensure_ascii=False)[:2000])
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # ntfy Test-Push
+        if self.path == '/api/ntfy/test':
+            try:
+                import urllib.request as _urlreq
+                topic  = (body.get('topic') or '').strip()
+                server = (body.get('server') or 'https://ntfy.sh').rstrip('/')
+                if not topic:
+                    self._json({'ok': False, 'error': 'Kein Topic angegeben'})
+                    return
+                url = f"{server}/{topic}"
+                req = _urlreq.Request(
+                    url,
+                    data='Kira Test-Push: Verbindung erfolgreich! \u2728'.encode('utf-8'),
+                    headers={'Content-Type': 'text/plain; charset=utf-8',
+                             'Title': 'Kira Assistenz', 'Priority': 'default'},
+                    method='POST')
+                with _urlreq.urlopen(req, timeout=8) as resp:
+                    st = resp.status
+                self._json({'ok': st < 300})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Config zurücksetzen auf Werkseinstellungen
+        if self.path == '/api/config/reset':
+            try:
+                config_path = SCRIPTS_DIR / "config.json"
+                backup_path = SCRIPTS_DIR / "config.json.bak"
+                try:
+                    backup_path.write_text(config_path.read_text('utf-8'), 'utf-8')
+                except Exception:
+                    pass
+                defaults = {
+                    "_kommentar": "Deine persönliche Konfiguration für den rauMKult Assistenten",
+                    "ntfy": {"aktiv": False, "topic_name": "", "server": "https://ntfy.sh"},
+                    "aufgaben": {"unanswered_check_days": 3, "erinnerung_intervall_stunden": 24},
+                    "nachfass": {"intervall_1_tage": 7, "intervall_2_tage": 14, "intervall_3_tage": 30},
+                    "server": {"port": 8765, "auto_open_browser": True},
+                    "protokoll": {"max_eintraege": 0, "tage": 90},
+                    "runtime_log": {"aktiv": True, "ui_events": True, "kira_events": True,
+                                   "llm_events": True, "hintergrund_events": True,
+                                   "settings_events": True, "fehler_immer_loggen": True,
+                                   "vollkontext_speichern": True, "kira_darf_lesen": True},
+                    "kira": {"launcher_variant": "B", "size": 112, "prox_radius": 0.5,
+                             "bounce_dist": 130, "idle_mode": True, "idle_delay": 10},
+                    "llm": {"internet_recherche": False, "geschaeftsdaten_teilen": True,
+                            "konversationen_speichern": True, "max_kontext_items": 50,
+                            "auto_wissen_extrahieren": True, "providers": []}
+                }
+                config_path.write_text(json.dumps(defaults, ensure_ascii=False, indent=2), 'utf-8')
+                rlog('settings', 'config_reset', 'Konfiguration auf Werkseinstellungen zurückgesetzt',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
                 self._json({'ok': True})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})

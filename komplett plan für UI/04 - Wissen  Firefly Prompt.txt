@@ -1,0 +1,89 @@
+04 - Wissen  Firefly Prompt
+
+
+Create a premium enterprise knowledge module UI for the same Kira product system and the same visual family as the existing dashboard, communication, and business reference pages.
+
+Important:
+This must look like the same product family as the already created Kira pages.
+Use the same app shell, same collapsible left sidebar, same top utility bar, same spacing rhythm, same card language, same typography feeling, same elegant light SaaS aesthetic, same refined neutral color palette.
+
+This is the “Wissen” module of the same Kira software.
+
+Page layout:
+full-width desktop application,
+same left collapsible navigation,
+same top utility bar,
+below that a clear module header for “Wissen” with status numbers and utility actions,
+below that a top-level split navigation with two main sections:
+Bibliothek and Regelsteuerung.
+
+Bibliothek section:
+show a clean and elegant grid of medium-sized category cards, not tiny cards and not long text blocks.
+Main categories:
+Stil & Ton,
+Preise & Kalkulation,
+Technik,
+Prozess,
+Geschäftsregeln,
+FAQ,
+Projektwissen.
+
+Each category card should feel premium and highly readable:
+title,
+short description,
+count of entries,
+last updated indicator,
+subtle status hint,
+open button or open affordance.
+
+Below or beside the category grid, show a larger detail area for the currently selected category.
+This detail area should feel spacious and editorial, with:
+left side = list of entries or subtopics,
+center = main content preview,
+right side optional = metadata, links, actions, history, related modules.
+The whole composition should feel like a real knowledge system, not a wall of rules.
+
+Regelsteuerung section:
+visualize a second layer with clear segmented tabs:
+Feste Regeln,
+Gelernt,
+Vorschläge,
+Korrekturen,
+Freigaben.
+
+This section should feel more structured and administrative than the Bibliothek, but still elegant and readable.
+Show tidy cards, lists, or grouped panels with status markers and action affordances.
+Do not show giant stacked text cards.
+Do not create an endless list of similar boxes.
+
+Visual direction:
+must feel like premium enterprise software from 2026,
+smart internal knowledge system,
+clean, calm, highly usable,
+same design DNA as the existing Kira dashboard, communication and business pages.
+
+Use:
+larger readable typography,
+crisp white and light neutral surfaces,
+dark charcoal text,
+soft but clear shadows,
+refined spacing,
+subtle restrained accent color for active states and highlights only.
+
+Important visual constraints:
+no long text wall as default,
+no giant vertical list of similar rule blocks,
+no tiny unreadable cards,
+no pale weak contrast,
+no raw form page,
+no generic CMS look,
+no retro admin look,
+no rauMKult brand colors,
+no dark mode,
+no unrelated visual style.
+
+Allowed:
+same subtle Kira launcher button in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS knowledge module, enterprise knowledge base UI, internal rules library, modern business software, elegant card grid, readable editorial workspace, structured admin tabs, same visual system as the existing Kira modules.

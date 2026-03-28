@@ -1,0 +1,360 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1020px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.plan{opacity:0.45}
+.sn.plan .pb{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.grp-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid #F1EFE8}
+.row:last-child{border-bottom:none}
+.row-label{font-size:13px;color:#1C1C1A;flex:1;min-width:0}
+.row-desc{font-size:10px;color:#B4B2A9;margin-top:1px}
+.toggle{width:38px;height:20px;background:#D3D1C7;border-radius:10px;position:relative;cursor:pointer;flex-shrink:0;transition:background 0.2s}
+.toggle.on{background:#1D9E75}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s}
+.toggle.on::after{transform:translateX(18px)}
+.seg{display:flex;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;overflow:hidden;flex-shrink:0}
+.seg-o{padding:5px 14px;font-size:11px;color:#5F5E5A;cursor:pointer;border-right:0.5px solid #D3D1C7}
+.seg-o:last-child{border-right:none}
+.seg-o.act{background:#fff;color:#1C1C1A;font-weight:500}
+.status-badge{font-size:10px;padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0}
+.status-badge.on{background:#EAF3DE;color:#3B6D11}
+.status-badge.off{background:#F1EFE8;color:#888780}
+.status-badge.warn{background:#FAEEDA;color:#854F0B}
+.channel{display:flex;gap:14px;padding:14px 16px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:10px;margin-bottom:8px;align-items:flex-start}
+.channel-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.channel-icon.push{background:#EEEDFE;color:#534AB7}
+.channel-icon.win{background:#E6F1FB;color:#185FA5}
+.channel-icon.mail{background:#FAEEDA;color:#854F0B}
+.channel-body{flex:1;min-width:0}
+.channel-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.channel-name{font-size:14px;font-weight:500;color:#1C1C1A}
+.channel-desc{font-size:11px;color:#888780;line-height:1.4;margin-bottom:8px}
+.channel-meta{font-size:10px;color:#B4B2A9;display:flex;gap:12px;align-items:center}
+.channel-meta b{font-weight:500;color:#5F5E5A}
+.channel-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.channel-btn{font-size:10px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#fff;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.channel-btn:hover{border-color:#B4B2A9}
+.time-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}
+.time-day{text-align:center}
+.time-day-label{font-size:10px;color:#888780;margin-bottom:4px;font-weight:500}
+.time-bar{height:48px;border-radius:6px;background:#F5F4F1;border:0.5px solid #EEEDE9;position:relative;overflow:hidden}
+.time-quiet{position:absolute;left:0;right:0;background:#EEEDFE;border-radius:4px}
+.time-label{font-size:8px;color:#534AB7;text-align:center;line-height:1;padding-top:2px}
+.time-range{display:flex;align-items:center;gap:10px;margin-top:8px}
+.time-input{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:6px 12px;font-size:13px;color:#1C1C1A;width:80px;text-align:center}
+.time-sep{font-size:13px;color:#888780}
+.test-panel{display:flex;gap:12px;align-items:flex-start}
+.test-action{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:16px 18px;flex:1;cursor:pointer;transition:border-color 0.15s}
+.test-action:hover{border-color:#D3D1C7}
+.test-action-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.test-action-desc{font-size:11px;color:#888780;line-height:1.4;margin-bottom:8px}
+.test-action-btn{font-size:11px;padding:6px 14px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;display:inline-block}
+.test-action-btn.primary{background:#444441;border-color:#444441;color:#fff}
+.test-status{margin-top:8px;font-size:10px;color:#B4B2A9;display:flex;align-items:center;gap:4px}
+.test-status .dot{width:5px;height:5px;border-radius:50%}
+.test-status .dot.ok{background:#1D9E75}
+.test-status .dot.none{background:#D3D1C7}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar">
+<div class="srch">⌕ Suche in allen Modulen…</div>
+<div class="tpr">
+<div class="tc">⚡ Quick Actions</div>
+<div class="tc ok"><span class="dot"></span>Verbunden</div>
+<div class="tc">🔔 Offene Aufgaben</div>
+<div class="av">KM</div>
+</div>
+</div>
+
+<div class="mh">
+<div class="mt">Einstellungen</div>
+<div class="mstats">
+<div class="ms">Provider: <b>Anthropic</b></div>
+<div class="ms">Theme: <b>Hell</b></div>
+<div class="ms">Push: <b>aktiv</b></div>
+<div class="ms">Zuletzt: <b>vor 2 Std.</b></div>
+</div>
+<div class="macts">
+<div class="ma">⌕ Suche</div>
+<div class="ma">↺ Zurücksetzen</div>
+<div class="ma">↗ Export</div>
+<div class="ma">↙ Import</div>
+<div class="ma primary">Speichern</div>
+</div>
+</div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn"><div class="sico">◐</div>Design</div>
+<div class="sn act"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">3</span></div>
+<div class="sn"><div class="sico">⇌</div>Integrationen<span class="cnt">4</span></div>
+<div class="sn plan"><div class="sico">⟳</div>Automationen<span class="pb">Geplant</span></div>
+</div>
+
+<div class="main-set">
+
+<!-- SECTION 1: Allgemein -->
+<div class="sec">
+<div class="sec-h">Benachrichtigungen</div>
+<div class="sec-sub">Kanäle, Prioritäten und Zeitfenster für Benachrichtigungen verwalten</div>
+
+<div class="grp">
+<div class="grp-h">Allgemeine Benachrichtigungen</div>
+<div class="grp-sub">Globaler Schalter und Grundverhalten</div>
+<div class="row">
+<div class="row-label">Benachrichtigungen aktiv<div class="row-desc">Alle Kanäle ein- oder ausschalten</div></div>
+<span class="status-badge on">Aktiv</span>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Zusammenfassungsmodus<div class="row-desc">Einzelne Meldungen zu periodischen Zusammenfassungen bündeln</div></div>
+<div class="seg"><div class="seg-o">Einzeln</div><div class="seg-o act">Zusammenfassung</div><div class="seg-o">Nur kritisch</div></div>
+</div>
+<div class="row">
+<div class="row-label">Zusammenfassungsintervall<div class="row-desc">Wie oft gebündelte Benachrichtigungen gesendet werden</div></div>
+<div class="seg"><div class="seg-o">Stündlich</div><div class="seg-o act">Alle 4 Std.</div><div class="seg-o">Täglich</div></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 2: Kanäle -->
+<div class="sec">
+<div class="sec-h">Kanäle</div>
+<div class="sec-sub">Über welche Wege Benachrichtigungen zugestellt werden</div>
+
+<div class="channel">
+<div class="channel-icon push">⚡</div>
+<div class="channel-body">
+<div class="channel-top"><span class="channel-name">Push-Benachrichtigungen (ntfy.sh)</span><span class="status-badge on">Verbunden</span></div>
+<div class="channel-desc">Echtzeit-Push über ntfy.sh an Smartphone und Desktop. Unterstützt Prioritätsstufen und stille Zustellung.</div>
+<div class="channel-meta"><span><b>Server:</b> ntfy.sh/kira-raumkult</span><span><b>Letzte:</b> vor 34 Min.</span><span><b>Heute:</b> 7 gesendet</span></div>
+</div>
+<div class="channel-right">
+<div class="toggle on"></div>
+<div class="channel-btn">Konfigurieren</div>
+<div class="channel-btn">Einrichtungshilfe</div>
+</div>
+</div>
+
+<div class="channel">
+<div class="channel-icon win">🖥</div>
+<div class="channel-body">
+<div class="channel-top"><span class="channel-name">Windows Toast-Benachrichtigungen</span><span class="status-badge on">Aktiv</span></div>
+<div class="channel-desc">Native Windows 11 Desktop-Benachrichtigungen im Benachrichtigungscenter. Erscheinen direkt am Bildschirmrand.</div>
+<div class="channel-meta"><span><b>Modus:</b> Standard</span><span><b>Letzte:</b> vor 2 Std.</span></div>
+</div>
+<div class="channel-right">
+<div class="toggle on"></div>
+<div class="channel-btn">Konfigurieren</div>
+</div>
+</div>
+
+<div class="channel">
+<div class="channel-icon mail">✉</div>
+<div class="channel-body">
+<div class="channel-top"><span class="channel-name">E-Mail-Zusammenfassung</span><span class="status-badge off">Inaktiv</span></div>
+<div class="channel-desc">Tägliche oder wöchentliche Zusammenfassung aller Benachrichtigungen per E-Mail an info@raumkult.eu.</div>
+<div class="channel-meta"><span><b>Intervall:</b> nicht konfiguriert</span></div>
+</div>
+<div class="channel-right">
+<div class="toggle"></div>
+<div class="channel-btn">Einrichten</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 3: Priorität -->
+<div class="sec">
+<div class="sec-h">Priorität &amp; Verhalten</div>
+<div class="sec-sub">Welche Ereignisse lösen Benachrichtigungen aus und wie dringend</div>
+
+<div class="grp">
+<div class="grp-h">Benachrichtigungsregeln</div>
+<div class="row">
+<div class="row-label">Nur hohe Priorität<div class="row-desc">Nur bei dringenden Fristen, überfälligen Rechnungen und kritischen Leads benachrichtigen</div></div>
+<div class="toggle"></div>
+</div>
+<div class="row">
+<div class="row-label">Neue Leads sofort melden<div class="row-desc">Jeder neue Lead löst unabhängig vom Zusammenfassungsmodus sofort eine Benachrichtigung aus</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Fristenwarnungen<div class="row-desc">Benachrichtigung wenn Fristen in weniger als 24 Stunden ablaufen</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Zahlungseingänge melden<div class="row-desc">Benachrichtigung bei erkannten Zahlungseingängen</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Skonto-Warnungen<div class="row-desc">Benachrichtigung wenn ein Skonto-Fenster bald abläuft</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Kira-Vorschläge melden<div class="row-desc">Wenn Kira neue Wissensregeln oder Korrekturen vorschlägt</div></div>
+<div class="seg"><div class="seg-o">Nie</div><div class="seg-o act">In Zusammenfassung</div><div class="seg-o">Sofort</div></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 4: Ruhezeiten -->
+<div class="sec">
+<div class="sec-h">Ruhezeiten</div>
+<div class="sec-sub">Zeitfenster in denen keine Benachrichtigungen zugestellt werden — außer bei kritischen Fällen</div>
+
+<div class="grp">
+<div class="grp-h">Stille Zeiten</div>
+<div class="grp-sub">Benachrichtigungen werden in diesen Zeitfenstern zurückgehalten und danach gesammelt zugestellt</div>
+<div class="row">
+<div class="row-label">Ruhezeit aktiv<div class="row-desc">Aktiviert das konfigurierte Zeitfenster</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Zeitfenster<div class="row-desc">In dieser Zeit werden keine Benachrichtigungen gesendet</div></div>
+<div class="time-range">
+<input class="time-input" value="20:00" disabled>
+<span class="time-sep">bis</span>
+<input class="time-input" value="07:00" disabled>
+</div>
+</div>
+<div class="row">
+<div class="row-label">Wochenenden stumm<div class="row-desc">Samstag und Sonntag komplett stumm schalten</div></div>
+<div class="toggle"></div>
+</div>
+<div class="row">
+<div class="row-label">Kritische trotzdem zustellen<div class="row-desc">Überfällige Rechnungen und neue Leads ignorieren die Ruhezeit</div></div>
+<div class="toggle on"></div>
+</div>
+</div>
+
+<div class="grp">
+<div class="grp-h">Wochenübersicht</div>
+<div class="grp-sub">Visuelle Darstellung der aktiven Ruhezeiten pro Wochentag</div>
+<div class="time-grid">
+<div class="time-day"><div class="time-day-label">Mo</div><div class="time-bar"><div class="time-quiet" style="top:0;height:29%;"><div class="time-label">bis 7h</div></div><div class="time-quiet" style="bottom:0;height:17%"><div class="time-label">ab 20h</div></div></div></div>
+<div class="time-day"><div class="time-day-label">Di</div><div class="time-bar"><div class="time-quiet" style="top:0;height:29%"></div><div class="time-quiet" style="bottom:0;height:17%"></div></div></div>
+<div class="time-day"><div class="time-day-label">Mi</div><div class="time-bar"><div class="time-quiet" style="top:0;height:29%"></div><div class="time-quiet" style="bottom:0;height:17%"></div></div></div>
+<div class="time-day"><div class="time-day-label">Do</div><div class="time-bar"><div class="time-quiet" style="top:0;height:29%"></div><div class="time-quiet" style="bottom:0;height:17%"></div></div></div>
+<div class="time-day"><div class="time-day-label">Fr</div><div class="time-bar"><div class="time-quiet" style="top:0;height:29%"></div><div class="time-quiet" style="bottom:0;height:17%"></div></div></div>
+<div class="time-day"><div class="time-day-label">Sa</div><div class="time-bar" style="opacity:0.5"></div></div>
+<div class="time-day"><div class="time-day-label">So</div><div class="time-bar" style="opacity:0.5"></div></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 5: Test -->
+<div class="sec">
+<div class="sec-h">Test &amp; Diagnose</div>
+<div class="sec-sub">Kanäle testen und Zustellungsstatus prüfen</div>
+
+<div class="test-panel">
+<div class="test-action">
+<div class="test-action-h">⚡ Push testen</div>
+<div class="test-action-desc">Sendet eine Testbenachrichtigung über ntfy.sh an alle verbundenen Geräte.</div>
+<div class="test-action-btn primary">Testbenachrichtigung senden</div>
+<div class="test-status"><span class="dot ok"></span>Letzte: vor 34 Min. — erfolgreich zugestellt</div>
+</div>
+
+<div class="test-action">
+<div class="test-action-h">🖥 Windows Toast testen</div>
+<div class="test-action-desc">Zeigt eine Test-Benachrichtigung im Windows 11 Benachrichtigungscenter.</div>
+<div class="test-action-btn primary">Toast anzeigen</div>
+<div class="test-status"><span class="dot ok"></span>Letzte: vor 2 Std. — angezeigt</div>
+</div>
+
+<div class="test-action">
+<div class="test-action-h">✉ E-Mail testen</div>
+<div class="test-action-desc">Sendet eine Test-Zusammenfassung an info@raumkult.eu.</div>
+<div class="test-action-btn">Einrichten erforderlich</div>
+<div class="test-status"><span class="dot none"></span>Kanal nicht konfiguriert</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+</div>

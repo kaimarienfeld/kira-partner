@@ -436,15 +436,20 @@ def _clear_all() -> None:
     """Löscht alle Events aus der DB. Nur für manuelle Bereinigung via UI."""
     with _lock:
         try:
-            db = sqlite3.connect(str(EVENTS_DB))
+            db = sqlite3.connect(str(EVENTS_DB), timeout=10)
             _ensure_db(db)
             db.execute("DELETE FROM events")
             db.execute("DELETE FROM event_payloads")
-            db.execute("VACUUM")
-            db.commit()
+            db.commit()  # Commit BEFORE VACUUM — VACUUM needs exclusive lock and may fail in WAL mode
             db.close()
         except Exception:
             pass
+        try:
+            db2 = sqlite3.connect(str(EVENTS_DB), timeout=5)
+            db2.execute("VACUUM")
+            db2.close()
+        except Exception:
+            pass  # VACUUM is best-effort; DELETEs already committed above
 
 
 # ── Config-Defaults sicherstellen ─────────────────────────────────────────────

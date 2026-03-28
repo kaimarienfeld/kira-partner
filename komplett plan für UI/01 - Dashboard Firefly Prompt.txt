@@ -1,0 +1,55 @@
+01 Dashboard Firefly Prompt
+
+Modern premium enterprise dashboard UI for a business assistant software called Kira, full-width desktop cockpit, elegant and highly usable SaaS product design, bright professional interface with strong readability and clear hierarchy, not washed out, not retro, not old admin style.
+
+Show a collapsible left sidebar navigation as part of the design:
+default state = slim vertical navigation rail with icons,
+expanded state = elegant slide-out sidebar with labels and sections.
+Navigation should include:
+Start, Kommunikation, Organisation, Geschäft, Wissen, Einstellungen,
+and additional muted “planned” items with subtle badges:
+Kunden, Marketing, Social / DMs, Automationen, Analysen.
+
+Main dashboard layout:
+top utility bar across the full width with global search on the left, then subtle quick actions, system status, open tasks, profile on the right.
+Below that a compact horizontal daily briefing strip with 3 to 5 management signals.
+Below that a wide KPI grid with 8 clear clickable metric cards.
+Below that a broad two-zone layout:
+left large area for “Heute priorisiert” with 5 elegant priority cards,
+right upper panel for “Nächste Termine & Fristen”,
+right lower panel for “Geschäft aktuell”.
+Bottom full-width area for “Signale / Auffälligkeiten”.
+
+Important visual direction:
+this must feel like premium enterprise software from 2026,
+not like a mail dashboard,
+not like a center-column layout,
+not like a chat widget page,
+not like Windows 98,
+not like a retro computer,
+not like a pale prototype.
+
+Use the full page width intelligently.
+Large readable typography.
+Crisp white and soft neutral surfaces.
+Dark charcoal text.
+One restrained accent color only for emphasis.
+Subtle depth, refined shadows, clean spacing, strong grouping.
+The left sidebar should look beautiful both collapsed and expanded.
+Dashboard cards should feel strategic and executive, not email-based.
+
+Important constraints:
+no open chat sidebar,
+no visible Kira workspace,
+no large floating modal,
+no email list as main content,
+no tiny text,
+no weak contrast,
+no neon,
+no gaming style,
+no brand colors from rauMKult,
+no hardcoded branding.
+Only a small subtle circular Kira launcher button in the bottom right corner is allowed, closed state only.
+
+Style keywords:
+premium SaaS dashboard, enterprise cockpit, modern admin software, executive overview screen, high readability, modular product UI, elegant sidebar navigation, collapsible navigation rail, refined business software, polished web app mockup.

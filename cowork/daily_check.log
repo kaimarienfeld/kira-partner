@@ -1,0 +1,109 @@
+[24.03.2026 12:00:01,13] Daily Check 
+[12:00] rauMKult Daily Check v3...
+  Neue Mails: 2
+  Unbeantwortete Mails erkannt: 33
+  ntfy: Fehler – 'latin-1' codec can't encode character '\u2013' in position 10: ordinal not in range(256)
+  Tasks gesamt offen: 38 (davon 26 unbeantwortet)
+  Erinnerungen fällig: 0
+[12:00] Fertig.
+[24.03.2026 16:00:01,67] Daily Check 
+[16:00] rauMKult Daily Check v3...
+  Neue Mails: 7
+  Unbeantwortete Mails erkannt: 33
+  ntfy: Fehler – 'latin-1' codec can't encode character '\u2013' in position 10: ordinal not in range(256)
+  Tasks gesamt offen: 38 (davon 26 unbeantwortet)
+  Erinnerungen fällig: 0
+[16:00] Fertig.
+[25.03.2026  5:00:02,29] Daily Check 
+[05:00] rauMKult Daily Check v4...
+  Neue Mails: 6
+  Tasks erstellt: 0
+  Ignoriert: 6
+  Nachfass fällig: 3 Angebote
+  Überfällige Rechnungen (>30 Tage): 2
+  ntfy: gesendet
+  Tasks offen: 8 (davon 5 Antwort nötig)
+  Erinnerungen fällig: 0
+[05:00] Fertig.
+[25.03.2026 12:00:02,27] Daily Check 
+[12:00] rauMKult Daily Check v4...
+  Neue Mails: 10
+  Tasks erstellt: 1
+  Ignoriert: 2
+  Nachfass fällig: 3 Angebote
+  Überfällige Rechnungen (>30 Tage): 2
+  ntfy: gesendet
+  Tasks offen: 7 (davon 4 Antwort nötig)
+  Erinnerungen fällig: 0
+[12:00] Fertig.
+[25.03.2026 16:00:02,40] Daily Check 
+[16:00] rauMKult Daily Check v4...
+  Neue Mails: 35
+  Tasks erstellt: 1
+  Ignoriert: 7
+  Nachfass fällig: 3 Angebote
+  Überfällige Rechnungen (>30 Tage): 2
+  ntfy: gesendet
+  Tasks offen: 6 (davon 2 Antwort nötig)
+  Erinnerungen fällig: 0
+[16:00] Fertig.
+[26.03.2026  5:00:02,44] Daily Check 
+[05:00] rauMKult Daily Check v4...
+  Neue Mails: 6
+  Tasks erstellt: 0
+  Ignoriert: 3
+  Überfällige Rechnungen (>30 Tage): 24
+  ntfy: gesendet
+  Tasks offen: 44 (davon 21 Antwort nötig)
+  Erinnerungen fällig: 0
+[05:00] Fertig.
+[26.03.2026 12:00:02,45] Daily Check 
+[12:00] rauMKult Daily Check v4...
+  Neue Mails: 12
+  Tasks erstellt: 1
+  Ignoriert: 5
+  Überfällige Rechnungen (>30 Tage): 24
+  ntfy: gesendet
+  Tasks offen: 45 (davon 21 Antwort nötig)
+  Erinnerungen fällig: 0
+[12:00] Fertig.
+[26.03.2026 16:00:05,01] Daily Check 
+[16:00] rauMKult Daily Check v4...
+  Neue Mails: 3
+  Tasks erstellt: 0
+  Ignoriert: 2
+  Überfällige Rechnungen (>30 Tage): 24
+  ntfy: gesendet
+  Tasks offen: 44 (davon 17 Antwort nötig)
+  Erinnerungen fällig: 0
+[16:00] Fertig.
+[27.03.2026  5:00:02,55] Daily Check 
+^C[27.03.2026 12:00:02,98] Daily Check 
+[12:00] rauMKult Daily Check v4...
+  Neue Mails: 4
+  Tasks erstellt: 0
+  Ignoriert: 4
+  Überfällige Rechnungen (>30 Tage): 24
+  ntfy: gesendet
+  Tasks offen: 40 (davon 5 Antwort nötig)
+  Erinnerungen fällig: 0
+[12:00] Fertig.
+[27.03.2026 16:00:01,66] Daily Check 
+[16:00] rauMKult Daily Check v4...
+  Neue Mails: 2
+  Tasks erstellt: 0
+  Ignoriert: 2
+  Überfällige Rechnungen (>30 Tage): 24
+  ntfy: gesendet
+  Tasks offen: 40 (davon 5 Antwort nötig)
+  Erinnerungen fällig: 0
+[16:00] Fertig.
+[28.03.2026  5:00:02,53] Daily Check 
+[05:00] rauMKult Daily Check v4...
+  Neue Mails: 2
+  Tasks erstellt: 0
+  Ignoriert: 2
+  Überfällige Rechnungen (>30 Tage): 24
+  Tasks offen: 40 (davon 5 Antwort nötig)
+  Erinnerungen fällig: 0
+[05:00] Fertig.

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rauMKult(r) Tagesbericht – 24.03.2026</title>
+<style>
+  :root {
+    --gold: #bda27c; --gold-light: #d4b896; --bg: #0b0b0b;
+    --card: #111; --border: rgba(255,255,255,0.09);
+    --text: #e8e8e8; --muted: rgba(255,255,255,0.55);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, Arial, sans-serif;
+          font-size: 14px; line-height: 1.5; }
+  a { color: var(--gold); text-decoration: none; }
+  a:hover { color: var(--gold-light); }
+
+  /* Header */
+  .header { background: linear-gradient(180deg,rgba(189,162,124,.15),rgba(0,0,0,0));
+             border-bottom: 1px solid var(--border); padding: 20px 32px; display: flex;
+             align-items: center; justify-content: space-between; }
+  .header-logo { font-size: 20px; font-weight: 900; letter-spacing: .5px; color: var(--gold); }
+  .header-logo span { color: var(--text); font-weight: 300; }
+  .header-right { text-align: right; color: var(--muted); font-size: 12px; }
+  .header-right strong { color: var(--text); font-size: 14px; display: block; }
+
+  /* Summary Bar */
+  .summary { display: flex; gap: 12px; padding: 16px 32px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .sum-item { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+               padding: 12px 20px; flex: 1; min-width: 140px; }
+  .sum-num  { font-size: 28px; font-weight: 900; color: var(--gold); }
+  .sum-label{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sum-item.highlight { border-color: rgba(189,162,124,.4); background: rgba(189,162,124,.07); }
+
+  /* Main */
+  .main { padding: 24px 32px; max-width: 1100px; margin: 0 auto; }
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 13px; font-weight: 800; color: var(--gold);
+                    letter-spacing: .8px; text-transform: uppercase;
+                    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+                    margin-bottom: 14px; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+           padding: 16px 18px; margin-bottom: 12px; transition: border-color .2s; }
+  .card:hover { border-color: rgba(189,162,124,.3); }
+  .card-anfrage { border-left: 3px solid var(--gold); }
+  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .card-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .card-meta { color: var(--muted); font-size: 12px; display: flex; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
+  .card-text { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.55;
+                background: rgba(255,255,255,.03); border-radius: 8px; padding: 10px 12px;
+                margin-bottom: 12px; max-height: 80px; overflow: hidden; }
+
+  /* Tags & Badges */
+  .tag { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 20px; letter-spacing: .3px; }
+  .tag-anfrage { background: rgba(189,162,124,.2); color: var(--gold); border: 1px solid rgba(189,162,124,.35); }
+  .tag-antwort { background: rgba(100,160,255,.15); color: #7baff5; border: 1px solid rgba(100,160,255,.3); }
+  .tag-zahlung { background: rgba(80,200,120,.15); color: #6dc98a; border: 1px solid rgba(80,200,120,.3); }
+  .tag-shop    { background: rgba(200,130,80,.15); color: #e09060; border: 1px solid rgba(200,130,80,.3); }
+  .konto-badge { font-size: 11px; color: var(--muted); background: rgba(255,255,255,.05);
+                  border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; }
+  .badge { font-size: 11px; color: #7baff5; background: rgba(100,160,255,.1);
+            border: 1px solid rgba(100,160,255,.25); border-radius: 6px; padding: 2px 8px; }
+
+  /* Buttons */
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+          cursor: pointer; border: none; text-decoration: none; display: inline-block;
+          transition: all .15s; }
+  .btn-primary { background: var(--gold); color: #000; }
+  .btn-primary:hover { background: var(--gold-light); color: #000; }
+  .btn-claude  { background: rgba(100,100,255,.2); color: #a0a8ff;
+                  border: 1px solid rgba(100,100,255,.35); }
+  .btn-claude:hover { background: rgba(100,100,255,.35); }
+  .btn-sec     { background: rgba(255,255,255,.07); color: var(--text);
+                  border: 1px solid var(--border); }
+  .btn-sec:hover { background: rgba(255,255,255,.12); }
+
+  /* Newsletter */
+  .nl-item { display: flex; gap: 12px; padding: 8px 0;
+              border-bottom: 1px solid var(--border); font-size: 13px; }
+  .nl-item span:first-child { color: var(--muted); min-width: 80px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0;
+                    background: rgba(0,0,0,.85); z-index: 1000;
+                    align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #161616; border: 1px solid rgba(189,162,124,.3);
+            border-radius: 18px; padding: 24px; width: 100%; max-width: 700px; }
+  .modal h3 { color: var(--gold); font-size: 16px; margin-bottom: 14px; }
+  .modal textarea { width: 100%; background: #0b0b0b; color: var(--text);
+                     border: 1px solid var(--border); border-radius: 10px;
+                     padding: 12px; font-size: 13px; line-height: 1.55;
+                     min-height: 180px; resize: vertical; }
+  .modal-hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  .zeit-info { color: var(--muted); font-size: 12px; padding: 16px 32px;
+                border-top: 1px solid var(--border); text-align: center; }
+
+  @media (max-width: 600px) {
+    .header, .summary, .main { padding-left: 16px; padding-right: 16px; }
+    .sum-num { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">rauMKult<span>(r)</span></div>
+  <div class="header-right">
+    <strong>24.03.2026</strong>
+    21.03. 08:10 – 24.03. 08:10
+  </div>
+</div>
+
+<div class="summary">
+  <div class="sum-item highlight">
+    <div class="sum-num">1</div>
+    <div class="sum-label">Neue Anfragen</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-num">0</div>
+    <div class="sum-label">Kunden-Antworten</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-num">0</div>
+    <div class="sum-label">Zahlungen</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-num">0</div>
+    <div class="sum-label">Shop-Bestellungen</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-num">1</div>
+    <div class="sum-label">Newsletter ignoriert</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="section">
+    <div class="section-title">Neue Anfragen</div>
+    
+        <div class="card card-anfrage">
+          <div class="card-header">
+            <span class="tag tag-anfrage">Neue Anfrage</span>
+            <span class="konto-badge">info</span>
+            
+          </div>
+          <div class="card-title">Aw: AW: Aw: AW: AW: Angebotsanfrage Betonkosmetik, Fam. Huber, 84453 Mühldorf am Inn</div>
+          <div class="card-meta">
+            <span>Von: stefan.huber.1990@web.de</span>
+            <span>2026-03-23 12:20</span>
+          </div>
+          <div class="card-text">Hallo Herr Marienfeld, vielen Dank für Ihr ausführliche Nachricht. Aufgrund der Höhe der von Ihnen geschätzten Kosten, werden wir unser Vorhaben voerst zurückstellen, da es sich lediglich um einen optischen Aspekt im Gartenbereich handelt. Sollten wir in nächster Zeit dennoch das Projekt weiter verf...</div>
+          <div class="card-actions">
+            <a href="mailto:stefan.huber.1990@web.de?subject=Re%3A%20Aw%3A%C2%A0AW%3A%20Aw%3A%C2%A0AW%3A%20AW%3A%20Angebotsanfrage%20Betonkosmetik%2C%20Fam.%20Huber%2C%2084453%20M%C3%BChldorf%20am%20Inn" class="btn btn-primary">In Outlook antworten</a>
+            
+            <button class="btn btn-claude" onclick="openInClaude('Hallo Herr Marienfeld, vielen Dank für Ihr ausführliche Nachricht. Aufgrund der Höhe der von Ihnen geschätzten Kosten, werden wir unser Vorhaben voerst zurückstellen, da es sich lediglich um einen optischen Aspekt im Gartenbereich handelt. Sollten wir in nächster Zeit dennoch das Projekt weiter verfolgen, werde ich mich telefonisch bei Ihnen melden. Beste Grüße Stefan Huber Talstraße 16 84453 Mühldorf am Inn Mobil: 0173 7278480 -- Gesendet mit der WEB.DE Mail App Am 17.03.26, 06:04 schrieb \"info@ raumkult.eu \" <info@ raumkult.eu >: Sehr geehrter Herr Huber, danke für die Rückmeldung und die Kl', 'Aw: AW: Aw: AW: AW: Angebotsanfrage Betonkosmetik, Fam. Huber, 84453 Mühldorf am Inn')">
+              In Claude bearbeiten
+            </button>
+            <button class="btn btn-sec" onclick="copyContext('Hallo Herr Marienfeld, vielen Dank für Ihr ausführliche Nachricht. Aufgrund der Höhe der von Ihnen geschätzten Kosten, werden wir unser Vorhaben voerst zurückstellen, da es sich lediglich um einen optischen Aspekt im Gartenbereich handelt. Sollten wir in nächster Zeit dennoch das Projekt weiter verfolgen, werde ich mich telefonisch bei Ihnen melden. Beste Grüße Stefan Huber Talstraße 16 84453 Mühldorf am Inn Mobil: 0173 7278480 -- Gesendet mit der WEB.DE Mail App Am 17.03.26, 06:04 schrieb \"info@ raumkult.eu \" <info@ raumkult.eu >: Sehr geehrter Herr Huber, danke für die Rückmeldung und die Kl', 'Aw: AW: Aw: AW: AW: Angebotsanfrage Betonkosmetik, Fam. Huber, 84453 Mühldorf am Inn')">
+              Kontext kopieren
+            </button>
+          </div>
+        </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Kunden-Nachrichten</div>
+    <p class="empty">Keine.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Zahlungen & Rechnungen</div>
+    <p class="empty">Keine.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Shop-Bestellungen</div>
+    <p class="empty">Keine.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Relevante Branchen-News</div>
+    <div class="nl-item"><span>2026-03-21</span><span>Achtung. Wir haben bemerkt, dass Sie kürzlich eine große  Anzahl Datei</span></div>
+<div class="nl-item"><span>2026-03-22</span><span>Neue Betonkosmetik Anfrage (Landing) – Patric Kuhn</span></div>
+<div class="nl-item"><span>2026-03-23</span><span>	Zahlung überwiesen an Dr. Sieghard Werner Frischmann</span></div>
+  </div>
+
+</div>
+
+<div class="zeit-info">
+  Generiert 08:10 Uhr &nbsp;·&nbsp; 21 neue Mails verarbeitet
+  &nbsp;·&nbsp; 1 Newsletter automatisch ignoriert
+</div>
+
+<!-- Modal: Kontext für Claude -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modalTitle">Kontext für Claude</h3>
+    <textarea id="modalText" readonly></textarea>
+    <div class="modal-hint">Text ist bereits kopiert. In Claude einfuegen (Strg+V).</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="copyAndClose()">Kopieren & Schliessen</button>
+      <a href="https://claude.ai/new" target="_blank" class="btn btn-claude" onclick="copyModal()">
+        Claude.ai oeffnen
+      </a>
+      <button class="btn btn-sec" onclick="document.getElementById('modalOverlay').classList.remove('active')">
+        Schliessen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openInClaude(context, title) {
+  document.getElementById('modalTitle').textContent = 'In Claude bearbeiten: ' + title;
+  document.getElementById('modalText').value = context;
+  document.getElementById('modalOverlay').classList.add('active');
+  navigator.clipboard.writeText(context).catch(()=>{});
+}
+function copyContext(context, title) {
+  navigator.clipboard.writeText(context)
+    .then(()=> alert('Kopiert! Einfuegen in Claude oder Outlook.'))
+    .catch(()=> alert('Bitte manuell kopieren:\n\n' + context.substring(0,200)));
+}
+function copyModal() {
+  const t = document.getElementById('modalText').value;
+  navigator.clipboard.writeText(t).catch(()=>{});
+}
+function copyAndClose() {
+  copyModal();
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+function closeModal(e) {
+  if(e.target === document.getElementById('modalOverlay'))
+    document.getElementById('modalOverlay').classList.remove('active');
+}
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape') document.getElementById('modalOverlay').classList.remove('active');
+});
+</script>
+
+</body>
+</html>

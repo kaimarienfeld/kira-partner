@@ -1,0 +1,938 @@
+06_KIRA_Einstellungen_Design
+
+Create a premium enterprise settings module UI for the same Kira product system and the same visual family as the already created dashboard, communication, business, knowledge, and Kira workspace reference pages.
+
+Important:
+This must clearly look like the same product family as the existing Kira pages.
+Use the same elegant light SaaS app shell, the same collapsible left sidebar, the same top utility bar, the same refined neutral palette, the same typography feel, the same spacing rhythm, and the same premium enterprise product design language.
+
+This is the “Einstellungen” module of the same Kira software.
+
+Page layout:
+full-width desktop application,
+same left collapsible navigation,
+same top utility bar,
+below that a clear settings module header with:
+title “Einstellungen”,
+small live status row such as active provider, theme mode, notifications state, last change,
+and utility actions on the right:
+search, reset, export, import, save changes.
+
+Main layout:
+left side = section navigation for settings categories,
+center = main settings configuration area,
+right side optional = contextual help, preview, status, test actions.
+
+Settings categories in the left settings navigation:
+Design,
+Benachrichtigungen,
+Aufgabenlogik,
+Nachfass-Intervalle,
+Dashboard,
+Kira / LLM / Provider,
+Integrationen,
+Automationen (planned badge).
+
+Design section:
+should feel like a premium design control center, not a raw form.
+Show elegant grouped controls for:
+theme mode,
+accent color,
+font size,
+density,
+company name,
+logo upload,
+card radius,
+shadow strength,
+reduce animations,
+high contrast.
+Include a clean live preview area that visually suggests these settings affect the interface.
+
+Notifications section:
+show structured switches and grouped notification preferences.
+Should feel modern and easy to understand, not technical.
+
+Task logic and follow-up sections:
+show elegant control groups, intervals, priorities, timing settings, but in the same premium visual system.
+
+Dashboard section:
+show settings for KPI visibility, start view, compact vs. relaxed density, business signal visibility.
+This should visually imply that the dashboard can be customized.
+
+Kira / LLM / Provider section:
+this is important and should feel like a refined mini console.
+Show:
+provider list,
+fallback order,
+model selection,
+API status,
+add provider,
+test provider,
+set default,
+save fallback order.
+Make it look like a polished enterprise AI provider management panel, not a developer-only JSON page.
+
+Integrations section:
+show current and planned integrations in a structured way.
+Mail, OneDrive / Dokumente, Push should look active-capable.
+Calendar and Automations should have subtle “In Planung” badges.
+
+Visual direction:
+must feel like premium 2026 business software,
+clean, calm, highly readable,
+larger text,
+clear groups,
+strong visual hierarchy,
+same design DNA as the rest of the Kira product.
+
+Important constraints:
+no raw long forms,
+no tiny inputs,
+no weak contrast,
+no pale low-impact UI,
+no generic admin settings page,
+no rauMKult brand colors,
+no hardcoded branding,
+no dark mode,
+no retro interface,
+no old Windows control panel look.
+
+Use:
+crisp white and soft neutral surfaces,
+dark readable text,
+subtle restrained accent colors only for active states,
+premium spacing,
+refined shadows,
+clear grouping,
+elegant toggles, segmented controls, dropdowns, and configuration cards.
+
+Allowed:
+same subtle Kira launcher button in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS settings module, enterprise configuration console, elegant admin preferences UI, provider management panel, refined design controls, modern business software settings, same visual system as the Kira reference modules.
+Avoid: raw settings form, developer-only config page, generic admin panel, old Windows control panel, retro UI, tiny text, weak contrast, washed out colors, narrow center column, dark cyber style, cluttered controls, mismatched design language, generic CMS settings page.
+
+
+_____________________________________________________________________________________________
+
+Hier ist der Firefly-Prompt für „Benachrichtigungen“, rein visuell:
+
+
+Create a premium enterprise settings subpage UI for the “Benachrichtigungen” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Benachrichtigungen” subsection inside the Kira settings module.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Benachrichtigungen” item should be active.
+
+Main content area:
+show a premium enterprise notification control center, not a raw settings form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Allgemeine Benachrichtigungen
+
+* master toggle for notifications on/off
+* quiet, high-readability grouped controls
+* subtle status badge like “aktiv”
+
+2. Kanäle
+
+* Push-Benachrichtigungen (ntfy.sh)
+* Windows Toast
+* optional email summary or digest style presentation
+  Each channel should look like a refined configuration card or row with status, action and small explanation.
+
+3. Priorität & Verhalten
+
+* only high priority
+* summary mode
+* immediate alerts
+* grouped notification behavior controls
+  These should look like elegant segmented controls, switches and selection groups.
+
+4. Ruhezeiten / Zeitfenster
+
+* do not disturb or quiet hours
+* calendar-like or time-window style controls
+* visually calm and premium
+
+5. Test & Diagnose
+
+* test notification action
+* small status indicators
+* maybe “letzte Testbenachrichtigung”
+  This area should feel like a clean operational tools panel, not like a developer debug screen.
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, readable, operational, refined.
+The user should immediately understand:
+this is where notification channels, priorities and timing are controlled.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+clear labels,
+larger readable typography,
+elegant toggles,
+refined segmented controls,
+compact status badges,
+subtle shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a plain form dump,
+not a consumer app notification page.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+generic Android settings look,
+mobile app style,
+raw technical config fields,
+developer console styling,
+rauMKult brand colors,
+dark mode,
+old Windows control panel look.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS notification settings, enterprise preferences UI, refined admin controls, modern business software settings, elegant channel management, same visual family as the Kira settings reference.
+
+Avoid: raw settings form, mobile phone settings screen, generic Android notification page, retro admin panel, developer console look, tiny text, weak contrast, pale washed-out UI, dark cyber style, old Windows control panel, mismatched design language.
+
+
+_________________________________________________________________________________________________________
+
+Create a premium enterprise settings subpage UI for the “Aufgabenlogik” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Aufgabenlogik” subsection inside the Kira settings module.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Aufgabenlogik” item should be active.
+
+Main content area:
+show a premium enterprise task logic control center, not a raw settings form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Erinnerungen & Prüfzyklen
+
+* Erinnerungsintervall
+* Prüfzeitraum
+* rhythm / timing controls
+* a compact status hint like “aktuell aktiv”
+
+2. Dringlichkeit & Eskalation
+
+* when tasks become urgent
+* how long a task may stay open
+* escalation thresholds
+* urgency levels shown as clean segmented controls or sliders
+
+3. Wiedervorlagen & Vorschläge
+
+* automatic follow-up suggestions
+* manual review preference
+* automatic reminder recommendations
+* grouped toggles and behavior settings
+
+4. Priorisierung & Arbeitslogik
+
+* how many tasks are highlighted
+* what is considered high priority
+* maybe a visual priority ladder or rule stack
+* should feel like a smart operational logic panel
+
+5. Vorschau / Wirkung
+
+* a small preview area showing example task states such as:
+  normal,
+  dringend,
+  überfällig,
+  manuelle Prüfung
+* visually explain how the chosen settings affect tasks
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, readable, operational, refined.
+The user should immediately understand:
+this is where task behavior, urgency, reminders, and follow-up logic are controlled.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+elegant switches,
+segmented controls,
+small rule cards,
+priority indicators,
+refined shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a plain form dump,
+not a project-management app clone.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+generic mobile settings look,
+developer config screen,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS task settings, enterprise task logic control center, refined admin preferences UI, workflow behavior settings, urgency and reminder management, modern business software settings, same visual family as the Kira settings reference.
+Avoid: raw settings form, generic to-do app settings, project management clone, retro admin panel, mobile settings look, tiny text, weak contrast, washed out colors, old Windows control panel, developer-only configuration page, mismatched design language.
+
+_________________________________________________________________________________________________________________________________
+
+
+
+Firefly-Prompt für den Unterpunkt „Nachfass-Intervalle
+
+
+
+Create a premium enterprise settings subpage UI for the “Nachfass-Intervalle” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Nachfass-Intervalle” subsection inside the Kira settings module.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Nachfass-Intervalle” item should be active.
+
+Main content area:
+show a premium enterprise follow-up timing control center, not a raw settings form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Nachfass-Stufen
+
+* three clearly grouped interval cards or rows:
+  Intervall 1,
+  Intervall 2,
+  Intervall 3
+* each should visually show timing, tone, and status
+* not just plain number inputs
+* should feel like a smart sequence editor
+
+2. Tonalität & Eskalation
+
+* visual control for friendly / more direct / last reminder tone progression
+* should look like refined segmented controls or step indicators
+* elegant, not aggressive
+
+3. Gültigkeitsbereich
+
+* visual options for:
+  nur Angebote,
+  auch Rechnungen,
+  auch Leads
+* clearly grouped applicability settings
+* should feel like business logic controls
+
+4. Automatisierung & Freigabe
+
+* automatically remind yes/no
+* manual confirmation before draft yes/no
+* follow-up suggestions active/inactive
+* visually clean toggle and policy groups
+
+5. Wirkung / Vorschau
+
+* a small preview block showing how the follow-up sequence behaves:
+  Tag 10 = freundlich,
+  Tag 21 = bestimmter,
+  Tag 45 = letzte Erinnerung
+* should feel like a behavioral preview, not a developer diagram
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, highly readable, operational, smart.
+The user should immediately understand:
+this is where the timing and behavior of the follow-up system is controlled.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+elegant step cards,
+segmented controls,
+clear rule groups,
+subtle status badges,
+refined shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a plain form dump,
+not a CRM automation builder,
+not a marketing funnel screen.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+developer config screen,
+generic workflow automation builder,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS follow-up settings, enterprise reminder interval control, refined workflow timing UI, modern business software settings, elegant escalation logic panel, same visual family as the Kira settings reference.
+
+Avoid: raw settings form, CRM automation builder, generic funnel tool, retro admin panel, mobile settings look, tiny text, weak contrast, washed out colors, old Windows control panel, developer-only configuration page, mismatched design language.
+
+
+
+
+___________________________________________________________________________________________________________
+
+
+
+
+
+Kira / LLM / Provider
+
+
+Create a premium enterprise settings subpage UI for the “Kira / LLM / Provider” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Kira / LLM / Provider” subsection inside the Kira settings module.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Kira / LLM / Provider” item should be active.
+
+Main content area:
+show a premium enterprise AI provider control center, not a raw developer form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Aktive Provider
+
+* a refined provider list or stack of provider cards
+* providers such as Anthropic, OpenAI, OpenRouter, Ollama, Custom
+* each provider card should show:
+  provider name,
+  model,
+  status,
+  priority / fallback position,
+  small state badge like aktiv / bereit / inaktiv / kein Key,
+  and compact actions like test, bearbeiten, standard setzen.
+* should feel like a polished enterprise provider console
+
+2. Fallback-Reihenfolge
+
+* a visually clear ordered sequence or priority list
+* should show how fallback works across providers
+* elegant draggable-looking order cards or priority rows
+* should look operational, not technical
+
+3. Modellwahl & Zugriff
+
+* grouped controls for model selection, API key state, endpoint state, package status
+* can look like a clean provider details panel, not a raw JSON editor
+* should communicate readiness and control
+
+4. Kira-Verhalten
+
+* standard context mode
+* how much history is loaded
+* response length: knapp / standard / ausführlich
+* suggestion style: zurückhaltend / neutral / offensiv
+* automatic follow-up actions on/off
+* this section should feel like a behavior tuning panel for an AI assistant, not a generic form
+
+5. Test & Status
+
+* test provider
+* show last provider test or last active provider state
+* subtle system indicators
+* should look like a clean operational diagnostics panel, not like a developer console
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, highly readable, operational and intelligent.
+The user should immediately understand:
+this is where Kira’s AI brain, provider fallback logic, and behavior are controlled.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+elegant segmented controls,
+refined status badges,
+structured provider cards,
+subtle shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a plain form dump,
+not a developer-only config screen,
+not a generic AI playground.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+raw JSON editor,
+debug console look,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS AI provider settings, enterprise LLM control center, refined provider management panel, modern business software settings, fallback logic UI, assistant behavior tuning, same visual family as the Kira settings reference.
+
+
+
+Avoid: developer console look, raw JSON config page, generic AI playground, retro admin panel, mobile settings look, tiny text, weak contrast, washed out colors, old Windows control panel, mismatched design language, over-technical debug UI.
+
+____________________________________________________________________________________________________
+
+
+Integrationen
+
+
+
+Create a premium enterprise settings subpage UI for the “Integrationen” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Integrationen” subsection inside the Kira settings module.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Integrationen” item should be active.
+
+Main content area:
+show a premium enterprise integrations control center, not a raw settings form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Aktive Integrationen
+
+* Mail
+* OneDrive / Dokumente
+* Push
+  These should look like refined integration cards or rows with:
+  service name,
+  status,
+  small description,
+  connection state,
+  and a few compact action affordances.
+
+2. Geplante Integrationen
+
+* Kalender (In Planung)
+* weitere Quellen
+* optional Messenger / research style future integrations
+  These should appear clearly separated from active integrations, with subtle “In Planung” badges, not as dead empty placeholders.
+
+3. Verbindungsstatus & Datenfluss
+
+* visually show that the system connects to multiple sources
+* elegant status chips, sync indicators, or simple connection overview
+* should feel operational and trustworthy, not technical and raw
+
+4. Aktionen / Verwaltung
+
+* connect,
+* reconnect,
+* test,
+* status view,
+* documentation/help
+  These should appear as premium admin actions, not debug controls.
+
+5. Hilfebereich / Vorschau
+
+* a clean side panel or lower panel showing:
+  what this integration is used for,
+  which module it affects,
+  and whether it is active or planned.
+  This should feel useful and polished.
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, highly readable, operational and modular.
+The user should immediately understand:
+this is where Kira’s active and future external connections are managed.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+structured integration cards,
+small elegant service icons,
+status badges,
+subtle shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a developer integration console,
+not a SaaS billing page,
+not a marketplace app store.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+raw API token fields as the main focus,
+developer console look,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS integrations settings, enterprise connection management UI, refined admin integrations panel, modern business software settings, clean connected systems overview, same visual family as the Kira settings reference.
+
+Avoid: developer integration console, API dashboard look, marketplace app store style, retro admin panel, mobile settings look, tiny text, weak contrast, washed out colors, old Windows control panel, mismatched design language, raw token management page.
+
+
+_____________________________________________________________________________________________
+
+
+Automationen
+
+Create a premium enterprise settings subpage UI for the “Automationen” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Automationen” subsection inside the Kira settings module.
+This section is marked as “In Planung”, but it must still look purposeful, structured, and premium — not empty and not dead.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Integrationen, Automationen.
+The “Automationen” item should be active and show a subtle “In Planung” badge.
+
+Main content area:
+show a premium enterprise automation control center shell, designed as a future-ready module, not a blank placeholder.
+
+Structure the page into elegant grouped panels such as:
+
+1. Überblick
+
+* a short premium overview area explaining what automations will later handle
+* should visually suggest follow-ups, reminders, escalation flows, workflow steps, triggers, and rules
+* should feel like a prepared command center, not a static info box
+
+2. Geplante Automationsbereiche
+
+* Mail-Follow-up
+* Erinnerungsregeln
+* Eskalationen
+* Workflow-Bausteine
+* Trigger / Bedingungen
+  Show these as elegant modular cards or blocks with subtle “In Planung” badges and short descriptions.
+
+3. Visuelle Workflow-Vorschau
+
+* a refined preview area or conceptual layout showing how a workflow might later be structured
+* for example:
+  trigger → condition → action
+* should feel high-end and software-like, not like a marketing illustration
+
+4. Automationsstatus / Verfügbarkeit
+
+* what is already prepared
+* what depends on future integrations
+* what will later connect to communication, business, tasks, or calendar
+* show this in a subtle, trustworthy, product-like way
+
+5. Hilfebereich / Kontext
+
+* short guidance or future use cases
+* examples like:
+  automatic follow-up after offer,
+  escalation when invoice overdue,
+  reminder before deadline
+* visually elegant, not text-heavy
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, future-ready, modular and intelligent.
+The user should immediately understand:
+this is a planned but serious part of the Kira system, not a dead page.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+modular cards,
+subtle “In Planung” badges,
+light workflow visualization,
+refined shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a generic workflow builder,
+not a marketing landing page,
+not a dead placeholder.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+blank empty screen,
+generic automation SaaS builder,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS automation settings, enterprise workflow shell, refined planned module UI, future-ready admin panel, modern business software settings, elegant trigger and rule preview, same visual family as the Kira settings reference.
+Avoid: empty placeholder page, generic workflow builder, Zapier clone, retro admin panel, mobile settings look, tiny text, weak contrast, washed out colors, old Windows control panel, developer-only automation page, mismatched design language.
+
+
+____________________________________________________________________________________
+
+Mail & Konten
+
+
+
+Create a premium enterprise settings subpage UI for the “Mail & Konten” section inside the same Kira product system.
+
+Important:
+This page must visually match the already created Kira modules and especially the existing settings design reference.
+Use the same product family, same collapsible left sidebar, same top utility bar, same settings page shell, same typography, same spacing rhythm, same neutral premium SaaS style, same elegant light interface.
+
+This is not a standalone page.
+This is the “Mail & Konten” subsection inside the Kira settings module.
+
+Important product context:
+This section is for managing business email accounts, sending and receiving logic, sender identities, signatures, and sync fallback preparation.
+It should feel like a serious enterprise mail control center, not like a consumer webmail settings page.
+
+Layout:
+full-width desktop application,
+same left main navigation as the Kira product,
+same top utility bar,
+same settings header area,
+same left inner settings navigation with sections such as:
+Design, Benachrichtigungen, Aufgabenlogik, Nachfass-Intervalle, Dashboard, Kira / LLM / Provider, Mail & Konten, Integrationen, Automationen.
+The “Mail & Konten” item should be active.
+
+Main content area:
+show a premium enterprise mail account control center, not a raw form.
+
+Structure the page into elegant grouped panels such as:
+
+1. Kontenübersicht
+
+* a refined list of connected or prepared mail accounts
+* each account card should show:
+  display name,
+  email address,
+  status,
+  inbound enabled,
+  outbound enabled,
+  default sender yes/no,
+  signature assigned yes/no,
+  sync state or fallback readiness.
+* should feel like a polished account management console
+
+2. Standardkonto & Absenderlogik
+
+* controls for default sending account
+* sender identity behavior
+* reply-from-same-account logic
+* preferred account for inquiries / offers / invoices
+* visually clear selection groups, not raw dropdowns only
+
+3. Empfang & Abruf
+
+* elegant settings area for receive/check behavior
+* mailbox polling / check status / enabled accounts
+* visual indication that mail retrieval is active-capable
+* should feel trustworthy and operational
+
+4. Versand & Signaturen
+
+* grouped signature management
+* per-account signatures
+* optional default signature per context
+* business-like composition controls
+* visually strong edit / preview area for signatures
+
+5. Sync & Fallback
+
+* visually show main mail handling and fallback preparation
+* sync / bridge / fallback readiness
+* status indicators and operational clarity
+* this area may include subtle “prepared / linked / in planning” states
+
+6. Test & Diagnose
+
+* test sending
+* connection test
+* last sync or last send state
+* compact diagnostics panel
+* should feel like a professional operational tool area
+
+Visual direction:
+must feel like premium business software from 2026,
+calm, clear, highly readable, trustworthy and operational.
+The user should immediately understand:
+this is where business mail identities, account logic, signatures and sending/receiving behavior are controlled.
+
+Use:
+soft white and neutral surfaces,
+dark readable text,
+slightly stronger contrast,
+larger typography,
+structured account cards,
+signature preview areas,
+status badges,
+subtle shadows,
+high-quality enterprise settings look.
+
+Important:
+this must visually match the existing Kira settings design page,
+not a different style,
+not a different shell,
+not a webmail clone,
+not a Gmail settings page,
+not an Outlook clone,
+not a developer-only SMTP panel.
+
+Do not show:
+retro interface,
+tiny text,
+weak contrast,
+consumer email branding,
+generic inbox layout,
+rauMKult brand colors,
+dark mode,
+old Windows control panel style.
+
+Nimm in Einstellungen künftig:
+
+Design
+Benachrichtigungen
+Aufgabenlogik
+Nachfass-Intervalle
+Dashboard
+Kira / LLM / Provider
+Mail & Konten
+Integrationen
+Automationen
+
+Allowed:
+same subtle Kira launcher in the bottom right corner, closed state only.
+
+Style keywords:
+premium SaaS mail settings, enterprise email account control center, signature management UI, business sender identity settings, refined admin communication panel, modern business software settings, same visual family as the Kira settings reference.
+Avoid: Gmail clone, Outlook clone, generic webmail settings, raw SMTP panel, developer-only mail config screen, retro admin panel, tiny text, weak contrast, washed out colors, old Windows control panel, mismatched design language.
+
+
+____________________________________________________________________________________________________________
+
+
+
+
+

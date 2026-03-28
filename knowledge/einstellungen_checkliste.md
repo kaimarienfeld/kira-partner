@@ -1,5 +1,5 @@
 # Einstellungen – Vollständige Checkliste & Erweiterungsvorschläge
-_Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
+_Stand: 2026-03-28 · session-t · Analyse-Basis: config.json, server.py (~8700 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
 
 ---
 
@@ -44,10 +44,24 @@ _Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 
 | ✅ | Push aktiv | `cfg-ntfy-aktiv` / `ntfy.aktiv` | saveSettings verbunden |
 | ✅ | Kanal (Topic) | `cfg-ntfy-topic` / `ntfy.topic_name` | saveSettings verbunden |
 | ✅ | Server-URL | `cfg-ntfy-server` / `ntfy.server` | saveSettings verbunden |
+| ✅ | ntfy.sh Docs-Link | — | Link zu ntfy.sh + Einrichtungs-Hinweis, session-t |
+| ✅ | Arbeitszeiten-Filter aktiv | `cfg-ntfy-arbeitszeit-aktiv` / `ntfy.arbeitszeit_aktiv` | saveSettings verbunden, session-t |
+| ✅ | Arbeitszeit von | `cfg-ntfy-az-von` / `ntfy.arbeitszeit_von` | time-Input, session-t |
+| ✅ | Arbeitszeit bis | `cfg-ntfy-az-bis` / `ntfy.arbeitszeit_bis` | time-Input, session-t |
+| ✅ | Urlaubsmodus | `cfg-ntfy-urlaub` / `ntfy.urlaub_modus` | Toggle + Badge, session-t |
 | 🔧 | Test-Push Button | `testPush()` | Funktion vorhanden, ntfy-Server muss erreichbar sein |
 | 💡 | Notification-Priorität | `ntfy.prioritaet` | low/default/high/urgent |
 | 💡 | Welche Events → Push | `ntfy.events[]` | Mail / Aufgabe fällig / Fehler / Daily-Check |
-| 💡 | Push-Stille-Zeiten | `ntfy.stille_von`, `ntfy.stille_bis` | z.B. 22:00–07:00 kein Push |
+
+### 2b. In-App Benachrichtigungen (neu session-t)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Mail-Eingang Toast | `cfg-inapp-mail` / `benachrichtigungen.inapp_mail` | saveSettings verbunden |
+| ✅ | Kira-Antwort Toast | `cfg-inapp-kira` / `benachrichtigungen.inapp_kira` | saveSettings verbunden |
+| ✅ | Aufgaben-Erinnerungen Toast | `cfg-inapp-aufgaben` / `benachrichtigungen.inapp_aufgaben` | saveSettings verbunden |
+| ✅ | Hintergrund-Jobs Toast | `cfg-inapp-bg` / `benachrichtigungen.inapp_bg` | default: aus, session-t |
+| ✅ | Fehler-Meldungen Toast | `cfg-inapp-fehler` / `benachrichtigungen.inapp_fehler` | default: an, session-t |
+| 🔧 | Toast-Auslösung im Backend | — | Einstellungen werden gespeichert; Backend-Auslösung (showToast via SSE) noch nicht verdrahtet |
 
 ### 2b. E-Mail-Benachrichtigungen
 | Status | Element | ID / Schlüssel | Anmerkung |
@@ -69,13 +83,12 @@ _Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 
 |--------|---------|---------------|-----------|
 | ✅ | Erinnerungs-Vorlauf (Stunden) | `cfg-erinnerung-h` / `aufgaben.erinnerung_intervall_stunden` | saveSettings verbunden |
 | ✅ | Unbeantwortete Mails (Tage) | `cfg-unanswered-days` / `aufgaben.unanswered_check_days` | saveSettings verbunden |
-| ✅ | Port | `cfg-server-port` / `server.port` | saveSettings verbunden |
-| ✅ | Browser auto-öffnen | `cfg-auto-browser` / `server.auto_open_browser` | saveSettings verbunden |
-| 💡 | Aufgaben-Standardpriorität | `aufgaben.default_prioritaet` | normal/hoch/kritisch bei Neu-Erstellung |
+| ✅ | Deadline-Warnung (Tage vorher) | `cfg-deadline-warnung-tage` / `aufgaben.deadline_warnung_tage` | saveSettings verbunden, session-t |
+| ✅ | Erinnerungs-Typ | `cfg-erinnerung-typ` / `aufgaben.erinnerung_typ` | push/toast/beide, session-t |
+| ✅ | Standard-Priorität | `cfg-default-prioritaet` / `aufgaben.default_prioritaet` | normal/hoch/kritisch, session-t |
+| ✅ | Auto-Archiv (Tage) | `cfg-auto-archiv-tage` / `aufgaben.auto_archiv_tage` | 0=nie, session-t |
 | 💡 | Aufgaben-Standarddeadline | `aufgaben.default_deadline_tage` | X Tage nach Erstellung |
-| 💡 | Automatisch erledigt archivieren | `aufgaben.auto_archiv_tage` | Erledigte nach X Tagen verstecken |
 | 💡 | Aufgaben aus Kira-Chat | `aufgaben.kira_erstellt_aufgaben` 🔗 | Soll Kira Aufgaben anlegen können? |
-| 💡 | Deadline-Warnung bei Fälligkeit | `aufgaben.warnung_bei_faelligkeit` | Push / Toast / beides |
 
 ---
 
@@ -83,26 +96,27 @@ _Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 
 
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
+| ✅ | Nachfass aktiv | `cfg-nf-aktiv` / `nachfass.aktiv` | Toggle, session-t |
+| ✅ | Benachrichtigung via | `cfg-nf-typ` / `nachfass.benachrichtigung` | push/toast/beide/aufgabe, session-t |
+| ✅ | Kira schreibt Nachfass-Text | `cfg-nf-kira-text` / `nachfass.kira_nachfass_text` | LLM-Vorschlag, session-t |
 | ✅ | Stufe 1 (Tage) | `cfg-nf-1` / `nachfass.intervall_1_tage` | saveSettings verbunden |
 | ✅ | Stufe 2 (Tage) | `cfg-nf-2` / `nachfass.intervall_2_tage` | saveSettings verbunden |
 | ✅ | Stufe 3 (Tage) | `cfg-nf-3` / `nachfass.intervall_3_tage` | saveSettings verbunden |
-| 💡 | Nachfass-Typ | `nachfass.typ` | Manuell / Push-Erinnerung / Auto-Mail |
-| 💡 | Nachfass für Rechnungen | `nachfass.rechnung_tage` | Separate Intervalle für offene Rechnungen |
+| ✅ | Rechnungs-Nachfass (Tage) | `cfg-nf-rechnung` / `nachfass.rechnung_tage` | session-t |
 | 💡 | Nachfass deaktivieren für | `nachfass.ausnahme_kategorien[]` | Bestimmte Kontakttypen ausschließen |
 
 ---
 
 ## 5. DASHBOARD
 
+_session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Kontext nach §6 verschoben._
+
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
 | ✅ | Max. Protokoll-Einträge | `cfg-proto-max` / `protokoll.max_eintraege` | saveSettings verbunden |
 | ✅ | Protokoll aufbewahren (Tage) | `cfg-proto-tage` / `protokoll.tage` | saveSettings verbunden |
-| ✅ | Internet-Kontext | `cfg-llm-internet` / `llm.internet_recherche` | saveSettings verbunden |
-| ✅ | Geschäfts-Kontext | `cfg-llm-geschaeft` / `llm.geschaeftsdaten_teilen` | saveSettings verbunden |
-| ✅ | Konversations-Kontext | `cfg-llm-konv` / `llm.konversationen_speichern` | saveSettings verbunden |
-| ❌ | Max. Kontext-Items | `cfg-llm-max-items` / `llm.max_kontext_items` | In config.json (50), **keine UI** |
-| ❌ | Auto-Wissen extrahieren | `cfg-llm-auto-wissen` / `llm.auto_wissen_extrahieren` | In config.json, **keine UI** |
+| ✅ | Server-Port | `cfg-server-port` / `server.port` | hierher verschoben (war Aufgabenlogik), session-t |
+| ✅ | Browser auto-öffnen | `cfg-auto-browser` / `server.auto_open_browser` | hierher verschoben, session-t |
 | 💡 | Dashboard-Kacheln konfigurieren | `dashboard.kacheln[]` | Welche Statistiken auf Start-Seite |
 | 💡 | Refresh-Intervall Dashboard | `dashboard.refresh_intervall` | Auto-Reload alle X Minuten |
 | 💡 | Aufgaben-Ansicht Standard | `dashboard.aufgaben_view` | Liste / Kanban / Kalender |
@@ -128,7 +142,21 @@ _Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 
 | 💡 | Kira Quick-Actions editieren | `kira.quick_actions[]` | Welche 7 Items im Quick Panel |
 | 💡 | Kira im Hintergrund aktiv | `kira.background_hints` | Push wenn Kira Idee hat |
 
-### 6b. LLM-Verhalten
+### 6b. LLM-Kontext (neu in §6, session-t verschoben von Dashboard)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Internet-Kontext | `cfg-llm-internet` / `llm.internet_recherche` | korrekte Key-Namen, session-t |
+| ✅ | Geschäfts-Kontext | `cfg-llm-geschaeft` / `llm.geschaeftsdaten_teilen` | session-t |
+| ✅ | Konversations-Kontext | `cfg-llm-konv` / `llm.konversationen_speichern` | session-t |
+
+### 6c. Mail-Klassifizierung / Budget-Modell (neu session-t)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Erklärungs-Tabelle (Haiku vs Sonnet) | — | Info-Tabelle mit Kostenvergleich, session-t |
+| ✅ | Auto-Budget Hinweis | — | Anthropic→Haiku, OpenAI→gpt-4o-mini, session-t |
+| 💡 | Manuelles Klassifizierungs-Modell | `llm.classifier_model` | Eigenes Modell festlegen statt Auto |
+
+### 6d. LLM-Verhalten
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
 | ❌ | Max. Kontext-Items (Zeilen) | `cfg-llm-max-items` / `llm.max_kontext_items` | Kira liest bis 50 Items aus DB |
@@ -256,7 +284,7 @@ _Stand: 2026-03-27 · session-s · Analyse-Basis: config.json, server.py (~8000 
 | ✅ | Runtime-Log-DB-Größe | — | Statische Info |
 | ❌ | Config exportieren | — | Button vorhanden, **Funktion fehlt** (showToast Platzhalter) |
 | ❌ | Config importieren | — | Button vorhanden, **Funktion fehlt** (showToast Platzhalter) |
-| ❌ | Zurücksetzen | — | Button vorhanden, **Funktion fehlt** (showToast Platzhalter) |
+| ✅ | Zurücksetzen | `resetConfig()` / `POST /api/config/reset` | showKritischModal(ZURÜCKSETZEN) + Backup als config.json.bak + factory defaults, session-t |
 | 💡 | Auto-Backup aktivieren | `backup.aktiv` | Täglich config.json sichern |
 | 💡 | Backup-Pfad | `backup.pfad` | Wohin gesichert wird |
 

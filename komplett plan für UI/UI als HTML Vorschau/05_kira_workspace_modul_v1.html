@@ -1,0 +1,372 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:980px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px 12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.ws{flex:1;display:flex;overflow:hidden}
+.ctx-panel{width:260px;min-width:260px;background:#fff;border-right:0.5px solid #E8E7E3;display:flex;flex-direction:column;overflow-y:auto}
+.ctx-hdr{padding:16px 18px 12px;border-bottom:0.5px solid #E8E7E3}
+.ctx-hdr-t{font-size:14px;font-weight:500;color:#1C1C1A;margin-bottom:8px}
+.ctx-search{width:100%;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:6px 10px;font-size:11px;color:#888;border:0.5px solid #D3D1C7}
+.ctx-section{padding:12px 0}
+.ctx-sec-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 6px}
+.ctx-item{display:flex;align-items:flex-start;gap:8px;padding:8px 18px;cursor:pointer;transition:background 0.12s;border-left:2px solid transparent}
+.ctx-item:hover{background:#F9F8F6}
+.ctx-item.act{background:#FDFCFF;border-left-color:#534AB7}
+.ctx-chip{font-size:8px;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px}
+.ctx-chip.mail{background:#E6F1FB;color:#185FA5}
+.ctx-chip.task{background:#FAEEDA;color:#854F0B}
+.ctx-chip.inv{background:#EAF3DE;color:#3B6D11}
+.ctx-chip.offer{background:#EEEDFE;color:#3C3489}
+.ctx-chip.know{background:#E1F5EE;color:#085041}
+.ctx-chip.cust{background:#FAECE7;color:#712B13}
+.ctx-chip.pin{background:#FCEBEB;color:#A32D2D}
+.ctx-body{flex:1;min-width:0}
+.ctx-title{font-size:12px;font-weight:500;color:#1C1C1A;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctx-sub{font-size:10px;color:#B4B2A9}
+.ctx-sep{height:0.5px;background:#E8E7E3;margin:0 18px}
+.center{flex:1;display:flex;flex-direction:column;background:#FAFAF8;overflow:hidden}
+.cbar{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cbar-mode{font-size:11px;padding:4px 10px;border-radius:5px;background:#EEEDFE;color:#534AB7;font-weight:500}
+.cbar-title{font-size:13px;font-weight:500;color:#1C1C1A}
+.cbar-obj{display:flex;gap:4px;margin-left:4px}
+.cbar-tag{font-size:9px;padding:2px 7px;border-radius:4px;background:#F1EFE8;color:#5F5E5A}
+.cbar-provider{font-size:10px;color:#B4B2A9;margin-left:auto;display:flex;align-items:center;gap:4px}
+.cbar-provider .pdot{width:6px;height:6px;border-radius:50%;background:#1D9E75}
+.cbar-acts{display:flex;gap:4px}
+.cbar-btn{font-size:10px;padding:3px 9px;border-radius:4px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.chat{flex:1;overflow-y:auto;padding:20px 24px}
+.msg{margin-bottom:16px;max-width:90%}
+.msg.kira{margin-right:auto}
+.msg.user{margin-left:auto}
+.msg-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.msg-name{font-size:11px;font-weight:500;color:#534AB7}
+.msg-name.u{color:#1C1C1A}
+.msg-time{font-size:10px;color:#B4B2A9}
+.msg-bubble{font-size:13px;line-height:1.6;color:#1C1C1A;padding:14px 18px;border-radius:10px}
+.msg.kira .msg-bubble{background:#fff;border:0.5px solid #E8E7E3}
+.msg.user .msg-bubble{background:#EEEDFE;border:0.5px solid #CECBF6;color:#26215C}
+.card{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:16px 18px;margin-bottom:12px}
+.card-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.card-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.card-icon.summary{background:#E6F1FB;color:#185FA5}
+.card-icon.draft{background:#EEEDFE;color:#534AB7}
+.card-icon.steps{background:#EAF3DE;color:#3B6D11}
+.card-icon.warn{background:#FAEEDA;color:#854F0B}
+.card-title{font-size:13px;font-weight:500;color:#1C1C1A}
+.card-text{font-size:12px;color:#5F5E5A;line-height:1.5;margin-bottom:10px}
+.card-acts{display:flex;gap:4px;flex-wrap:wrap}
+.btn{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn-k{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.btn-p{background:#534AB7;border-color:#534AB7;color:#fff}
+.quick{padding:8px 20px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:0.5px solid #E8E7E3;background:#fff}
+.quick-h{font-size:10px;color:#B4B2A9;margin-right:4px;align-self:center}
+.qb{font-size:10px;padding:5px 12px;border-radius:14px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap;transition:border-color 0.12s}
+.qb:hover{border-color:#CECBF6;color:#534AB7}
+.input-area{background:#fff;border-top:0.5px solid #E8E7E3;padding:14px 20px;display:flex;align-items:flex-end;gap:10px}
+.input-box{flex:1;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:10px;padding:12px 16px;min-height:48px;font-size:13px;color:#1C1C1A;line-height:1.5;display:flex;align-items:center}
+.input-box span{color:#888780}
+.input-acts{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.ia{width:34px;height:34px;border-radius:8px;border:0.5px solid #D3D1C7;background:#F9F8F6;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:#888780}
+.ia:hover{border-color:#CECBF6;color:#534AB7}
+.ia.send{background:#534AB7;border-color:#534AB7;color:#fff}
+.mode-sel{font-size:10px;padding:5px 10px;border-radius:6px;border:0.5px solid #CECBF6;background:#EEEDFE;color:#534AB7;cursor:pointer;display:flex;align-items:center;gap:3px}
+.tools{width:260px;min-width:260px;background:#fff;border-left:0.5px solid #E8E7E3;display:flex;flex-direction:column;overflow-y:auto}
+.tools-hdr{padding:14px 16px 10px;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;justify-content:space-between}
+.tools-t{font-size:13px;font-weight:500;color:#1C1C1A}
+.tools-close{font-size:11px;color:#B4B2A9;cursor:pointer}
+.tools-sec{padding:14px 16px}
+.tools-sh{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px}
+.tools-sep{height:0.5px;background:#E8E7E3;margin:0 16px}
+.t-item{background:#F5F4F1;border:0.5px solid #EEEDE9;border-radius:6px;padding:10px 12px;margin-bottom:6px;font-size:11px;color:#1C1C1A;cursor:pointer;transition:border-color 0.12s}
+.t-item:hover{border-color:#CECBF6}
+.t-item-h{font-weight:500;margin-bottom:2px}
+.t-item-sub{font-size:10px;color:#888780}
+.t-att{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#F5F4F1;border:0.5px solid #EEEDE9;border-radius:6px;margin-bottom:4px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.t-att-ico{opacity:0.5;font-size:13px}
+.t-rule{background:#E1F5EE;border:0.5px solid #9FE1CB;border-radius:6px;padding:8px 12px;margin-bottom:4px;font-size:11px;color:#085041;line-height:1.4}
+.t-rule-h{font-weight:500;margin-bottom:2px;color:#04342C}
+.t-next{background:#FAFAF8;border:0.5px solid #E8E7E3;border-radius:6px;padding:8px 12px;margin-bottom:4px;font-size:11px;cursor:pointer;color:#5F5E5A;transition:border-color 0.12s}
+.t-next:hover{border-color:#CECBF6;color:#534AB7}
+.tg{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tg-purple{background:#EEEDFE;color:#3C3489}
+.tg-amber{background:#FAEEDA;color:#854F0B}
+.tg-green{background:#EAF3DE;color:#3B6D11}
+.tg-blue{background:#E6F1FB;color:#185FA5}
+.tg-gray{background:#F1EFE8;color:#5F5E5A}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar">
+<div class="srch">⌕ Suche in allen Modulen…</div>
+<div class="tpr">
+<div class="tc">⚡ Quick Actions</div>
+<div class="tc ok"><span class="dot"></span>Verbunden</div>
+<div class="tc">🔔 Offene Aufgaben</div>
+<div class="av">KM</div>
+</div>
+</div>
+
+<div class="ws">
+
+<div class="ctx-panel">
+<div class="ctx-hdr">
+<div class="ctx-hdr-t">Kontexte &amp; Verläufe</div>
+<div class="ctx-search">⌕ Kontext suchen…</div>
+</div>
+
+<div class="ctx-section">
+<div class="ctx-sec-h">Aktive Vorgänge</div>
+<div class="ctx-item act">
+<span class="ctx-chip mail">Mail</span>
+<div class="ctx-body"><div class="ctx-title">Fassadenplanung Meier — Farbwahl</div><div class="ctx-sub">Kommunikation · vor 12 Min.</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip offer">Angebot</span>
+<div class="ctx-body"><div class="ctx-title">AG-2026-041 · Fam. Krüger</div><div class="ctx-sub">Geschäft · Nachfass fällig</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip inv">Rechnung</span>
+<div class="ctx-body"><div class="ctx-title">ER Baustoffhandel Schmidt</div><div class="ctx-sub">Geschäft · Skonto morgen</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip task">Aufgabe</span>
+<div class="ctx-body"><div class="ctx-title">Rechnungsentwurf Hartmann freigeben</div><div class="ctx-sub">Geschäft · seit 2 Tagen</div></div>
+</div>
+</div>
+
+<div class="ctx-sep"></div>
+
+<div class="ctx-section">
+<div class="ctx-sec-h">Angeheftet</div>
+<div class="ctx-item">
+<span class="ctx-chip know">Wissen</span>
+<div class="ctx-body"><div class="ctx-title">Preisregel: keine Preise in Erstreaktion</div><div class="ctx-sub">Feste Regel</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip cust">Kunde</span>
+<div class="ctx-body"><div class="ctx-title">Meier — Fassadenprojekt</div><div class="ctx-sub">Bestandskunde</div></div>
+</div>
+</div>
+
+<div class="ctx-sep"></div>
+
+<div class="ctx-section">
+<div class="ctx-sec-h">Letzte Verläufe</div>
+<div class="ctx-item">
+<span class="ctx-chip mail">Mail</span>
+<div class="ctx-body"><div class="ctx-title">Neuer Lead Weber — Erstreaktion</div><div class="ctx-sub">heute 08:30</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip inv">Rechnung</span>
+<div class="ctx-body"><div class="ctx-title">RE-2026-022 Kirchner — Prüfung</div><div class="ctx-sub">gestern 16:10</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip task">Aufgabe</span>
+<div class="ctx-body"><div class="ctx-title">Nachfass Angebot Lang vorbereiten</div><div class="ctx-sub">gestern 11:45</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip know">Wissen</span>
+<div class="ctx-body"><div class="ctx-title">Hydrophobierung — Regelergänzung</div><div class="ctx-sub">24.03. 14:20</div></div>
+</div>
+<div class="ctx-item">
+<span class="ctx-chip offer">Angebot</span>
+<div class="ctx-body"><div class="ctx-title">AG-2026-038 Bergmann — Preisfrage</div><div class="ctx-sub">23.03. 09:15</div></div>
+</div>
+</div>
+</div>
+
+<div class="center">
+<div class="cbar">
+<div class="cbar-mode">Mail-Kontext</div>
+<div class="cbar-title">Fassadenplanung Meier — Farbwahl</div>
+<div class="cbar-obj">
+<span class="tg tg-blue">Fotos</span>
+<span class="tg tg-amber">Frage</span>
+<span class="tg tg-green">Bestandskunde</span>
+</div>
+<div class="cbar-provider"><span class="pdot"></span>Anthropic Claude</div>
+<div class="cbar-acts">
+<span class="cbar-btn">Kontext lösen</span>
+<span class="cbar-btn">+ Kontext</span>
+<span class="cbar-btn">+ Anhang</span>
+<span class="cbar-btn">⏎ Anheften</span>
+</div>
+</div>
+
+<div class="chat">
+
+<div class="msg kira">
+<div class="msg-head"><span class="msg-name">Kira</span><span class="msg-time">vor 12 Min.</span></div>
+<div class="card">
+<div class="card-h"><div class="card-icon summary">Σ</div><div class="card-title">Vorgangszusammenfassung</div></div>
+<div class="card-text">Herr Meier (Bestandskunde) fragt nach Farboptionen für die Fassadenbehandlung seines Mehrfamilienhauses (ca. 120 m²). Er hat zwei Fotos der aktuellen Betonoberfläche geschickt. Am Sockelbereich zeigen die Bilder leichte Ausblühungen. Die Fläche und Maße sind bereits geklärt. Die Erstreaktion zum Leistungsumfang wurde am 18.03. gesendet. Preise wurden bewusst noch nicht genannt (Regel: keine Preise in Erstreaktion).</div>
+</div>
+
+<div class="card">
+<div class="card-h"><div class="card-icon warn">!</div><div class="card-title">Offene Punkte</div></div>
+<div class="card-text">
+• Farbeinschätzung auf Basis der Fotos steht aus<br>
+• Empfehlung Grundierung ja/nein<br>
+• Einschätzung Ausblühungen am Sockel<br>
+• Möglicher Ortstermin bei Unklarheit
+</div>
+</div>
+
+<div class="card">
+<div class="card-h"><div class="card-icon steps">→</div><div class="card-title">Empfohlene nächste Schritte</div></div>
+<div class="card-text">Fotos prüfen und fachliche Einschätzung zu Farboptionen und Grundierung geben. Bei Unsicherheit zu Ausblühungen einen Ortstermin vorschlagen. Ich kann auf Basis der Fotos und deiner Wissensregeln einen Antwort-Entwurf vorbereiten.</div>
+<div class="card-acts">
+<span class="btn btn-p">Antwort-Entwurf erstellen</span>
+<span class="btn btn-k">Fotos analysieren</span>
+<span class="btn">Rückfrage formulieren</span>
+<span class="btn">Ortstermin vorschlagen</span>
+</div>
+</div>
+</div>
+
+<div class="msg user">
+<div class="msg-head"><span class="msg-name u">Kai</span><span class="msg-time">vor 8 Min.</span></div>
+<div class="msg-bubble">Die Ausblühungen am Sockel sehen nach normalem Kalkausblühungen aus, das ist kein Problem. Farblich können wir die ganze Palette anbieten, aber bei dem Untergrund würde ich eher zu einem warmen Grauton raten. Mach mir bitte einen Entwurf, freundlich und fachlich, mit Hinweis auf mögliche Farbmuster vor Ort.</div>
+</div>
+
+<div class="msg kira">
+<div class="msg-head"><span class="msg-name">Kira</span><span class="msg-time">vor 5 Min.</span></div>
+<div class="card">
+<div class="card-h"><div class="card-icon draft">✎</div><div class="card-title">Antwort-Entwurf an Herrn Meier</div></div>
+<div class="card-text">Guten Tag Herr Meier,<br><br>vielen Dank für die Fotos. Die Fassade ist gut geeignet für eine Behandlung. Die weißen Stellen am Sockel sind Kalkausblühungen — das ist bei Beton normal und stellt kein Problem für die Behandlung dar.<br><br>Farblich haben wir eine breite Palette an Möglichkeiten. Bei Ihrem Untergrund würde ich persönlich zu einem warmen Grauton raten, der harmoniert erfahrungsgemäß sehr gut mit der vorhandenen Betonstruktur. Gern bringe ich beim nächsten Termin Farbmuster mit, damit Sie die Töne direkt an der Fassade vergleichen können.<br><br>Eine Grundierung ist bei diesem Untergrund empfehlenswert, damit die Farbe gleichmäßig aufgenommen wird.<br><br>Soll ich einen Termin für die Farbmuster-Ansicht vorschlagen?<br><br>Beste Grüße<br>Kai Marienfeld</div>
+<div class="card-acts">
+<span class="btn btn-p">Als Entwurf übernehmen</span>
+<span class="btn btn-k">Überarbeiten</span>
+<span class="btn">In Aufgabe umwandeln</span>
+<span class="btn">Als Wissensvorschlag</span>
+<span class="btn">Bearbeiten</span>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="quick">
+<span class="quick-h">Schnellaktionen:</span>
+<span class="qb">Antworte auf diese Mail</span>
+<span class="qb">Fasse zusammen</span>
+<span class="qb">Erstelle Rückfrage</span>
+<span class="qb">Bewerte Risiko</span>
+<span class="qb">Vergleiche mit Wissensregeln</span>
+<span class="qb">Erstelle Nachfass-Vorschlag</span>
+</div>
+
+<div class="input-area">
+<div class="input-box"><span>Nachricht an Kira schreiben…</span></div>
+<div class="input-acts">
+<div class="ia" title="Anhang">📎</div>
+<div class="ia" title="Kontext anhängen">+</div>
+<div class="mode-sel">Modus ▾</div>
+<div class="ia send" title="Senden">↑</div>
+</div>
+</div>
+</div>
+
+<div class="tools">
+<div class="tools-hdr"><span class="tools-t">Kontext &amp; Werkzeuge</span><span class="tools-close">✕ Einklappen</span></div>
+
+<div class="tools-sec">
+<div class="tools-sh">Anhänge</div>
+<div class="t-att"><span class="t-att-ico">📎</span>Fassade_Front_01.jpg — 2.4 MB</div>
+<div class="t-att"><span class="t-att-ico">📎</span>Sockel_Detail_02.jpg — 1.8 MB</div>
+<div class="t-att"><span class="t-att-ico">📎</span>Angebot_AG-2026-033.pdf — 340 KB</div>
+</div>
+
+<div class="tools-sep"></div>
+
+<div class="tools-sec">
+<div class="tools-sh">Kundendaten</div>
+<div class="t-item">
+<div class="t-item-h">Herr Meier</div>
+<div class="t-item-sub">Bestandskunde · Mehrfamilienhaus · ca. 120 m² Fassade · Projekt seit 17.03.</div>
+</div>
+</div>
+
+<div class="tools-sep"></div>
+
+<div class="tools-sec">
+<div class="tools-sh">Relevante Wissensregeln</div>
+<div class="t-rule">
+<div class="t-rule-h">Keine Preise in Erstreaktion</div>
+Erst nach Klärung von Fläche, Zustand und Leistungsumfang.
+</div>
+<div class="t-rule">
+<div class="t-rule-h">Grundtonalität</div>
+Natürlich, klar, direkt. Kein KI-Sound.
+</div>
+<div class="t-rule">
+<div class="t-rule-h">Hydrophobierung</div>
+Nur als abschließender Schutzschritt einordnen.
+</div>
+</div>
+
+<div class="tools-sep"></div>
+
+<div class="tools-sec">
+<div class="tools-sh">Nächste Aktionen</div>
+<div class="t-next">→ Entwurf an Kommunikation senden</div>
+<div class="t-next">→ Termin vorschlagen</div>
+<div class="t-next">→ Status auf „beantwortet" setzen</div>
+<div class="t-next">→ Wiedervorlage in 7 Tagen</div>
+</div>
+
+<div class="tools-sep"></div>
+
+<div class="tools-sec">
+<div class="tools-sh">Mail-Zusammenfassung</div>
+<div class="t-item">
+<div class="t-item-h">Thread: 4 Nachrichten</div>
+<div class="t-item-sub">Letzte: 23.03. — Fotos + Farbfrage · Offen seit 3 Tagen · Keine Preise genannt</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>

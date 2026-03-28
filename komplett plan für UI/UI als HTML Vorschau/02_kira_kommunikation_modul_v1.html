@@ -1,0 +1,369 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:960px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.sb-i{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.sb-i.act{background:#2C2C2A;color:#fff}
+.sb-i .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.sb-i.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px 12px}
+.sb-i.plan{opacity:0.45}
+.sb-i.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.topbar-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.ct{flex:1;overflow-y:auto}
+.mod-hdr{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mod-t{font-size:18px;font-weight:500;color:#1C1C1A}
+.mod-stats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.mod-acts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.seg{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:0 24px;display:flex;gap:0}
+.seg-t{padding:10px 16px;font-size:13px;color:#888780;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.seg-t.act{color:#534AB7;border-bottom-color:#534AB7;font-weight:500}
+.seg-t .cnt{font-size:10px;background:#F1EFE8;color:#5F5E5A;padding:1px 6px;border-radius:10px;margin-left:4px}
+.seg-t.act .cnt{background:#EEEDFE;color:#534AB7}
+.flt{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:10px 24px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.flt-label{font-size:11px;color:#888780;margin-right:4px}
+.fc{font-size:11px;padding:4px 10px;border-radius:14px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.fc.on{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.fc.dd{padding-right:16px;position:relative}
+.fc.dd::after{content:'▾';margin-left:4px;font-size:8px;opacity:0.5}
+.workspace{flex:1;display:flex;gap:0;overflow:hidden}
+.wl{width:58%;border-right:0.5px solid #E8E7E3;overflow-y:auto;background:#FAFAF8}
+.wl-inner{padding:12px 16px}
+.wi{display:flex;gap:12px;padding:14px 16px;background:#fff;border:0.5px solid #EEEDE9;border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
+.wi:hover{border-color:#CECBF6}
+.wi.sel{border-color:#AFA9EC;background:#FDFCFF}
+.wi-accent{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch}
+.wi-body{flex:1;min-width:0}
+.wi-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.wi-title{font-size:13px;font-weight:500;color:#1C1C1A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.wi-time{font-size:10px;color:#B4B2A9;flex-shrink:0}
+.wi-sum{font-size:11px;color:#5F5E5A;margin-bottom:4px;line-height:1.4}
+.wi-reason{font-size:10px;color:#888780;margin-bottom:5px}
+.wi-foot{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.tg{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tg-red{background:#FCEBEB;color:#A32D2D}
+.tg-amber{background:#FAEEDA;color:#854F0B}
+.tg-blue{background:#E6F1FB;color:#185FA5}
+.tg-gray{background:#F1EFE8;color:#5F5E5A}
+.tg-green{background:#EAF3DE;color:#3B6D11}
+.tg-coral{background:#FAECE7;color:#712B13}
+.tg-purple{background:#EEEDFE;color:#3C3489}
+.wi-sender{font-size:10px;color:#B4B2A9;margin-left:auto;flex-shrink:0}
+.wi-acts{display:flex;gap:4px;margin-top:6px}
+.btn{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn-k{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.ctx{width:42%;overflow-y:auto;background:#fff}
+.ctx-inner{padding:20px 24px}
+.ctx-top{margin-bottom:16px}
+.ctx-title{font-size:17px;font-weight:500;color:#1C1C1A;margin-bottom:6px;line-height:1.3}
+.ctx-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ctx-block{margin-bottom:16px}
+.ctx-h{font-size:12px;font-weight:500;color:#888780;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.ctx-text{font-size:13px;color:#1C1C1A;line-height:1.6}
+.ctx-text.muted{color:#5F5E5A}
+.ctx-status{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.ctx-s{font-size:11px;padding:5px 12px;border-radius:6px;display:flex;align-items:center;gap:5px}
+.ctx-s .dot{width:6px;height:6px;border-radius:50%}
+.ctx-s.open{background:#FCEBEB;color:#791F1F}
+.ctx-s.open .dot{background:#E24B4A}
+.ctx-s.wait{background:#FAEEDA;color:#633806}
+.ctx-s.wait .dot{background:#EF9F27}
+.ctx-s.info{background:#E6F1FB;color:#0C447C}
+.ctx-s.info .dot{background:#378ADD}
+.ctx-recommend{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.ctx-recommend-h{font-size:11px;font-weight:500;color:#534AB7;margin-bottom:4px}
+.ctx-recommend-t{font-size:13px;color:#1C1C1A;line-height:1.5}
+.ctx-attachments{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.ctx-att{background:#F5F4F1;border:0.5px solid #E8E7E3;border-radius:6px;padding:8px 12px;font-size:11px;color:#5F5E5A;display:flex;align-items:center;gap:6px;cursor:pointer}
+.ctx-att .ico{font-size:14px;opacity:0.5}
+.ctx-thread{border-top:0.5px solid #E8E7E3;padding-top:14px;margin-bottom:16px}
+.ctx-msg{padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:12px;line-height:1.5}
+.ctx-msg.in{background:#F5F4F1;color:#1C1C1A}
+.ctx-msg.out{background:#EEEDFE;color:#26215C}
+.ctx-msg-meta{font-size:10px;color:#B4B2A9;margin-bottom:3px}
+.ctx-actions{border-top:0.5px solid #E8E7E3;padding-top:14px;display:flex;flex-wrap:wrap;gap:6px}
+.ctx-btn{font-size:11px;padding:7px 14px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ctx-btn.primary{background:#534AB7;border-color:#534AB7;color:#fff}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="sb-i"><div class="ic">⌂</div>Start</div>
+<div class="sb-i act"><div class="ic">✉</div>Kommunikation</div>
+<div class="sb-i"><div class="ic">☐</div>Organisation</div>
+<div class="sb-i"><div class="ic">€</div>Geschäft</div>
+<div class="sb-i"><div class="ic">☰</div>Wissen</div>
+<div class="sb-i"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="sb-i plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="sb-i plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="sb-i plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="sb-i plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="sb-i plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar">
+<div class="srch">⌕ Suche in allen Modulen…</div>
+<div class="topbar-r">
+<div class="tc">⚡ Quick Actions</div>
+<div class="tc ok"><span class="dot"></span>Verbunden</div>
+<div class="tc">🔔 Offene Aufgaben</div>
+<div class="av">KM</div>
+</div>
+</div>
+
+<div class="mod-hdr">
+<div class="mod-t">Kommunikation</div>
+<div class="mod-stats">
+<div class="ms"><b>26</b> offen</div>
+<div class="ms"><b>5</b> neue Leads</div>
+<div class="ms"><b>3</b> Angebotsrückm.</div>
+<div class="ms"><b>2</b> man. Prüfungen</div>
+</div>
+<div class="mod-acts">
+<div class="ma">⌕ Suche</div>
+<div class="ma">⊞ Ansicht</div>
+<div class="ma">☑ Sammelaktion</div>
+<div class="ma">+ Neue Notiz</div>
+</div>
+</div>
+
+<div class="seg">
+<div class="seg-t act">Antwort erforderlich<span class="cnt">8</span></div>
+<div class="seg-t">Neue Leads<span class="cnt">5</span></div>
+<div class="seg-t">Angebotsrückmeld.<span class="cnt">3</span></div>
+<div class="seg-t">Zur Kenntnis<span class="cnt">6</span></div>
+<div class="seg-t">Newsletter / System<span class="cnt">12</span></div>
+<div class="seg-t">Abgeschlossen<span class="cnt">34</span></div>
+</div>
+
+<div class="flt">
+<span class="flt-label">Filter:</span>
+<span class="fc on">offene Frage</span>
+<span class="fc">mit Termin</span>
+<span class="fc">mit Fotos</span>
+<span class="fc">mit Anhängen</span>
+<span class="fc dd">Kunde</span>
+<span class="fc dd">Projektart</span>
+<span class="fc dd">Quelle</span>
+<span class="fc dd">Dringlichkeit</span>
+<span class="fc">bereits beantwortet</span>
+<span class="fc">manuelle Prüfung</span>
+<span class="fc">nur mit Kira-Kontext</span>
+</div>
+
+<div class="workspace">
+<div class="wl">
+<div class="wl-inner">
+
+<div class="wi sel">
+<div class="wi-accent" style="background:#E24B4A"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">RE: Fassadenplanung Meier — offene Frage zur Farbwahl</div><div class="wi-time">vor 3 Tagen</div></div>
+<div class="wi-sum">Kunde fragt nach Farboptionen für die Fassadenbehandlung. Fotos der aktuellen Oberfläche angehängt. Wartet auf Einschätzung und Vorschlag.</div>
+<div class="wi-reason">Einordnung: offene Frage erkannt · Fotos vorhanden · Antwort seit 3 Tagen ausstehend</div>
+<div class="wi-foot">
+<span class="tg tg-red">dringend</span>
+<span class="tg tg-amber">Frage</span>
+<span class="tg tg-blue">Fotos</span>
+<span class="tg tg-gray">Anhang</span>
+<span class="wi-sender">Kunde · Meier</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn btn-k">Mit Kira besprechen</span><span class="btn">Status</span><span class="btn">Korrektur</span></div>
+</div>
+</div>
+
+<div class="wi">
+<div class="wi-accent" style="background:#E24B4A"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">Anfrage Terrasse Beton-Optik — Rückfrage zur Fläche</div><div class="wi-time">vor 2 Tagen</div></div>
+<div class="wi-sum">Bestandskunde bittet um Einschätzung für Terrassenfläche. Maße fehlen noch, Fotos angekündigt.</div>
+<div class="wi-reason">Einordnung: Rückfrage erkannt · fehlende Angaben · Bestandskunde</div>
+<div class="wi-foot">
+<span class="tg tg-amber">Frage</span>
+<span class="tg tg-green">Bestandskunde</span>
+<span class="wi-sender">Kunde · Schulze</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn btn-k">Mit Kira besprechen</span><span class="btn">Status</span></div>
+</div>
+</div>
+
+<div class="wi">
+<div class="wi-accent" style="background:#EF9F27"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">AW: Angebot Garagenboden — Preisrückfrage</div><div class="wi-time">vor 1 Tag</div></div>
+<div class="wi-sum">Interessent fragt nach günstigerer Variante. Bezug auf Angebot #AG-2026-038. Preisregel beachten.</div>
+<div class="wi-reason">Einordnung: Preisfrage erkannt · Angebotsrückmeldung · Preislogik aus Wissen relevant</div>
+<div class="wi-foot">
+<span class="tg tg-amber">Preis</span>
+<span class="tg tg-purple">Angebotsrückm.</span>
+<span class="tg tg-gray">Wissen relevant</span>
+<span class="wi-sender">Lead · Bergmann</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn btn-k">Mit Kira besprechen</span><span class="btn">Status</span></div>
+</div>
+</div>
+
+<div class="wi">
+<div class="wi-accent" style="background:#378ADD"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">Neue Anfrage: Umbau Dachterrasse, ca. 35 m²</div><div class="wi-time">heute 08:14</div></div>
+<div class="wi-sum">Erstanfrage über Website-Formular. Dachterrasse, Betonoptik gewünscht. Fotos und Maße noch nicht vorhanden.</div>
+<div class="wi-reason">Einordnung: neuer Lead · Webformular · Erstreaktion empfohlen</div>
+<div class="wi-foot">
+<span class="tg tg-blue">neuer Lead</span>
+<span class="tg tg-gray">Website</span>
+<span class="wi-sender">Lead · Weber</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn btn-k">Mit Kira besprechen</span><span class="btn">Status</span></div>
+</div>
+</div>
+
+<div class="wi">
+<div class="wi-accent" style="background:#378ADD"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">Instagram DM → Mail: Kellertreppe Betonkosmetik</div><div class="wi-time">gestern</div></div>
+<div class="wi-sum">Lead über Instagram, weitergeleitet per Mail. Fragt nach Möglichkeiten für Kellertreppe. Fotos dabei.</div>
+<div class="wi-reason">Einordnung: neuer Lead · Social-Quelle · Fotos vorhanden</div>
+<div class="wi-foot">
+<span class="tg tg-blue">neuer Lead</span>
+<span class="tg tg-blue">Fotos</span>
+<span class="tg tg-coral">Instagram</span>
+<span class="wi-sender">Lead · Hoffmann</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn btn-k">Mit Kira besprechen</span><span class="btn">Status</span></div>
+</div>
+</div>
+
+<div class="wi">
+<div class="wi-accent" style="background:#B4B2A9"></div>
+<div class="wi-body">
+<div class="wi-top"><div class="wi-title">RE: Termin Baustellenbegehung — Bestätigung</div><div class="wi-time">vor 4 Tagen</div></div>
+<div class="wi-sum">Kunde bestätigt den Termin am 26.03. um 14:00. Keine offene Frage. Termin bereits in Organisation.</div>
+<div class="wi-reason">Einordnung: Bestätigung erkannt · Termin extrahiert · keine Aktion nötig</div>
+<div class="wi-foot">
+<span class="tg tg-green">bestätigt</span>
+<span class="tg tg-gray">Termin</span>
+<span class="wi-sender">Kunde · Meier</span>
+</div>
+<div class="wi-acts"><span class="btn">Öffnen</span><span class="btn">Status</span></div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="ctx">
+<div class="ctx-inner">
+<div class="ctx-top">
+<div class="ctx-title">RE: Fassadenplanung Meier — offene Frage zur Farbwahl</div>
+<div class="ctx-meta">
+<span class="tg tg-red">dringend</span>
+<span class="tg tg-amber">Frage</span>
+<span class="tg tg-blue">Fotos</span>
+<span class="tg tg-gray">Anhang</span>
+<span class="tg tg-green">Bestandskunde</span>
+</div>
+</div>
+
+<div class="ctx-status">
+<div class="ctx-s open"><span class="dot"></span>Antwort erforderlich</div>
+<div class="ctx-s wait"><span class="dot"></span>Seit 3 Tagen offen</div>
+<div class="ctx-s info"><span class="dot"></span>Thread: 4 Nachrichten</div>
+</div>
+
+<div class="ctx-block">
+<div class="ctx-h">Zusammenfassung</div>
+<div class="ctx-text">Herr Meier fragt nach Farboptionen für die Fassadenbehandlung seines Mehrfamilienhauses. Er hat Fotos der aktuellen Betonoberfläche geschickt und möchte wissen, welche Farbtöne möglich sind und ob die Oberfläche vorher grundiert werden muss. Zwei Fotos zeigen leichte Ausblühungen am Sockelbereich.</div>
+</div>
+
+<div class="ctx-block">
+<div class="ctx-h">Warum diese Einordnung</div>
+<div class="ctx-text muted">Offene Frage erkannt (Farbwahl + Grundierung). Fotos vorhanden, aber noch keine fachliche Antwort im Thread. Bestandskunde mit laufendem Projekt. Dringlichkeit erhöht wegen 3 Tagen ohne Reaktion.</div>
+</div>
+
+<div class="ctx-block">
+<div class="ctx-h">Was ist offen</div>
+<div class="ctx-text">Farbeinschätzung auf Basis der Fotos · Empfehlung Grundierung ja/nein · Einschätzung Ausblühungen am Sockel · möglicher Ortstermin bei Unklarheit</div>
+</div>
+
+<div class="ctx-block">
+<div class="ctx-h">Bereits beantwortet</div>
+<div class="ctx-text muted">Erstantwort zu Leistungsumfang und Ablauf wurde am 18.03. gesendet. Maße und Fläche sind geklärt (ca. 120 m²). Preisrange wurde bewusst noch nicht genannt (Regel: keine Preise in Erstreaktion).</div>
+</div>
+
+<div class="ctx-recommend">
+<div class="ctx-recommend-h">Empfohlene nächste Aktion</div>
+<div class="ctx-recommend-t">Fotos prüfen und fachliche Einschätzung zu Farboptionen und Grundierung geben. Bei Unsicherheit zu Ausblühungen einen Ortstermin vorschlagen. Kira kann auf Basis der Fotos und Wissensregeln einen Antwort-Entwurf vorbereiten.</div>
+</div>
+
+<div class="ctx-block">
+<div class="ctx-h">Anhänge</div>
+<div class="ctx-attachments">
+<div class="ctx-att"><span class="ico">📎</span>Fassade_Front_01.jpg — 2.4 MB</div>
+<div class="ctx-att"><span class="ico">📎</span>Sockel_Detail_02.jpg — 1.8 MB</div>
+<div class="ctx-att"><span class="ico">📎</span>Angebot_AG-2026-033.pdf — 340 KB</div>
+</div>
+</div>
+
+<div class="ctx-thread">
+<div class="ctx-h">Thread-Verlauf</div>
+<div class="ctx-msg in">
+<div class="ctx-msg-meta">Meier · 23.03. 09:42</div>
+Hallo Herr Marienfeld, anbei die Fotos der Fassade. Welche Farbtöne wären denn möglich? Und muss vorher grundiert werden? Am Sockel sind diese weißen Flecken, ist das ein Problem?
+</div>
+<div class="ctx-msg out">
+<div class="ctx-msg-meta">Kai · 18.03. 14:15</div>
+Guten Tag Herr Meier, vielen Dank für Ihre Anfrage. Die Fläche klingt gut machbar. Schicken Sie mir gern Fotos, dann kann ich besser einschätzen…
+</div>
+<div class="ctx-msg in">
+<div class="ctx-msg-meta">Meier · 17.03. 11:20</div>
+Erstanfrage: Fassadenbehandlung Mehrfamilienhaus, ca. 120 m², Betonoptik gewünscht.
+</div>
+</div>
+
+<div class="ctx-actions">
+<div class="ctx-btn primary">Mit Kira besprechen</div>
+<div class="ctx-btn">Mail vollständig lesen</div>
+<div class="ctx-btn">Anhänge öffnen</div>
+<div class="ctx-btn">Wiedervorlage setzen</div>
+<div class="ctx-btn">Als erledigt markieren</div>
+<div class="ctx-btn">Kategorie korrigieren</div>
+</div>
+
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="kira-fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+</div>

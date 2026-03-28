@@ -46,7 +46,8 @@ PRIORITAETEN = ["hoch", "mittel", "niedrig"]
 
 
 def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent,
-                                  angebote_kontext: str = "", correction_beispiele: str = ""):
+                                  angebote_kontext: str = "", correction_beispiele: str = "",
+                                  kira_wissen: str = "", kunden_profil: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:2000]
 
@@ -67,8 +68,19 @@ LERNBEISPIELE aus vergangenen Korrekturen (Kais Feedback — bitte beachten!):
 {correction_beispiele}
 """
 
+    wissen_block = ""
+    if kira_wissen:
+        wissen_block = f"""
+WISSEN (von Kira gelernte Erkenntnisse zur Klassifizierung):
+{kira_wissen}
+"""
+
+    profil_block = ""
+    if kunden_profil:
+        profil_block = f"\n{kunden_profil}\n"
+
     return f"""Klassifiziere diese E-Mail für rauMKult® Sichtbeton (Betonkosmetik-Fachbetrieb).
-{angebote_block}{corrections_block}
+{angebote_block}{corrections_block}{wissen_block}{profil_block}
 MAIL-DATEN:
 - Konto: {konto}
 - Absender: {absender}
@@ -103,8 +115,16 @@ Antworte NUR als JSON:
   "empfohlene_aktion": "Was Kai tun sollte",
   "kategorie_grund": "Warum diese Kategorie",
   "prioritaet": "hoch" | "mittel" | "niedrig",
+  "konfidenz": "hoch" | "mittel" | "niedrig",
+  "mit_termin": true/false,
+  "manuelle_pruefung": true/false,
+  "beantwortet": true/false,
   "organisation": {{"termin": "...", "rueckruf": true, "frist": "..."}} oder null
-}}"""
+}}
+
+mit_termin=true wenn Mail konkretes Datum, Besichtigungstermin oder Terminvereinbarung enthält.
+manuelle_pruefung=true wenn Kira unsicher ist oder der Fall ungewöhnlich komplex ist.
+beantwortet=true wenn diese Mail eine Antwort AUF eine vorangegangene eigene Mail ist (Re:/AW: + Inhalts-Bezug)."""
 
 
 def _parse_llm_response(text):
@@ -133,6 +153,12 @@ def _parse_llm_response(text):
     if prio not in PRIORITAETEN:
         data["prioritaet"] = "mittel"
 
+    konfidenz = data.get("konfidenz", "mittel")
+    if konfidenz not in ("hoch", "mittel", "niedrig"):
+        data["konfidenz"] = "mittel"
+    else:
+        data["konfidenz"] = konfidenz
+
     # Geschaeft-Daten aus Text extrahieren (Regex, schnell + zuverlässig)
     data.setdefault("geschaeft", None)
 
@@ -146,75 +172,168 @@ def _get_angebote_kontext(absender: str, text: str, mail_datum: str = "") -> str
     Filtert Angebote die NACH dem Maildatum erstellt wurden (zeitliche Kausalität).
     """
     try:
-        email = extract_email(absender).lower()
+        email = _resolve_alias(extract_email(absender).lower())
         domain = email.split("@")[1] if "@" in email else ""
-        db = sqlite3.connect(str(KUNDEN_DB))
+        # angebote liegt in tasks.db (nicht kunden.db)
+        db = sqlite3.connect(str(TASKS_DB))
         db.row_factory = sqlite3.Row
         treffer = []
 
         # Datum-Guard: nur Angebote die VOR oder AM TAG der Mail erstellt wurden
-        # Wenn kein Datum: kein Filter (sicher fallback)
         datum_filter = ""
         datum_param  = []
         if mail_datum:
             datum_kurz = str(mail_datum)[:10]
-            datum_filter = " AND (erstellt IS NULL OR erstellt <= ?)"
+            datum_filter = " AND (erstellt_am IS NULL OR erstellt_am <= ?)"
             datum_param  = [datum_kurz]
 
         # 1. Direkte E-Mail-Übereinstimmung
         rows = db.execute(
-            "SELECT angebots_nr, kunde, status, erstellt, betrag FROM angebote "
+            "SELECT a_nummer, kunde_name, status, erstellt_am, betrag_geschaetzt FROM angebote "
             f"WHERE status='offen' AND LOWER(kunde_email)=?{datum_filter}",
             [email] + datum_param
         ).fetchall()
         for r in rows:
             tage = ""
-            if r['erstellt'] and mail_datum:
+            if r['erstellt_am'] and mail_datum:
                 try:
                     from datetime import datetime as _dt
                     diff = (_dt.strptime(str(mail_datum)[:10], "%Y-%m-%d")
-                            - _dt.strptime(str(r['erstellt'])[:10], "%Y-%m-%d")).days
+                            - _dt.strptime(str(r['erstellt_am'])[:10], "%Y-%m-%d")).days
                     tage = f", {diff} Tage vor Mail"
                 except: pass
             treffer.append(
-                f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}{tage}, Betrag: {r['betrag']}€) "
+                f"Angebot {r['a_nummer']} an {r['kunde_name']} "
+                f"(Datum: {(r['erstellt_am'] or '')[:10]}{tage}, ca. {r['betrag_geschaetzt']}€) "
                 f"→ DIREKTE E-MAIL-ÜBEREINSTIMMUNG"
             )
 
         # 2. Domain-Match (anderer Account, gleiche Firma)
         if not treffer and domain and domain not in _GENERIC_DOMAINS:
             rows2 = db.execute(
-                "SELECT angebots_nr, kunde, status, erstellt FROM angebote "
+                "SELECT a_nummer, kunde_name, status, erstellt_am FROM angebote "
                 f"WHERE status='offen' AND LOWER(kunde_email) LIKE ?{datum_filter}",
                 [f"%@{domain}"] + datum_param
             ).fetchall()
             for r in rows2:
                 treffer.append(
-                    f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                    f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}) "
+                    f"Angebot {r['a_nummer']} an {r['kunde_name']} "
+                    f"(Datum: {(r['erstellt_am'] or '')[:10]}) "
                     f"→ GLEICHE FIRMEN-DOMAIN, anderer Account"
                 )
 
-        # 3. Kundenname im Mailtext (Firmenname aus Angeboten in Text suchen)
+        # 3. Kundenname im Mailtext
         if not treffer:
             kandidaten = db.execute(
-                "SELECT angebots_nr, kunde, erstellt FROM angebote "
-                f"WHERE status='offen' AND kunde IS NOT NULL{datum_filter}",
+                "SELECT a_nummer, kunde_name, erstellt_am FROM angebote "
+                f"WHERE status='offen' AND kunde_name IS NOT NULL{datum_filter}",
                 datum_param
             ).fetchall()
             text_lower = (text or "")[:3000].lower()
             for r in kandidaten:
-                name = (r['kunde'] or "").strip()
+                name = (r['kunde_name'] or "").strip()
                 if len(name) >= 5 and name.lower() in text_lower:
                     treffer.append(
-                        f"Angebot {r['angebots_nr']} an {r['kunde']} "
-                        f"(Angebotsdatum: {(r['erstellt'] or '')[:10]}) "
+                        f"Angebot {r['a_nummer']} an {r['kunde_name']} "
+                        f"(Datum: {(r['erstellt_am'] or '')[:10]}) "
                         f"→ KUNDENNAME IM MAILTEXT gefunden"
                     )
 
         db.close()
         return "\n".join(f"  • {t}" for t in treffer[:3])
+    except Exception:
+        return ""
+
+
+def _resolve_alias(email: str) -> str:
+    """Löst bekannte E-Mail-Aliase auf die Haupt-Adresse auf."""
+    if not email:
+        return email
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        row = db.execute(
+            "SELECT haupt_email FROM kunden_aliases WHERE LOWER(alias_email)=?",
+            (email.lower(),)
+        ).fetchone()
+        db.close()
+        if row:
+            return row[0]
+    except: pass
+    return email
+
+
+def _get_kunden_profil(email: str) -> str:
+    """
+    Erstellt ein kurzes Kundenprofil aus bisherigen Tasks und Interaktionen.
+    Gibt einen Prompt-Block zurück, der dem LLM die Kundenhistorie zeigt.
+    """
+    if not email:
+        return ""
+    email = _resolve_alias(email.lower().strip())
+    try:
+        profil_parts = []
+
+        # Aus tasks.db: Anzahl früherer Tasks, letztes Datum, letzte Kategorie
+        tdb = sqlite3.connect(str(TASKS_DB))
+        tdb.row_factory = sqlite3.Row
+        task_rows = tdb.execute(
+            "SELECT kategorie, datum_mail FROM tasks WHERE LOWER(kunden_email)=? ORDER BY datum_mail DESC LIMIT 5",
+            (email,)
+        ).fetchall()
+        tdb.close()
+        if task_rows:
+            n = len(task_rows)
+            letztes = (task_rows[0]["datum_mail"] or "")[:10]
+            letzte_kat = task_rows[0]["kategorie"] or ""
+            profil_parts.append(
+                f"{n} frühere{'r' if n==1 else ''} Kontakt{'e' if n>1 else ''}, letzter: {letztes}, Kategorie: {letzte_kat}"
+                f" → wahrscheinlich {'Bestandskunde' if n >= 2 else 'Interessent'}"
+            )
+
+        # Aus kunden.db: Interaktionen
+        kdb = sqlite3.connect(str(KUNDEN_DB))
+        kdb.row_factory = sqlite3.Row
+        try:
+            inter = kdb.execute(
+                "SELECT COUNT(*) c FROM interaktionen WHERE LOWER(kunden_email)=?",
+                (email,)
+            ).fetchone()
+            if inter and inter["c"] > 0:
+                profil_parts.append(f"{inter['c']} gespeicherte Interaktionen in kunden.db")
+        except: pass
+        kdb.close()
+
+        if not profil_parts:
+            return ""
+        return "KUNDENPROFIL: " + " | ".join(profil_parts)
+    except Exception:
+        return ""
+
+
+def _get_kira_wissen(limit: int = 10) -> str:
+    """
+    Lädt Kiras gelernte Erkenntnisse aus wissen_regeln, die für die
+    Mail-Klassifizierung relevant sind (Kategorien: klassifizierung, vorschlag, gelernt).
+    """
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute("""
+            SELECT kategorie, titel, inhalt, erstellt_am
+            FROM wissen_regeln
+            WHERE status = 'aktiv'
+              AND kategorie IN ('klassifizierung','vorschlag','gelernt','kira')
+            ORDER BY erstellt_am DESC LIMIT ?
+        """, (limit,)).fetchall()
+        db.close()
+        if not rows:
+            return ""
+        lines = []
+        for r in rows:
+            titel  = (r["titel"] or "")[:60]
+            inhalt = (r["inhalt"] or "")[:120]
+            lines.append(f"  • {titel}: {inhalt}")
+        return "\n".join(lines)
     except Exception:
         return ""
 
@@ -273,9 +392,28 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
     if is_system_sender(absender):
         return _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
 
-    # ── FAST-PATH 3: Klare Newsletter ──
+    # ── FAST-PATH 3: Newsletter — nur wenn eindeutig Consumer/generisch ──
+    # B2B-Newsletters (Lieferanten, Fachverbände, Materiallieferanten) können relevant sein
     if is_newsletter(absender, betreff, text):
-        return _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
+        sender_email = extract_email(absender).lower()
+        sender_domain = sender_email.split('@')[-1] if '@' in sender_email else ''
+        # Generische Massen-Newsletter-Domains → Regelbasiert (kein LLM nötig)
+        _generic_newsletter_domains = {
+            "mailchimp.com", "klaviyo.com", "sendinblue.com", "mailjet.com",
+            "constantcontact.com", "newsletter2go.com", "cleverreach.com",
+            "emarsys.com", "salesmanago.com", "hubspot.com", "marketo.com",
+            "pardot.com", "campaignmonitor.com", "drip.com", "convertkit.com",
+            "aweber.com", "getresponse.com",
+        }
+        # Prüfe ob Domain generisch klingt (kein Firmenname erkennbar)
+        is_generic_nl_domain = (
+            sender_domain in _generic_newsletter_domains
+            or sender_domain in _GENERIC_DOMAINS
+            or any(x in sender_domain for x in ("newsletter","noreply","no-reply","marketing","promo"))
+        )
+        if is_generic_nl_domain:
+            return _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
+        # B2B-Domain → LLM entscheiden lassen (könnte Fachinfo sein)
 
     # ── FAST-PATH 4: Ausschluss-Betreffs ──
     if is_exclude_subject(betreff):
@@ -283,28 +421,30 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
 
     # ── LLM-Klassifizierung ──
     try:
-        from kira_llm import chat as kira_chat, get_providers
+        from kira_llm import classify_direct, get_providers
 
         # Prüfe ob überhaupt ein Provider verfügbar
         providers = get_providers()
         if not providers:
             raise RuntimeError("Kein Provider konfiguriert")
 
-        # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen als Lernbeispiele
+        # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen + Kira-Wissen + Kundenprofil
         angebote_kontext     = _get_angebote_kontext(absender, text, mail_datum=mail_datum)
         correction_beispiele = _get_correction_beispiele()
+        kira_wissen          = _get_kira_wissen()
+        kunden_email_raw     = extract_email(absender)
+        kunden_profil        = _get_kunden_profil(kunden_email_raw)
 
         prompt = _build_classification_prompt(
             konto, absender, betreff, text, folder, is_sent,
             angebote_kontext=angebote_kontext,
             correction_beispiele=correction_beispiele,
+            kira_wissen=kira_wissen,
+            kunden_profil=kunden_profil,
         )
 
-        # Spezieller Chat ohne Tool-Nutzung, kurze Antwort
-        result = kira_chat(
-            user_message=f"[SYSTEM: Mail-Klassifizierung — antworte NUR als JSON]\n\n{prompt}",
-            session_id=None
-        )
+        # Leichtgewichtiger Direkt-Aufruf (Haiku, 512 max_tokens, kein System-Prompt)
+        result = classify_direct(prompt, max_tokens=512)
 
         if result.get("error"):
             raise RuntimeError(result["error"])
@@ -322,15 +462,19 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                 organisation = None
 
             return {
-                "kategorie":        parsed["kategorie"],
-                "absender_rolle":   parsed.get("absender_rolle", ""),
-                "zusammenfassung":  parsed.get("zusammenfassung", betreff[:100]),
-                "antwort_noetig":   bool(parsed.get("antwort_noetig", False)),
-                "empfohlene_aktion":parsed.get("empfohlene_aktion", ""),
-                "kategorie_grund":  parsed.get("kategorie_grund", "LLM-klassifiziert"),
-                "prioritaet":       parsed.get("prioritaet", "mittel"),
-                "organisation":     organisation,
-                "geschaeft":        geschaeft,
+                "kategorie":          parsed["kategorie"],
+                "absender_rolle":     parsed.get("absender_rolle", ""),
+                "zusammenfassung":    parsed.get("zusammenfassung", betreff[:100]),
+                "antwort_noetig":     bool(parsed.get("antwort_noetig", False)),
+                "empfohlene_aktion":  parsed.get("empfohlene_aktion", ""),
+                "kategorie_grund":    parsed.get("kategorie_grund", "LLM-klassifiziert"),
+                "prioritaet":         parsed.get("prioritaet", "mittel"),
+                "konfidenz":          parsed.get("konfidenz", "mittel"),
+                "mit_termin":         1 if parsed.get("mit_termin") else 0,
+                "manuelle_pruefung":  1 if parsed.get("manuelle_pruefung") else 0,
+                "beantwortet":        1 if parsed.get("beantwortet") else 0,
+                "organisation":       organisation,
+                "geschaeft":          geschaeft,
             }
 
     except Exception as e:

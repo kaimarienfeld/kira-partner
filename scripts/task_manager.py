@@ -12,10 +12,11 @@ KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
 SCRIPTS_DIR   = Path(__file__).parent
 
 TASK_STATUS = {
-    "offen":      "Offen",
-    "erledigt":   "Erledigt",
-    "ignorieren": "Ignoriert",
-    "spaeter":    "Erinnere später",
+    "offen":        "Offen",
+    "erledigt":     "Erledigt",
+    "ignorieren":   "Ignoriert",
+    "spaeter":      "Erinnere später",
+    "zur_kenntnis": "Zur Kenntnis genommen",
 }
 
 # ── Datenbank Setup ────────────────────────────────────────────────────────────

@@ -1,0 +1,376 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1080px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.plan{opacity:0.45}
+.sn.plan .pb{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.grp-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid #F1EFE8}
+.row:last-child{border-bottom:none}
+.row-label{font-size:13px;color:#1C1C1A;flex:1;min-width:0}
+.row-desc{font-size:10px;color:#B4B2A9;margin-top:1px}
+.toggle{width:38px;height:20px;background:#D3D1C7;border-radius:10px;position:relative;cursor:pointer;flex-shrink:0}
+.toggle.on{background:#1D9E75}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%}
+.toggle.on::after{transform:translateX(18px)}
+.seg{display:flex;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;overflow:hidden;flex-shrink:0}
+.seg-o{padding:5px 14px;font-size:11px;color:#5F5E5A;cursor:pointer;border-right:0.5px solid #D3D1C7}
+.seg-o:last-child{border-right:none}
+.seg-o.act{background:#fff;color:#1C1C1A;font-weight:500}
+.sb-g{font-size:10px;padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0}
+.sb-g.on{background:#EAF3DE;color:#3B6D11}
+.sb-g.rdy{background:#E6F1FB;color:#0C447C}
+.sb-g.off{background:#F1EFE8;color:#888780}
+.sb-g.warn{background:#FAEEDA;color:#854F0B}
+.sb-g.err{background:#FCEBEB;color:#A32D2D}
+.prov{display:flex;gap:14px;padding:16px 18px;background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:10px;margin-bottom:8px;align-items:center;transition:border-color 0.15s}
+.prov:hover{border-color:#D3D1C7}
+.prov.primary{border-color:#1D9E75;background:#FAFFFE}
+.prov-drag{display:flex;flex-direction:column;gap:2px;cursor:grab;opacity:0.3;flex-shrink:0}
+.prov-drag span{width:14px;height:2px;background:#888780;border-radius:1px}
+.prov-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500;flex-shrink:0}
+.prov-icon.anth{background:#EEEDFE;color:#534AB7}
+.prov-icon.oai{background:#E1F5EE;color:#0F6E56}
+.prov-icon.ort{background:#E6F1FB;color:#185FA5}
+.prov-icon.oll{background:#F1EFE8;color:#5F5E5A}
+.prov-icon.cust{background:#FAEEDA;color:#854F0B}
+.prov-body{flex:1;min-width:0}
+.prov-top{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.prov-name{font-size:14px;font-weight:500;color:#1C1C1A}
+.prov-rank{font-size:9px;padding:2px 7px;border-radius:4px;background:#F1EFE8;color:#5F5E5A}
+.prov-rank.std{background:#EAF3DE;color:#3B6D11}
+.prov-detail{font-size:11px;color:#888780;line-height:1.4}
+.prov-meta{display:flex;gap:10px;margin-top:4px;font-size:10px;color:#B4B2A9}
+.prov-meta b{font-weight:500;color:#5F5E5A}
+.prov-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.prov-acts{display:flex;gap:4px}
+.btn{font-size:10px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#B4B2A9}
+.btn-t{background:#E1F5EE;border-color:#9FE1CB;color:#085041}
+.btn-d{background:#444441;border-color:#444441;color:#fff}
+.btn-k{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.fb-track{display:flex;align-items:center;gap:0;margin-top:10px}
+.fb-node{display:flex;align-items:center;gap:10px;background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:8px 14px}
+.fb-node-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
+.fb-node-name{font-size:12px;font-weight:500;color:#1C1C1A}
+.fb-node-model{font-size:10px;color:#888780}
+.fb-arrow{font-size:14px;color:#D3D1C7;padding:0 6px}
+.fb-label{font-size:9px;color:#B4B2A9;text-align:center;margin-top:4px}
+.test-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.test-card{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;padding:14px 16px}
+.test-card-h{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.test-card-name{font-size:12px;font-weight:500;color:#1C1C1A}
+.test-card-detail{font-size:10px;color:#888780;line-height:1.4;margin-bottom:8px}
+.test-card-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px;color:#5F5E5A}
+.test-card-row .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.test-card-row .dot.ok{background:#1D9E75}
+.test-card-row .dot.off{background:#D3D1C7}
+.test-card-row .dot.warn{background:#EF9F27}
+.test-card-btn{margin-top:8px}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar"><div class="srch">⌕ Suche in allen Modulen…</div><div class="tpr"><div class="tc">⚡ Quick Actions</div><div class="tc ok"><span class="dot"></span>Verbunden</div><div class="tc">🔔 Offene Aufgaben</div><div class="av">KM</div></div></div>
+
+<div class="mh"><div class="mt">Einstellungen</div><div class="mstats"><div class="ms">Provider: <b>Anthropic</b></div><div class="ms">Theme: <b>Hell</b></div><div class="ms">Push: <b>aktiv</b></div><div class="ms">Zuletzt: <b>vor 2 Std.</b></div></div><div class="macts"><div class="ma">⌕ Suche</div><div class="ma">↺ Zurücksetzen</div><div class="ma">↗ Export</div><div class="ma">↙ Import</div><div class="ma primary">Speichern</div></div></div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn"><div class="sico">◐</div>Design</div>
+<div class="sn"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn act"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">5</span></div>
+<div class="sn"><div class="sico">⇌</div>Integrationen<span class="cnt">4</span></div>
+<div class="sn plan"><div class="sico">⟳</div>Automationen<span class="pb">Geplant</span></div>
+</div>
+
+<div class="main-set">
+
+<!-- SECTION 1: Aktive Provider -->
+<div class="sec">
+<div class="sec-h">Kira / LLM / Provider</div>
+<div class="sec-sub">Verwalte KI-Provider, Fallback-Logik, Modellwahl und Kira-Verhalten — die zentrale Steuerung für Kiras KI-Kern</div>
+
+<div class="grp">
+<div class="grp-h">Aktive Provider</div>
+<div class="grp-sub">Provider in der Reihenfolge der Fallback-Priorität — ziehen zum Umsortieren</div>
+
+<div class="prov primary">
+<div class="prov-drag"><span></span><span></span><span></span></div>
+<div class="prov-icon anth">A</div>
+<div class="prov-body">
+<div class="prov-top"><span class="prov-name">Anthropic</span><span class="prov-rank std">Standard</span><span class="sb-g on">Aktiv</span></div>
+<div class="prov-detail">Claude Sonnet 4 · claude-sonnet-4-20250514</div>
+<div class="prov-meta"><span><b>Latenz:</b> 1.2s</span><span><b>Letzte Nutzung:</b> vor 12 Min.</span><span><b>Heute:</b> 34 Anfragen</span></div>
+</div>
+<div class="prov-right">
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Modell wählen</span><span class="btn">API-Key</span><span class="btn">Bearbeiten</span></div>
+</div>
+</div>
+
+<div class="prov">
+<div class="prov-drag"><span></span><span></span><span></span></div>
+<div class="prov-icon oai">O</div>
+<div class="prov-body">
+<div class="prov-top"><span class="prov-name">OpenAI</span><span class="prov-rank">Fallback #1</span><span class="sb-g rdy">Bereit</span></div>
+<div class="prov-detail">GPT-4o · gpt-4o-2024-08-06</div>
+<div class="prov-meta"><span><b>Latenz:</b> 1.8s</span><span><b>Letzte Nutzung:</b> vor 3 Tagen</span><span><b>Key:</b> gesetzt</span></div>
+</div>
+<div class="prov-right">
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Modell</span><span class="btn">Bearbeiten</span><span class="btn">Als Standard</span></div>
+</div>
+</div>
+
+<div class="prov">
+<div class="prov-drag"><span></span><span></span><span></span></div>
+<div class="prov-icon ort">R</div>
+<div class="prov-body">
+<div class="prov-top"><span class="prov-name">OpenRouter</span><span class="prov-rank">Fallback #2</span><span class="sb-g rdy">Bereit</span></div>
+<div class="prov-detail">Auto-Routing · mehrere Modelle verfügbar</div>
+<div class="prov-meta"><span><b>Latenz:</b> variabel</span><span><b>Key:</b> gesetzt</span></div>
+</div>
+<div class="prov-right">
+<div class="prov-acts"><span class="btn btn-t">Testen</span><span class="btn">Modell</span><span class="btn">Bearbeiten</span></div>
+</div>
+</div>
+
+<div class="prov">
+<div class="prov-drag"><span></span><span></span><span></span></div>
+<div class="prov-icon oll">L</div>
+<div class="prov-body">
+<div class="prov-top"><span class="prov-name">Ollama (Lokal)</span><span class="prov-rank">Fallback #3</span><span class="sb-g off">Inaktiv</span></div>
+<div class="prov-detail">Lokaler Endpunkt · kein Modell konfiguriert</div>
+<div class="prov-meta"><span><b>Endpunkt:</b> localhost:11434</span><span><b>Status:</b> nicht erreichbar</span></div>
+</div>
+<div class="prov-right">
+<div class="prov-acts"><span class="btn">Konfigurieren</span><span class="btn">Aktivieren</span></div>
+</div>
+</div>
+
+<div class="prov">
+<div class="prov-drag"><span></span><span></span><span></span></div>
+<div class="prov-icon cust">+</div>
+<div class="prov-body">
+<div class="prov-top"><span class="prov-name">Benutzerdefiniert</span><span class="sb-g warn">Kein Key</span></div>
+<div class="prov-detail">Eigener OpenAI-kompatibler Endpunkt</div>
+<div class="prov-meta"><span><b>Endpunkt:</b> nicht konfiguriert</span></div>
+</div>
+<div class="prov-right">
+<div class="prov-acts"><span class="btn">Einrichten</span></div>
+</div>
+</div>
+
+<div style="display:flex;gap:6px;margin-top:12px">
+<div class="btn">+ Provider hinzufügen</div>
+<div class="btn btn-d">Fallback-Reihenfolge speichern</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 2: Fallback -->
+<div class="sec">
+<div class="sec-h">Fallback-Reihenfolge</div>
+<div class="sec-sub">Wenn der Standard-Provider nicht erreichbar ist, wechselt Kira automatisch zum nächsten verfügbaren Provider</div>
+
+<div class="grp">
+<div class="grp-h">Aktuelle Fallback-Kette</div>
+<div class="grp-sub">Anfragen werden von links nach rechts weitergeleitet, bis ein Provider antwortet</div>
+<div class="fb-track">
+<div class="fb-node" style="border-color:#1D9E75">
+<div class="fb-node-icon anth">A</div>
+<div><div class="fb-node-name">Anthropic</div><div class="fb-node-model">Claude Sonnet 4</div></div>
+</div>
+<div class="fb-arrow">→</div>
+<div class="fb-node">
+<div class="fb-node-icon oai">O</div>
+<div><div class="fb-node-name">OpenAI</div><div class="fb-node-model">GPT-4o</div></div>
+</div>
+<div class="fb-arrow">→</div>
+<div class="fb-node">
+<div class="fb-node-icon ort">R</div>
+<div><div class="fb-node-name">OpenRouter</div><div class="fb-node-model">Auto</div></div>
+</div>
+<div class="fb-arrow" style="opacity:0.3">→</div>
+<div class="fb-node" style="opacity:0.4">
+<div class="fb-node-icon oll">L</div>
+<div><div class="fb-node-name">Ollama</div><div class="fb-node-model">inaktiv</div></div>
+</div>
+</div>
+<div style="display:flex;gap:20px;margin-top:10px">
+<div class="fb-label">Standard</div>
+<div class="fb-label" style="margin-left:80px">Fallback 1</div>
+<div class="fb-label" style="margin-left:60px">Fallback 2</div>
+<div class="fb-label" style="margin-left:60px;opacity:0.4">Inaktiv</div>
+</div>
+
+<div class="row" style="margin-top:14px">
+<div class="row-label">Automatisches Fallback aktiv<div class="row-desc">Kira wechselt bei Timeout oder Fehler automatisch zum nächsten Provider</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Timeout bis Fallback<div class="row-desc">Nach wie vielen Sekunden ohne Antwort zum nächsten Provider gewechselt wird</div></div>
+<div class="seg"><div class="seg-o">5s</div><div class="seg-o act">10s</div><div class="seg-o">15s</div><div class="seg-o">30s</div></div>
+</div>
+<div class="row">
+<div class="row-label">Fallback-Wechsel im Chat anzeigen<div class="row-desc">Zeigt im Kira-Workspace an, wenn ein Fallback-Provider genutzt wurde</div></div>
+<div class="toggle on"></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 3: Kira-Verhalten -->
+<div class="sec">
+<div class="sec-h">Kira-Verhalten</div>
+<div class="sec-sub">Wie Kira antwortet, vorschlägt und mit Kontext umgeht</div>
+
+<div class="grp">
+<div class="grp-h">Antwort &amp; Kontext</div>
+<div class="row">
+<div class="row-label">Standard-Kontextmodus<div class="row-desc">Welcher Kontext beim Öffnen von Kira automatisch geladen wird</div></div>
+<div class="seg"><div class="seg-o act">Automatisch</div><div class="seg-o">Letzter Vorgang</div><div class="seg-o">Leer</div></div>
+</div>
+<div class="row">
+<div class="row-label">Antwortlänge<div class="row-desc">Wie ausführlich Kira standardmäßig antwortet</div></div>
+<div class="seg"><div class="seg-o">Knapp</div><div class="seg-o act">Standard</div><div class="seg-o">Ausführlich</div></div>
+</div>
+<div class="row">
+<div class="row-label">Historie laden<div class="row-desc">Wie viele vergangene Nachrichten beim Start eines Kontexts geladen werden</div></div>
+<div class="seg"><div class="seg-o">10</div><div class="seg-o act">20</div><div class="seg-o">50</div><div class="seg-o">Alle</div></div>
+</div>
+</div>
+
+<div class="grp">
+<div class="grp-h">Vorschläge &amp; Folgeaktionen</div>
+<div class="row">
+<div class="row-label">Vorschlagsstärke<div class="row-desc">Wie proaktiv Kira Empfehlungen und nächste Schritte anbietet</div></div>
+<div class="seg"><div class="seg-o">Zurückhaltend</div><div class="seg-o act">Neutral</div><div class="seg-o">Offensiv</div></div>
+</div>
+<div class="row">
+<div class="row-label">Automatische Folgeaktionen<div class="row-desc">Kira zeigt nach jeder Antwort kontextabhängige Aktions-Buttons an</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Wissensregeln automatisch einbeziehen<div class="row-desc">Kira berücksichtigt passende Regeln aus dem Wissensmodul bei Antworten</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Entwürfe vor Versand zur Prüfung vorlegen<div class="row-desc">Kira sendet nie direkt — Entwürfe müssen immer bestätigt werden</div></div>
+<div class="toggle on"></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 4: Test & Status -->
+<div class="sec">
+<div class="sec-h">Test &amp; Status</div>
+<div class="sec-sub">Provider-Verbindungen testen und Systemstatus prüfen</div>
+
+<div class="test-grid">
+<div class="test-card">
+<div class="test-card-h"><div class="prov-icon anth" style="width:24px;height:24px;border-radius:6px;font-size:11px">A</div><span class="test-card-name">Anthropic</span></div>
+<div class="test-card-row"><span class="dot ok"></span>API erreichbar</div>
+<div class="test-card-row"><span class="dot ok"></span>Key gültig</div>
+<div class="test-card-row"><span class="dot ok"></span>Modell verfügbar</div>
+<div class="test-card-detail">Letzter Test: vor 12 Min. · Latenz: 1.2s · 34 Anfragen heute</div>
+<div class="test-card-btn"><span class="btn btn-t">Jetzt testen</span></div>
+</div>
+
+<div class="test-card">
+<div class="test-card-h"><div class="prov-icon oai" style="width:24px;height:24px;border-radius:6px;font-size:11px">O</div><span class="test-card-name">OpenAI</span></div>
+<div class="test-card-row"><span class="dot ok"></span>API erreichbar</div>
+<div class="test-card-row"><span class="dot ok"></span>Key gültig</div>
+<div class="test-card-row"><span class="dot ok"></span>Modell verfügbar</div>
+<div class="test-card-detail">Letzter Test: vor 3 Tagen · Latenz: 1.8s · Standby</div>
+<div class="test-card-btn"><span class="btn btn-t">Jetzt testen</span></div>
+</div>
+
+<div class="test-card">
+<div class="test-card-h"><div class="prov-icon oll" style="width:24px;height:24px;border-radius:6px;font-size:11px">L</div><span class="test-card-name">Ollama</span></div>
+<div class="test-card-row"><span class="dot off"></span>Endpunkt nicht erreichbar</div>
+<div class="test-card-row"><span class="dot off"></span>Kein Modell konfiguriert</div>
+<div class="test-card-row"><span class="dot warn"></span>Lokaler Server gestoppt</div>
+<div class="test-card-detail">Letzter Test: nie · Endpunkt: localhost:11434</div>
+<div class="test-card-btn"><span class="btn">Konfigurieren</span></div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab"><span class="k">K</span><span class="kl">Kira</span><span class="status"></span></div>
+</div>

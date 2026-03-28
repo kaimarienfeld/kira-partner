@@ -1,0 +1,268 @@
+Bitte beginne jetzt ausschließlich mit der UI-Anpassung der Seite Einstellungen.
+
+Wichtig:
+Es geht in diesem Schritt nur um Einstellungen und nichts anderes. Arbeite nicht an Dashboard, Kommunikation, Geschäft, Wissen oder Kira-Workspace weiter. Nach Abschluss des Einstellungsbereichs bitte stoppen.
+
+Zwingend bindend sind für diesen Schritt die Dateien im Ordner:
+
+C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI
+
+Für diesen Schritt gelten fachlich und strukturell die Einstellungs-Vorgaben aus diesen Referenzen:
+
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\06 - Einstellungen - Plan für UI.md
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\06 - Einstellungen - Mail und Konte - Plan für UI.md
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_modul_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_benachrichtigungen_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_aufgabenlogik_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_nachfass_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_provider_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_integrationen_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_automationen_v1.html
+* C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau\06_kira_einstellungen_mail_konten_v1.html
+* alle Bilder im Ordner „Scrrenshots zur UI“, die mit 06 im Dateinamen beginnen
+
+Andere UI-Dateien dürfen für Überblick, Konsistenz und Übernahme des bereits aktualisierten Produktdesigns gelesen werden, aber die fachliche Zielstruktur für Einstellungen ist ausschließlich aus den 06er-Dateien zu übernehmen.
+
+Ganz wichtig:
+Die bisherige Einstellungs-UI ist vollständig zu ignorieren und gestalterisch zu entfernen. Sie darf nicht weitergedreht, nicht recycelt und nicht als Layoutbasis benutzt werden. Funktionen dürfen dabei aber nicht gelöscht werden.
+
+Ebenso wichtig:
+Die bereits in Dashboard, Kommunikation, Geschäft, Wissen, Kira-Workspace und Sidebar optisch umgesetzten Verbesserungen haben Vorrang gegenüber älteren Entwurfsständen. Diese bereits aktualisierten visuellen Entscheidungen sollen übernommen und auf den Einstellungsbereich übertragen werden, damit das System überall gleich aussieht und nicht wieder auseinanderläuft.
+
+Das bedeutet konkret:
+
+* optische Änderungen aus den bereits angepassten vorherigen Seiten Dashboard, Kommunikation, Geschäft, Wissen, Kira und Sidebar beibehalten und weiterverwenden und typografisch als Referenz benutzen
+* Sidebar, Topbar, Größenwirkung, Typografie, Abstände, Flächenlogik, Lesbarkeit und visuelle Hierarchie nicht neu erfinden oder aus alten Anweisungen übernehmen, wenn diese von den bereits aktualisierten Seiten abweichen
+* Einstellungen müssen wie dieselbe Produktfamilie aussehen wie die zuletzt angepassten Seiten
+* nicht auf alte Referenzoptik zurückfallen, wenn neuere umgesetzte Seiten bereits besser und verbindlicher sind
+
+Fachlich bleibt für Einstellungen aber streng bindend:
+
+* Einstellungen sind ein echtes Steuerzentrum, kein langer Formularblock
+* klare Modul-Kopfzeile über volle Breite
+* Statuszeile mit echten Zuständen
+* Suche, zurücksetzen, exportieren, importieren, speichern
+* linke Bereichsnavigation
+* Hauptkonfiguration in der Mitte
+* optionale rechte Hilfe-/Status-/Vorschaufläche
+* größere, gut lesbare Einstellungen
+* klare Kategorien und Gruppierungen
+* keine Mini-Schrift
+* keine blassen Formulare
+* keine rohe Technikansicht
+
+Verbindliche Bereiche:
+
+* Design
+* Benachrichtigungen
+* Aufgabenlogik
+* Nachfass-Intervalle
+* Dashboard
+* Kira / LLM / Provider
+* Mail & Konten
+* Integrationen
+* Automationen
+
+Wichtig:
+Mail & Konten ist als eigener Bereich mitzunehmen und nicht nur als kleine Integrationskarte.
+Dort sollen mindestens sichtbar vorbereitet oder angebunden sein:
+
+* Kontenübersicht
+* Standardkonto & Absenderlogik
+* Empfang & Abruf
+* Versand & Signaturen
+* Sync & Fallback
+* Test & Diagnose
+
+Wichtig:
+Bestehende Funktionen im aktuellen System sind direkt in die neue Einstellungs-UI einzubauen und zu aktivieren, auch wenn sie in den ursprünglichen 06er-Referenzen noch nicht vollständig vorgesehen waren.
+Wenn seit dem ursprünglichen UI-Entwurf neue Funktionen, Datenpunkte, Buttons, Statusanzeigen, Logging-/Protokollfunktionen, Provider-Felder, Mail-/Konto-Logik oder Steueroptionen hinzugekommen sind, dann sollen diese sinnvoll in die neue Einstellungs-UI integriert und nicht weggelassen werden.
+
+Regel:
+
+* 06er-Dateien definieren die fachliche Zielstruktur von Einstellungen
+* bereits aktualisierte vorherige Seiten definieren den aktuellen visuellen Produktstandard
+* neu hinzugekommene reale Funktionen aus dem System müssen ebenfalls übernommen werden
+
+Wenn eine in der Referenz gezeigte Funktion noch nicht oder nur teilweise existiert, dann soll die UI dafür trotzdem bereits sichtbar vorbereitet werden. In diesem Fall sauber mit „In Planung“ kennzeichnen oder bei kleinen Elementen durch einen dezenten leuchtenden Punkt bzw. klaren Statushinweis markieren. Zusätzlich soll dafür ein Todo bzw. Vermerk angelegt werden, dass die UI bereits vorhanden ist und die Funktion später fertig angebunden wird. UI hat Vorrang.
+
+Nutze vorzugsweise die Codes aus den HTML-Vorschau-Dateien im Ordner:
+
+C:\Users\kaimr.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\komplett plan für UI\UI als HTML Vorschau
+
+Das ist der sicherste Weg, damit du nicht neu erfindest und auch nicht versehentlich die alte UI weiterverwendest.
+
+Wichtig zur Größenwahrnehmung:
+Die Referenzbilder im Projekt sind teilweise ausgezoomt, damit sie auf eine Seite passen. Dass sie dort kleiner wirken, ist nicht das Ziel. Die tatsächliche UI soll gut lesbar und komfortabel zum Arbeiten sein. Nicht die ausgezoomte Kleinwirkung übernehmen.
+
+Für Einstellungen gilt inhaltlich und gestalterisch:
+
+* keine lange Formularwand
+* keine technische JSON-/Admin-Ansicht
+* keine schwache Lesbarkeit
+* keine alten Control-Panel-Muster
+* linke Bereichsnavigation muss klar funktionieren
+* Hauptbereich pro Unterseite deutlich getrennt
+* Live-Vorschau dort, wo sinnvoll, besonders bei Design
+* Provider-Seite als echte kleine Konsole
+* Benachrichtigungen als echter Steuerbereich
+* Aufgabenlogik und Nachfass mit echter Wirkung
+* Dashboard-Steuerung für KPI, Dichte und Cockpitblöcke
+* Integrationen klar in aktiv und geplant getrennt
+* Automationen nicht leer, sondern sinnvoll vorbereitet
+* Mail & Konten wie hochwertiger geschäftlicher Mail-Steuerbereich
+* Bereich für Protokoll / Änderungsverlauf / Runtime-Log vorbereiten oder übernehmen, wenn bereits vorhanden
+* hohe Lesbarkeit
+* volle Breite sinnvoll nutzen
+* gleiche visuelle Linie wie die bereits angepassten vorherigen Seiten
+
+Setze den Einstellungsbereich zu 100 Prozent nach Referenzbild und HTML-Vorgabe um, aber übernehme optische Verbesserungen, die auf den bereits angepassten Seiten verbindlich geworden sind. Erfinde kein alternatives Layout und falle nicht auf frühere alte Optik zurück.
+
+Wichtig:
+Nicht nur die Optik umsetzen. Die sichtbaren Hauptfunktionen müssen ebenfalls korrekt gesetzt und geprüft werden:
+
+* Bereichsnavigation muss wirklich umschalten
+* Design-Einstellungen müssen echte Zustände vorbereiten oder übernehmen
+* Benachrichtigungen müssen echte Test-/Statuslogik haben oder sauber vorbereitet sein
+* Aufgabenlogik und Nachfass müssen in echte Logik zurückschreiben oder als vorbereitet markiert sein
+* Dashboard-Optionen müssen die Cockpit-Darstellung wirklich beeinflussen oder vorbereitet dafür sein
+* Provider-/Fallback-/Modelllogik muss echte Konfigurationszustände zeigen
+* Integrationen müssen echte oder vorbereitete Zustände sauber unterscheiden
+* Mail & Konten muss echte oder vorbereitete Mehrkonten-/Signatur-/Fallback-Logik sichtbar tragen
+* bestehende neue Funktionen aus dem aktuellen Systemstand müssen integriert werden
+* alles nach Umbau auf Funktion prüfen
+
+Zusätzliche wichtige Regel:
+Wenn aktuelle Teilbereiche der Einstellungen bereits in Teilen richtig umgesetzt sind, dann nicht unnötig neu anordnen. Richtig gesetzte Grundstruktur beibehalten und verfeinern, statt funktionierende Bereiche wieder zu zerstören.
+
+Wenn Referenz und vorhandene Funktion noch nicht vollständig zusammenpassen, passe die Funktion an die Referenz an oder markiere den fehlenden Teil sauber als vorbereitet / in Planung. Die Referenz hat Vorrang, aber neue reale Funktionen dürfen nicht verloren gehen.
+
+Arbeite in dieser Reihenfolge:
+
+1. Bestehende Einstellungs-UI gestalterisch verwerfen
+2. Neue Einstellungsstruktur strikt nach 06er-Referenz aufbauen
+3. Bereits aktualisierte visuelle Entscheidungen aus Dashboard / Kommunikation / Geschäft / Wissen / Kira / Sidebar übernehmen
+4. Bestehende Funktionen in diese neue Struktur einsetzen und aktivieren
+5. Neu hinzugekommene reale Funktionen sinnvoll integrieren
+6. Fehlende Funktionen sichtbar vorbereiten und markieren
+7. Einstellungen komplett testen
+8. Änderungen speichern
+9. Danach stoppen und noch nicht mit der nächsten Seite weitermachen
+
+Nach Abschluss bitte kurz dokumentieren:
+
+* was für Einstellungen bereits fertig integriert wurde und mit Funktionen aktiviert
+* was zusätzlich aus neueren Funktionen übernommen wurde
+* was nur visuell vorbereitet ist
+* welche Punkte noch in Planung sind
+* welche Todos für spätere Backend-/Funktionsanbindung offen bleiben
+
+Zusatz für 06 Einstellungen – Protokoll / Runtime-Log als eigener Unterbereich
+
+Wichtig:
+Im Bereich Einstellungen soll der Protokoll-/Änderungsverlauf-/Runtime-Log-Bereich nicht irgendwo halb versteckt oder nur als kleine Zusatzkarte auftauchen, sondern als sauberer eigener Unterbereich innerhalb der linken Einstellungsnavigation.
+
+Er soll sich visuell und strukturell vollständig an die bereits umgesetzte neue Einstellungs-UI anpassen und dieselbe Produktfamilie fortführen.
+
+Fachliche Regel:
+Bestehende bereits umgesetzte Teile zum Änderungsverlauf / change_log / activity_log / Protokoll dürfen nicht verloren gehen.
+Vorhandenes ist zu prüfen, zu übernehmen und in den neuen Unterbereich sauber einzuarbeiten.
+Nicht doppelt bauen.
+Nicht verstecken.
+Nicht als Debug-Ecke behandeln.
+
+Der neue Unterbereich soll klar als eigener Bereich in der Einstellungsnavigation sichtbar sein, zum Beispiel:
+
+* Protokoll
+* Änderungsverlauf
+* Runtime-Log
+* Telemetrie
+
+Wenn im bestehenden System schon ein Bereich oder Teilbereich dafür existiert, diesen sauber in die neue Einstellungsstruktur überführen statt neu parallel aufzubauen.
+
+Dieser Unterbereich soll mindestens diese Ebenen sichtbar vorbereiten oder anbinden:
+
+1. Entwicklungs-/Änderungslog
+
+* change_log.jsonl
+* Mikro-Logging für Code-/UI-/Konfigurationsänderungen
+* Filter nach Modul / Feature / Ergebnis / Zeit
+* strukturierte Karten oder Liste
+* keine rohe Textwand
+
+2. Runtime-/Kontext-Log
+
+* UI-Ereignisse
+* Kira-Ereignisse
+* Hintergrundjobs
+* LLM-/Provider-/Token-Ereignisse
+* Settings-Änderungen
+* klar getrennt von reinem Entwicklerlog
+
+3. Detailansicht
+
+* bei Klick auf ein Ereignis große lesbare Detailansicht
+* Metadaten
+* Ergebnis
+* Kontext
+* Payload / Vollinhalt, wenn vorhanden
+* Follow-up / Related Todos / Fehlerhinweise
+
+4. Steuerung / Konfiguration
+
+* Logging aktiv / aus
+* Detailgrad
+* welche Event-Typen geloggt werden
+* Fehler immer loggen
+* Filter
+* Export
+* Archivierung / Rotation
+* Status des Logsystems
+* ob Kira selbst diese Logs für Antworten verwenden darf
+
+Wichtig:
+Wenn Teile davon funktional noch nicht vollständig existieren, dann die UI trotzdem bereits sichtbar vorbereiten und sauber mit „In Planung“ oder entsprechendem Status markieren.
+Nicht auslassen.
+
+Gestalterische Regeln:
+
+* keine versteckte Entwicklerseite
+* keine rohe JSON-/Debug-Ansicht
+* keine kleine Zusatzkarte irgendwo unten
+* eigene saubere Unterseite innerhalb der Einstellungen
+* klare Modul-Kopfzeile
+* gute Lesbarkeit
+* große Tabellen-/Karten-/Detailflächen
+* Filter und Status klar sichtbar
+* optisch gleiche Linie wie Design, Benachrichtigungen, Aufgabenlogik, Nachfass, Dashboard, Provider, Integrationen und Mail & Konten
+
+Funktionale Regeln:
+
+* vorhandene change_log-Funktionen übernehmen
+* vorhandene activity_log-/Runtime-Bausteine prüfen und sinnvoll andocken
+* keine Doppelstruktur ohne Not
+* was schon da ist, sauber in die neue UI einbauen
+* was fehlt, vorbereitet anzeigen
+* alles nach Einbau prüfen
+
+Wichtig:
+Dieser Unterbereich soll später zentral dafür nutzbar sein,
+
+* Fehler nachzuvollziehen
+* Änderungen zu prüfen
+* Runtime-Ereignisse auszuwerten
+* Kira Kontextfragen beantworten zu lassen
+* Transparenz über Hintergrundaktionen, Provider, Modelle, Tokenverbrauch und Einstellungsänderungen zu bekommen
+
+Arbeite in diesem Unterbereich genauso wie in den anderen Einstellungsbereichen:
+
+1. bestehende Protokoll-UI und Logik prüfen
+2. in neue Einstellungsstruktur überführen
+3. vorhandene Funktionen übernehmen
+4. fehlende Teile sichtbar vorbereiten
+5. testen
+6. dokumentieren, was aktiv ist und was noch in Planung bleibt
+
+
+
+

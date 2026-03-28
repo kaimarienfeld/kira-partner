@@ -13,9 +13,9 @@ SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mail_classifier import (classify_mail, extract_email, is_system_sender,
-                              kategorie_to_task_typ)
-from response_gen import generate_draft
+from llm_classifier import (classify_mail, extract_email, is_system_sender,
+                             kategorie_to_task_typ)
+from llm_response_gen import generate_draft
 
 TASKS_DB  = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB = KNOWLEDGE_DIR / "kunden.db"
@@ -24,7 +24,8 @@ SENT_DB   = KNOWLEDGE_DIR / "sent_mails.db"
 DAYS_TASKS  = 30   # Tasks fuer die letzten N Tage
 DAYS_GESCH  = 180  # Geschaeftsdaten fuer die letzten N Tage
 
-EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com"}
+EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com",
+                  "invoicefetcher.email"}  # DATEV-Weiterleitung
 
 # ======================================================================
 # 1. DATENBANK-SCHEMA
@@ -67,7 +68,12 @@ def rebuild_schema(db):
             erledigt_am       TEXT,
             naechste_erinnerung TEXT,
             erinnerungen      INTEGER DEFAULT 0,
-            notiz             TEXT
+            notiz             TEXT,
+            thread_id         TEXT,
+            konfidenz         TEXT DEFAULT 'mittel',
+            mit_termin        INTEGER DEFAULT 0,
+            manuelle_pruefung INTEGER DEFAULT 0,
+            beantwortet       INTEGER DEFAULT 0
         );
         CREATE INDEX idx_tasks_status ON tasks(status);
         CREATE INDEX idx_tasks_typ    ON tasks(typ);
@@ -130,10 +136,27 @@ def rebuild_schema(db):
             titel          TEXT,
             inhalt         TEXT,
             status         TEXT DEFAULT 'aktiv',
+            quelle         TEXT,
             erstellt_am    TEXT DEFAULT CURRENT_TIMESTAMP,
             bestaetigt_am  TEXT
         );
     """)
+    # Safe migrations für bestehende DBs
+    try: db.execute("ALTER TABLE tasks ADD COLUMN thread_id TEXT")
+    except: pass
+    try: db.execute("ALTER TABLE tasks ADD COLUMN konfidenz TEXT DEFAULT 'mittel'")
+    except: pass
+    try: db.execute("ALTER TABLE tasks ADD COLUMN mit_termin INTEGER DEFAULT 0")
+    except: pass
+    try: db.execute("ALTER TABLE tasks ADD COLUMN manuelle_pruefung INTEGER DEFAULT 0")
+    except: pass
+    try: db.execute("ALTER TABLE tasks ADD COLUMN beantwortet INTEGER DEFAULT 0")
+    except: pass
+    try: db.execute("ALTER TABLE wissen_regeln ADD COLUMN quelle TEXT")
+    except: pass
+    try: db.execute("ALTER TABLE loeschhistorie ADD COLUMN message_id TEXT")
+    except: pass
+
     # Zusätzliche Tabellen (IF NOT EXISTS - überleben Rebuilds)
     db.executescript("""
         CREATE TABLE IF NOT EXISTS ausgangsrechnungen (
@@ -177,6 +200,15 @@ def rebuild_schema(db):
         );
         CREATE INDEX IF NOT EXISTS idx_ang_status ON angebote(status);
 
+        CREATE TABLE IF NOT EXISTS kunden_aliases (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            haupt_email  TEXT NOT NULL,
+            alias_email  TEXT NOT NULL UNIQUE,
+            erstellt_am  TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_alias_haupt ON kunden_aliases(haupt_email);
+        CREATE INDEX IF NOT EXISTS idx_alias_alias ON kunden_aliases(alias_email);
+
         CREATE TABLE IF NOT EXISTS geschaeft_statistik (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             typ         TEXT,
@@ -185,6 +217,23 @@ def rebuild_schema(db):
             daten_json  TEXT,
             erstellt_am TEXT DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS loeschhistorie (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            geloescht_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+            task_id          INTEGER,
+            konto            TEXT,
+            absender         TEXT,
+            betreff          TEXT,
+            datum_mail       TEXT,
+            anhaenge_info    TEXT,
+            grund            TEXT,
+            referenz_task_id INTEGER,
+            referenz_konto   TEXT,
+            message_id       TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_lh_datum ON loeschhistorie(geloescht_am);
+        CREATE INDEX IF NOT EXISTS idx_lh_konto ON loeschhistorie(konto);
     """)
     db.commit()
 
@@ -232,6 +281,16 @@ def classify_and_build(db, since_tasks: str, since_gesch: str, sent_index: dict)
              "geschaeft": 0, "organisation": 0, "zur_kenntnis": 0}
     seen_msgids = set()
 
+    # Permanently deleted message_ids — never re-create tasks for these
+    deleted_msgids = set()
+    try:
+        _del_rows = db.execute(
+            "SELECT message_id FROM loeschhistorie WHERE message_id IS NOT NULL AND message_id != ''"
+        ).fetchall()
+        deleted_msgids = {row[0] for row in _del_rows}
+    except Exception:
+        pass
+
     for r in rows:
         folder = r["folder"] or ""
         is_sent = "Gesendete" in folder or "Sent" in folder
@@ -248,6 +307,10 @@ def classify_and_build(db, since_tasks: str, since_gesch: str, sent_index: dict)
             continue
         if msgid:
             seen_msgids.add(msgid)
+
+        # Skip permanently deleted mails
+        if msgid and msgid in deleted_msgids:
+            continue
 
         # Eigene-Domain-Mails ignorieren
         if k_email:
@@ -324,8 +387,8 @@ def classify_and_build(db, since_tasks: str, since_gesch: str, sent_index: dict)
              kunden_email, kunden_name, absender_rolle, empfohlene_aktion,
              kategorie_grund, message_id, mail_folder_pfad, anhaenge_pfad,
              antwort_entwurf, claude_prompt, betreff, konto, datum_mail,
-             prioritaet, antwort_noetig)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             prioritaet, antwort_noetig, thread_id, konfidenz)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (task_typ, kat, betr[:120] or f"Mail von {k_email}",
              cl["zusammenfassung"], text[:1000],
              k_email, kunden_name, cl["absender_rolle"],
@@ -333,7 +396,8 @@ def classify_and_build(db, since_tasks: str, since_gesch: str, sent_index: dict)
              msgid, r["mail_folder_pfad"] or "", r["anhaenge_pfad"] or "",
              entwurf[:4000], claude_prompt[:2000],
              betr[:120], konto, datum,
-             cl["prioritaet"], 1 if cl["antwort_noetig"] else 0))
+             cl["prioritaet"], 1 if cl["antwort_noetig"] else 0,
+             None, cl.get("konfidenz","mittel")))
         stats["tasks"] += 1
 
     db.commit()

@@ -1,0 +1,152 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.scene{position:relative;min-height:700px;font-family:'Anthropic Sans',-apple-system,sans-serif;border-radius:12px;overflow:hidden;background:#F5F4F1}
+.bg{display:flex;min-height:700px;opacity:0.35;pointer-events:none;filter:blur(0.5px)}
+.bg-sb{width:220px;min-width:220px;background:#1C1C1A;padding:20px 0}
+.bg-sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.bg-sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.bg-sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.bg-sb-nav{padding:16px 12px}
+.bg-si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;margin-bottom:2px}
+.bg-si.act{background:#2C2C2A;color:#fff}
+.bg-si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.bg-sep{height:0.5px;background:#444;margin:12px}
+.bg-si.plan{opacity:0.45}
+.bg-mn{flex:1;display:flex;flex-direction:column}
+.bg-topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px}
+.bg-srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.bg-content{flex:1;padding:20px 24px}
+.bg-briefing{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:14px 20px;margin-bottom:16px;height:44px}
+.bg-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.bg-kpi-card{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;height:90px}
+.bg-work{display:grid;grid-template-columns:63fr 37fr;gap:16px;margin-bottom:20px}
+.bg-panel{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;height:280px}
+.bg-signals{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;height:80px}
+.overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(28,28,26,0.25);z-index:10}
+.qp{position:absolute;bottom:84px;right:24px;width:340px;background:#fff;border-radius:14px;border:0.5px solid #E8E7E3;z-index:20;overflow:hidden}
+.qp-header{padding:18px 20px 14px;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;gap:10px}
+.qp-logo{width:36px;height:36px;background:#534AB7;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.qp-logo .k{color:#fff;font-size:15px;font-weight:500;line-height:1}
+.qp-logo .kl{color:#CECBF6;font-size:7px;margin-top:1px}
+.qp-htext{flex:1}
+.qp-htitle{font-size:16px;font-weight:500;color:#1C1C1A}
+.qp-hstatus{font-size:11px;color:#888780;display:flex;align-items:center;gap:5px;margin-top:2px}
+.qp-hstatus .dot{width:6px;height:6px;border-radius:50%;background:#1D9E75}
+.qp-close{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#B4B2A9;cursor:pointer;border:0.5px solid #E8E7E3;background:#F9F8F6}
+.qp-close:hover{color:#5F5E5A;border-color:#D3D1C7}
+.qp-actions{padding:10px 12px}
+.qa{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;cursor:pointer;transition:background 0.12s,border-color 0.12s;border:0.5px solid transparent;margin-bottom:2px}
+.qa:hover{background:#F9F8F6;border-color:#EEEDE9}
+.qa-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.qa-icon.purple{background:#EEEDFE;color:#534AB7}
+.qa-icon.amber{background:#FAEEDA;color:#BA7517}
+.qa-icon.green{background:#EAF3DE;color:#3B6D11}
+.qa-icon.blue{background:#E6F1FB;color:#185FA5}
+.qa-icon.coral{background:#FAECE7;color:#993C1D}
+.qa-icon.teal{background:#E1F5EE;color:#0F6E56}
+.qa-icon.gray{background:#F1EFE8;color:#5F5E5A}
+.qa-body{flex:1;min-width:0}
+.qa-title{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:1px}
+.qa-sub{font-size:11px;color:#888780}
+.qa-arrow{font-size:13px;color:#D3D1C7;flex-shrink:0;transition:color 0.12s}
+.qa:hover .qa-arrow{color:#534AB7}
+.qp-footer{padding:10px 16px 14px;border-top:0.5px solid #E8E7E3;display:flex;align-items:center;gap:8px}
+.qp-input{flex:1;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:8px 12px;font-size:12px;color:#888780}
+.qp-send{width:32px;height:32px;border-radius:8px;background:#534AB7;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;flex-shrink:0}
+.fab{position:absolute;bottom:20px;right:24px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;z-index:20}
+.fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="scene">
+
+<div class="bg">
+<div class="bg-sb">
+<div class="bg-sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="bg-sb-nav">
+<div class="bg-si act"><div class="ic">⌂</div>Start</div>
+<div class="bg-si"><div class="ic">✉</div>Kommunikation</div>
+<div class="bg-si"><div class="ic">☐</div>Organisation</div>
+<div class="bg-si"><div class="ic">€</div>Geschäft</div>
+<div class="bg-si"><div class="ic">☰</div>Wissen</div>
+<div class="bg-si"><div class="ic">⚙</div>Einstellungen</div>
+<div class="bg-sep"></div>
+<div class="bg-si plan">Kunden</div>
+<div class="bg-si plan">Marketing</div>
+</div>
+</div>
+<div class="bg-mn">
+<div class="bg-topbar"><div class="bg-srch">⌕ Suche…</div></div>
+<div class="bg-content">
+<div class="bg-briefing"></div>
+<div class="bg-kpi"><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div></div>
+<div class="bg-kpi"><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div><div class="bg-kpi-card"></div></div>
+<div class="bg-work"><div class="bg-panel"></div><div class="bg-panel"></div></div>
+<div class="bg-signals"></div>
+</div>
+</div>
+</div>
+
+<div class="overlay"></div>
+
+<div class="qp">
+<div class="qp-header">
+<div class="qp-logo"><span class="k">K</span><span class="kl">Kira</span></div>
+<div class="qp-htext">
+<div class="qp-htitle">Kira Assistenz</div>
+<div class="qp-hstatus"><span class="dot"></span>Bereit · Anthropic Claude</div>
+</div>
+<div class="qp-close">✕</div>
+</div>
+
+<div class="qp-actions">
+<div class="qa">
+<div class="qa-icon purple">?</div>
+<div class="qa-body"><div class="qa-title">Frage stellen</div><div class="qa-sub">Freie Frage an Kira — zu allem im System</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon amber">☐</div>
+<div class="qa-body"><div class="qa-title">Aufgabe besprechen</div><div class="qa-sub">Aktuelle Aufgabe mit Kontext öffnen</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon green">€</div>
+<div class="qa-body"><div class="qa-title">Rechnung prüfen</div><div class="qa-sub">Eingangs- oder Ausgangsrechnung analysieren</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon blue">✎</div>
+<div class="qa-body"><div class="qa-title">Angebot prüfen</div><div class="qa-sub">Angebotsstatus, Nachfass oder Entwurf</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon coral">♟</div>
+<div class="qa-body"><div class="qa-title">Kunde öffnen</div><div class="qa-sub">Kundendaten, Historie, offene Themen</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon teal">⌕</div>
+<div class="qa-body"><div class="qa-title">Suche</div><div class="qa-sub">In Mails, Aufgaben, Wissen, Geschäft suchen</div></div>
+<span class="qa-arrow">›</span>
+</div>
+<div class="qa">
+<div class="qa-icon gray">↻</div>
+<div class="qa-body"><div class="qa-title">Letzte Verläufe</div><div class="qa-sub">Gespeicherte Kira-Gespräche wieder öffnen</div></div>
+<span class="qa-arrow">›</span>
+</div>
+</div>
+
+<div class="qp-footer">
+<div class="qp-input">Direkt an Kira schreiben…</div>
+<div class="qp-send">↑</div>
+</div>
+</div>
+
+<div class="fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+
+</div>

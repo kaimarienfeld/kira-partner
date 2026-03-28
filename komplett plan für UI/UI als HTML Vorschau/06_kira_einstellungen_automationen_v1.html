@@ -1,0 +1,321 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1040px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.act .pb{font-size:8px;background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.sn.plan-nav{opacity:0.45}
+.sn.plan-nav .pb{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.plan-badge{font-size:10px;padding:3px 10px;border-radius:5px;background:#FAEEDA;color:#854F0B;font-weight:500}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.grp-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.overview{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:24px 28px;margin-bottom:16px;display:flex;gap:24px;align-items:flex-start}
+.ov-text{flex:1}
+.ov-title{font-size:15px;font-weight:500;color:#1C1C1A;margin-bottom:6px}
+.ov-desc{font-size:13px;color:#5F5E5A;line-height:1.6;margin-bottom:12px}
+.ov-features{display:flex;gap:6px;flex-wrap:wrap}
+.ov-feat{font-size:10px;padding:4px 10px;border-radius:5px;background:#F5F4F1;color:#5F5E5A;border:0.5px solid #E8E7E3}
+.ov-visual{width:200px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.ov-icon{width:64px;height:64px;border-radius:16px;background:#F5F4F1;border:0.5px solid #E8E7E3;display:flex;align-items:center;justify-content:center;font-size:28px;color:#888780}
+.ov-stat{font-size:11px;color:#888780;text-align:center}
+.blocks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.block{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;position:relative;transition:border-color 0.15s}
+.block:hover{border-color:#D3D1C7}
+.block-badge{position:absolute;top:14px;right:14px;font-size:9px;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#854F0B}
+.block-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
+.block-icon.followup{background:#E6F1FB;color:#185FA5}
+.block-icon.remind{background:#FAEEDA;color:#854F0B}
+.block-icon.escalate{background:#FCEBEB;color:#A32D2D}
+.block-icon.workflow{background:#EEEDFE;color:#534AB7}
+.block-icon.trigger{background:#E1F5EE;color:#0F6E56}
+.block-title{font-size:14px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.block-desc{font-size:11px;color:#888780;line-height:1.4;margin-bottom:8px}
+.block-modules{display:flex;gap:3px;flex-wrap:wrap}
+.block-mod{font-size:9px;padding:2px 6px;border-radius:3px;background:#F1EFE8;color:#5F5E5A}
+.wf-preview{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:20px 24px;margin-bottom:16px}
+.wf-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.wf-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.wf-flow{display:flex;align-items:center;gap:0;justify-content:center;margin-bottom:16px}
+.wf-node{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:10px;padding:14px 18px;text-align:center;min-width:140px}
+.wf-node-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;margin:0 auto 6px}
+.wf-node-title{font-size:12px;font-weight:500;color:#1C1C1A;margin-bottom:2px}
+.wf-node-desc{font-size:10px;color:#888780}
+.wf-arrow{font-size:18px;color:#D3D1C7;padding:0 8px;flex-shrink:0}
+.wf-example{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.wf-ex-label{font-size:11px;font-weight:500;color:#1C1C1A;min-width:160px}
+.wf-ex-flow{font-size:10px;color:#888780;flex:1}
+.wf-ex-badge{font-size:9px;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#854F0B;flex-shrink:0}
+.status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.status-card{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;padding:14px 16px}
+.status-card-h{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.status-card-name{font-size:12px;font-weight:500;color:#1C1C1A}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-card-desc{font-size:10px;color:#888780;line-height:1.3;margin-bottom:4px}
+.status-card-dep{font-size:9px;color:#B4B2A9}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar"><div class="srch">⌕ Suche in allen Modulen…</div><div class="tpr"><div class="tc">⚡ Quick Actions</div><div class="tc ok"><span class="dot"></span>Verbunden</div><div class="tc">🔔 Offene Aufgaben</div><div class="av">KM</div></div></div>
+<div class="mh"><div class="mt">Einstellungen</div><div class="mstats"><div class="ms">Provider: <b>Anthropic</b></div><div class="ms">Theme: <b>Hell</b></div><div class="ms">Push: <b>aktiv</b></div><div class="ms">Zuletzt: <b>vor 2 Std.</b></div></div><div class="macts"><div class="ma">⌕ Suche</div><div class="ma">↺ Zurücksetzen</div><div class="ma">↗ Export</div><div class="ma">↙ Import</div><div class="ma primary">Speichern</div></div></div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn"><div class="sico">◐</div>Design</div>
+<div class="sn"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">5</span></div>
+<div class="sn"><div class="sico">⇌</div>Integrationen<span class="cnt">6</span></div>
+<div class="sn act"><div class="sico">⟳</div>Automationen<span class="pb">In Planung</span></div>
+</div>
+
+<div class="main-set">
+
+<!-- OVERVIEW -->
+<div class="sec">
+<div class="sec-h">Automationen <span class="plan-badge">In Planung</span></div>
+<div class="sec-sub">Regelbasierte Automatisierungen für Nachfass, Erinnerungen, Eskalationen und Workflows — strukturell vorbereitet</div>
+
+<div class="overview">
+<div class="ov-text">
+<div class="ov-title">Was Automationen leisten werden</div>
+<div class="ov-desc">Automationen ergänzen Kiras manuelle Assistenz um regelbasierte Abläufe. Statt einzelne Nachfass-Mails, Erinnerungen oder Eskalationen manuell auszulösen, definierst du hier Regeln, die automatisch greifen — immer unter deiner Kontrolle und mit Bestätigungsmöglichkeit vor jeder Aktion.</div>
+<div class="ov-features">
+<span class="ov-feat">Follow-ups</span>
+<span class="ov-feat">Erinnerungen</span>
+<span class="ov-feat">Eskalationen</span>
+<span class="ov-feat">Workflow-Ketten</span>
+<span class="ov-feat">Trigger & Bedingungen</span>
+<span class="ov-feat">Zeitgesteuerte Aktionen</span>
+</div>
+</div>
+<div class="ov-visual">
+<div class="ov-icon">⟳</div>
+<div class="ov-stat">Verfügbar ab Q3 2026</div>
+<div class="ov-stat">0 aktive Regeln</div>
+</div>
+</div>
+</div>
+
+<!-- GEPLANTE BEREICHE -->
+<div class="sec">
+<div class="sec-h">Geplante Automationsbereiche</div>
+<div class="sec-sub">Fünf Kernbereiche, die nach Freischaltung als konfigurierbare Regelmodule zur Verfügung stehen</div>
+
+<div class="blocks">
+<div class="block">
+<span class="block-badge">Q3 2026</span>
+<div class="block-icon followup">↗</div>
+<div class="block-title">Mail-Follow-up</div>
+<div class="block-desc">Automatische Nachfass-Mails nach konfigurierbaren Intervallen. Kira erstellt Entwürfe basierend auf Stufe und Tonalität.</div>
+<div class="block-modules"><span class="block-mod">Kommunikation</span><span class="block-mod">Geschäft</span><span class="block-mod">Nachfass</span></div>
+</div>
+<div class="block">
+<span class="block-badge">Q3 2026</span>
+<div class="block-icon remind">🔔</div>
+<div class="block-title">Erinnerungsregeln</div>
+<div class="block-desc">Zeitgesteuerte Erinnerungen für offene Aufgaben, Fristen und Wiedervorlagen. Konfigurierbar nach Modul und Priorität.</div>
+<div class="block-modules"><span class="block-mod">Aufgabenlogik</span><span class="block-mod">Dashboard</span><span class="block-mod">Push</span></div>
+</div>
+<div class="block">
+<span class="block-badge">Q3 2026</span>
+<div class="block-icon escalate">⚠</div>
+<div class="block-title">Eskalationen</div>
+<div class="block-desc">Automatische Hochstufung wenn Schwellenwerte überschritten werden. Verbindung zu Aufgabenlogik und Mahnwesen.</div>
+<div class="block-modules"><span class="block-mod">Aufgabenlogik</span><span class="block-mod">Geschäft</span><span class="block-mod">Mahnungen</span></div>
+</div>
+</div>
+<div class="blocks" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+<div class="block">
+<span class="block-badge">Q4 2026</span>
+<div class="block-icon workflow">⊞</div>
+<div class="block-title">Workflow-Bausteine</div>
+<div class="block-desc">Mehrstufige Abläufe aus verknüpften Aktionen: wenn A passiert, dann prüfe B, dann erstelle C. Visueller Workflow-Editor geplant.</div>
+<div class="block-modules"><span class="block-mod">Alle Module</span><span class="block-mod">Kira</span></div>
+</div>
+<div class="block">
+<span class="block-badge">Q4 2026</span>
+<div class="block-icon trigger">⚡</div>
+<div class="block-title">Trigger &amp; Bedingungen</div>
+<div class="block-desc">Ereignisbasierte Auslöser: neue Mail, Fristablauf, Zahlung erkannt, Lead eingegangen. Kombinierbar mit Bedingungen und Filtern.</div>
+<div class="block-modules"><span class="block-mod">Kommunikation</span><span class="block-mod">Geschäft</span><span class="block-mod">Kira</span></div>
+</div>
+</div>
+</div>
+
+<!-- WORKFLOW-VORSCHAU -->
+<div class="sec">
+<div class="sec-h">Workflow-Vorschau</div>
+<div class="sec-sub">So werden automatisierte Abläufe später aufgebaut — Trigger → Bedingung → Aktion</div>
+
+<div class="wf-preview">
+<div class="wf-h">Beispiel-Ablauf: Automatischer Nachfass</div>
+<div class="wf-sub">Visualisierung eines typischen dreistufigen Automations-Workflows</div>
+
+<div class="wf-flow">
+<div class="wf-node">
+<div class="wf-node-icon" style="background:#E1F5EE;color:#0F6E56">⚡</div>
+<div class="wf-node-title">Trigger</div>
+<div class="wf-node-desc">Angebot seit 10 Tagen ohne Rückmeldung</div>
+</div>
+<div class="wf-arrow">→</div>
+<div class="wf-node">
+<div class="wf-node-icon" style="background:#FAEEDA;color:#854F0B">?</div>
+<div class="wf-node-title">Bedingung</div>
+<div class="wf-node-desc">Kein manueller Kontakt in der Zwischenzeit</div>
+</div>
+<div class="wf-arrow">→</div>
+<div class="wf-node">
+<div class="wf-node-icon" style="background:#E6F1FB;color:#185FA5">✎</div>
+<div class="wf-node-title">Aktion</div>
+<div class="wf-node-desc">Nachfass-Entwurf erstellen, zur Prüfung vorlegen</div>
+</div>
+<div class="wf-arrow">→</div>
+<div class="wf-node">
+<div class="wf-node-icon" style="background:#EEEDFE;color:#534AB7">✓</div>
+<div class="wf-node-title">Freigabe</div>
+<div class="wf-node-desc">Kai bestätigt oder passt an</div>
+</div>
+</div>
+
+<div class="wf-h" style="margin-top:8px">Weitere geplante Workflows</div>
+<div class="wf-example">
+<div class="wf-ex-label">Rechnung überfällig</div>
+<div class="wf-ex-flow">Fälligkeitsdatum überschritten → Prüfe Zahlungsstatus → Mahnentwurf erstellen → Zur Freigabe</div>
+<div class="wf-ex-badge">Q3 2026</div>
+</div>
+<div class="wf-example">
+<div class="wf-ex-label">Neuer Lead erkannt</div>
+<div class="wf-ex-flow">Mail klassifiziert als Lead → Prüfe Duplikat → Erstreaktion vorbereiten → Dashboard-Priorität setzen</div>
+<div class="wf-ex-badge">Q3 2026</div>
+</div>
+<div class="wf-example">
+<div class="wf-ex-label">Frist in 24 Stunden</div>
+<div class="wf-ex-flow">Termin/Frist morgen fällig → Push-Benachrichtigung → Dashboard hervorheben → Kira-Vorschlag</div>
+<div class="wf-ex-badge">Q3 2026</div>
+</div>
+<div class="wf-example">
+<div class="wf-ex-label">Skonto-Fenster schließt</div>
+<div class="wf-ex-flow">Skonto < 3 Tage → Dashboard-Signal → Push-Warnung → Zahlung vorschlagen</div>
+<div class="wf-ex-badge">Q4 2026</div>
+</div>
+</div>
+</div>
+
+<!-- STATUS -->
+<div class="sec">
+<div class="sec-h">Verfügbarkeit &amp; Abhängigkeiten</div>
+<div class="sec-sub">Was bereits strukturell vorbereitet ist und wovon die Umsetzung abhängt</div>
+
+<div class="grp">
+<div class="status-grid">
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#1D9E75"></span><span class="status-card-name">Nachfass-Logik</span></div>
+<div class="status-card-desc">Intervalle und Tonalität sind in Einstellungen konfigurierbar. Automatisierung wird darauf aufbauen.</div>
+<div class="status-card-dep">Abhängigkeit: Nachfass-Intervalle ✓</div>
+</div>
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#1D9E75"></span><span class="status-card-name">Aufgaben-Eskalation</span></div>
+<div class="status-card-desc">Eskalationsstufen und Schwellenwerte sind definiert. Automatische Hochstufung vorbereitet.</div>
+<div class="status-card-dep">Abhängigkeit: Aufgabenlogik ✓</div>
+</div>
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#1D9E75"></span><span class="status-card-name">Push-Benachrichtigungen</span></div>
+<div class="status-card-desc">ntfy.sh und Windows Toast sind aktiv. Automationen können Benachrichtigungen auslösen.</div>
+<div class="status-card-dep">Abhängigkeit: Benachrichtigungen ✓</div>
+</div>
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#EF9F27"></span><span class="status-card-name">Kalender-Integration</span></div>
+<div class="status-card-desc">Für termingesteuerte Automationen wird die Kalender-Sync benötigt.</div>
+<div class="status-card-dep">Abhängigkeit: Kalender-Integration (In Planung)</div>
+</div>
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#EF9F27"></span><span class="status-card-name">Workflow-Engine</span></div>
+<div class="status-card-desc">Mehrstufige Abläufe benötigen eine zentrale Verarbeitungsschicht.</div>
+<div class="status-card-dep">Abhängigkeit: Neue Backend-Komponente (Q4 2026)</div>
+</div>
+<div class="status-card">
+<div class="status-card-h"><span class="status-dot" style="background:#D3D1C7"></span><span class="status-card-name">Visueller Workflow-Editor</span></div>
+<div class="status-card-desc">Drag-and-Drop-Editor für komplexe Automationen. Langfristiges Ziel.</div>
+<div class="status-card-dep">Abhängigkeit: Workflow-Engine + UI-Komponente</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab"><span class="k">K</span><span class="kl">Kira</span><span class="status"></span></div>
+</div>

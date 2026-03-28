@@ -1,0 +1,344 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:1060px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tpr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.ma.primary{background:#444441;border-color:#444441;color:#fff}
+.ct{flex:1;display:flex;overflow:hidden}
+.snav{width:220px;min-width:220px;background:#fff;border-right:0.5px solid #E8E7E3;padding:16px 0;overflow-y:auto}
+.snav-h{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;padding:0 18px 8px}
+.sn{display:flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;color:#5F5E5A;cursor:pointer;border-left:2px solid transparent}
+.sn:hover{background:#F9F8F6}
+.sn.act{background:#FDFCFF;border-left-color:#444441;color:#1C1C1A;font-weight:500}
+.sn .sico{width:18px;text-align:center;font-size:12px;opacity:0.5}
+.sn.act .sico{opacity:0.8}
+.sn .cnt{font-size:9px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:8px;margin-left:auto}
+.sn.plan{opacity:0.45}
+.sn.plan .pb{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:auto}
+.sn-sep{height:0.5px;background:#E8E7E3;margin:10px 18px}
+.main-set{flex:1;overflow-y:auto;padding:24px 28px}
+.sec{margin-bottom:28px}
+.sec-h{font-size:16px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.sec-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.grp{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;margin-bottom:12px}
+.grp-h{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.grp-sub{font-size:11px;color:#888780;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid #F1EFE8}
+.row:last-child{border-bottom:none}
+.row-label{font-size:13px;color:#1C1C1A;flex:1;min-width:0}
+.row-desc{font-size:10px;color:#B4B2A9;margin-top:1px}
+.toggle{width:38px;height:20px;background:#D3D1C7;border-radius:10px;position:relative;cursor:pointer;flex-shrink:0}
+.toggle.on{background:#1D9E75}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%}
+.toggle.on::after{transform:translateX(18px)}
+.seg{display:flex;background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;overflow:hidden;flex-shrink:0}
+.seg-o{padding:5px 14px;font-size:11px;color:#5F5E5A;cursor:pointer;border-right:0.5px solid #D3D1C7}
+.seg-o:last-child{border-right:none}
+.seg-o.act{background:#fff;color:#1C1C1A;font-weight:500}
+.val-box{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:6px 12px;font-size:13px;color:#1C1C1A;min-width:60px;text-align:center;font-weight:500}
+.val-unit{font-size:11px;color:#888780;margin-left:4px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.step{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+.step-top{height:4px;border-radius:2px 2px 0 0;position:absolute;top:0;left:0;right:0}
+.step-top.s1{background:#1D9E75}
+.step-top.s2{background:#EF9F27}
+.step-top.s3{background:#E24B4A}
+.step-num{font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px}
+.step-title{font-size:15px;font-weight:500;color:#1C1C1A;margin-bottom:2px}
+.step-subtitle{font-size:11px;color:#888780;margin-bottom:12px}
+.step-field{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.step-field-label{font-size:12px;color:#5F5E5A;min-width:80px}
+.step-val{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 10px;font-size:13px;color:#1C1C1A;font-weight:500;min-width:56px;text-align:center}
+.step-field-unit{font-size:11px;color:#888780}
+.step-tone{display:flex;align-items:center;gap:6px;margin-top:4px}
+.tone-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tone-label{font-size:11px;color:#5F5E5A}
+.step-connector{display:flex;align-items:center;justify-content:center;font-size:16px;color:#D3D1C7}
+.tone-ladder{display:flex;align-items:stretch;gap:0;margin-top:8px;border-radius:8px;overflow:hidden;height:48px}
+.tone-seg{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;cursor:pointer;transition:opacity 0.15s;position:relative}
+.tone-seg:hover{opacity:0.85}
+.tone-seg .tl{font-size:11px;font-weight:500}
+.tone-seg .ts{font-size:9px;opacity:0.7}
+.tone-seg.t1{background:#E1F5EE;color:#085041}
+.tone-seg.t2{background:#FAEEDA;color:#633806}
+.tone-seg.t3{background:#FCEBEB;color:#791F1F}
+.tone-arrow{position:absolute;right:-6px;top:50%;transform:translateY(-50%);font-size:12px;color:#D3D1C7;z-index:1}
+.scope-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.scope-card{background:#F9F8F6;border:0.5px solid #EEEDE9;border-radius:8px;padding:14px 16px;cursor:pointer;transition:border-color 0.15s}
+.scope-card:hover{border-color:#D3D1C7}
+.scope-card.on{border-color:#1D9E75;background:#FAFFFE}
+.scope-card-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.scope-card-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.scope-card-icon.offer{background:#EEEDFE;color:#534AB7}
+.scope-card-icon.inv{background:#FAEEDA;color:#854F0B}
+.scope-card-icon.lead{background:#E6F1FB;color:#185FA5}
+.scope-card-title{font-size:13px;font-weight:500;color:#1C1C1A}
+.scope-card-desc{font-size:10px;color:#888780;line-height:1.3;margin-bottom:8px}
+.scope-card-toggle{display:flex;align-items:center;gap:6px}
+.scope-card-status{font-size:10px;padding:3px 8px;border-radius:4px}
+.scope-card-status.on{background:#EAF3DE;color:#3B6D11}
+.scope-card-status.off{background:#F1EFE8;color:#888780}
+.timeline{display:flex;align-items:flex-end;gap:0;position:relative;height:120px;margin-top:12px;padding:0 8px}
+.tl-track{position:absolute;bottom:28px;left:8px;right:8px;height:3px;background:#E8E7E3;border-radius:2px}
+.tl-segment{position:absolute;bottom:28px;height:3px;border-radius:2px}
+.tl-point{position:absolute;bottom:20px;display:flex;flex-direction:column;align-items:center;transform:translateX(-50%)}
+.tl-dot{width:14px;height:14px;border-radius:50%;border:2px solid #fff;margin-bottom:6px}
+.tl-label{font-size:11px;font-weight:500;color:#1C1C1A;white-space:nowrap;margin-bottom:2px}
+.tl-detail{font-size:9px;color:#888780;white-space:nowrap;text-align:center;line-height:1.3}
+.tl-day{position:absolute;bottom:0;font-size:10px;color:#B4B2A9;transform:translateX(-50%)}
+.tl-now{position:absolute;bottom:20px;left:0;display:flex;flex-direction:column;align-items:center}
+.tl-now-line{width:1px;height:24px;background:#1C1C1A;opacity:0.15}
+.tl-now-label{font-size:9px;color:#B4B2A9;margin-top:2px}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si act"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar"><div class="srch">⌕ Suche in allen Modulen…</div><div class="tpr"><div class="tc">⚡ Quick Actions</div><div class="tc ok"><span class="dot"></span>Verbunden</div><div class="tc">🔔 Offene Aufgaben</div><div class="av">KM</div></div></div>
+
+<div class="mh"><div class="mt">Einstellungen</div><div class="mstats"><div class="ms">Provider: <b>Anthropic</b></div><div class="ms">Theme: <b>Hell</b></div><div class="ms">Push: <b>aktiv</b></div><div class="ms">Zuletzt: <b>vor 2 Std.</b></div></div><div class="macts"><div class="ma">⌕ Suche</div><div class="ma">↺ Zurücksetzen</div><div class="ma">↗ Export</div><div class="ma">↙ Import</div><div class="ma primary">Speichern</div></div></div>
+
+<div class="ct">
+<div class="snav">
+<div class="snav-h">Konfiguration</div>
+<div class="sn"><div class="sico">◐</div>Design</div>
+<div class="sn"><div class="sico">🔔</div>Benachrichtigungen</div>
+<div class="sn"><div class="sico">☐</div>Aufgabenlogik</div>
+<div class="sn act"><div class="sico">↻</div>Nachfass-Intervalle</div>
+<div class="sn"><div class="sico">⊞</div>Dashboard</div>
+<div class="sn-sep"></div>
+<div class="snav-h">System</div>
+<div class="sn"><div class="sico">◈</div>Kira / LLM / Provider<span class="cnt">3</span></div>
+<div class="sn"><div class="sico">⇌</div>Integrationen<span class="cnt">4</span></div>
+<div class="sn plan"><div class="sico">⟳</div>Automationen<span class="pb">Geplant</span></div>
+</div>
+
+<div class="main-set">
+
+<!-- SECTION 1: Nachfass-Stufen -->
+<div class="sec">
+<div class="sec-h">Nachfass-Intervalle</div>
+<div class="sec-sub">Steuert Timing, Tonalität und Verhalten des dreistufigen Nachfass-Systems für Angebote, Rechnungen und Leads</div>
+
+<div class="grp">
+<div class="grp-h">Nachfass-Stufen</div>
+<div class="grp-sub">Drei aufeinander aufbauende Erinnerungsstufen — Timing und Ton werden mit jeder Stufe bestimmter</div>
+
+<div class="steps">
+<div class="step">
+<div class="step-top s1"></div>
+<div class="step-num">Stufe 1 — Erste Erinnerung</div>
+<div class="step-title">Freundliche Nachfrage</div>
+<div class="step-subtitle">Höflich, unverbindlich, Gesprächsfaden aufnehmen</div>
+<div class="step-field"><span class="step-field-label">Intervall</span><div class="step-val">10</div><span class="step-field-unit">Tage nach Versand</span></div>
+<div class="step-field"><span class="step-field-label">Tonalität</span><div class="seg"><div class="seg-o act">Freundlich</div><div class="seg-o">Neutral</div></div></div>
+<div class="step-tone"><div class="tone-dot" style="background:#1D9E75"></div><span class="tone-label">Weich, einladend, keine Dringlichkeit</span></div>
+</div>
+
+<div class="step">
+<div class="step-top s2"></div>
+<div class="step-num">Stufe 2 — Zweite Erinnerung</div>
+<div class="step-title">Bestimmtere Nachfrage</div>
+<div class="step-subtitle">Konkreter, auf Entscheidung hinarbeiten</div>
+<div class="step-field"><span class="step-field-label">Intervall</span><div class="step-val">21</div><span class="step-field-unit">Tage nach Versand</span></div>
+<div class="step-field"><span class="step-field-label">Tonalität</span><div class="seg"><div class="seg-o">Freundlich</div><div class="seg-o act">Neutral</div></div></div>
+<div class="step-tone"><div class="tone-dot" style="background:#EF9F27"></div><span class="tone-label">Sachlich, konkret, leichter Nachdruck</span></div>
+</div>
+
+<div class="step">
+<div class="step-top s3"></div>
+<div class="step-num">Stufe 3 — Letzte Erinnerung</div>
+<div class="step-title">Abschließende Nachfrage</div>
+<div class="step-subtitle">Klar, respektvoll, Angebot als auslaufend markieren</div>
+<div class="step-field"><span class="step-field-label">Intervall</span><div class="step-val">45</div><span class="step-field-unit">Tage nach Versand</span></div>
+<div class="step-field"><span class="step-field-label">Tonalität</span><div class="seg"><div class="seg-o">Neutral</div><div class="seg-o act">Bestimmt</div></div></div>
+<div class="step-tone"><div class="tone-dot" style="background:#E24B4A"></div><span class="tone-label">Klar, abschließend, nicht aufdringlich</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 2: Tonalität -->
+<div class="sec">
+<div class="sec-h">Tonalität &amp; Eskalation</div>
+<div class="sec-sub">Visuelle Übersicht der Tonalitätsprogression über alle drei Stufen</div>
+
+<div class="grp">
+<div class="grp-h">Tonverlauf</div>
+<div class="grp-sub">Die Kommunikation wird mit jeder Stufe etwas direkter — aber nie aggressiv oder unangemessen</div>
+<div class="tone-ladder">
+<div class="tone-seg t1"><span class="tl">Freundlich</span><span class="ts">Tag 10</span><span class="tone-arrow">›</span></div>
+<div class="tone-seg t2"><span class="tl">Bestimmter</span><span class="ts">Tag 21</span><span class="tone-arrow">›</span></div>
+<div class="tone-seg t3"><span class="tl">Letzte Erinnerung</span><span class="ts">Tag 45</span></div>
+</div>
+<div class="row" style="margin-top:12px">
+<div class="row-label">Maximal-Ton<div class="row-desc">Obergrenze für die Tonalität — Kira geht nie über diese Stufe hinaus</div></div>
+<div class="seg"><div class="seg-o">Freundlich</div><div class="seg-o">Neutral</div><div class="seg-o act">Bestimmt</div><div class="seg-o">Deutlich</div></div>
+</div>
+<div class="row">
+<div class="row-label">Tonalität aus Wissensregeln übernehmen<div class="row-desc">Kira berücksichtigt die Tonregeln aus dem Wissensmodul (Stil &amp; Ton)</div></div>
+<div class="toggle on"></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 3: Gültigkeitsbereich -->
+<div class="sec">
+<div class="sec-h">Gültigkeitsbereich</div>
+<div class="sec-sub">Für welche Vorgangstypen gelten die Nachfass-Intervalle</div>
+
+<div class="scope-grid">
+<div class="scope-card on">
+<div class="scope-card-top"><div class="scope-card-icon offer">✎</div><span class="scope-card-title">Angebote</span></div>
+<div class="scope-card-desc">Nachfass bei Angeboten ohne Rückmeldung nach den konfigurierten Intervallen</div>
+<div class="scope-card-toggle"><div class="toggle on"></div><span class="scope-card-status on">Aktiv</span></div>
+</div>
+<div class="scope-card on">
+<div class="scope-card-top"><div class="scope-card-icon inv">€</div><span class="scope-card-title">Rechnungen</span></div>
+<div class="scope-card-desc">Zahlungserinnerungen bei überfälligen Ausgangsrechnungen nach gleicher Stufenlogik</div>
+<div class="scope-card-toggle"><div class="toggle on"></div><span class="scope-card-status on">Aktiv</span></div>
+</div>
+<div class="scope-card">
+<div class="scope-card-top"><div class="scope-card-icon lead">⚡</div><span class="scope-card-title">Leads</span></div>
+<div class="scope-card-desc">Nachfass bei neuen Leads ohne Reaktion — nur Stufe 1 und 2 empfohlen</div>
+<div class="scope-card-toggle"><div class="toggle"></div><span class="scope-card-status off">Inaktiv</span></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 4: Automatisierung -->
+<div class="sec">
+<div class="sec-h">Automatisierung &amp; Freigabe</div>
+<div class="sec-sub">Wie automatisch darf Kira Nachfass-Aktionen vorbereiten und vorschlagen</div>
+
+<div class="grp">
+<div class="row">
+<div class="row-label">Automatisch erinnern<div class="row-desc">Kira erstellt bei fälligem Nachfass automatisch einen Erinnerungseintrag im Dashboard</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Entwurf automatisch vorbereiten<div class="row-desc">Kira erstellt bei fälligem Nachfass automatisch einen Nachfass-Entwurf</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Manuelle Bestätigung vor Entwurf<div class="row-desc">Kira zeigt den Nachfass-Entwurf zuerst zur Prüfung, bevor er versendet werden kann</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Nachfass-Vorschläge in Quick Actions<div class="row-desc">Kira zeigt im Kira-Workspace kontextabhängige Nachfass-Aktionen an</div></div>
+<div class="toggle on"></div>
+</div>
+<div class="row">
+<div class="row-label">Nach Stufe 3 automatisch archivieren<div class="row-desc">Angebote ohne Reaktion nach der letzten Stufe automatisch als „verloren" markieren</div></div>
+<div class="seg"><div class="seg-o">Nie</div><div class="seg-o act">Vorschlagen</div><div class="seg-o">Automatisch</div></div>
+</div>
+</div>
+</div>
+
+<!-- SECTION 5: Vorschau -->
+<div class="sec">
+<div class="sec-h">Wirkung — Ablaufvorschau</div>
+<div class="sec-sub">So verhält sich das Nachfass-System mit den aktuellen Einstellungen bei einem Angebot</div>
+
+<div class="grp" style="background:#F9F8F6;padding:20px 24px">
+<div style="position:relative;height:120px;margin:0 20px">
+
+<div class="tl-track"></div>
+
+<div class="tl-segment" style="left:0;width:22%;background:#1D9E75;opacity:0.3"></div>
+<div class="tl-segment" style="left:22%;width:24%;background:#EF9F27;opacity:0.3"></div>
+<div class="tl-segment" style="left:46%;width:54%;background:#E24B4A;opacity:0.15"></div>
+
+<div class="tl-now" style="left:0"><div class="tl-now-line"></div><div class="tl-now-label">Versand</div></div>
+
+<div class="tl-point" style="left:22%">
+<div class="tl-dot" style="background:#1D9E75"></div>
+<div class="tl-label">Stufe 1</div>
+<div class="tl-detail">Tag 10<br>Freundlich</div>
+</div>
+
+<div class="tl-point" style="left:46%">
+<div class="tl-dot" style="background:#EF9F27"></div>
+<div class="tl-label">Stufe 2</div>
+<div class="tl-detail">Tag 21<br>Bestimmter</div>
+</div>
+
+<div class="tl-point" style="left:100%">
+<div class="tl-dot" style="background:#E24B4A"></div>
+<div class="tl-label">Stufe 3</div>
+<div class="tl-detail">Tag 45<br>Letzte Erinnerung</div>
+</div>
+
+<div class="tl-day" style="left:0">Tag 0</div>
+<div class="tl-day" style="left:22%">Tag 10</div>
+<div class="tl-day" style="left:46%">Tag 21</div>
+<div class="tl-day" style="left:100%">Tag 45</div>
+</div>
+
+<div style="display:flex;gap:12px;margin-top:16px">
+<div style="flex:1;background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:12px 14px">
+<div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:4px">Beispiel: Angebot #AG-2026-041</div>
+<div style="font-size:12px;color:#1C1C1A;line-height:1.5">Gesendet am 14.03. · Heute Tag 12 · <span style="color:#1D9E75;font-weight:500">Stufe 1 fällig in 2 Tagen</span> · Kira hat Entwurf vorbereitet</div>
+</div>
+<div style="flex:1;background:#fff;border:0.5px solid #E8E7E3;border-radius:8px;padding:12px 14px">
+<div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:4px">Beispiel: Angebot #AG-2026-038</div>
+<div style="font-size:12px;color:#1C1C1A;line-height:1.5">Gesendet am 09.02. · Heute Tag 45 · <span style="color:#E24B4A;font-weight:500">Stufe 3 — letzte Erinnerung fällig</span> · Archivierung vorgeschlagen</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab"><span class="k">K</span><span class="kl">Kira</span><span class="status"></span></div>
+</div>

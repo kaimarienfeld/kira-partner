@@ -1,0 +1,178 @@
+05.2 KIRA Launcher Prompt
+
+Bitte baue den Kira-Launcher unten rechts im bestehenden Projekt nicht als statischen runden Standard-Button, sondern als kleinen hochwertigen animierten Assistenz-Charakter.
+
+Wichtig:
+
+* direkt im bestehenden HTML/CSS/JS-Frontend umsetzen
+* keine externe schwere Lösung erzwingen
+* auf dem aktuellen Kira-System aufbauen
+* Kira bleibt der Launcher für Quick Panel und Workspace
+* die bestehende Funktion des Buttons soll erhalten bleiben
+
+Ziel:
+Der Launcher soll lebendig, sympathisch und hochwertig wirken, ohne verspielt oder kindisch zu werden.
+Er soll wie eine kleine KI-Präsenz für die Firma wirken.
+
+Gewünschtes Verhalten:
+
+1. Idle-Zustand
+
+* ruhige subtile Bewegung
+* leichtes Atmen / Schweben / sanftes Pulsieren
+* nicht hektisch
+* nicht nervig
+* kein blinkendes Gimmick
+
+2. Mausnähe
+
+* wenn sich der Mauszeiger dem Kira-Launcher nähert, reagiert Kira mit „Vorfreude“
+* z. B. leichtes Aufrichten, etwas mehr Aufmerksamkeit, subtiler Glow, sanfte Blickrichtung zur Maus
+* keine übertriebene Cartoon-Reaktion
+
+3. Mausverfolgung
+
+* Kira soll mit den Augen oder dem Blick leicht der Maus folgen
+* subtil und hochwertig
+* nicht albern
+* nicht wie ein Spielzeug
+
+4. Klick
+
+* beim Klick auf Kira ein kurzes freundliches Lächeln oder positives Reaktionsmoment
+* danach öffnet sich Kira Quick wie geplant
+* die Animation darf die Bedienung nicht verzögern oder blockieren
+
+5. Fokuszustand
+
+* wenn Kira Quick geöffnet ist, darf der Launcher aktiv wirken, dass man sieht das in Kira schwer gearbeitet wird
+* z. B. leicht hervorgehoben, aber nicht überzeichnet
+
+Gestaltung:
+
+* kein generischer Chat-Bubble-Button
+* kein langweiliges rundes Icon
+* lieber ein minimalistischer kleiner Bot-/Assistenz-Kopf oder abstrakter KI-Charakter
+* modern, neutral, hochwertig
+* passend zu Kira als Name
+* kein harter rauMKult-Markenlook
+* keine festen Brand-Farben
+* stilistisch passend zur bestehenden hellen Premium-SaaS-Oberfläche
+* nicht zu klein aber responsiv
+
+Technische Vorgaben:
+
+* zuerst mit HTML/CSS/JS im bestehenden Projekt umsetzen
+* bevorzugt mit sauberem SVG / CSS / JavaScript
+* wenn sinnvoll, Augen/Blickrichtung über JS steuern
+* Animationen performant halten
+* keine schwere Abhängigkeit ohne Not
+* sauber in die bestehende App integrieren
+* bestehende Quick-Panel-Öffnung beibehalten
+
+Wichtig:
+Der Kira-Launcher ist kein Deko-Element, sondern Teil der Produktidentität.
+Bitte nicht verspielt, nicht comicartig, nicht kindlich, sondern eher wie eine elegante kleine KI-Präsenz für professionelle Unternehmenssoftware.
+
+Falls du mehrere Varianten sinnvoll findest, dann erstelle bitte 2 bis 3 visuell unterschiedliche Launcher-Konzepte im Code mit Möglichkeit zum ändern in den einstellungen:
+
+* eine sehr minimalistische Variante
+* eine etwas freundlichere Variante
+* eine etwas technischere Variante
+
+Danach soll eine davon als Standard auswählbar sein.
+
+
+
+
+Design a premium animated AI assistant launcher character for a business software called Kira.
+
+Kira is not a playful mascot and not a childish bot.
+Kira should feel like a small elegant AI presence for professional enterprise software.
+
+Visual direction:
+minimal, modern, refined, intelligent, slightly friendly, calm, premium, high-quality.
+The character should work as a compact launcher icon in the bottom right corner of a light enterprise SaaS interface.
+
+Desired appearance:
+a small abstract bot / assistant face or head,
+clean geometric forms,
+subtle personality through eyes and expression,
+soft premium surfaces,
+high readability even at small size,
+not too detailed,
+not cartoonish,
+not cute in a childish way,
+not robotic in a cold sci-fi way.
+
+Behavioral personality to support visually:
+
+* calm and attentive in idle state
+* slightly curious when the cursor gets closer
+* eyes gently follow the cursor
+* a subtle anticipatory expression when hovered
+* a short warm smile when clicked
+* elegant, not exaggerated
+
+Style constraints:
+
+* no rauMKult branding
+* no hardcoded brand colors
+* no neon
+* no gaming style
+* no mascot look
+* no support widget look
+* no emoji face
+* no comic robot
+* no retro computer character
+
+Use:
+soft neutral tones,
+clear silhouette,
+premium micro-expression design,
+subtle eye area,
+slight depth,
+refined lighting,
+modern SaaS product style,
+professional AI assistant identity.
+
+The result should feel like:
+“a small intelligent company assistant living inside the software”
+rather than
+“a chatbot icon”.
+
+Style keywords:
+premium AI assistant icon, elegant micro-mascot, enterprise SaaS assistant, refined bot character, minimal geometric face, professional digital companion, subtle intelligent launcher, modern product mascot.
+
+
+Avoid: childish mascot, emoji face, cartoon robot, toy-like bot, sci-fi cyborg, gamer icon, neon glow, support chat bubble, generic chatbot logo, retro computer style, Windows 95, Windows 98, comic illustration, kawaii style.
+
+
+Create a small premium AI assistant launcher character for enterprise software called Kira.
+Style: minimal, geometric, elegant, intelligent, calm, professional.
+Design a compact assistant head or abstract face with very clean shapes, subtle eyes, soft depth, refined lighting, and a modern SaaS product feel.
+The character should look like a high-end software assistant, not like a mascot or toy.
+It should feel precise, slightly friendly, attentive, and premium.
+No cartoon style. No childish proportions. No exaggerated smile. No bright colors.
+Use neutral tones, soft light surfaces, subtle shadow, crisp silhouette, strong readability at small size.
+The character should visually support small micro-expressions like eye movement, curiosity, and a subtle smile.
+It should feel like an elegant digital companion inside a business app.
+
+
+
+Create a compact premium AI assistant character called Kira for a professional enterprise software launcher.
+Style: warm, intelligent, calm, modern, slightly humanized but still abstract and minimal.
+Design a small assistant face with soft geometry, expressive but subtle eyes, gentle micro-expression, and a refined premium SaaS aesthetic.
+The character should feel attentive and approachable, but not playful, not childish, not like a support chatbot mascot.
+Use elegant neutral tones, smooth high-quality surfaces, minimal detailing, and clear silhouette.
+It should visually support subtle reactions like looking toward the cursor, anticipation on hover, and a short friendly smile on click.
+The result should feel like a trusted digital assistant for business operations.
+
+
+Avoid: childish mascot, comic robot, emoji face, kawaii style, toy-like proportions, sci-fi cyborg, gamer icon, neon glow, support widget logo, cartoon chatbot, retro computer character, Windows 95, Windows 98.
+
+
+
+
+
+

@@ -1,0 +1,355 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;min-height:980px;font-family:'Anthropic Sans',-apple-system,sans-serif;background:#F5F4F1;border-radius:12px;overflow:hidden;position:relative}
+.sb{width:220px;min-width:220px;background:#1C1C1A;color:#B4B2A9;display:flex;flex-direction:column;padding:20px 0}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;border-bottom:0.5px solid #333}
+.sb-logo .icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:500;font-size:14px}
+.sb-logo span{font-size:17px;font-weight:500;color:#fff}
+.sb-nav{padding:16px 12px;flex:1}
+.si{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:#B4B2A9;cursor:pointer;margin-bottom:2px}
+.si.act{background:#2C2C2A;color:#fff}
+.si .ic{width:20px;text-align:center;font-size:14px;opacity:0.7}
+.si.act .ic{opacity:1}
+.sb-sep{height:0.5px;background:#444;margin:12px 12px}
+.si.plan{opacity:0.45}
+.si.plan .badge{font-size:9px;background:#333;color:#888;padding:2px 6px;border-radius:4px;margin-left:auto}
+.sb-bot{padding:12px;border-top:0.5px solid #333}
+.sb-col{padding:6px 12px;font-size:11px;color:#5F5E5A;cursor:pointer}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;background:#fff;border-bottom:0.5px solid #E8E7E3;display:flex;align-items:center;padding:0 24px;gap:16px}
+.srch{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:8px;padding:7px 14px;font-size:13px;color:#888;width:280px}
+.tr{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tc{background:#F5F4F1;border:0.5px solid #D3D1C7;border-radius:6px;padding:5px 12px;font-size:12px;color:#5F5E5A;display:flex;align-items:center;gap:6px}
+.tc.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11}
+.tc.ok .dot{width:7px;height:7px;background:#639922;border-radius:50%}
+.av{width:32px;height:32px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#534AB7}
+.ct{flex:1;overflow-y:auto}
+.mh{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mt{font-size:18px;font-weight:500;color:#1C1C1A}
+.mstats{display:flex;gap:14px;margin-left:8px}
+.ms{font-size:12px;color:#888780}
+.ms b{font-weight:500;color:#1C1C1A}
+.ms .w{color:#E24B4A;font-weight:500}
+.macts{margin-left:auto;display:flex;gap:6px}
+.ma{font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.tabs{background:#fff;border-bottom:0.5px solid #E8E7E3;padding:0 24px;display:flex;gap:0;overflow-x:auto}
+.tab{padding:10px 14px;font-size:13px;color:#888780;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab.act{color:#534AB7;border-bottom-color:#534AB7;font-weight:500}
+.tab .cnt{font-size:10px;background:#F1EFE8;color:#5F5E5A;padding:1px 6px;border-radius:10px;margin-left:4px}
+.tab.act .cnt{background:#EEEDFE;color:#534AB7}
+.tab.plan{opacity:0.45}
+.tab.plan .pbadge{font-size:8px;background:#F1EFE8;color:#888;padding:1px 5px;border-radius:3px;margin-left:4px}
+.inner{padding:20px 24px}
+.hero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.hc{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px;cursor:pointer;transition:border-color 0.15s}
+.hc:hover{border-color:#CECBF6}
+.hc-label{font-size:12px;color:#888780;margin-bottom:6px}
+.hc-row{display:flex;align-items:baseline;gap:10px}
+.hc-val{font-size:28px;font-weight:500;color:#1C1C1A}
+.hc-change{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500}
+.hc-change.red{background:#FCEBEB;color:#A32D2D}
+.hc-change.amber{background:#FAEEDA;color:#854F0B}
+.hc-change.green{background:#EAF3DE;color:#3B6D11}
+.hc-change.blue{background:#E6F1FB;color:#185FA5}
+.hc-change.gray{background:#F1EFE8;color:#5F5E5A}
+.hc-sub{font-size:11px;color:#B4B2A9;margin-top:6px}
+.hc-spark{margin-top:10px;height:32px}
+.hc-spark svg{width:100%;height:32px}
+.zones{display:grid;grid-template-columns:60fr 40fr;gap:16px;margin-bottom:20px}
+.panel{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px}
+.ph{font-size:15px;font-weight:500;color:#1C1C1A;margin-bottom:4px}
+.psub{font-size:11px;color:#888780;margin-bottom:14px}
+.bi{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;margin-bottom:4px;font-size:12px;color:#1C1C1A;cursor:pointer;transition:background 0.12s}
+.bi:nth-child(odd){background:#F9F8F6}
+.bi:hover{background:#F3F2EE}
+.bi-accent{width:3px;height:36px;border-radius:2px;flex-shrink:0}
+.bi-body{flex:1;min-width:0}
+.bi-title{font-size:13px;font-weight:500;color:#1C1C1A;margin-bottom:2px}
+.bi-meta{font-size:11px;color:#888780}
+.bi-val{font-weight:500;font-size:13px;flex-shrink:0;margin-left:auto;white-space:nowrap}
+.bi-tags{display:flex;gap:4px;margin-left:8px;flex-shrink:0}
+.tg{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tg-red{background:#FCEBEB;color:#A32D2D}
+.tg-amber{background:#FAEEDA;color:#854F0B}
+.tg-blue{background:#E6F1FB;color:#185FA5}
+.tg-gray{background:#F1EFE8;color:#5F5E5A}
+.tg-green{background:#EAF3DE;color:#3B6D11}
+.tg-coral{background:#FAECE7;color:#712B13}
+.tg-purple{background:#EEEDFE;color:#3C3489}
+.warn{padding:10px 14px;border-radius:8px;border:0.5px solid;margin-bottom:6px;display:flex;align-items:flex-start;gap:8px;font-size:11px;cursor:pointer;line-height:1.4;transition:opacity 0.12s}
+.warn:hover{opacity:0.85}
+.warn .wdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.warn .arr{margin-left:auto;font-size:12px;opacity:0.4;flex-shrink:0}
+.warn.wr{background:#FCEBEB;border-color:#F7C1C1;color:#791F1F}
+.warn.wr .wdot{background:#E24B4A}
+.warn.wa{background:#FAEEDA;border-color:#FAC775;color:#633806}
+.warn.wa .wdot{background:#EF9F27}
+.warn.wb{background:#E6F1FB;border-color:#B5D4F4;color:#0C447C}
+.warn.wb .wdot{background:#378ADD}
+.warn.wc{background:#FAECE7;border-color:#F5C4B3;color:#712B13}
+.warn.wc .wdot{background:#D85A30}
+.warn.wt{background:#E1F5EE;border-color:#9FE1CB;color:#085041}
+.warn.wt .wdot{background:#1D9E75}
+.tbl-panel{background:#fff;border:0.5px solid #E8E7E3;border-radius:10px;padding:18px 20px}
+.tbl-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.tbl-title{font-size:15px;font-weight:500;color:#1C1C1A}
+.tbl-filter{margin-left:auto;display:flex;gap:6px}
+.tf{font-size:10px;padding:3px 10px;border-radius:12px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.tf.on{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-weight:500;color:#888780;font-size:11px;padding:8px 10px;border-bottom:0.5px solid #E8E7E3;text-transform:uppercase;letter-spacing:0.3px}
+td{padding:10px;border-bottom:0.5px solid #F1EFE8;color:#1C1C1A;vertical-align:middle}
+tr:hover td{background:#FDFCFF}
+.td-num{font-weight:500;text-align:right}
+.td-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:4px}
+.td-status.open{background:#FAEEDA;color:#854F0B}
+.td-status.overdue{background:#FCEBEB;color:#A32D2D}
+.td-status.paid{background:#EAF3DE;color:#3B6D11}
+.td-status.partial{background:#E6F1FB;color:#185FA5}
+.td-status.unclear{background:#FAECE7;color:#712B13}
+.td-acts{display:flex;gap:4px}
+.btn{font-size:10px;padding:3px 8px;border-radius:4px;border:0.5px solid #D3D1C7;background:#F9F8F6;color:#5F5E5A;cursor:pointer;white-space:nowrap}
+.btn-k{background:#EEEDFE;border-color:#CECBF6;color:#534AB7}
+.kira-fab{position:absolute;bottom:20px;right:20px;width:52px;height:52px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer}
+.kira-fab .k{color:#fff;font-size:16px;font-weight:500;line-height:1}
+.kira-fab .kl{color:#CECBF6;font-size:8px;margin-top:1px}
+.kira-fab .status{position:absolute;top:0;right:0;width:12px;height:12px;background:#1D9E75;border-radius:50%;border:2px solid #F5F4F1}
+</style>
+<div class="app">
+<div class="sb">
+<div class="sb-logo"><div class="icon">K</div><span>Kira</span></div>
+<div class="sb-nav">
+<div class="si"><div class="ic">⌂</div>Start</div>
+<div class="si"><div class="ic">✉</div>Kommunikation</div>
+<div class="si"><div class="ic">☐</div>Organisation</div>
+<div class="si act"><div class="ic">€</div>Geschäft</div>
+<div class="si"><div class="ic">☰</div>Wissen</div>
+<div class="si"><div class="ic">⚙</div>Einstellungen</div>
+<div class="sb-sep"></div>
+<div class="si plan"><div class="ic">♟</div>Kunden<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◎</div>Marketing<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">◇</div>Social / DMs<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">⟳</div>Automatione<span class="badge">Geplant</span></div>
+<div class="si plan"><div class="ic">▤</div>Analysen<span class="badge">Geplant</span></div>
+</div>
+<div class="sb-bot"><div class="sb-col">‹› Sidebar einklappen</div></div>
+</div>
+
+<div class="mn">
+<div class="topbar">
+<div class="srch">⌕ Suche in allen Modulen…</div>
+<div class="tr">
+<div class="tc">⚡ Quick Actions</div>
+<div class="tc ok"><span class="dot"></span>Verbunden</div>
+<div class="tc">🔔 Offene Aufgaben</div>
+<div class="av">KM</div>
+</div>
+</div>
+
+<div class="mh">
+<div class="mt">Geschäft</div>
+<div class="mstats">
+<div class="ms"><b>€ 24.800</b> offenes Vol.</div>
+<div class="ms"><b>4</b> Eingangsrechn.</div>
+<div class="ms"><b>7</b> Angebote offen</div>
+<div class="ms"><b>3</b> Nachfass fällig</div>
+<div class="ms"><span class="w">1</span> ungeklärt</div>
+</div>
+<div class="macts">
+<div class="ma">⌕ Suche</div>
+<div class="ma">📅 Datumsfilter</div>
+<div class="ma">↗ Export</div>
+<div class="ma">⚑ Prüfung</div>
+<div class="ma">⟳ Sync</div>
+</div>
+</div>
+
+<div class="tabs">
+<div class="tab act">Übersicht</div>
+<div class="tab">Ausgangsrechnungen<span class="cnt">12</span></div>
+<div class="tab">Angebote<span class="cnt">7</span></div>
+<div class="tab">Eingangsrechnungen<span class="cnt">4</span></div>
+<div class="tab">Zahlungen<span class="cnt">8</span></div>
+<div class="tab">Mahnungen<span class="cnt">2</span></div>
+<div class="tab">Auswertung</div>
+<div class="tab plan">Kalkulation<span class="pbadge">Geplant</span></div>
+<div class="tab plan">Preispos.<span class="pbadge">Geplant</span></div>
+<div class="tab plan">Cashflow<span class="pbadge">Geplant</span></div>
+<div class="tab plan">Kunden-360<span class="pbadge">Geplant</span></div>
+</div>
+
+<div class="ct">
+<div class="inner">
+
+<div class="hero">
+<div class="hc">
+<div class="hc-label">Offenes Rechnungsvolumen</div>
+<div class="hc-row"><span class="hc-val">€ 24.800</span><span class="hc-change amber">3 überfällig</span></div>
+<div class="hc-sub">davon € 5.400 seit &gt; 30 Tagen</div>
+<div class="hc-spark"><svg viewBox="0 0 200 32"><rect x="6" y="18" width="24" height="14" rx="2" fill="#EF9F27" opacity="0.25"/><rect x="38" y="10" width="24" height="22" rx="2" fill="#EF9F27" opacity="0.35"/><rect x="70" y="4" width="24" height="28" rx="2" fill="#EF9F27" opacity="0.5"/><rect x="102" y="8" width="24" height="24" rx="2" fill="#EF9F27" opacity="0.4"/><rect x="134" y="2" width="24" height="30" rx="2" fill="#EF9F27" opacity="0.6"/><rect x="166" y="6" width="24" height="26" rx="2" fill="#EF9F27" opacity="0.45"/></svg></div>
+</div>
+<div class="hc">
+<div class="hc-label">Fällige Ausgangsrechnungen</div>
+<div class="hc-row"><span class="hc-val">5</span><span class="hc-change red">2 überfällig</span></div>
+<div class="hc-sub">nächste Fälligkeit: 28.03.</div>
+</div>
+<div class="hc">
+<div class="hc-label">Offene Eingangsrechnungen</div>
+<div class="hc-row"><span class="hc-val">4</span><span class="hc-change amber">1 Skonto!</span></div>
+<div class="hc-sub">Gesamtvolumen € 4.260</div>
+</div>
+<div class="hc">
+<div class="hc-label">Angebote ohne Rückmeldung</div>
+<div class="hc-row"><span class="hc-val">7</span><span class="hc-change blue">3 Nachfass</span></div>
+<div class="hc-sub">ältestes seit 45 Tagen offen</div>
+<div class="hc-spark"><svg viewBox="0 0 200 32"><polyline points="0,28 35,24 70,20 105,22 140,16 175,12 200,18" fill="none" stroke="#378ADD" stroke-width="1.5" opacity="0.4"/></svg></div>
+</div>
+<div class="hc">
+<div class="hc-label">Ungeklärte Zahlungen</div>
+<div class="hc-row"><span class="hc-val">1</span><span class="hc-change coral">prüfen</span></div>
+<div class="hc-sub">€ 780 ohne Rechnungszuordnung</div>
+</div>
+<div class="hc">
+<div class="hc-label">Mahnfälle</div>
+<div class="hc-row"><span class="hc-val">2</span><span class="hc-change gray">Stufe 1</span></div>
+<div class="hc-sub">1 Fall seit 94 Tagen offen</div>
+</div>
+</div>
+
+<div class="zones">
+<div class="panel">
+<div class="ph">Aktuelle Geschäftsvorgänge</div>
+<div class="psub">Kritische Rechnungen, fällige Zahlungen, Handlungsbedarf</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#E24B4A"></div>
+<div class="bi-body">
+<div class="bi-title">RE-2026-022 · Projekt Kirchner — überfällig</div>
+<div class="bi-meta">Ausgangsrechnung · fällig seit 12.03. · 14 Tage überfällig</div>
+</div>
+<div class="bi-val" style="color:#E24B4A">€ 5.400</div>
+<div class="bi-tags"><span class="tg tg-red">überfällig</span></div>
+</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#E24B4A"></div>
+<div class="bi-body">
+<div class="bi-title">RE-2025-089 · Projekt Neumann — 94 Tage offen</div>
+<div class="bi-meta">Ausgangsrechnung · fällig seit 22.12.2025 · Mahnstufe prüfen</div>
+</div>
+<div class="bi-val" style="color:#E24B4A">€ 3.800</div>
+<div class="bi-tags"><span class="tg tg-red">Mahnung?</span></div>
+</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#EF9F27"></div>
+<div class="bi-body">
+<div class="bi-title">AG-2026-041 · Fam. Krüger — Nachfass fällig</div>
+<div class="bi-meta">Angebot · gesendet 14.03. · keine Rückmeldung seit 12 Tagen</div>
+</div>
+<div class="bi-val" style="color:#BA7517">€ 8.200</div>
+<div class="bi-tags"><span class="tg tg-amber">Nachfass</span></div>
+</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#EF9F27"></div>
+<div class="bi-body">
+<div class="bi-title">ER Baustoffhandel Schmidt — Skonto läuft morgen ab</div>
+<div class="bi-meta">Eingangsrechnung · Zahlziel 30.03. · Skonto bis 27.03.</div>
+</div>
+<div class="bi-val" style="color:#BA7517">€ 1.840</div>
+<div class="bi-tags"><span class="tg tg-amber">Skonto!</span></div>
+</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#378ADD"></div>
+<div class="bi-body">
+<div class="bi-title">AG-2026-044 · Projekt Lang — 45 Tage ohne Rückmeldung</div>
+<div class="bi-meta">Angebot · gesendet 09.02. · Eskalation empfohlen</div>
+</div>
+<div class="bi-val" style="color:#185FA5">€ 6.200</div>
+<div class="bi-tags"><span class="tg tg-blue">Eskalation</span></div>
+</div>
+
+<div class="bi">
+<div class="bi-accent" style="background:#1D9E75"></div>
+<div class="bi-body">
+<div class="bi-title">Zahlung eingegangen · Projekt Hartmann</div>
+<div class="bi-meta">Zahlungseingang · heute · RE-2026-019 beglichen</div>
+</div>
+<div class="bi-val" style="color:#1D9E75">+ € 3.200</div>
+<div class="bi-tags"><span class="tg tg-green">bezahlt</span></div>
+</div>
+</div>
+
+<div class="panel">
+<div class="ph">Signale / Warnungen</div>
+<div class="psub">Automatisch erkannte Auffälligkeiten</div>
+
+<div class="warn wr"><span class="wdot"></span>RE-2025-089 seit 94 Tagen offen — Mahnstufe prüfen<span class="arr">→</span></div>
+<div class="warn wa"><span class="wdot"></span>Dokumentdatum weicht ab: ER vom 14.01. in Mail vom 22.03.<span class="arr">→</span></div>
+<div class="warn wa"><span class="wdot"></span>Doppelzuordnung möglich: Zahlung € 1.200 → 2 Rechnungen<span class="arr">→</span></div>
+<div class="warn wc"><span class="wdot"></span>Ungeklärte Zahlung: € 780 ohne Rechnungsbezug<span class="arr">→</span></div>
+<div class="warn wa"><span class="wdot"></span>Skonto Baustoffhandel Schmidt läuft morgen ab<span class="arr">→</span></div>
+<div class="warn wb"><span class="wdot"></span>Angebot Projekt Lang: 45 Tage ohne Reaktion<span class="arr">→</span></div>
+<div class="warn wt"><span class="wdot"></span>Kira-Vorschlag: Nachfass-Regel für &gt; 21 Tage ergänzen<span class="arr">→</span></div>
+<div class="warn wa"><span class="wdot"></span>Eingangsrechnung Abo-Hosting: automatische Verlängerung prüfen<span class="arr">→</span></div>
+</div>
+</div>
+
+<div class="tbl-panel">
+<div class="tbl-head">
+<div class="tbl-title">Ausgangsrechnungen — Vorschau</div>
+<div class="tbl-filter">
+<span class="tf on">offen</span>
+<span class="tf">überfällig</span>
+<span class="tf">bezahlt</span>
+<span class="tf">teilbezahlt</span>
+<span class="tf">ungeklärt</span>
+<span class="tf">dieses Jahr</span>
+</div>
+</div>
+<table>
+<thead>
+<tr><th>Nr.</th><th>Kunde</th><th>Datum</th><th>Fälligkeit</th><th style="text-align:right">Betrag</th><th>Status</th><th>Leistungsart</th><th>Aktionen</th></tr>
+</thead>
+<tbody>
+<tr>
+<td style="font-weight:500">RE-2026-022</td><td>Kirchner</td><td>28.02.</td><td style="color:#E24B4A">12.03.</td><td class="td-num">€ 5.400</td>
+<td><span class="td-status overdue">überfällig</span></td><td style="color:#888">Fassade</td>
+<td><div class="td-acts"><span class="btn">Details</span><span class="btn btn-k">Kira</span></div></td>
+</tr>
+<tr>
+<td style="font-weight:500">RE-2026-021</td><td>Berger</td><td>15.02.</td><td>31.03.</td><td class="td-num">€ 4.600</td>
+<td><span class="td-status open">offen</span></td><td style="color:#888">Boden</td>
+<td><div class="td-acts"><span class="btn">Details</span><span class="btn btn-k">Kira</span></div></td>
+</tr>
+<tr>
+<td style="font-weight:500">RE-2026-019</td><td>Hartmann</td><td>10.02.</td><td>28.02.</td><td class="td-num">€ 3.200</td>
+<td><span class="td-status paid">bezahlt</span></td><td style="color:#888">Treppe</td>
+<td><div class="td-acts"><span class="btn">Details</span></div></td>
+</tr>
+<tr>
+<td style="font-weight:500">RE-2026-018</td><td>Meier</td><td>05.02.</td><td>31.03.</td><td class="td-num">€ 7.800</td>
+<td><span class="td-status partial">teilbezahlt</span></td><td style="color:#888">Fassade</td>
+<td><div class="td-acts"><span class="btn">Details</span><span class="btn btn-k">Kira</span><span class="btn">Zahlung</span></div></td>
+</tr>
+<tr>
+<td style="font-weight:500">RE-2025-089</td><td>Neumann</td><td>15.11.</td><td style="color:#E24B4A">22.12.</td><td class="td-num">€ 3.800</td>
+<td><span class="td-status overdue">94 Tage!</span></td><td style="color:#888">Betonsanierung</td>
+<td><div class="td-acts"><span class="btn">Details</span><span class="btn btn-k">Kira</span><span class="btn">Mahnung</span></div></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="kira-fab">
+<span class="k">K</span>
+<span class="kl">Kira</span>
+<span class="status"></span>
+</div>
+</div>

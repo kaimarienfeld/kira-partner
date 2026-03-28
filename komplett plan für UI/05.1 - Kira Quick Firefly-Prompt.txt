@@ -1,0 +1,89 @@
+05.1 Kira Quick Firefly-Prompt
+
+Create a premium enterprise AI assistant quick panel UI for the same Kira product system and the same visual family as the existing Kira reference pages, especially matching the already created dashboard, communication, business, and knowledge modules.
+
+Important:
+This is not the full Kira workspace.
+This is the small opened “Kira Quick” state after clicking the Kira launcher.
+Use the same visual system as the existing Kira product:
+same elegant light SaaS style,
+same neutral premium palette,
+same spacing logic,
+same typography feeling,
+same refined surfaces,
+same product DNA.
+
+Scene:
+show the regular Kira application page in the background, but softly dimmed or slightly faded so the background does not dominate.
+The background should still be recognizable as the Kira software, but visually reduced.
+The focus is on a compact, elegant quick assistant panel.
+
+Kira Quick panel:
+positioned in the lower right area above the closed Kira launcher,
+compact but premium,
+rounded, refined, calm,
+not tiny,
+not cramped,
+not like a consumer support widget.
+
+Inside the quick panel:
+clear Kira header,
+small status hint,
+then a vertical set of elegant quick actions:
+Frage stellen
+Aufgabe besprechen
+Rechnung prüfen
+Angebot prüfen
+Kunde öffnen
+Suche
+Letzte Verläufe
+
+Each action should look like a premium actionable entry:
+icon,
+title,
+small supporting subtitle or short purpose line,
+good spacing,
+clear hover affordance.
+
+Visual direction:
+this should feel like the small command center entry into a much larger AI assistant system.
+It should look expensive, precise, calm, modern and enterprise-ready.
+Not playful.
+Not generic chatbot.
+Not floating support widget.
+Not messenger UI.
+
+Important constraints:
+background softly dimmed or faded,
+the quick panel clearly in focus,
+no full chat view yet,
+no full workspace yet,
+no big modal,
+no huge sidebar,
+no dark mode,
+no rauMKult brand colors,
+no retro look,
+no Windows 95,
+no Windows 98,
+no gamer aesthetic,
+no neon,
+no generic CRM popup.
+
+Use:
+soft white or very light neutral panel,
+dark readable text,
+slightly stronger contrast than the current prototype,
+subtle accent only for active elements,
+high readability,
+beautiful spacing,
+refined shadow,
+clean premium app feel.
+
+Include:
+the small circular Kira launcher button in the bottom right,
+and the quick panel opened just above it.
+
+Style keywords:
+premium AI quick panel, enterprise assistant launcher, modern SaaS assistant entry point, elegant command palette style, refined business software, context launcher, polished quick actions panel, same visual language as the Kira dashboard system.
+
+
