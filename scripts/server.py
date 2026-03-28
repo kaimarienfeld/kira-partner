@@ -8075,8 +8075,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     self._json({'ok': False, 'error': 'Keine Empfaenger-E-Mail angegeben'})
                     return
                 msg = MIMEMultipart('alternative')
+                bcc_addr = (
+                    body.get('bcc')
+                    or CFG.get('partner_view', {}).get('leni_mail_bcc')
+                    or absender
+                )
                 msg['From'] = absender
                 msg['To']   = to_addr
+                if bcc_addr and bcc_addr != to_addr:
+                    msg['Bcc'] = bcc_addr
                 if mail_type == 'welcome':
                     msg['Subject'] = 'Du bist dabei! Kira wartet auf dich'
                     text = (

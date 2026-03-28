@@ -109,6 +109,8 @@
     "partner_github_pages_url": "https://kaimarienfeld.github.io/kira-partner",
     "partner_pw_kai": "KaiAdmin2026",
     "partner_pw_leni": "HalloLeni2026",
-    "_pw_anleitung": "Passwörter VOR dem ersten Leni-Link ändern! generate_partner_view.py injiziert sie ins HTML."
+    "_pw_anleitung": "Passwörter VOR dem ersten Leni-Link ändern! generate_partner_view.py injiziert sie ins HTML.",
+    "leni_mail_bcc": "info@raumkult.eu",
+    "_bcc_anleitung": "BCC-Adresse fuer alle Mails an Leni (Kai bekommt immer eine Kopie)"
   }
 }

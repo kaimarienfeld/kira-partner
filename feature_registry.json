@@ -395,6 +395,65 @@
       "description": "Start/Stop Timer, Zuordnung zu Rechnung, Stundensatz effektiv vs. kalkuliert, ProjektZeit-App Integration"
     },
     {
+      "id": "sprachmodul",
+      "name": "Sprachmodul / Diktat-Eingabe",
+      "icon": "🎤",
+      "leni_name": "Zu Kira diktieren statt tippen",
+      "leni_desc": "Geplant: Einfach ins Mikrofon sprechen — Kira schreibt mit, überprüft das Transkript und fügt es in den Chat ein. Erst nach Bestätigung wird es abgeschickt. Praktisch wie bei ChatGPT, nur direkt in der App.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Browser-Spracheingabe (Web Speech API), Transkript-Review vor Absenden, Integration in Kira-Chat"
+    },
+    {
+      "id": "dokument-export",
+      "name": "Dokument-Export aus Kira-Chat",
+      "icon": "📑",
+      "leni_name": "Dokumente direkt in Kira erstellen & drucken",
+      "leni_desc": "Geplant: Was Kira im Chat erarbeitet — Angebote, Auswertungen, Berichte — kann direkt als PDF, Word oder Textdatei gespeichert und ausgedruckt werden. Alles bleibt in der App, kein Export in externe Programme nötig.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kira_llm.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "PDF/DOCX/TXT Export aus Chat, Inline-Vorschau im Browser, Ablage in DB für späteren Abruf"
+    },
+    {
+      "id": "lexware-anbindung",
+      "name": "Lexware Office API-Anbindung",
+      "icon": "🔗",
+      "leni_visible": false,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Alle Geschäftsdaten (Rechnungen, Kontakte, Aufträge, Preispositionen) aus Lexware/LexOffice automatisch in KIRA-DBs synchronisieren. Basis für Cashflow, Kalkulation, Kunden-360."
+    },
+    {
+      "id": "cloud-backup",
+      "name": "Cloud-Backup (automatisch)",
+      "icon": "☁️",
+      "leni_visible": false,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Automatisches Backup aller DBs in Cloud-Dienste (OneDrive/Dropbox/iCloud/S3), einstellbar per Checkbox, mit manuellem Trigger und Wiederherstellungs-Funktion"
+    },
+    {
+      "id": "urlaubsmodus-smart",
+      "name": "Urlaubsmodus — Smarte Abwesenheit",
+      "icon": "🏖️",
+      "leni_name": "Kira hält während des Urlaubs die Stellung",
+      "leni_desc": "Geplant: Im Urlaubsmodus sendet Kira automatisch intelligente Abwesenheitsmeldungen — angepasst an den Inhalt der Mail (kein generischer Text). Nach dem Urlaub gibt es einen Kurzbrief: Was ist passiert? Welche Mails wurden beantwortet? Was ist neu?",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "mail_monitor.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Auto-Abwesenheitsantwort via LLM (inhaltsbezogen), Post-Urlaub-Bericht, Markierung aller Urlaubs-Mails"
+    },
+    {
       "id": "crm-pipeline",
       "name": "CRM Lead-Pipeline",
       "icon": "🎯",
