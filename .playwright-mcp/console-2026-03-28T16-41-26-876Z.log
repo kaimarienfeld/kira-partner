@@ -1,0 +1,2 @@
+[     736ms] Unexpected token '.'
+[    8364ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8765/?nocache=1774716094917:0

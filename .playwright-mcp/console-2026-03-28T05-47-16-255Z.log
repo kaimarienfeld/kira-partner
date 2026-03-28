@@ -1,0 +1,48 @@
+[   81255ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81267ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81269ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81275ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81277ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81278ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81280ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81287ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81289ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81293ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81297ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)
+[   81305ms] SyntaxError: Failed to read the 'onclick' property from 'HTMLElement': Invalid or unexpected token
+    at eval (eval at evaluate (:301:30), <anonymous>:11:81)
+    at Array.find (<anonymous>)
+    at eval (eval at evaluate (:301:30), <anonymous>:11:69)

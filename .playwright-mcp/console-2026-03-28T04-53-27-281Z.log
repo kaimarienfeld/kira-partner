@@ -1,0 +1,13 @@
+[ 1119264ms] ReferenceError: testPush is not defined
+    at HTMLButtonElement.onclick (http://localhost:8765/:3481:64)
+[ 1184820ms] ReferenceError: testPush is not defined
+    at HTMLButtonElement.onclick (http://localhost:8765/:3481:64)
+[ 2883199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/aktivitaeten?limit=1:0
+[ 2883235ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0
+[ 2913136ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0
+[ 2943164ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/aktivitaeten?limit=1:0
+[ 2943182ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0
+[ 2973147ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0
+[ 3003149ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/aktivitaeten?limit=1:0
+[ 3003149ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0
+[ 3033150ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8765/api/monitor/status:0

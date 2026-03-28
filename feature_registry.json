@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "2026-03-28",
+  "_updated": "2026-03-28-session-y",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -465,6 +465,48 @@
       "status": "planned",
       "last_updated": "2026-03-28",
       "description": "Lead-Pipeline Anfrage→Angebot→Auftrag→Abrechnung, Conversion-Rate, Auto-Wiedervorlage"
+    },
+    {
+      "id": "partner-view",
+      "name": "Partner-View (Beta-Seite für Leni)",
+      "icon": "🤝",
+      "leni_name": "Deine persönliche Kira-Übersicht",
+      "leni_desc": "Das bist du gerade — diese Seite! Eine passwortgeschützte Übersichtsseite, die dir zeigt was eingebaut ist, was geplant ist und wo du selbst mitgestalten kannst. Mit Kacheln, Filtern, Feedback-Funktion und personalisierten Updates von Kai.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "partner_view.html + generate_partner_view.py",
+      "status": "done",
+      "last_updated": "2026-03-28",
+      "description": "Passwortgeschützte GitHub-Pages-Seite: Feature-Kacheln, Onboarding-Tour, ntfy-Push, Admin-Panel (Kai), feature_registry.json als Datenquelle",
+      "session": "session-v/w"
+    },
+    {
+      "id": "postfach-ui",
+      "name": "Postfach — Vollständige Mail-UI",
+      "icon": "📬",
+      "leni_name": "Alle Mails direkt in der App lesen",
+      "leni_desc": "Eingebaut: Alle 5 Mailkonten in einer Ansicht — wie Outlook, direkt im Dashboard. Links die Konten-/Ordner-Liste, in der Mitte die Mailliste, rechts die Vorschau. Suche über alle Konten, Thread-Ansicht, direkt antworten oder Kira um Hilfe bitten.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "partial",
+      "last_updated": "2026-03-28",
+      "description": "3-Pane Outlook-Stil: Konten-Baum + Mail-Liste (paginiert, Suche) + Vorschau/Antwort. APIs: /api/mail/folders, /api/mail/list, /api/mail/thread, /api/mail/send",
+      "session": "session-x"
+    },
+    {
+      "id": "mail-sender-smtp",
+      "name": "Mail-Versand via SMTP XOAUTH2",
+      "icon": "✉️",
+      "leni_name": "Mails direkt aus KIRA verschicken",
+      "leni_desc": "Eingebaut: Kira kann Mails aus dem Dashboard heraus senden — über die echten Mailkonten, vollständig authentifiziert. Antworten, Weiterleiten oder neue Mails schreiben, inklusive HTML-Templates für professionelle Optik.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/mail_sender.py",
+      "status": "done",
+      "last_updated": "2026-03-28",
+      "description": "SMTP XOAUTH2 über smtp.office365.com:587, MSAL Device Code Flow, HTML+Plain MIME, Threading-Header, sent_mails.db Speicherung, Template-Rendering",
+      "session": "session-y"
     }
   ]
 }

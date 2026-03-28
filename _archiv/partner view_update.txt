@@ -1,0 +1,39 @@
+
+
+klingt wunderbar.
+
+
+Die html seite grafisch aber trotzdem Hochwertig und übersichtlich gestalten. Leni ist anspruchsvoll. es muss dann immer später direkt änderungen auffällig zu sehen sein und extra wenn ihre ideen umgestzt wurden, dass sie sich freut und darauf aber noch feadback geben kann und die bestimmte funktion erweitern und prüfen. du prüftst dann immer nach was daraus sinn macht zu bauen, ob möglich, und sendest mir eine formuliertes update das ich es verstehe zur freigabe. erst dann trägst du es sinnvoll in die liste ein und setzt das nicht auf hohe prio, ausser du siehst, wenn es sinn macht direkt mit einzubauen..Wenn du dafür eine api benötigst , sagen.
+
+seite vielleich in kacheln aufteilen, aktuelle liste bestand, schon eingebaut- geplant - teilweise - komplett - deine einträge - alles mögliche filterbar, im stil unserer app kira. somit erschlägt es leni nicht, und sie kann filtern.
+
+Seite passwort geschützt. zudgang für mich und zugang für leni mit unterschiedlicher kommunikation, ich admin - liste ensprechnd aufbauen und leni partener
+
+Schreibe aber die html seite so verständlich, ohne technik gelaber das es ein leihe wie leni auch versteht. also technisches verständlich übersetzen. 
+
+Begrüße leni lieb bei jeden login und bedanke dich herzlich wenn sie speichert am ende. gib ihr am anfang eine kurze tour, was sie wo findet und hier machen kann und benutzen, damit sie direkt einen einblick hat. mit erklärungen wie wieso warum, was geschiet als nächstes
+
+weiter funktionsvorschläge immer erwünscht die die zusammenarbeit für mich, leni, und mit dir claude verbessern
+
+
+Die Typo, bitte hochwertg im hell modus wie die app ist wenn sie im hell modus ist. Die karten oben Fertig eingebaut Teilweise fertig In Planung presänter bauen
+
+
+
+
+
+du hast jetzt nur die feature_registry.json als liste genommen. aber diese ist defenitiv nicht die einzige. bitte alle listen im ordner suchen und lesen die auf features, geplantes, und stuse hinweisen, git, und logs durchsuchen, diese dann mit der app selbst vergleichen (app koomplett scannen) und das mit der feature_registry.json aktualisieren und diese dann noch einmal mit partner view.htm aktuelisieren. die feature_registry.json ist dann die schnittstelle
+
+
+in der zwischenzeit kümmere ich mich um 
+
+Was du jetzt noch tun musst (einmalig):
+
+  1. GitHub-Repo anlegen: kaimarienfeld/kira-partner — public, leer (kein README)
+  2. GitHub Pages aktivieren: Repo-Settings → Pages → Source: main / (root)
+  3. PAT erstellen: github.com → Settings → Developer Settings → Tokens (classic) → contents:write für kira-partner
+  4. Im Admin-Panel eintragen: Partner-View öffnen → Kai-Login → Tab "Einstellungen" → GitHub PAT + Leni-ntfy-Topic
+  5. Passwörter ändern: scripts/config.json → partner_view.partner_pw_kai + partner_pw_leni
+  6. Ersten Push ausführen:
+  python scripts/generate_partner_view.py --push
+  6. (oder über "GitHub Sync" Tab direkt im Admin-Panel)

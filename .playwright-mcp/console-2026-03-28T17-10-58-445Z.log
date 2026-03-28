@@ -1,0 +1,1 @@
+[ 3330985ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:8765/api/monitor/status:0

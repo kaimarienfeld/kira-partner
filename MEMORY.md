@@ -22,8 +22,9 @@
 
 ## Partner & Universalversion
 - [project_partner_feedback_system.md](project_partner_feedback_system.md) — Beta-Testerin Leni, partner_view.html live auf kaimarienfeld.github.io/kira-partner
-- [project_leni_mail_pending.md](project_leni_mail_pending.md) — Willkommens- und Passwort-Mail AUSSTEHEND — erst nach nächstem KIRA-App-Commit senden!
+- [project_leni_mail_pending.md](project_leni_mail_pending.md) — Gmail-Drafts erstellt (IDs gespeichert). Passwort-Draft: [PASSWORT] ersetzen! Senden erst nach KIRA-App-Commit.
 - [feedback_partner_view_automation.md](feedback_partner_view_automation.md) — PFLICHT: Nach jedem Commit generate_partner_view.py + Leni-Feedback-Prozess
+- Mail-Templates: `knowledge/mail_templates/` — einladung.html, passwort.html, benachrichtigung.html (Kira-Branding)
 
 ## Nutzer & Projekt
 - [user_profile.md](user_profile.md) — Kai Marienfeld, rauMKult® Inhaber, Betonkosmetik-Spezialist
