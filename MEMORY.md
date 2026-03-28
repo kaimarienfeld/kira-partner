@@ -21,7 +21,8 @@
 - [KIRA_KOMPLETT_UEBERSICHT.md](KIRA_KOMPLETT_UEBERSICHT.md) — Vollständige Systemübersicht inkl. Runtime-Log (Stand 27.03.2026)
 
 ## Partner & Universalversion
-- [project_partner_feedback_system.md](project_partner_feedback_system.md) — Beta-Testerin Leni, partner_view.html gebaut, wartet auf GitHub-Username + Netlify/GitHub-Pages Setup
+- [project_partner_feedback_system.md](project_partner_feedback_system.md) — Beta-Testerin Leni, partner_view.html live auf kaimarienfeld.github.io/kira-partner
+- [project_leni_mail_pending.md](project_leni_mail_pending.md) — Willkommens- und Passwort-Mail AUSSTEHEND — erst nach nächstem KIRA-App-Commit senden!
 - [feedback_partner_view_automation.md](feedback_partner_view_automation.md) — PFLICHT: Nach jedem Commit generate_partner_view.py + Leni-Feedback-Prozess
 
 ## Nutzer & Projekt
