@@ -8,7 +8,9 @@
     "arbeitszeit_aktiv": true,
     "arbeitszeit_von": "05:00",
     "arbeitszeit_bis": "18:00",
-    "urlaub_modus": false
+    "urlaub_modus": false,
+    "urlaub_von": "2026-03-28T09:29",
+    "urlaub_bis": "2026-03-29T09:29"
   },
   "email_notification": {
     "aktiv": false,
@@ -35,7 +37,7 @@
     "intervall_3_tage": 30,
     "_kommentar": "Nachfass-Intervalle für offene Angebote (Tage)",
     "aktiv": true,
-    "benachrichtigung": "beide",
+    "benachrichtigung": "alle",
     "kira_nachfass_text": true,
     "rechnung_tage": 14
   },
@@ -97,5 +99,16 @@
     "inapp_aufgaben": true,
     "inapp_bg": true,
     "inapp_fehler": true
+  },
+  "partner_view": {
+    "_kommentar": "GitHub Pages Konfiguration für Leni-Partner-View. Wird von generate_partner_view.py gelesen.",
+    "partner_github_repo_dir": "",
+    "_repo_dir_anleitung": "Lokaler Pfad zum geclonten GitHub-Pages-Repo, z.B. C:\\Users\\kaimr\\kira-partner",
+    "partner_github_branch": "main",
+    "partner_github_repo_url": "",
+    "_repo_url_anleitung": "z.B. https://github.com/DEIN-USERNAME/kira-partner",
+    "partner_pw_kai": "KaiAdmin2026",
+    "partner_pw_leni": "HalloLeni2026",
+    "_pw_anleitung": "Passwörter VOR dem ersten Leni-Link ändern! generate_partner_view.py injiziert sie ins HTML."
   }
 }

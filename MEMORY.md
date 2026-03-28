@@ -13,11 +13,16 @@
 - [feedback_dashboard_ui_rebuild.md](feedback_dashboard_ui_rebuild.md) — Dashboard UI aus Referenzvorlagen bauen, alte UI vollständig ersetzen
 - [feedback_feature_list_rule.md](feedback_feature_list_rule.md) — PFLICHT: feature_registry.json VOR und NACH jeder Session prüfen+aktualisieren
 - [feedback_activity_log_rule.md](feedback_activity_log_rule.md) — Neue Module/Funktionen immer mit activity_log integrieren
+- [feedback_integration_check.md](feedback_integration_check.md) — PFLICHT: Nach jedem neuen Feature App-weit auf Integrationspunkte prüfen (Einstellungen/LLM/Log/Notifs/Backup/Dashboard/Mail/Kunden/Marketing) + in feature_registry+open_tasks eintragen
 
 ## Navigation & Architektur
 - [server_map.md](server_map.md) — Alle Funktionen in server.py mit Zeilennummern (7200 Zeilen!)
 - [architecture_decisions.md](architecture_decisions.md) — Warum wurde was wie gebaut (ADR-001..007)
 - [KIRA_KOMPLETT_UEBERSICHT.md](KIRA_KOMPLETT_UEBERSICHT.md) — Vollständige Systemübersicht inkl. Runtime-Log (Stand 27.03.2026)
+
+## Partner & Universalversion
+- [project_partner_feedback_system.md](project_partner_feedback_system.md) — Beta-Testerin Leni, partner_view.html gebaut, wartet auf GitHub-Username + Netlify/GitHub-Pages Setup
+- [feedback_partner_view_automation.md](feedback_partner_view_automation.md) — PFLICHT: Nach jedem Commit generate_partner_view.py + Leni-Feedback-Prozess
 
 ## Nutzer & Projekt
 - [user_profile.md](user_profile.md) — Kai Marienfeld, rauMKult® Inhaber, Betonkosmetik-Spezialist

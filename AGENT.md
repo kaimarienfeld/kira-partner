@@ -25,6 +25,22 @@
 5. `MEMORY.md` prüfen und bei Bedarf ergänzen
 6. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
 7. `server_map.md` aktualisieren wenn neue Funktionen in server.py hinzukamen
+8. **Partner-View generieren** (PFLICHT nach Änderungen an feature_registry.json):
+   ```
+   python scripts/generate_partner_view.py
+   ```
+   → prüft ob HTML aktuell ist, aktualisiert falls nötig
+   → Push zu GitHub NUR nach expliziter Freigabe durch Kai: `--push` Flag
+   → Kai sieht diff und sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
+
+### Nach Leni-Feedback (Workflow)
+1. Kai gibt Leni-Feedback mit "Alles für Claude kopieren" (Admin-Panel) → fügt in Chat ein
+2. Claude prüft jedes Feedback-Item:
+   - Sinnvoll & machbar? → formuliert Update-Vorschlag für Kai
+   - Kai gibt Freigabe? → Claude trägt in `feature_registry.json` ein (Status `leni_idea`)
+   - Nicht sinnvoll / außerhalb Scope? → Claude erklärt warum, kein Eintrag
+3. **Priorität:** Leni-Ideen bekommen KEINE hohe Priorität — außer Claude sieht klaren Mehrwert
+4. Wenn Leni-Idee umgesetzt: Status → `leni_done`, `generate_partner_view.py` ausführen, pushen
 
 > **Atomares Mikro-Logging (automatisch via pre-commit Hook):**
 > `scripts/diff_to_changelog.py --staged` — ein Eintrag pro CSS-Property, Funktion, HTML-Attribut, Farbe, Schriftart
