@@ -8,7 +8,7 @@ Nutzt den Token-Cache des Mail-Archivers (gemeinsamer OAuth2-Login).
 Extrahiert und adaptiert aus raumkult_mail_archiver_v3.81.py.
 """
 import json, os, sys, threading, imaplib, email, email.header, email.utils
-import re, hashlib, base64, time, logging, webbrowser
+import re, hashlib, base64, time, logging, webbrowser, sqlite3
 from datetime import datetime
 from pathlib import Path
 from html.parser import HTMLParser
@@ -28,11 +28,12 @@ try:
 except ImportError:
     MSAL_OK = False
 
-SCRIPTS_DIR   = Path(__file__).parent
-KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
-TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
-KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
-CONFIG_FILE   = SCRIPTS_DIR / "config.json"
+SCRIPTS_DIR    = Path(__file__).parent
+KNOWLEDGE_DIR  = SCRIPTS_DIR.parent / "knowledge"
+TASKS_DB       = KNOWLEDGE_DIR / "tasks.db"
+KUNDEN_DB      = KNOWLEDGE_DIR / "kunden.db"
+MAIL_INDEX_DB  = KNOWLEDGE_DIR / "mail_index.db"
+CONFIG_FILE    = SCRIPTS_DIR / "config.json"
 
 # Archiver-Pfade (Token-Cache teilen!)
 ARCHIVER_DIR  = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv")
@@ -281,15 +282,39 @@ def _extract_attachments(msg):
     return names
 
 
+def _fallback_msg_id(konto_label, absender, an, datum_iso, betreff):
+    """Erzeugt Fallback-ID wenn Message-ID fehlt."""
+    raw = f"{konto_label}|{absender}|{an}|{datum_iso}|{(betreff or '')[:60]}"
+    return "FALLBACK-" + hashlib.sha256(raw.encode('utf-8', errors='replace')).hexdigest()[:20]
+
+
+def _compute_thread_id(msg_id, in_reply_to, references):
+    """
+    Berechnet thread_id: älteste bekannte Message-ID im Thread.
+    Wenn In-Reply-To oder References vorhanden → die erste Reference ist Thread-Anker.
+    Sonst → msg_id selbst ist Thread-Anker (neue Konversation).
+    """
+    if references:
+        # References enthält älteste zuerst (RFC 2822)
+        refs = [r.strip() for r in references.split() if r.strip().startswith("<")]
+        if refs:
+            return refs[0]
+    if in_reply_to and in_reply_to.strip():
+        return in_reply_to.strip()
+    return msg_id or ""
+
+
 def parse_raw_mail(raw_bytes, konto_label):
-    """Parst RFC822-Bytes in ein dict."""
+    """Parst RFC822-Bytes in ein dict. Extrahiert jetzt auch Threading-Header."""
     msg = email.message_from_bytes(raw_bytes)
     betreff = _decode_hdr(msg.get("Subject", ""))
     absender = _decode_hdr(msg.get("From", ""))
     an = _decode_hdr(msg.get("To", ""))
     cc = _decode_hdr(msg.get("Cc", ""))
     datum_str = msg.get("Date", "")
-    msg_id = msg.get("Message-ID", "")
+    msg_id = (msg.get("Message-ID", "") or "").strip()
+    in_reply_to = (msg.get("In-Reply-To", "") or "").strip()
+    mail_references = (msg.get("References", "") or "").strip()
 
     datum_obj = None
     datum_fmt = datum_str
@@ -299,6 +324,13 @@ def parse_raw_mail(raw_bytes, konto_label):
     except:
         pass
 
+    datum_iso = datum_obj.isoformat() if datum_obj else None
+
+    # Fallback-ID wenn keine Message-ID
+    if not msg_id:
+        msg_id = _fallback_msg_id(konto_label, absender, an, datum_iso or datum_fmt, betreff)
+
+    thread_id = _compute_thread_id(msg_id, in_reply_to, mail_references)
     text = _extract_text(msg)
     anhaenge = _extract_attachments(msg)
 
@@ -309,8 +341,11 @@ def parse_raw_mail(raw_bytes, konto_label):
         "an": an,
         "cc": cc,
         "datum": datum_fmt,
-        "datum_iso": datum_obj.isoformat() if datum_obj else None,
+        "datum_iso": datum_iso,
         "message_id": msg_id,
+        "in_reply_to": in_reply_to,
+        "mail_references": mail_references,
+        "thread_id": thread_id,
         "text": text[:6000],
         "anhaenge": anhaenge,
         "hat_anhaenge": len(anhaenge) > 0,
@@ -452,7 +487,56 @@ def _process_mail(mail_data, konto_label, folder_name):
     except:
         pass
 
+    # In mail_index.db speichern (zentraler Index aller Mails)
+    _index_mail(mail_data, konto_label, folder_name)
+
     return result
+
+
+def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
+    """
+    Schreibt eine Mail in mail_index.db (zentraler Index).
+    Idempotent: INSERT OR IGNORE verhindert Duplikate.
+    Quelle: 'live_sync' (vom IMAP-Monitor in Echtzeit abgerufen).
+    """
+    if not MAIL_INDEX_DB.exists():
+        return  # DB noch nicht initialisiert → still überspringen
+
+    try:
+        conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            INSERT OR IGNORE INTO mails
+            (konto, konto_label, betreff, absender, an, cc,
+             datum, datum_iso, message_id, folder,
+             hat_anhaenge, anhaenge,
+             in_reply_to, mail_references, thread_id,
+             sync_source, text_plain, archiviert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            mail_data.get("konto", konto_label),
+            konto_label,
+            mail_data.get("betreff", ""),
+            mail_data.get("absender", ""),
+            mail_data.get("an", ""),
+            mail_data.get("cc", ""),
+            mail_data.get("datum", ""),
+            mail_data.get("datum_iso", ""),
+            mail_data.get("message_id", ""),
+            folder_name,
+            1 if mail_data.get("hat_anhaenge") else 0,
+            json.dumps(mail_data.get("anhaenge", []), ensure_ascii=False),
+            mail_data.get("in_reply_to", ""),
+            mail_data.get("mail_references", ""),
+            mail_data.get("thread_id", ""),
+            "live_sync",
+            mail_data.get("text", "")[:8000],
+            datetime.now().isoformat(),
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        log.debug(f"mail_index.db Schreiben fehlgeschlagen: {e}")
 
 
 def _send_notification(new_tasks):

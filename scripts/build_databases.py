@@ -220,14 +220,40 @@ def setup_databases():
     c.execute("""CREATE TABLE IF NOT EXISTS mails (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         konto TEXT, konto_label TEXT, betreff TEXT,
-        absender TEXT, an TEXT, datum TEXT, datum_iso TEXT,
+        absender TEXT, an TEXT, cc TEXT,
+        datum TEXT, datum_iso TEXT,
         message_id TEXT UNIQUE, folder TEXT,
         hat_anhaenge INTEGER DEFAULT 0, anhaenge TEXT,
-        anhaenge_pfad TEXT, mail_folder_pfad TEXT, archiviert_am TEXT
+        anhaenge_pfad TEXT, mail_folder_pfad TEXT, archiviert_am TEXT,
+        in_reply_to TEXT,
+        mail_references TEXT,
+        thread_id TEXT,
+        sync_source TEXT DEFAULT 'archiv_import',
+        text_plain TEXT,
+        eml_path TEXT,
+        fallback_hash TEXT
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_datum ON mails(datum)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_konto ON mails(konto_label)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_folder ON mails(folder)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_thread ON mails(thread_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_message_id ON mails(message_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_sync_source ON mails(sync_source)")
+    # Sichere Migration: neue Spalten anlegen wenn DB schon existiert
+    existing_cols = {row[1] for row in c.execute("PRAGMA table_info(mails)").fetchall()}
+    for col, defn in [
+        ("cc",              "TEXT"),
+        ("in_reply_to",     "TEXT"),
+        ("mail_references", "TEXT"),
+        ("thread_id",       "TEXT"),
+        ("sync_source",     "TEXT DEFAULT 'archiv_import'"),
+        ("text_plain",      "TEXT"),
+        ("eml_path",        "TEXT"),
+        ("fallback_hash",   "TEXT"),
+    ]:
+        if col not in existing_cols:
+            try: c.execute(f"ALTER TABLE mails ADD COLUMN {col} {defn}")
+            except: pass
     c.commit(); dbs["index"] = c
 
     # 2. Kunden-Datenbank (alle Postfaecher, kanaluebergreifend)
@@ -344,18 +370,34 @@ def process_mailbox(mailbox_name: str, dbs: dict) -> dict:
             text_html   = mail.get('text', '') or ''
             text_plain  = html_to_text(text_html)
 
+            cc          = mail.get('cc', '') or ''
+            eml_pfad    = mail.get('eml_pfad', '') or ''
             stats["total"] += 1
 
-            # 1. Mail-Index (alle)
+            # Fallback-ID wenn keine Message-ID
+            if not message_id:
+                raw_id = f"{konto}|{absender}|{an}|{datum_iso}|{betreff[:60]}"
+                import hashlib
+                message_id = "FALLBACK-" + hashlib.sha256(raw_id.encode('utf-8', errors='replace')).hexdigest()[:20]
+
+            # 1. Mail-Index (alle) — mit neuen Thread/Source-Feldern
             dbs["index"].execute("""
                 INSERT OR IGNORE INTO mails
-                (konto, konto_label, betreff, absender, an, datum, datum_iso,
-                 message_id, folder, hat_anhaenge, anhaenge, anhaenge_pfad,
-                 mail_folder_pfad, archiviert_am)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (konto, konto_label, betreff, absender, an, datum, datum_iso,
-                  message_id, folder_name, hat_anh, anhaenge, anh_pfad,
-                  str(mail_dir), arch_am))
+                (konto, konto_label, betreff, absender, an, cc,
+                 datum, datum_iso, message_id, folder,
+                 hat_anhaenge, anhaenge, anhaenge_pfad,
+                 mail_folder_pfad, archiviert_am,
+                 in_reply_to, thread_id, sync_source, text_plain, eml_path)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (konto, konto_label, betreff, absender, an, cc,
+                  datum, datum_iso, message_id, folder_name,
+                  hat_anh, anhaenge, anh_pfad,
+                  str(mail_dir), arch_am,
+                  "",  # in_reply_to (nicht in mail.json gespeichert)
+                  message_id,  # thread_id = message_id als Standard
+                  "archiv_import",
+                  text_plain[:8000],
+                  eml_pfad))
 
             is_sent = "Gesendete" in folder_name or "Sent" in folder_name
 

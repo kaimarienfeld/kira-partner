@@ -16,6 +16,7 @@ SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
 ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
@@ -737,6 +738,446 @@ def build_kommunikation(tasks):
   </div>
   <div class="km-ctx" id="km-ctx">{ctx_placeholder}</div>
 </div>"""
+
+# ── POSTFACH Panel ────────────────────────────────────────────────────────────
+def build_postfach():
+    """Outlook-Style 3-Pane Mail-Modul. Daten werden via AJAX geladen."""
+    return """<div class="pf-shell">
+
+<!-- LEFT: Konten + Ordner -->
+<div class="pf-left" id="pf-left">
+  <div class="pf-left-hdr">
+    <span class="pf-left-title">Postfach</span>
+    <button class="pf-compose-btn" onclick="pfOpenCompose()" title="Neue Mail verfassen">&#x270F; Neu</button>
+  </div>
+  <div id="pf-folders-loading" style="padding:16px;color:var(--text-muted);font-size:13px">Lade Konten...</div>
+  <div id="pf-folder-tree"></div>
+</div>
+
+<!-- MIDDLE: Mail-Liste -->
+<div class="pf-mid" id="pf-mid">
+  <div class="pf-mid-hdr">
+    <div class="pf-mid-title" id="pf-mid-title">Posteingang</div>
+    <input class="pf-search" id="pf-search" placeholder="&#x2315; Suchen..." oninput="pfSearchDebounce()" autocomplete="off">
+    <div class="pf-mid-meta" id="pf-mid-meta"></div>
+  </div>
+  <div id="pf-list-wrap">
+    <div class="pf-list-empty" id="pf-list-empty" style="display:none">
+      <div style="font-size:32px;margin-bottom:8px">&#x1F4EC;</div>
+      <div>Kein Ordner ausgewählt</div>
+    </div>
+    <div id="pf-list"></div>
+    <div id="pf-load-more" style="display:none;text-align:center;padding:12px">
+      <button class="btn btn-sec btn-xs" onclick="pfLoadMore()">Weitere laden</button>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT: Preview / Compose -->
+<div class="pf-right" id="pf-right">
+  <div id="pf-preview-empty" class="pf-preview-empty">
+    <div style="font-size:40px;margin-bottom:12px">&#x2709;</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Mail auswählen</div>
+    <div style="font-size:13px;color:var(--text-muted)">Klicke auf eine Mail um sie hier zu lesen</div>
+  </div>
+  <div id="pf-preview" style="display:none">
+    <div class="pf-prev-hdr">
+      <div class="pf-prev-betreff" id="pf-prev-betreff"></div>
+      <div class="pf-prev-meta">
+        <span class="pf-prev-absender" id="pf-prev-absender"></span>
+        <span class="pf-prev-datum" id="pf-prev-datum"></span>
+      </div>
+      <div class="pf-prev-acts">
+        <button class="pf-act-btn" onclick="pfReply()" title="Antworten">&#x21A9; Antworten</button>
+        <button class="pf-act-btn" onclick="pfForward()" title="Weiterleiten">&#x21AA; Weiterleiten</button>
+        <button class="pf-act-btn" onclick="pfKiraContext()" title="Kira fragen">&#x1F916; Kira</button>
+      </div>
+    </div>
+    <div class="pf-prev-anhaenge" id="pf-prev-anhaenge" style="display:none"></div>
+    <div class="pf-prev-body" id="pf-prev-body"></div>
+    <!-- Thread -->
+    <div id="pf-thread-wrap" style="display:none">
+      <div class="pf-thread-hdr" onclick="pfToggleThread()">
+        <span>&#x1F4AC; Thread-Verlauf</span><span id="pf-thread-cnt"></span>
+        <span id="pf-thread-toggle">&#x25BC;</span>
+      </div>
+      <div id="pf-thread-list"></div>
+    </div>
+  </div>
+  <!-- Compose -->
+  <div id="pf-compose" style="display:none">
+    <div class="pf-comp-hdr">
+      <span id="pf-comp-title">Neue Mail</span>
+      <button class="pf-act-btn" onclick="pfCloseCompose()">&#x2715;</button>
+    </div>
+    <div class="pf-comp-fields">
+      <div class="pf-comp-row">
+        <label class="pf-comp-lbl">Von</label>
+        <select class="pf-comp-sel" id="pf-comp-from"></select>
+      </div>
+      <div class="pf-comp-row">
+        <label class="pf-comp-lbl">An</label>
+        <input class="pf-comp-inp" id="pf-comp-to" placeholder="empfaenger@example.com">
+      </div>
+      <div class="pf-comp-row">
+        <label class="pf-comp-lbl">CC</label>
+        <input class="pf-comp-inp" id="pf-comp-cc" placeholder="(optional)">
+      </div>
+      <div class="pf-comp-row">
+        <label class="pf-comp-lbl">Betreff</label>
+        <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff">
+      </div>
+    </div>
+    <textarea class="pf-comp-body" id="pf-comp-body" placeholder="Nachricht eingeben..."></textarea>
+    <div class="pf-comp-acts">
+      <button class="btn btn-primary btn-sm" onclick="pfSend()" id="pf-send-btn">&#x27A4; Senden</button>
+      <button class="btn btn-sec btn-sm" onclick="pfSaveDraft()">&#x1F4BE; Entwurf</button>
+      <button class="btn btn-sec btn-sm" onclick="pfKiraDraft()">&#x1F916; Kira formuliert</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<style>
+.pf-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;gap:0}
+.pf-left{width:220px;min-width:160px;max-width:280px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;border-bottom:1px solid var(--border)}
+.pf-left-title{font-weight:700;font-size:14px;color:var(--text)}
+.pf-compose-btn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600}
+.pf-compose-btn:hover{opacity:.88}
+.pf-folder-konto{padding:10px 14px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)}
+.pf-folder-item{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
+.pf-folder-item:hover{background:var(--bg-hover)}
+.pf-folder-item.active{background:rgba(124,77,255,.1);border-left-color:var(--accent);color:var(--accent);font-weight:600}
+.pf-folder-badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-weight:700}
+.pf-mid{width:320px;min-width:240px;max-width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.pf-mid-hdr{padding:12px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.pf-mid-title{font-weight:700;font-size:14px;color:var(--text)}
+.pf-search{border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;background:var(--bg);color:var(--text);width:100%;outline:none}
+.pf-search:focus{border-color:var(--accent)}
+.pf-mid-meta{font-size:11px;color:var(--text-muted)}
+#pf-list-wrap{overflow-y:auto;flex:1}
+.pf-mail-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.pf-mail-item:hover{background:var(--bg-hover)}
+.pf-mail-item.active{background:rgba(124,77,255,.08);border-left:3px solid var(--accent)}
+.pf-mail-item.unread .pf-item-betreff{font-weight:700}
+.pf-item-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px}
+.pf-item-absender{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.pf-item-datum{font-size:11px;color:var(--text-muted);flex-shrink:0}
+.pf-item-betreff{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px}
+.pf-item-preview{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-item-badges{display:flex;gap:4px;margin-top:3px}
+.pf-item-badge{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--bg-raised);color:var(--text-muted)}
+.pf-item-badge.att{background:rgba(124,77,255,.1);color:var(--accent)}
+.pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
+.pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
+.pf-prev-hdr{padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pf-prev-betreff{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3}
+.pf-prev-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.pf-prev-absender{font-size:13px;color:var(--text-muted)}
+.pf-prev-datum{font-size:12px;color:var(--text-muted)}
+.pf-prev-acts{display:flex;gap:6px;flex-wrap:wrap}
+.pf-act-btn{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text);transition:.1s}
+.pf-act-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pf-prev-anhaenge{padding:8px 20px;background:rgba(124,77,255,.05);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+.pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
+.pf-att-chip:hover{border-color:var(--accent);color:var(--accent)}
+.pf-prev-body{flex:1;overflow-y:auto;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
+.pf-thread-cnt{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px}
+.pf-thread-msg{padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px}
+.pf-thread-msg-hdr{display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px}
+.pf-thread-msg-sender{font-weight:600;color:var(--text)}
+.pf-thread-msg-date{color:var(--text-muted)}
+.pf-thread-msg-body{color:var(--text-muted);white-space:pre-wrap;max-height:120px;overflow:hidden}
+.pf-comp-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px;border-bottom:1px solid var(--border)}
+.pf-comp-hdr span{font-weight:700;font-size:15px}
+.pf-comp-fields{padding:12px 20px 0;border-bottom:1px solid var(--border)}
+.pf-comp-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+.pf-comp-lbl{font-size:12px;color:var(--text-muted);width:45px;flex-shrink:0}
+.pf-comp-inp{flex:1;border:none;background:transparent;color:var(--text);font-size:13px;outline:none;padding:2px 0}
+.pf-comp-sel{flex:1;border:none;background:transparent;color:var(--text);font-size:13px;outline:none}
+.pf-comp-body{flex:1;border:none;resize:none;background:transparent;color:var(--text);font-size:13px;padding:14px 20px;outline:none;min-height:200px;font-family:inherit;line-height:1.6}
+.pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:900px){.pf-left{width:52px}.pf-left-title,.pf-folder-konto,.pf-folder-item span:not(.pf-folder-badge){display:none}.pf-mid{width:240px}}
+</style>
+
+<script>
+(function(){{
+let _pfCurrentFolder = null;
+let _pfCurrentKonto  = null;
+let _pfOffset = 0;
+let _pfTotal  = 0;
+let _pfSearch = '';
+let _pfSearchTimer = null;
+let _pfActiveItem = null;
+let _pfThreadOpen = false;
+
+// ── Init ─────────────────────────────────────────────────
+function pfInit() {{
+  fetch('/api/mail/folders').then(r=>r.json()).then(data=>{{
+    pfRenderFolders(data);
+    document.getElementById('pf-folders-loading').style.display='none';
+    // Auto-select first INBOX
+    const first = data.konten?.[0];
+    if(first) {{
+      const ib = first.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || first.ordner?.[0];
+      if(ib) pfSelectFolder(first.email, ib.name, ib.label||ib.name);
+    }}
+  }}).catch(e=>{{
+    document.getElementById('pf-folders-loading').textContent='Konten konnten nicht geladen werden.';
+  }});
+}}
+
+// ── Folder Tree ──────────────────────────────────────────
+function pfRenderFolders(data) {{
+  const tree = document.getElementById('pf-folder-tree');
+  // Fill from-select in compose
+  const fromSel = document.getElementById('pf-comp-from');
+  tree.innerHTML = '';
+  (data.konten||[]).forEach(konto=>{{
+    const lbl = document.createElement('div');
+    lbl.className='pf-folder-konto';
+    lbl.textContent=konto.label||konto.email;
+    tree.appendChild(lbl);
+    if(fromSel) {{
+      const opt=document.createElement('option');
+      opt.value=konto.email; opt.textContent=konto.email;
+      fromSel.appendChild(opt);
+    }}
+    (konto.ordner||[]).forEach(ord=>{{
+      const item=document.createElement('div');
+      item.className='pf-folder-item';
+      item.id='pf-fi-'+konto.email.replace(/[@.]/g,'_')+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+      item.innerHTML=`<span>${{ord.icon||'&#x1F4C2;'}}</span><span>${{ord.label||ord.name}}</span>`
+        + (ord.unread>0?`<span class="pf-folder-badge">${{ord.unread}}</span>`:'');
+      item.onclick=()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
+      tree.appendChild(item);
+    }});
+  }});
+}}
+
+// ── Select Folder ────────────────────────────────────────
+window.pfSelectFolder = function(email, folder, label) {{
+  _pfCurrentKonto=email; _pfCurrentFolder=folder; _pfOffset=0; _pfSearch='';
+  document.getElementById('pf-mid-title').textContent=label;
+  document.getElementById('pf-search').value='';
+  document.querySelectorAll('.pf-folder-item').forEach(el=>el.classList.remove('active'));
+  const id='pf-fi-'+email.replace(/[@.]/g,'_')+'_'+folder.replace(/[^a-z0-9]/gi,'_');
+  const el=document.getElementById(id);
+  if(el) el.classList.add('active');
+  pfLoadList(true);
+}};
+
+// ── Load Mail List ───────────────────────────────────────
+function pfLoadList(reset) {{
+  if(reset) {{ _pfOffset=0; document.getElementById('pf-list').innerHTML=''; }}
+  if(!_pfCurrentKonto) return;
+  let url=`/api/mail/list?konto=${{encodeURIComponent(_pfCurrentKonto)}}&folder=${{encodeURIComponent(_pfCurrentFolder)}}&offset=${{_pfOffset}}&limit=50`;
+  if(_pfSearch) url+=`&q=${{encodeURIComponent(_pfSearch)}}`;
+  fetch(url).then(r=>r.json()).then(data=>{{
+    _pfTotal=data.total||0;
+    document.getElementById('pf-mid-meta').textContent=`${{_pfTotal}} Mails`;
+    const list=document.getElementById('pf-list');
+    if(reset) list.innerHTML='';
+    if(!data.mails||data.mails.length===0) {{
+      if(reset) document.getElementById('pf-list-empty').style.display='';
+      return;
+    }}
+    document.getElementById('pf-list-empty').style.display='none';
+    data.mails.forEach(m=>pfRenderMailItem(m, list));
+    _pfOffset+=data.mails.length;
+    document.getElementById('pf-load-more').style.display=_pfOffset<_pfTotal?'':'none';
+  }});
+}}
+
+function pfRenderMailItem(m, container) {{
+  const el=document.createElement('div');
+  el.className='pf-mail-item'+(m.unread?' unread':'');
+  el.dataset.msgid=m.message_id;
+  el.dataset.threadid=m.thread_id||'';
+  const d=m.datum?m.datum.slice(0,10):'';
+  const absender=m.absender_short||m.absender||'';
+  const preview=(m.text_plain||'').replace(/\\s+/g,' ').slice(0,80);
+  let badges='';
+  if(m.hat_anhaenge) badges+='<span class="pf-item-badge att">&#x1F4CE;</span>';
+  if(m.hat_thread) badges+=`<span class="pf-item-badge">&#x1F4AC; ${{m.thread_count}}</span>`;
+  el.innerHTML=`
+    <div class="pf-item-row1">
+      <span class="pf-item-absender">${{esc(absender)}}</span>
+      <span class="pf-item-datum">${{d}}</span>
+    </div>
+    <div class="pf-item-betreff">${{esc(m.betreff||'(kein Betreff)')}}</div>
+    <div class="pf-item-preview">${{esc(preview)}}</div>
+    ${{badges?`<div class="pf-item-badges">${{badges}}</div>`:''}}
+  `;
+  el.onclick=()=>pfOpenMail(m, el);
+  container.appendChild(el);
+}}
+
+function esc(s){{return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}}
+
+// ── Open Mail ────────────────────────────────────────────
+window.pfOpenMail = function(m, el) {{
+  if(_pfActiveItem) _pfActiveItem.classList.remove('active');
+  _pfActiveItem=el; el.classList.add('active');
+  document.getElementById('pf-preview-empty').style.display='none';
+  document.getElementById('pf-preview').style.display='flex';
+  document.getElementById('pf-preview').style.flexDirection='column';
+  document.getElementById('pf-compose').style.display='none';
+
+  document.getElementById('pf-prev-betreff').textContent=m.betreff||'(kein Betreff)';
+  document.getElementById('pf-prev-absender').textContent='Von: '+(m.absender||'');
+  document.getElementById('pf-prev-datum').textContent=m.datum||'';
+  document.getElementById('pf-prev-body').textContent='Lade...';
+  document.getElementById('pf-prev-anhaenge').style.display='none';
+  document.getElementById('pf-thread-wrap').style.display='none';
+
+  fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{{
+    document.getElementById('pf-prev-body').textContent=d.text||'(kein Inhalt)';
+    // Anhänge
+    if(d.anhaenge&&d.anhaenge.length>0) {{
+      const wrap=document.getElementById('pf-prev-anhaenge');
+      wrap.style.display='flex';
+      wrap.innerHTML=d.anhaenge.map(a=>`<div class="pf-att-chip" onclick="pfOpenAtt('${{encodeURIComponent(a.pfad)}}')">&#x1F4CE; ${{esc(a.name)}} <small style="color:var(--text-muted)">${{a.typ}}</small></div>`).join('');
+    }}
+  }});
+
+  // Thread laden wenn thread_id vorhanden
+  if(m.thread_id&&m.thread_id!==m.message_id) {{
+    fetch('/api/mail/thread?thread_id='+encodeURIComponent(m.thread_id)).then(r=>r.json()).then(d=>{{
+      if(d.mails&&d.mails.length>1) {{
+        pfRenderThread(d.mails, m.message_id);
+      }}
+    }});
+  }}
+}};
+
+function pfRenderThread(mails, currentMsgId) {{
+  const wrap=document.getElementById('pf-thread-wrap');
+  const list=document.getElementById('pf-thread-list');
+  const cnt=document.getElementById('pf-thread-cnt');
+  cnt.textContent=mails.length+' Nachrichten';
+  wrap.style.display='block';
+  list.innerHTML='';
+  list.style.display=_pfThreadOpen?'block':'none';
+  mails.filter(m=>m.message_id!==currentMsgId).forEach(m=>{{
+    const el=document.createElement('div');
+    el.className='pf-thread-msg';
+    el.innerHTML=`<div class="pf-thread-msg-hdr"><span class="pf-thread-msg-sender">${{esc(m.absender_short||m.absender||'')}}</span><span class="pf-thread-msg-date">${{m.datum||''}}</span></div>
+    <div class="pf-thread-msg-body">${{esc((m.text_plain||'').slice(0,200))}}</div>`;
+    el.onclick=()=>pfOpenMail(m,null);
+    list.appendChild(el);
+  }});
+}}
+
+window.pfToggleThread=function(){{
+  _pfThreadOpen=!_pfThreadOpen;
+  document.getElementById('pf-thread-list').style.display=_pfThreadOpen?'block':'none';
+  document.getElementById('pf-thread-toggle').textContent=_pfThreadOpen?'&#x25B2;':'&#x25BC;';
+}};
+
+// ── Compose ──────────────────────────────────────────────
+window.pfOpenCompose=function(replyTo){{
+  document.getElementById('pf-preview-empty').style.display='none';
+  document.getElementById('pf-preview').style.display='none';
+  document.getElementById('pf-compose').style.display='flex';
+  document.getElementById('pf-compose').style.flexDirection='column';
+  document.getElementById('pf-comp-title').textContent=replyTo?'Antworten':'Neue Mail';
+  if(!replyTo){{
+    document.getElementById('pf-comp-to').value='';
+    document.getElementById('pf-comp-subj').value='';
+    document.getElementById('pf-comp-body').value='';
+    document.getElementById('pf-comp-cc').value='';
+  }}
+}};
+window.pfCloseCompose=function(){{
+  document.getElementById('pf-compose').style.display='none';
+  document.getElementById('pf-preview-empty').style.display='flex';
+}};
+
+window.pfReply=function(){{
+  const betreff=document.getElementById('pf-prev-betreff').textContent;
+  const absender=document.getElementById('pf-prev-absender').textContent.replace('Von: ','');
+  const emailMatch=absender.match(/<([^>]+@[^>]+)>/);
+  const replyAddr=emailMatch?emailMatch[1]:absender.trim();
+  pfOpenCompose(true);
+  document.getElementById('pf-comp-to').value=replyAddr;
+  document.getElementById('pf-comp-subj').value=(betreff.startsWith('Re:')?betreff:'Re: '+betreff);
+}};
+window.pfForward=function(){{
+  const betreff=document.getElementById('pf-prev-betreff').textContent;
+  const body=document.getElementById('pf-prev-body').textContent;
+  pfOpenCompose(true);
+  document.getElementById('pf-comp-subj').value=(betreff.startsWith('Fwd:')?betreff:'Fwd: '+betreff);
+  document.getElementById('pf-comp-body').value='\\n\\n--- Weitergeleitet ---\\n'+body.slice(0,2000);
+}};
+
+window.pfSend=function(){{
+  const from=document.getElementById('pf-comp-from').value;
+  const to=document.getElementById('pf-comp-to').value.trim();
+  const cc=document.getElementById('pf-comp-cc').value.trim();
+  const subj=document.getElementById('pf-comp-subj').value.trim();
+  const body=document.getElementById('pf-comp-body').value;
+  if(!to||!subj){{showToast('Empfänger und Betreff erforderlich','warnung');return;}}
+  const btn=document.getElementById('pf-send-btn');
+  btn.disabled=true;btn.textContent='Wird gesendet...';
+  fetch('/api/mail/send',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{from_email:from,to,cc,subject:subj,body_plain:body,bcc:'info@raumkult.eu'}})
+  }}).then(r=>r.json()).then(d=>{{
+    btn.disabled=false;btn.textContent='&#x27A4; Senden';
+    if(d.ok){{showToast('Mail gesendet ✓','ok');pfCloseCompose();}}
+    else showToast('Fehler: '+(d.error||'?'),'fehler');
+  }}).catch(()=>{{btn.disabled=false;btn.textContent='&#x27A4; Senden';showToast('Netzwerkfehler','fehler');}});
+}};
+window.pfSaveDraft=function(){{showToast('Entwurf gespeichert (noch nicht implementiert)','info');}};
+window.pfKiraDraft=function(){{
+  const to=document.getElementById('pf-comp-to').value;
+  const subj=document.getElementById('pf-comp-subj').value;
+  if(!subj){{showToast('Bitte zuerst Betreff eingeben','warnung');return;}}
+  document.getElementById('pf-comp-body').value='Kira formuliert...';
+  fetch('/api/kira/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{message:'Bitte formuliere eine professionelle Mail an '+to+' zum Thema: '+subj+'. Im Stil von rauMKult Sichtbeton.'}})
+  }}).then(r=>r.json()).then(d=>{{
+    document.getElementById('pf-comp-body').value=d.response||d.text||'(keine Antwort)';
+  }}).catch(()=>document.getElementById('pf-comp-body').value='Fehler');
+}};
+window.pfKiraContext=function(){{
+  const betreff=document.getElementById('pf-prev-betreff').textContent;
+  const body=document.getElementById('pf-prev-body').textContent.slice(0,1000);
+  showPanel('kira');
+  setTimeout(()=>{{
+    const inp=document.getElementById('kiraInput');
+    if(inp){{inp.value='Analysiere diese Mail: '+betreff+'. Inhalt: '+body;inp.focus();}}
+  }},300);
+}};
+window.pfOpenAtt=function(p){{window.open('/api/file?path='+p,'_blank');}};
+
+// Suche
+window.pfSearchDebounce=function(){{
+  clearTimeout(_pfSearchTimer);
+  _pfSearchTimer=setTimeout(()=>{{
+    _pfSearch=document.getElementById('pf-search').value.trim();
+    pfLoadList(true);
+  }},400);
+}};
+window.pfLoadMore=function(){{pfLoadList(false);}};
+
+// Postfach aufrufen
+if(document.getElementById('panel-postfach')&&document.getElementById('panel-postfach').classList.contains('active')){{
+  pfInit();
+}}
+// Sidebar-Klick
+const origShowPanel=window.showPanel;
+window.showPanel=function(name){{
+  origShowPanel(name);
+  if(name==='postfach'&&!_pfCurrentFolder){{pfInit();}}
+}};
+}})();
+</script>"""
+
 
 # ── ORGANISATION Panel ────────────────────────────────────────────────────────
 def build_organisation(db):
@@ -2924,6 +3365,7 @@ def generate_html() -> str:
 
     dashboard_html = build_dashboard(tasks, db)
     komm_html      = build_kommunikation(tasks)
+    postfach_html  = build_postfach()
     org_html       = build_organisation(db)
     gesch_html     = build_geschaeft(db)
     wissen_html    = build_wissen(db)
@@ -2987,6 +3429,9 @@ def generate_html() -> str:
       </div>
       <div class="sidebar-item" id="nav-kommunikation" onclick="showPanel('kommunikation')" data-label="Kommunikation">
         <span class="si-icon">&#x2709;</span><span class="si-label">Kommunikation</span>
+      </div>
+      <div class="sidebar-item" id="nav-postfach" onclick="showPanel('postfach')" data-label="Postfach">
+        <span class="si-icon">&#x1F4EC;</span><span class="si-label">Postfach</span>
       </div>
       <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')" data-label="Organisation">
         <span class="si-icon">&#x1F4C5;</span><span class="si-label">Organisation</span>
@@ -3052,6 +3497,7 @@ def generate_html() -> str:
 
   <div class="panel active" id="panel-dashboard">{dashboard_html}</div>
   <div class="panel" id="panel-kommunikation">{komm_html}</div>
+  <div class="panel pf-panel" id="panel-postfach">{postfach_html}</div>
   <div class="panel" id="panel-organisation">{org_html}</div>
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
@@ -6289,6 +6735,7 @@ a:hover{text-decoration:underline;}
 /* Panels */
 .panel{display:none;padding:20px 24px 80px;max-width:1200px;margin:0 auto;width:100%;}
 .panel.active{display:block;}
+.panel.pf-panel{padding:0;max-width:none;overflow:hidden}
 /* Dashboard: full-width, no max-width constraint */
 #panel-dashboard{max-width:none;padding:20px 24px 80px;}
 
@@ -7203,6 +7650,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/read?'):
             self._read_mail()
 
+        elif self.path == '/api/mail/folders':
+            self._api_mail_folders()
+
+        elif self.path.startswith('/api/mail/list'):
+            self._api_mail_list()
+
+        elif self.path.startswith('/api/mail/thread'):
+            self._api_mail_thread()
+
         elif self.path.startswith('/api/ausgangsrechnungen'):
             self._api_ausgangsrechnungen()
 
@@ -7590,6 +8046,178 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except: pass
         self._json(result)
 
+    # ── Postfach API ──────────────────────────────────────────────────────────
+    def _api_mail_folders(self):
+        """GET /api/mail/folders — Liefert Konten + Ordner mit Mailanzahlen."""
+        try:
+            archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+            konten_raw = []
+            if archiver_cfg.exists():
+                cfg = json.loads(archiver_cfg.read_text('utf-8'))
+                konten_raw = [k for k in cfg.get('konten', []) if k.get('aktiv', True) and k.get('auth_methode') == 'oauth2']
+
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+
+            folder_icons = {
+                'inbox': '&#x1F4EC;', 'posteingang': '&#x1F4EC;', 'eingang': '&#x1F4EC;',
+                'gesendete': '&#x1F4E4;', 'gesendet': '&#x1F4E4;', 'sent': '&#x1F4E4;',
+                'entwürfe': '&#x1F4DD;', 'drafts': '&#x1F4DD;',
+                'archiv': '&#x1F4C1;', 'archive': '&#x1F4C1;',
+            }
+            folder_labels = {
+                'gesendete elemente': 'Gesendet', 'gesendete': 'Gesendet', 'sent': 'Gesendet',
+                'inbox': 'Posteingang', 'posteingang': 'Posteingang',
+                'entwürfe': 'Entwürfe', 'drafts': 'Entwürfe',
+                'archiv': 'Archiv', 'archive': 'Archiv',
+            }
+
+            result = {"konten": []}
+            for k in konten_raw:
+                email = k['email']
+                label = email.split('@')[0]
+                rows = conn.execute(
+                    "SELECT folder, COUNT(*) as cnt FROM mails WHERE konto=? GROUP BY folder ORDER BY cnt DESC",
+                    (email,)
+                ).fetchall()
+                ordner = []
+                for r in rows:
+                    fn = r['folder'] or ''
+                    fn_low = fn.lower()
+                    icon = next((v for key, v in folder_icons.items() if key in fn_low), '&#x1F4C2;')
+                    lbl = next((v for key, v in folder_labels.items() if key in fn_low), fn)
+                    ordner.append({'name': fn, 'label': lbl, 'icon': icon, 'count': r['cnt'], 'unread': 0})
+                if ordner:
+                    result['konten'].append({'email': email, 'label': label, 'ordner': ordner})
+            conn.close()
+            self._json(result)
+        except Exception as e:
+            self._json({"konten": [], "error": str(e)})
+
+    def _api_mail_list(self):
+        """GET /api/mail/list?konto=&folder=&offset=&limit=&q= — Mailsliste aus mail_index.db."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        konto  = qs.get('konto',  [''])[0]
+        folder = qs.get('folder', [''])[0]
+        offset = int(qs.get('offset', ['0'])[0])
+        limit  = min(int(qs.get('limit', ['50'])[0]), 200)
+        q      = qs.get('q', [''])[0].strip()
+
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+
+            params = [konto, folder]
+            where  = "konto=? AND folder=?"
+            if q:
+                where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
+                like = f"%{q}%"
+                params += [like, like, like]
+
+            total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
+            rows  = conn.execute(
+                f"SELECT id,konto,konto_label,betreff,absender,an,datum,message_id,"
+                f"hat_anhaenge,thread_id,text_plain FROM mails WHERE {where} "
+                f"ORDER BY datum DESC LIMIT ? OFFSET ?",
+                params + [limit, offset]
+            ).fetchall()
+
+            # Thread-Counts berechnen
+            thread_counts = {}
+            for r in rows:
+                tid = r['thread_id']
+                if tid and tid not in thread_counts:
+                    cnt = conn.execute("SELECT COUNT(*) FROM mails WHERE thread_id=?", (tid,)).fetchone()[0]
+                    thread_counts[tid] = cnt
+
+            mails = []
+            for r in rows:
+                import re as _re
+                absender_full = r['absender'] or ''
+                m = _re.search(r'^([^<]+)<', absender_full)
+                absender_short = m.group(1).strip() if m else absender_full.split('@')[0]
+                tid = r['thread_id'] or ''
+                tc  = thread_counts.get(tid, 1)
+                mails.append({
+                    'message_id':    r['message_id'],
+                    'betreff':       r['betreff'] or '(kein Betreff)',
+                    'absender':      absender_full,
+                    'absender_short': absender_short[:40],
+                    'datum':         (r['datum'] or '')[:16],
+                    'hat_anhaenge':  bool(r['hat_anhaenge']),
+                    'thread_id':     tid,
+                    'hat_thread':    tc > 1,
+                    'thread_count':  tc,
+                    'text_plain':    (r['text_plain'] or '')[:120],
+                    'unread':        False,
+                })
+
+            conn.close()
+            self._json({'total': total, 'mails': mails})
+        except Exception as e:
+            self._json({'total': 0, 'mails': [], 'error': str(e)})
+
+    def _api_mail_thread(self):
+        """GET /api/mail/thread?thread_id=... — Alle Mails in einem Thread."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        thread_id = qs.get('thread_id', [''])[0]
+        if not thread_id:
+            self._json({'mails': []})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT message_id,betreff,absender,datum,text_plain,hat_anhaenge "
+                "FROM mails WHERE thread_id=? ORDER BY datum ASC",
+                (thread_id,)
+            ).fetchall()
+            import re as _re
+            mails = []
+            for r in rows:
+                absender_full = r['absender'] or ''
+                m2 = _re.search(r'^([^<]+)<', absender_full)
+                absender_short = m2.group(1).strip() if m2 else absender_full.split('@')[0]
+                mails.append({
+                    'message_id':    r['message_id'],
+                    'betreff':       r['betreff'] or '',
+                    'absender':      absender_full,
+                    'absender_short': absender_short[:40],
+                    'datum':         (r['datum'] or '')[:16],
+                    'text_plain':    (r['text_plain'] or '')[:300],
+                    'hat_anhaenge':  bool(r['hat_anhaenge']),
+                })
+            conn.close()
+            self._json({'mails': mails, 'thread_id': thread_id})
+        except Exception as e:
+            self._json({'mails': [], 'error': str(e)})
+
+    def _api_mail_send(self, body):
+        """POST /api/mail/send — Sendet eine Mail via mail_sender.py."""
+        from_email  = body.get('from_email', 'info@raumkult.eu')
+        to          = body.get('to', '')
+        cc          = body.get('cc', '')
+        bcc         = body.get('bcc', '')
+        subject     = body.get('subject', '')
+        body_plain  = body.get('body_plain', '')
+        body_html   = body.get('body_html', '')
+        in_reply_to = body.get('in_reply_to', '')
+        refs        = body.get('references', '')
+
+        if not to or not subject:
+            self._json({'ok': False, 'error': 'to und subject erforderlich'})
+            return
+        try:
+            from mail_sender import send_mail
+            result = send_mail(
+                from_email=from_email, to=to, cc=cc, bcc=bcc,
+                subject=subject, body_plain=body_plain, body_html=body_html,
+                in_reply_to=in_reply_to, references=refs,
+            )
+            self._json(result)
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_ausgangsrechnungen(self):
         """GET /api/ausgangsrechnungen — Listet Ausgangsrechnungen."""
         db = get_db()
@@ -7615,6 +8243,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
         body   = json.loads(self.rfile.read(length) or b'{}')
+
+        if self.path == '/api/mail/send':
+            self._api_mail_send(body)
+            return
 
         # Server-Neustart: alle Port-8765-Instanzen beenden, dann neu starten
         if self.path == '/api/server/neustart':
