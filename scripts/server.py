@@ -2242,6 +2242,7 @@ function esShowSec(id) {{
   var nav = document.querySelector('.es-sn[data-essec="'+id+'"]');
   if(nav) nav.classList.add('act');
   if(id==='mail') {{ esLoadMailKonten(); esLoadMailArchiv(); }}
+  if(id==='integrationen') {{ esIntegLoad(); }}
 }}
 function esShowProtoTab(id) {{
   document.querySelectorAll('.es-proto-tab-panel').forEach(function(p){{p.classList.remove('act');}});
@@ -2899,262 +2900,255 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: MAIL & KONTEN ─────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-mail">
   <div class="es-sec-h">Mail &amp; Konten</div>
-  <div class="es-sec-sub">OAuth2-authentifizierte Microsoft-Konten. Token werden automatisch erneuert — kein manuelles Login nach dem ersten Verbinden.</div>
+  <div class="es-sec-sub">Mailkonten verwalten, IMAP-Verbindungen testen und Archiv konfigurieren.</div>
 
-  <div class="es-grp">
-    <div class="es-grp-h">Mailkonten</div>
-    <div class="es-grp-sub">Microsoft 365 / Exchange-Konten via OAuth2 (wie Mailbird). Klick auf <strong>Verbinden</strong> öffnet ein Browser-Fenster zur Microsoft-Anmeldung.</div>
-    <div id="es-mail-konten-list"><div style="padding:12px;color:var(--text-muted);font-size:13px">Lade Konten...</div></div>
-    <style>
-    .es-mk-row{{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}}
-    .es-mk-row:last-child{{border-bottom:none}}
-    .es-mk-ico{{font-size:20px;flex-shrink:0;width:28px;text-align:center}}
-    .es-mk-body{{flex:1;min-width:0}}
-    .es-mk-email{{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-    .es-mk-desc{{font-size:12px;color:var(--text-muted)}}
-    .es-mk-status{{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;flex-shrink:0}}
-    .es-mk-ok{{background:rgba(40,200,80,.15);color:#28c850}}
-    .es-mk-expired{{background:rgba(255,160,0,.15);color:#f0a000}}
-    .es-mk-missing{{background:rgba(200,60,60,.12);color:#c83c3c}}
-    .es-mk-btn{{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;flex-shrink:0}}
-    .es-mk-btn:hover{{opacity:.85}}
-    .es-mk-btn.connecting{{background:var(--bg-raised);color:var(--text-muted);cursor:default}}
-    </style>
+  <style>
+  /* ── Konto-Karten ── */
+  .es-mk-card{{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--bg-raised)}}
+  .es-mk-card-head{{display:flex;align-items:center;gap:10px;margin-bottom:10px}}
+  .es-mk-radio{{cursor:pointer;margin-right:4px;accent-color:var(--accent)}}
+  .es-mk-ico{{font-size:20px;flex-shrink:0}}
+  .es-mk-body{{flex:1;min-width:0}}
+  .es-mk-email{{font-size:13px;font-weight:600;color:var(--text)}}
+  .es-mk-desc{{font-size:12px;color:var(--text-muted)}}
+  .es-mk-status{{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;flex-shrink:0}}
+  .es-mk-ok{{background:rgba(40,200,80,.15);color:#28c850}}
+  .es-mk-expired{{background:rgba(255,160,0,.15);color:#f0a000}}
+  .es-mk-missing{{background:rgba(200,60,60,.12);color:#c83c3c}}
+  /* ── Stats-Zeile ── */
+  .es-mk-stats{{display:flex;gap:16px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:8px 0;flex-wrap:wrap}}
+  .es-mk-stat{{flex:1;min-width:100px}}
+  .es-mk-stat-val{{font-size:22px;font-weight:700;color:var(--accent)}}
+  .es-mk-stat-lbl{{font-size:11px;color:var(--text-muted)}}
+  .es-mk-stat-sub{{font-size:11px;color:var(--text-muted);margin-top:2px}}
+  /* ── Button-Gruppen ── */
+  .es-mk-actions{{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}}
+  .es-mk-btn{{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600}}
+  .es-mk-btn:hover{{opacity:.85}}
+  .es-mk-btn.sec{{background:var(--bg-card);color:var(--text);border:1px solid var(--border)}}
+  .es-mk-btn.danger{{background:rgba(200,60,60,.15);color:#c84444;border:1px solid rgba(200,60,60,.3)}}
+  .es-mk-btn:disabled{{opacity:.5;cursor:default}}
+  /* ── Gesamt-Header ── */
+  .es-mk-total{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-card);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;gap:8px}}
+  .es-mk-total-info{{font-size:13px;color:var(--text-muted)}}
+  .es-mk-total-info strong{{color:var(--text)}}
+  /* ── Dialog ── */
+  .es-mk-dialog-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center}}
+  .es-mk-dialog{{background:var(--bg-card);border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}}
+  .es-mk-dialog h3{{margin:0 0 16px;font-size:15px}}
+  .es-mk-dialog-row{{margin-bottom:12px}}
+  .es-mk-dialog-row label{{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px}}
+  .es-mk-dialog-row input,.es-mk-dialog-row select{{width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)}}
+  .es-mk-dialog-btns{{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}}
+  /* ── KIRA-Ordner Akkordeon ── */
+  .es-kira-ord-toggle{{cursor:pointer;font-size:12px;color:var(--accent);margin-top:6px;display:inline-block}}
+  .es-kira-ord-list{{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}}
+  .es-kira-ord-chip{{display:flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border-radius:6px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer}}
+  .es-kira-ord-chip.active{{background:rgba(79,125,249,.15);border-color:var(--accent);color:var(--accent)}}
+  </style>
+
+  <!-- Gesamt-Stats + Alle-Aktionen -->
+  <div class="es-mk-total" id="es-mk-total">
+    <div class="es-mk-total-info"><strong id="es-mk-total-cnt">–</strong> Mails im Index</div>
+    <div style="display:flex;gap:8px">
+      <button class="es-mk-btn sec" onclick="esMkAlleAbrufen(this)">&#x25BA; Alle abrufen</button>
+      <button class="es-mk-btn sec" onclick="esMkAlleTest()">&#x26A1; Alle testen</button>
+    </div>
   </div>
 
-  <div class="es-grp">
+  <!-- Konto-Liste -->
+  <div id="es-mail-konten-list"><div style="padding:12px;color:var(--text-muted);font-size:13px">Lade Konten...</div></div>
+  <button class="es-mk-btn" style="margin-top:8px" onclick="esMkAddDialog()">+ Konto hinzuf&uuml;gen</button>
+
+  <!-- Mail-Monitor -->
+  <div class="es-grp" style="margin-top:24px">
     <div class="es-grp-h">Mail-Monitor</div>
-    <div class="es-grp-sub">Automatisches IMAP-Polling und Klassifizierung eingehender Mails. Läuft im Hintergrund.</div>
+    <div class="es-grp-sub">Automatisches IMAP-Polling. L&auml;uft im Hintergrund.</div>
     <div class="es-row">
-      <div class="es-rl">Mail-Monitor aktiv<div class="es-rd">Neue Mails werden alle 5 Min. geprüft und als Aufgaben eingetragen</div></div>
-      <label class="es-toggle"><input type="checkbox" id="cfg-mail-monitor-aktiv" onchange="saveSettings()"><span class="es-slider"></span></label>
+      <div class="es-row-label"><span>Mail-Monitor aktiv</span><span class="es-row-hint">Neue Mails werden alle 5 Min. gepr&uuml;ft und als Aufgaben eingetragen</span></div>
+      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-monitor-aktiv"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
     </div>
     <div class="es-row">
-      <div class="es-rl">Polling-Intervall (Sekunden)<div class="es-rd">Wie oft neue Mails abgerufen werden</div></div>
-      <input type="number" class="es-num" id="cfg-mail-intervall" min="60" max="3600" step="30" onchange="saveSettings()" value="300">
+      <div class="es-row-label"><span>Polling-Intervall (Sekunden)</span><span class="es-row-hint">Wie oft neue Mails abgerufen werden</span></div>
+      <input type="number" id="cfg-mail-intervall" min="60" max="3600" style="width:90px;text-align:right;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
     </div>
     <div class="es-row">
-      <div class="es-rl">Status<div id="es-mail-monitor-status" class="es-rd">Wird geladen...</div></div>
+      <div class="es-row-label"><span>Mails vorgeladen im Postfach</span><span class="es-row-hint">Anzahl Mails die initial im Postfach angezeigt werden</span></div>
+      <input type="number" id="cfg-mail-vorladen" min="10" max="500" value="50" style="width:90px;text-align:right;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Status</span><span id="es-mail-monitor-status" class="es-row-hint">–</span></div>
       <div id="es-mail-monitor-badge"></div>
     </div>
   </div>
 
+  <!-- Mail-Klassifizierung -->
   <div class="es-grp">
     <div class="es-grp-h">Mail-Klassifizierung</div>
     <div class="es-grp-sub">KI-basierte Kategorisierung eingehender Mails mit LLM.</div>
     <div class="es-row">
-      <div class="es-rl">Klassifizierung (LLM)<div class="es-rd">Eingehende Mails automatisch kategorisieren (Anfrage / Newsletter / intern / etc.)</div></div>
-      <label class="es-toggle"><input type="checkbox" id="cfg-mail-klassifizierung-aktiv" onchange="saveSettings()"><span class="es-slider"></span></label>
+      <div class="es-row-label"><span>Klassifizierung (LLM)</span><span class="es-row-hint">Eingehende Mails automatisch kategorisieren (Anfrage / Newsletter / intern / etc.)</span></div>
+      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-classify"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
     </div>
     <div class="es-row">
-      <div class="es-rl">Aufgaben automatisch erstellen<div class="es-rd">Aus Anfragen und wichtigen Mails direkt Aufgaben generieren</div></div>
-      <label class="es-toggle"><input type="checkbox" id="cfg-mail-auto-aufgaben" onchange="saveSettings()"><span class="es-slider"></span></label>
+      <div class="es-row-label"><span>Aufgaben automatisch erstellen</span><span class="es-row-hint">Aus Anfragen und wichtigen Mails direkt Aufgaben generieren</span></div>
+      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-tasks"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
     </div>
     <div class="es-row">
-      <div class="es-rl">Newsletter ignorieren<div class="es-rd">Newsletter-Mails werden nicht als Aufgaben eingetragen</div></div>
-      <label class="es-toggle"><input type="checkbox" id="cfg-mail-skip-newsletter" onchange="saveSettings()" checked><span class="es-slider"></span></label>
+      <div class="es-row-label"><span>Newsletter ignorieren</span><span class="es-row-hint">Newsletter-Mails werden nicht als Aufgaben eingetragen</span></div>
+      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-ignore-newsletter"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
     </div>
   </div>
 
-  <!-- ── ARCHIV-ORDNER (PFLICHT) ───────────────────────────────────────── -->
-  <div class="es-grp" id="es-archiv-grp">
-    <div class="es-grp-h">
-      &#x1F4C1; Mail-Archiv-Ordner&nbsp;<span style="background:#c84444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">PFLICHT</span>
-    </div>
-    <div class="es-grp-sub">
-      KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext.
-      IMAP zeigt nur aktuelle Mails &mdash; alle historischen Mails, Aufgaben, Antworten und Anh&auml;nge liest KIRA aus dem lokalen Archiv.
-      Das Archiv ist deine exportierbare Datenbasis &mdash; bei Software-Weitergabe Archiv-Ordner + Datenbank mitnehmen.
-    </div>
-
-    <div id="es-archiv-fehlend-banner" style="display:{'none' if archiv_pfad else ''};background:rgba(200,68,68,.12);border:1px solid rgba(200,68,68,.3);border-radius:6px;padding:10px 14px;margin:8px 0;font-size:12px;color:#c84444;font-weight:600;">
-      &#x26A0; Kein Archiv-Pfad angegeben &mdash; KIRA hat keinen Zugriff auf historische Mail-Inhalte!
-    </div>
-
-    <div class="es-row" style="align-items:flex-start">
-      <div class="es-rl">Archiv-Ordner<div class="es-rd">Lokaler Pfad zum Mail-Archiv-Verzeichnis</div></div>
-      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-        <input type="text" class="es-inp" id="cfg-archiv-pfad"
-               value="{esc(archiv_pfad)}"
-               placeholder="C:/Pfad/zum/Mail Archiv/Archiv"
-               oninput="esArchivPfadChanged(this.value)"
-               style="width:100%;box-sizing:border-box">
-        <div id="es-archiv-pfad-warnung" style="display:none;background:rgba(240,160,0,.12);border:1px solid rgba(240,160,0,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#d48000;">
-          &#x26A0; Pfad ge&auml;ndert &mdash; bitte Re-Index ausf&uuml;hren damit KIRA alle Mails findet.
-        </div>
+  <!-- Archiv-Ordner -->
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F4C1; Mail-Archiv-Ordner <span style="color:#e06060;font-size:11px;font-weight:400">PFLICHT</span></div>
+    <div class="es-grp-sub">KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext. Das Archiv ist deine exportierbare Datenbasis.</div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Archiv-Ordner</span><span class="es-row-hint">Lokaler Pfad zum Mail-Archiv-Verzeichnis</span></div>
+      <div style="display:flex;gap:6px;flex:1;max-width:420px">
+        <input type="text" id="cfg-archiv-pfad" placeholder="C:/Pfad/zum/Mail Archiv/Archiv" style="flex:1;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
+        <button class="es-mk-btn sec" onclick="esMkArchivPruefen()" style="white-space:nowrap">&#x2713; Pr&uuml;fen</button>
       </div>
     </div>
-
     <div class="es-row">
-      <div class="es-rl">Neue Mails archivieren<div class="es-rd">Eingehende Mails automatisch als JSON+EML im Archiv speichern</div></div>
-      <label class="es-toggle"><input type="checkbox" id="cfg-archiv-neue-mails" {'checked' if neue_mails_archivieren else ''} onchange="saveSettings()"><span class="es-slider"></span></label>
+      <div class="es-row-label"><span>Neue Mails archivieren</span><span class="es-row-hint">Eingehende Mails automatisch als JSON+EML im Archiv speichern</span></div>
+      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-archiv-aktiv"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
     </div>
-
     <div class="es-row">
-      <div class="es-rl">Archiv-Status<div id="es-archiv-status-text" class="es-rd">Wird geladen...</div></div>
+      <div class="es-row-label"><span>Archiv-Status</span><span id="es-archiv-status-text" class="es-row-hint">–</span></div>
       <div style="display:flex;gap:8px;align-items:center">
         <div id="es-archiv-status-badge"></div>
-        <button class="es-mk-btn" id="es-archiv-reindex-btn" onclick="esArchivReindex()">Re-Index starten</button>
+        <button class="es-mk-btn sec" id="btn-archiv-reindex" onclick="esReindex(this)">Re-Index starten</button>
       </div>
     </div>
-
-    <div id="es-archiv-progress" style="display:none;padding:4px 0 8px">
-      <div style="background:var(--border);border-radius:3px;height:5px;overflow:hidden;margin-bottom:4px">
-        <div id="es-archiv-progress-bar" style="background:var(--accent);height:100%;width:0%;transition:width .4s"></div>
-      </div>
-      <div id="es-archiv-progress-text" style="font-size:11px;color:var(--text-muted)"></div>
-    </div>
+    <div id="es-reindex-progress" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
   </div>
 
-  <!-- ── SYNC-ORDNER PRO KONTO ─────────────────────────────────────────── -->
+  <!-- Sync-Ordner + KIRA-Zugang -->
   <div class="es-grp">
-    <div class="es-grp-h">Sync-Ordner pro Konto</div>
-    <div class="es-grp-sub">Welche IMAP-Ordner f&uuml;r neue Mails &uuml;berwacht und archiviert werden. Posteingang und Gesendete Elemente sind Pflicht.</div>
-    <style>
-    .es-ord-row{{padding:8px 0;border-bottom:1px solid var(--border)}}
-    .es-ord-row:last-child{{border-bottom:none}}
-    .es-ord-email{{font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px}}
-    .es-ord-chips{{display:flex;flex-wrap:wrap;gap:4px}}
-    .es-ord-chip{{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:12px;background:var(--bg-raised);cursor:pointer;user-select:none}}
-    .es-ord-chip input[disabled]{{opacity:.6;cursor:default}}
-    </style>
-    <div id="es-archiv-ordner-list">{sync_ordner_html}</div>
+    <div class="es-grp-h">Sync-Ordner &amp; KIRA-Zugang</div>
+    <div class="es-grp-sub">Welche IMAP-Ordner &uuml;berwacht werden. KIRA LLM-Zugang: KIRA kann diese Ordner lesen und f&uuml;r Antworten nutzen.</div>
+    <div id="es-sync-ordner-list"><div style="padding:8px;color:var(--text-muted);font-size:12px">Wird geladen...</div></div>
   </div>
 
   <script>
-  var _esArchivOrigPfad = {repr(archiv_pfad)};
-  var _esReindexPollTimer = null;
-
-  function esLoadMailArchiv() {{
-    fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
-      const txt = document.getElementById('es-archiv-status-text');
-      const badge = document.getElementById('es-archiv-status-badge');
-      const banner = document.getElementById('es-archiv-fehlend-banner');
-      if(!txt) return;
-      if(d.pfad_vorhanden) {{
-        txt.textContent = d.mails_total.toLocaleString()+' Mails im Index · '+d.pfad;
-        if(badge) badge.innerHTML = '<span class="es-mk-status es-mk-ok">&#x2713; Archiv OK</span>';
-        if(banner) banner.style.display='none';
-      }} else {{
-        txt.textContent = d.pfad ? 'Pfad nicht gefunden: '+d.pfad : 'Kein Pfad konfiguriert';
-        if(badge) badge.innerHTML = '<span class="es-mk-status es-mk-missing">Nicht konfiguriert</span>';
-        if(banner) banner.style.display='';
-      }}
-    }}).catch(()=>{{
-      const txt = document.getElementById('es-archiv-status-text');
-      if(txt) txt.textContent = 'Fehler beim Laden';
-    }});
-  }}
-
-  function esArchivPfadChanged(val) {{
-    const w = document.getElementById('es-archiv-pfad-warnung');
-    const b = document.getElementById('es-archiv-fehlend-banner');
-    if(w) w.style.display = (val && val !== _esArchivOrigPfad) ? '' : 'none';
-    if(b) b.style.display = val ? 'none' : '';
-  }}
-
-  function esArchivReindex() {{
-    const pfad = document.getElementById('cfg-archiv-pfad')?.value.trim() || '';
-    const btn = document.getElementById('es-archiv-reindex-btn');
-    if(btn) {{ btn.disabled=true; btn.textContent='Läuft...'; }}
-    const prog = document.getElementById('es-archiv-progress');
-    if(prog) prog.style.display='';
-    fetch('/api/mail/archiv/reindex', {{
-      method:'POST',
-      headers:{{'Content-Type':'application/json'}},
-      body:JSON.stringify({{pfad: pfad}})
-    }}).then(r=>r.json()).then(d=>{{
-      if(d.ok) {{
-        showToast('Re-Index gestartet...','ok');
-        _esReindexPoll();
-      }} else {{
-        showToast('Fehler: '+(d.error||'?'),'fehler');
-        if(btn) {{ btn.disabled=false; btn.textContent='Re-Index starten'; }}
-      }}
-    }}).catch(()=>{{ showToast('Verbindungsfehler','fehler'); if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}} }});
-  }}
-
-  function _esReindexPoll() {{
-    if(_esReindexPollTimer) clearInterval(_esReindexPollTimer);
-    _esReindexPollTimer = setInterval(()=>{{
-      fetch('/api/mail/archiv/reindex/progress').then(r=>r.json()).then(p=>{{
-        const bar = document.getElementById('es-archiv-progress-bar');
-        const ptxt = document.getElementById('es-archiv-progress-text');
-        const btn = document.getElementById('es-archiv-reindex-btn');
-        const pct = p.total > 0 ? Math.round(p.done/p.total*100) : 0;
-        if(bar) bar.style.width = pct+'%';
-        if(ptxt) ptxt.textContent = p.msg || (p.done+'/'+p.total+' verarbeitet');
-        if(p.finished) {{
-          clearInterval(_esReindexPollTimer);
-          _esReindexPollTimer = null;
-          if(btn) {{ btn.disabled=false; btn.textContent='Re-Index starten'; }}
-          showToast('Re-Index abgeschlossen: '+p.inserted+' neu, '+p.updated+' aktualisiert','ok');
-          esLoadMailArchiv();
-          const prog = document.getElementById('es-archiv-progress');
-          setTimeout(()=>{{ if(prog) prog.style.display='none'; }}, 3000);
-        }}
-      }});
-    }}, 1200);
-  }}
-
-  function esSyncOrdnerChange(el) {{
-    const konto = el.dataset.konto;
-    const ordner = el.dataset.ordner;
-    const aktiv = el.checked;
-    fetch('/api/mail/archiv/sync-ordner', {{
-      method:'POST',
-      headers:{{'Content-Type':'application/json'}},
-      body:JSON.stringify({{konto:konto, ordner:ordner, aktiv:aktiv}})
-    }}).then(r=>r.json()).then(d=>{{
-      if(!d.ok) showToast('Fehler beim Speichern der Ordner-Einstellung','fehler');
-    }});
-  }}
-
+  // ── Mail-Konten laden ──────────────────────────────────────────────────────
   function esLoadMailKonten() {{
     fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
       const list = document.getElementById('es-mail-konten-list');
       if(!list) return;
       const mon = data.monitor || {{}};
-      // Monitor-Status anzeigen
       const mstat = document.getElementById('es-mail-monitor-status');
       const mbadge = document.getElementById('es-mail-monitor-badge');
       if(mstat) mstat.textContent = mon.last_sync ? 'Zuletzt: '+mon.last_sync : 'Noch kein Sync';
-      if(mbadge) {{
-        mbadge.innerHTML = mon.aktiv ? '<span class="es-mk-status es-mk-ok">Aktiv</span>' : '<span class="es-mk-status es-mk-missing">Inaktiv</span>';
-      }}
-      // Mailkonten rendern
-      const konten = data.konten || [];
-      if(!konten.length) {{ list.innerHTML='<div style="padding:12px;color:var(--text-muted);font-size:13px">Keine Konten konfiguriert.</div>'; return; }}
-      list.innerHTML = konten.map(k=>{{
-        const icon = k.aktiv ? '&#x2709;' : '&#x1F4EA;';
-        let sbadge = '', btn = '';
-        const safe = k.email.replace(/[@.]/g,'_');
-        if(k.token_status==='ok') {{
-          sbadge='<span class="es-mk-status es-mk-ok">&#x2713; Verbunden</span>';
-          btn='<button class="es-mk-btn" data-email="'+k.email+'" onclick="esMkRefresh(this.dataset.email)">Token erneuern</button>';
-        }} else if(k.token_status==='expired') {{
-          sbadge='<span class="es-mk-status es-mk-expired">&#x26A0; Token abgelaufen</span>';
-          btn='<button class="es-mk-btn" id="esbtn-'+safe+'" data-email="'+k.email+'" onclick="esMkConnect(this.dataset.email)">Neu verbinden</button>';
-        }} else {{
-          sbadge='<span class="es-mk-status es-mk-missing">Nicht verbunden</span>';
-          btn='<button class="es-mk-btn" id="esbtn-'+safe+'" data-email="'+k.email+'" onclick="esMkConnect(this.dataset.email)">Verbinden</button>';
-        }}
-        return '<div class="es-mk-row"><div class="es-mk-ico">'+icon+'</div><div class="es-mk-body"><div class="es-mk-email">'+k.email+'</div><div class="es-mk-desc">'+k.beschreibung+'</div></div>'+sbadge+btn+'</div>';
-      }}).join('');
-      // Einstellungswerte setzen
+      if(mbadge) mbadge.innerHTML = mon.aktiv ? '<span class="es-mk-status es-mk-ok">Aktiv</span>' : '<span class="es-mk-status es-mk-missing">Inaktiv</span>';
       const mmAktiv = document.getElementById('cfg-mail-monitor-aktiv');
       const mmInt = document.getElementById('cfg-mail-intervall');
       if(mmAktiv) mmAktiv.checked = !!mon.aktiv;
       if(mmInt && mon.intervall) mmInt.value = mon.intervall;
+      const std = data.standard_konto || '';
+      const konten = data.konten || [];
+      if(!konten.length) {{ list.innerHTML='<div style="padding:12px;color:var(--text-muted);font-size:13px">Keine Konten konfiguriert.</div>'; return; }}
+      list.innerHTML = konten.map(k=>{{
+        const safe = k.email.replace(/[@.]/g,'_');
+        let sbadge='';
+        if(k.token_status==='ok') sbadge='<span class="es-mk-status es-mk-ok">&#x2713; Verbunden</span>';
+        else if(k.token_status==='expired') sbadge='<span class="es-mk-status es-mk-expired">&#x26A0; Token abgelaufen</span>';
+        else sbadge='<span class="es-mk-status es-mk-missing">Nicht verbunden</span>';
+        return `<div class="es-mk-card" id="es-mk-card-${{safe}}">
+          <div class="es-mk-card-head">
+            <input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">
+            <div class="es-mk-ico">&#x2709;</div>
+            <div class="es-mk-body">
+              <div class="es-mk-email">${{k.email}} ${{k.email===std?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
+              <div class="es-mk-desc">${{k.beschreibung||''}}</div>
+            </div>
+            ${{sbadge}}
+          </div>
+          <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
+            <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
+            <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-arc-${{safe}}">–</div><div class="es-mk-stat-lbl">Archiviert</div></div>
+          </div>
+          <div class="es-mk-actions">
+            <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
+            <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Testen</button>
+            <button class="es-mk-btn sec" id="esbtn-${{safe}}" onclick="esMkConnect('${{k.email}}')">${{k.token_status==='ok'?'Token erneuern':'Verbinden'}}</button>
+            <button class="es-mk-btn sec" onclick="esMkTokenDel('${{k.email}}')">Token l&ouml;schen</button>
+            <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">L&ouml;schen</button>
+          </div>
+          <div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div>
+          <div id="es-kira-ord-${{safe}}" style="display:none"></div>
+        </div>`;
+      }}).join('');
+      // Stats lazy laden
+      konten.forEach(k=>esMkLoadStats(k.email));
+      // Gesamt
+      esLoadTotalCount();
     }}).catch(()=>{{
-      const list = document.getElementById('es-mail-konten-list');
-      if(list) list.innerHTML='<div style="padding:12px;color:#c84444;font-size:13px">Fehler beim Laden der Kontoliste.</div>';
+      const list=document.getElementById('es-mail-konten-list');
+      if(list) list.innerHTML='<div style="padding:12px;color:#c84444;font-size:13px">Fehler beim Laden.</div>';
     }});
   }}
+  function esLoadTotalCount() {{
+    fetch('/api/mail/konten/stats').then(r=>r.json()).then(d=>{{
+      const el=document.getElementById('es-mk-total-cnt');
+      if(el) el.textContent=(d.mails_index||0).toLocaleString();
+    }}).catch(()=>{{}});
+  }}
+  function esMkLoadStats(email) {{
+    const safe=email.replace(/[@.]/g,'_');
+    fetch('/api/mail/konten/stats?email='+encodeURIComponent(email)).then(r=>r.json()).then(d=>{{
+      const idx=document.getElementById('es-mk-idx-'+safe);
+      const arc=document.getElementById('es-mk-arc-'+safe);
+      if(idx) idx.textContent=(d.mails_index||0).toLocaleString();
+      if(arc) arc.textContent=d.archiv?.archiviert!=null?d.archiv.archiviert.toLocaleString():'–';
+    }}).catch(()=>{{}});
+  }}
+  window.esMkSetStandard = function(email) {{
+    fetch('/api/mail/konto/standard',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
+    .then(r=>r.json()).then(d=>{{ if(d.ok) {{ showToast(email+' als Standardkonto gesetzt','ok'); esLoadMailKonten(); }} }}).catch(()=>{{}});
+  }};
+  window.esMkAbrufen = function(email,btn) {{
+    if(btn) {{btn.disabled=true;btn.textContent='...';}}
+    fetch('/api/mail/konto/abrufen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
+    .then(r=>r.json()).then(d=>{{ showToast('Abruf gestartet','ok'); setTimeout(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Abrufen';}} esMkLoadStats(email);}},3000); }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Abrufen';}}}});
+  }};
+  window.esMkAlleAbrufen = function(btn) {{
+    if(btn) {{btn.disabled=true;btn.textContent='...';}}
+    fetch('/api/mail/konto/alle-abrufen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{ showToast('Abruf aller Konten gestartet','ok'); setTimeout(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Alle abrufen';}} esLoadMailKonten();}},5000); }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Alle abrufen';}}}});
+  }};
+  window.esMkTest = function(email,btn) {{
+    if(btn) {{btn.disabled=true;btn.textContent='Teste...';}}
+    fetch('/api/mail/konto/imap-test',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok) showToast(email+': OK — '+d.ordner_anzahl+' Ordner in '+d.dauer_ms+'ms','ok');
+      else showToast(email+': FEHLER — '+(d.error||'?'),'fehler');
+    }}).catch(()=>showToast('Verbindungsfehler','fehler'))
+    .finally(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x26A1; Testen';}}}});
+  }};
+  window.esMkAlleTest = function() {{
+    const cards=document.querySelectorAll('[id^="es-mk-card-"]');
+    cards.forEach(card=>{{
+      const btn=card.querySelector('.es-mk-btn.sec');
+      const email=card.querySelector('.es-mk-email')?.textContent?.trim()?.split(' ')[0];
+      if(email) esMkTest(email,null);
+    }});
+  }};
+  window.esMkTokenDel = function(email) {{
+    if(!confirm('Token für '+email+' löschen?')) return;
+    fetch('/api/mail/konto/token-loeschen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
+    .then(r=>r.json()).then(d=>{{ showToast(d.ok?'Token gelöscht':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler'); esLoadMailKonten(); }}).catch(()=>{{}});
+  }};
+  window.esMkDeleteConfirm = function(email) {{
+    if(!confirm(email+' wirklich löschen? Konfiguration wird entfernt.')) return;
+    showToast('Löschen noch nicht implementiert — bitte manuell in raumkult_config.json','warnung');
+  }};
   window.esMkConnect = function(email) {{
-    const safeid = email.replace(/[@.]/g,'_');
-    const btn = document.getElementById('esbtn-'+safeid);
-    if(btn) {{ btn.textContent='Verbinden...'; btn.classList.add('connecting'); btn.disabled=true; }}
+    const safe=email.replace(/[@.]/g,'_');
+    const btn=document.getElementById('esbtn-'+safe);
+    if(btn) {{btn.textContent='Verbinden...';btn.classList.add('connecting');btn.disabled=true;}}
     fetch('/api/mail/oauth/connect',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
     .then(r=>r.json()).then(d=>{{
       if(d.ok) {{
@@ -3163,16 +3157,148 @@ function esShowProtoTab(id) {{
         const poll=setInterval(()=>{{
           polls++;
           fetch('/api/mail/oauth/status?email='+encodeURIComponent(email)).then(r=>r.json()).then(s=>{{
-            if(s.status==='ok') {{ clearInterval(poll); showToast(email+' erfolgreich verbunden','ok'); esLoadMailKonten(); }}
-            else if(s.status==='error') {{ clearInterval(poll); showToast('Fehler: '+(s.message||'?'),'fehler'); esLoadMailKonten(); }}
-            else if(polls>60) {{ clearInterval(poll); showToast('Timeout — bitte nochmal versuchen','warnung'); esLoadMailKonten(); }}
+            if(s.status==='ok') {{clearInterval(poll);showToast(email+' erfolgreich verbunden','ok');esLoadMailKonten();}}
+            else if(s.status==='error') {{clearInterval(poll);showToast('Fehler: '+(s.message||'?'),'fehler');esLoadMailKonten();}}
+            else if(polls>60) {{clearInterval(poll);showToast('Timeout','warnung');esLoadMailKonten();}}
           }});
         }},3000);
       }} else showToast('Fehler: '+(d.error||'?'),'fehler');
     }}).catch(()=>showToast('Verbindungsfehler','fehler'));
   }};
-  window.esMkRefresh = function(email) {{
-    window.esMkConnect(email);
+  window.esMkToggleOrdner = function(safe,email) {{
+    const el=document.getElementById('es-kira-ord-'+safe);
+    if(!el) return;
+    if(el.style.display==='none') {{
+      el.style.display='block';
+      if(!el.dataset.loaded) {{
+        el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Lade Ordner...</div>';
+        el.dataset.loaded='1';
+        fetch('/api/mail/konten/ordner?email='+encodeURIComponent(email)).then(r=>r.json()).then(d=>{{
+          if(!d.ok||!d.ordner.length) {{el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Keine Ordner gefunden.</div>';return;}}
+          // sync_ordner aus config lesen (vereinfacht)
+          el.innerHTML='<div class="es-kira-ord-list">'+d.ordner.map(o=>`<div class="es-kira-ord-chip" onclick="esMkOrdnerToggle(this,'${{email}}','${{o}}')">${{o}}</div>`).join('')+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Angeklickte Ordner: KIRA LLM-Zugang aktiv</div>';
+        }}).catch(()=>{{el.innerHTML='<div style="color:#c84444;font-size:12px">Fehler beim Laden</div>';}});
+      }}
+    }} else el.style.display='none';
+  }};
+  window.esMkOrdnerToggle = function(el,email,ordner) {{
+    el.classList.toggle('active');
+    // TODO: POST /api/mail/konto/ordner-kira
+  }};
+  window.esMkAddDialog = function() {{
+    const html=`<div class="es-mk-dialog-overlay" id="es-mk-add-dialog" onclick="if(event.target===this)this.remove()">
+      <div class="es-mk-dialog">
+        <h3>Konto hinzuf&uuml;gen</h3>
+        <div class="es-mk-dialog-row"><label>Konto-Typ</label><select id="dlg-typ" onchange="esMkDlgTyp()">
+          <option value="oauth2">Microsoft 365 / Exchange (OAuth2)</option>
+          <option value="imap">Standard IMAP + Passwort</option>
+          <option value="ms_app">Microsoft + App-Passwort (IMAP)</option>
+        </select></div>
+        <div class="es-mk-dialog-row"><label>E-Mail-Adresse</label><input type="email" id="dlg-email" placeholder="name@domain.de"></div>
+        <div class="es-mk-dialog-row"><label>Beschreibung</label><input type="text" id="dlg-desc" placeholder="z.B. Firmen-Info-Konto"></div>
+        <div id="dlg-oauth2-fields">
+          <div class="es-mk-dialog-row"><label>IMAP-Server</label><input type="text" id="dlg-imap-server" value="outlook.office365.com"></div>
+          <div class="es-mk-dialog-row"><label>Port</label><input type="number" id="dlg-imap-port" value="993"></div>
+          <div style="font-size:12px;color:var(--text-muted);padding:8px 0">OAuth2-Client-ID und Tenant-ID werden aus der bestehenden App-Konfiguration übernommen.</div>
+        </div>
+        <div id="dlg-imap-fields" style="display:none">
+          <div class="es-mk-dialog-row"><label>IMAP-Server</label><input type="text" id="dlg-imap-server2" placeholder="imap.gmail.com"></div>
+          <div class="es-mk-dialog-row"><label>Port</label><input type="number" id="dlg-imap-port2" value="993"></div>
+          <div class="es-mk-dialog-row"><label>Benutzername</label><input type="text" id="dlg-login" placeholder="email@gmail.com"></div>
+          <div class="es-mk-dialog-row"><label>Passwort / App-Passwort</label><input type="password" id="dlg-passwort" placeholder="App-Passwort aus Kontoeinstellungen"></div>
+        </div>
+        <div class="es-mk-dialog-btns">
+          <button class="es-mk-btn sec" onclick="document.getElementById('es-mk-add-dialog').remove()">Abbrechen</button>
+          <button class="es-mk-btn" onclick="esMkSaveNew()">Speichern</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend',html);
+  }};
+  window.esMkDlgTyp = function() {{
+    const typ=document.getElementById('dlg-typ').value;
+    document.getElementById('dlg-oauth2-fields').style.display=typ==='oauth2'?'':'none';
+    document.getElementById('dlg-imap-fields').style.display=typ==='imap'||typ==='ms_app'?'':'none';
+  }};
+  window.esMkSaveNew = function() {{
+    const typ=document.getElementById('dlg-typ').value;
+    const email=document.getElementById('dlg-email').value.trim();
+    if(!email){{showToast('E-Mail-Adresse fehlt','warnung');return;}}
+    const body={{
+      email,
+      beschreibung:document.getElementById('dlg-desc').value,
+      auth_methode:typ==='oauth2'?'oauth2':'imap_password',
+      imap_server:typ==='oauth2'?(document.getElementById('dlg-imap-server').value||'outlook.office365.com'):(document.getElementById('dlg-imap-server2')?.value||''),
+      imap_port:parseInt(typ==='oauth2'?(document.getElementById('dlg-imap-port').value||993):(document.getElementById('dlg-imap-port2')?.value||993)),
+      imap_ssl:true,
+      login:document.getElementById('dlg-login')?.value||email,
+      passwort:document.getElementById('dlg-passwort')?.value||''
+    }};
+    fetch('/api/mail/konto/hinzufuegen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok){{showToast('Konto hinzugefügt','ok');document.getElementById('es-mk-add-dialog').remove();esLoadMailKonten();}}
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+  window.esMkArchivPruefen = function() {{
+    const pfad=document.getElementById('cfg-archiv-pfad').value;
+    if(!pfad){{showToast('Bitte Pfad eingeben','warnung');return;}}
+    fetch('/api/mail/archiv/pruefen?pfad='+encodeURIComponent(pfad)).then(r=>r.json()).then(d=>{{
+      if(d.ok) showToast('Pfad vorhanden und erreichbar ✓','ok');
+      else showToast('Pfad nicht gefunden oder nicht erreichbar','fehler');
+    }}).catch(()=>{{}});
+  }};
+  window.esReindex = function(btn) {{
+    if(btn){{btn.textContent='Läuft...';btn.disabled=true;}}
+    fetch('/api/mail/archiv/reindex',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{
+      showToast('Re-Index gestartet...','ok');
+      const prog=document.getElementById('es-reindex-progress');
+      const timer=setInterval(()=>{{
+        fetch('/api/mail/archiv/reindex/progress').then(r=>r.json()).then(p=>{{
+          if(prog) prog.textContent=p.done?'Fertig: '+p.processed+' Mails':p.processed+'/'+p.total+' verarbeitet';
+          if(p.done){{clearInterval(timer);if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}} esLoadTotalCount();}}
+        }}).catch(()=>clearInterval(timer));
+      }},1500);
+    }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}}}});
+  }};
+  // Sync-Ordner laden (bestehende Funktion)
+  function esLoadMailArchiv() {{
+    fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
+      const pfad=document.getElementById('cfg-archiv-pfad');
+      const aktiv=document.getElementById('cfg-archiv-aktiv');
+      const badge=document.getElementById('es-archiv-status-badge');
+      const txt=document.getElementById('es-archiv-status-text');
+      if(pfad && d.pfad) pfad.value=d.pfad;
+      if(aktiv) aktiv.checked=!!d.aktiv;
+      if(txt) txt.textContent=(d.mails_index||0).toLocaleString()+' Mails im Index · '+(d.pfad||'kein Pfad');
+      if(badge) badge.innerHTML=d.pfad_ok?'<span class="es-mk-status es-mk-ok">&#x2713; Archiv OK</span>':'<span class="es-mk-status es-mk-expired">&#x26A0; Pfad fehlt</span>';
+    }}).catch(()=>{{}});
+    // Sync-Ordner
+    fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
+      const konten=data.konten||[];
+      const list=document.getElementById('es-sync-ordner-list');
+      if(!list||!konten.length) return;
+      fetch('/api/mail/archiv/status').then(r=>r.json()).then(arcData=>{{
+        const syncOrdner=arcData.sync_ordner||{{}};
+        list.innerHTML=konten.map(k=>{{
+          const ordner=syncOrdner[k.email]||['INBOX','Gesendete Elemente'];
+          const pflicht=['INBOX','Gesendete Elemente'];
+          const alleOrdner=[...new Set([...pflicht,...ordner,'Entwürfe','Gelöschte Elemente','Spam'])];
+          return `<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">${{k.email}}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">`+alleOrdner.map(o=>{{
+              const checked=ordner.includes(o);
+              const disabled_=pflicht.includes(o);
+              return `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:${{disabled_?'default':'pointer'}}">
+                <input type="checkbox" ${{checked?'checked':''}} ${{disabled_?'disabled':''}} onchange="esSyncOrdnerChange('${{k.email}}','${{o}}',this.checked)">${{o}}</label>`;
+            }}).join('')+`</div></div>`;
+        }}).join('');
+      }}).catch(()=>{{}});
+    }}).catch(()=>{{}});
+  }}
+  window.esSyncOrdnerChange = function(konto,ordner,aktiv) {{
+    fetch('/api/mail/archiv/sync-ordner',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{konto,ordner,aktiv}})}})
+    .then(r=>r.json()).then(d=>{{ if(!d.ok) showToast('Fehler beim Speichern','fehler'); }}).catch(()=>{{}});
   }};
   </script>
 </div>
@@ -3180,43 +3306,78 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: INTEGRATIONEN ─────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-integrationen">
   <div class="es-sec-h">Integrationen</div>
-  <div class="es-sec-sub">Externe Dienste und Datenquellen verbinden.</div>
+  <div class="es-sec-sub">Externe Dienste verbinden.</div>
 
+  <!-- WhatsApp Business API -->
   <div class="es-grp">
-    <div class="es-grp-h">Verf&uuml;gbare Integrationen</div>
-    <div class="es-intg">
-      <div class="es-intg-ico">&#x1F4C5;</div>
-      <div class="es-intg-body">
-        <div class="es-intg-name">Google Calendar</div>
-        <div class="es-intg-sub">Termine und Deadlines synchronisieren</div>
-      </div>
-      <span class="es-badge plan">In Planung</span>
+    <div class="es-grp-h">&#x1F4F1; WhatsApp Business Cloud API</div>
+    <div class="es-grp-sub">Eingehende WhatsApp-Nachrichten als KIRA-Tasks verarbeiten. Webhook-URL: <code style="font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:4px">/api/webhook/whatsapp</code></div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Verify Token</span><span class="es-row-hint">Frei wählbarer String — selber Wert in Meta Developer Console &gt; Webhook &gt; Verify Token</span></div>
+      <input type="text" id="cfg-wa-verify" placeholder="z.B. kira-2026-xyz" style="width:220px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
     </div>
-    <div class="es-intg">
-      <div class="es-intg-ico">&#x1F4DD;</div>
-      <div class="es-intg-body">
-        <div class="es-intg-name">CRM-Export</div>
-        <div class="es-intg-sub">Kundendaten in externes CRM exportieren</div>
-      </div>
-      <span class="es-badge plan">In Planung</span>
+    <div class="es-row">
+      <div class="es-row-label"><span>App Secret</span><span class="es-row-hint">Meta Developer Console &gt; App &gt; App-Einstellungen &gt; App Secret (für HMAC-Signatur-Prüfung)</span></div>
+      <input type="password" id="cfg-wa-secret" placeholder="App Secret" style="width:220px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
     </div>
-    <div class="es-intg">
-      <div class="es-intg-ico">&#x1F517;</div>
-      <div class="es-intg-body">
-        <div class="es-intg-name">Webhook</div>
-        <div class="es-intg-sub">Ereignisse an externe URLs senden</div>
-      </div>
-      <span class="es-badge plan">In Planung</span>
+    <div class="es-row">
+      <div class="es-row-label"><span>Phone Number ID</span><span class="es-row-hint">Aus Meta Developer Console (für späteres Senden von Antworten)</span></div>
+      <input type="text" id="cfg-wa-phone-id" placeholder="Phone Number ID" style="width:220px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
     </div>
-    <div class="es-intg">
-      <div class="es-intg-ico">&#x1F4C8;</div>
-      <div class="es-intg-body">
-        <div class="es-intg-name">Buchhaltungs-Export</div>
-        <div class="es-intg-sub">Rechnungsdaten exportieren (CSV/DATEV)</div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Einrichtung</span></div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">
+        1. Meta Business Manager → App → WhatsApp → Konfiguration<br>
+        2. Callback URL: <code style="background:var(--bg-raised);padding:1px 4px;border-radius:3px">https://deine-domain/api/webhook/whatsapp</code><br>
+        3. Verify Token: identisch mit dem Wert oben<br>
+        4. Webhook-Felder abonnieren: <code style="background:var(--bg-raised);padding:1px 4px;border-radius:3px">messages</code>
       </div>
-      <span class="es-badge plan">In Planung</span>
+    </div>
+    <div style="margin-top:8px">
+      <button class="es-mk-btn" onclick="esWaSpeichern(this)">Speichern</button>
+      <button class="es-mk-btn sec" style="margin-left:8px" onclick="esWaTest()">Webhook testen</button>
     </div>
   </div>
+
+  <!-- Andere (In Planung) -->
+  <div class="es-grp">
+    <div class="es-grp-h">Weitere Integrationen</div>
+    <div class="es-intg"><div class="es-intg-ico">&#x1F4C5;</div><div class="es-intg-body"><div class="es-intg-name">Google Calendar</div><div class="es-intg-sub">Termine synchronisieren</div></div><span class="es-badge plan">In Planung</span></div>
+    <div class="es-intg"><div class="es-intg-ico">&#x1F4DD;</div><div class="es-intg-body"><div class="es-intg-name">CRM-Export</div><div class="es-intg-sub">Kundendaten exportieren</div></div><span class="es-badge plan">In Planung</span></div>
+    <div class="es-intg"><div class="es-intg-ico">&#x1F517;</div><div class="es-intg-body"><div class="es-intg-name">Webhook</div><div class="es-intg-sub">Ereignisse an externe URLs senden</div></div><span class="es-badge plan">In Planung</span></div>
+    <div class="es-intg"><div class="es-intg-ico">&#x1F4C8;</div><div class="es-intg-body"><div class="es-intg-name">Buchhaltungs-Export</div><div class="es-intg-sub">Rechnungsdaten exportieren</div></div><span class="es-badge plan">In Planung</span></div>
+  </div>
+
+  <script>
+  function esIntegLoad() {{
+    // WhatsApp-Einstellungen laden
+    fetch('/api/einstellungen').then(r=>r.json()).then(d=>{{
+      const wa=d.whatsapp||{{}};
+      const el1=document.getElementById('cfg-wa-verify');
+      const el3=document.getElementById('cfg-wa-phone-id');
+      if(el1) el1.value=wa.verify_token||'';
+      if(el3) el3.value=wa.phone_number_id||'';
+    }}).catch(()=>{{}});
+  }}
+  window.esWaSpeichern = function(btn) {{
+    const body={{
+      whatsapp_verify_token:document.getElementById('cfg-wa-verify').value,
+      whatsapp_app_secret:document.getElementById('cfg-wa-secret').value,
+      whatsapp_phone_number_id:document.getElementById('cfg-wa-phone-id').value
+    }};
+    fetch('/api/whatsapp/secrets-speichern',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+    .then(r=>r.json()).then(d=>{{ showToast(d.ok?'WhatsApp-Einstellungen gespeichert':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler'); }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+  window.esWaTest = function() {{
+    const token=document.getElementById('cfg-wa-verify').value;
+    if(!token){{showToast('Verify Token fehlt','warnung');return;}}
+    const url='/api/webhook/whatsapp?hub.mode=subscribe&hub.verify_token='+encodeURIComponent(token)+'&hub.challenge=KIRATEST';
+    fetch(url).then(r=>r.text()).then(t=>{{
+      if(t==='KIRATEST') showToast('Webhook-Verifizierung erfolgreich ✓','ok');
+      else showToast('Webhook antwortet falsch: '+t,'warnung');
+    }}).catch(()=>showToast('Fehler beim Test','fehler'));
+  }};
+  </script>
 </div>
 
 <!-- ── SECTION: AUTOMATIONEN ──────────────────────────────────────────── -->
@@ -8103,6 +8264,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/webhook/whatsapp'):
             self._handle_whatsapp_verify()
 
+        elif self.path == '/api/einstellungen':
+            self._api_einstellungen_get()
+
+        elif self.path.startswith('/api/mail/konten/stats'):
+            self._api_mail_konto_stats()
+
+        elif self.path.startswith('/api/mail/konten/ordner'):
+            self._api_mail_konto_ordner()
+
+        elif self.path.startswith('/api/mail/archiv/pruefen'):
+            self._api_mail_archiv_pruefen()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
 
@@ -8828,6 +9001,231 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_konto_stats(self):
+        """GET /api/mail/konten/stats?email= — Archiv+Index-Stats für ein Konto."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        email = qs.get('email', [''])[0]
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            if email:
+                cnt = conn.execute("SELECT COUNT(*) FROM mails WHERE konto=?", (email,)).fetchone()[0]
+            else:
+                cnt = conn.execute("SELECT COUNT(*) FROM mails").fetchone()[0]
+            conn.close()
+            # Archivgröße (schnell: nur Ordner-Check, kein rekursiver Walk)
+            archiv_info = {}
+            try:
+                cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                archiv_pfad = cfg.get('mail_archiv', {}).get('pfad', '')
+                if archiv_pfad and email:
+                    safe = email.replace('@','_').replace('.','_')
+                    konto_pfad = Path(archiv_pfad) / safe
+                    if konto_pfad.exists():
+                        # Anzahl Unterordner = ca. Mails
+                        subdirs = sum(1 for _ in konto_pfad.rglob('mail.json') if True)
+                        archiv_info = {'archiviert': subdirs, 'pfad': str(konto_pfad)}
+            except Exception:
+                pass
+            self._json({'ok': True, 'mails_index': cnt, 'archiv': archiv_info})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e), 'mails_index': 0})
+
+    def _api_mail_konto_ordner(self):
+        """GET /api/mail/konten/ordner?email= — IMAP-Ordner eines Kontos."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        email = qs.get('email', [''])[0]
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            konten = _mm._load_accounts()
+            konto = next((k for k in konten if k['email'] == email), None)
+            if not konto:
+                self._json({'ok': False, 'error': 'Konto nicht gefunden', 'ordner': []})
+                return
+            imap = _mm.imap_connect(konto)
+            _, fl = imap.list()
+            imap.logout()
+            ordner = []
+            for entry in (fl or []):
+                if isinstance(entry, bytes):
+                    parts = entry.decode(errors='replace').split('"/"')
+                    if parts:
+                        name = parts[-1].strip().strip('"')
+                        ordner.append(name)
+            self._json({'ok': True, 'ordner': ordner})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e), 'ordner': []})
+
+    def _api_mail_archiv_pruefen(self):
+        """GET /api/mail/archiv/pruefen?pfad= — Prüft ob Archivpfad existiert."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        pfad = qs.get('pfad', [''])[0]
+        if not pfad:
+            self._json({'ok': False, 'status': 'kein_pfad'})
+            return
+        p = Path(pfad)
+        exists = p.exists() and p.is_dir()
+        writeable = False
+        if exists:
+            try:
+                import os
+                writeable = os.access(str(p), os.W_OK)
+            except Exception:
+                pass
+        self._json({'ok': exists, 'writeable': writeable, 'status': 'ok' if exists else 'nicht_gefunden'})
+
+    def _api_mail_konto_imap_test(self, body):
+        """POST /api/mail/konto/imap-test — Testet IMAP-Verbindung und gibt Ordner zurück."""
+        email = body.get('email', '')
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm, time as _time
+            konten = _mm._load_accounts()
+            konto = next((k for k in konten if k['email'] == email), None)
+            if not konto:
+                self._json({'ok': False, 'error': 'Konto nicht gefunden'})
+                return
+            t0 = _time.monotonic()
+            imap = _mm.imap_connect(konto)
+            _, fl = imap.list()
+            imap.logout()
+            ms = int((_time.monotonic() - t0) * 1000)
+            ordner = []
+            for entry in (fl or []):
+                if isinstance(entry, bytes):
+                    parts = entry.decode(errors='replace').split('"/"')
+                    if parts:
+                        ordner.append(parts[-1].strip().strip('"'))
+            self._json({'ok': True, 'ordner_anzahl': len(ordner), 'dauer_ms': ms, 'ordner': ordner[:20]})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_abrufen(self, body):
+        """POST /api/mail/konto/abrufen — Manuellen Poll für ein/alle Konten starten."""
+        import threading as _t, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        def _do():
+            try:
+                _mm.poll_all_accounts()
+            except Exception:
+                pass
+        _t.Thread(target=_do, daemon=True).start()
+        self._json({'ok': True, 'status': 'gestartet'})
+
+    def _api_mail_konto_alle_abrufen(self, body):
+        """POST /api/mail/konto/alle-abrufen — Alle Konten pollen."""
+        self._api_mail_konto_abrufen(body)
+
+    def _api_mail_konto_token_loeschen(self, body):
+        """POST /api/mail/konto/token-loeschen — OAuth2-Token löschen."""
+        email = body.get('email', '')
+        try:
+            token_dir = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\tokens")
+            safe = email.replace('@', '_').replace('.', '_')
+            token_file = token_dir / f"{safe}_token.json"
+            if token_file.exists():
+                token_file.unlink()
+                self._json({'ok': True})
+            else:
+                self._json({'ok': False, 'error': 'Token-Datei nicht gefunden'})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_standard(self, body):
+        """POST /api/mail/konto/standard — Standardkonto setzen."""
+        email = body.get('email', '')
+        try:
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8'))
+            cfg.setdefault('mail_konten', {})['standard_konto'] = email
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_hinzufuegen(self, body):
+        """POST /api/mail/konto/hinzufuegen — Neues Konto in raumkult_config.json anlegen."""
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        try:
+            archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+            cfg = json.loads(archiver_cfg.read_text('utf-8')) if archiver_cfg.exists() else {'konten': []}
+            konten = cfg.setdefault('konten', [])
+            # Duplikat-Check
+            if any(k.get('email') == email for k in konten):
+                self._json({'ok': False, 'error': 'Konto bereits vorhanden'})
+                return
+            # Passwort obfuskieren (Base64, wie bestehende Konten)
+            passwort = body.get('passwort', '')
+            if passwort:
+                import base64
+                passwort = 'enc:' + base64.b64encode(passwort.encode()).decode()
+            neues_konto = {
+                'email': email,
+                'login': body.get('login', email),
+                'passwort': passwort,
+                'beschreibung': body.get('beschreibung', email.split('@')[0]),
+                'aktiv': True,
+                'auth_methode': body.get('auth_methode', 'oauth2'),
+                'imap_server': body.get('imap_server', 'outlook.office365.com'),
+                'imap_port': int(body.get('imap_port', 993)),
+                'imap_ssl': bool(body.get('imap_ssl', True)),
+            }
+            konten.append(neues_konto)
+            archiver_cfg.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            # Sync-Ordner in config.json anlegen
+            cfg_kira = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+            cfg_kira.setdefault('mail_archiv', {}).setdefault('sync_ordner', {})[email] = ['INBOX', 'Gesendete Elemente']
+            (SCRIPTS_DIR / 'config.json').write_text(json.dumps(cfg_kira, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_einstellungen_get(self):
+        """GET /api/einstellungen — Lädt aktuelle Einstellungen (WhatsApp-Tokens aus secrets.json)."""
+        try:
+            secrets_path = SCRIPTS_DIR / 'secrets.json'
+            secrets = json.loads(secrets_path.read_text('utf-8')) if secrets_path.exists() else {}
+            self._json({
+                'ok': True,
+                'whatsapp': {
+                    'verify_token': secrets.get('whatsapp_verify_token', ''),
+                    'phone_number_id': secrets.get('whatsapp_phone_number_id', ''),
+                }
+            })
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_whatsapp_secrets_speichern(self, body):
+        """POST /api/whatsapp/secrets-speichern — WhatsApp-Credentials in secrets.json speichern."""
+        try:
+            secrets_path = SCRIPTS_DIR / 'secrets.json'
+            secrets = json.loads(secrets_path.read_text('utf-8')) if secrets_path.exists() else {}
+            if 'whatsapp_verify_token' in body:
+                secrets['whatsapp_verify_token'] = body['whatsapp_verify_token']
+            if 'whatsapp_app_secret' in body:
+                secrets['whatsapp_app_secret'] = body['whatsapp_app_secret']
+            if 'whatsapp_phone_number_id' in body:
+                secrets['whatsapp_phone_number_id'] = body['whatsapp_phone_number_id']
+            secrets_path.write_text(json.dumps(secrets, ensure_ascii=False, indent=2), 'utf-8')
+            # Auch phone_number_id in config.json
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8'))
+            if 'whatsapp_phone_number_id' in body:
+                cfg.setdefault('whatsapp', {})['phone_number_id'] = body['whatsapp_phone_number_id']
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_ausgangsrechnungen(self):
         """GET /api/ausgangsrechnungen — Listet Ausgangsrechnungen."""
         db = get_db()
@@ -8870,6 +9268,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/send':
             self._api_mail_send(body)
+            return
+
+        if self.path == '/api/mail/konto/imap-test':
+            self._api_mail_konto_imap_test(body)
+            return
+
+        if self.path == '/api/mail/konto/abrufen':
+            self._api_mail_konto_abrufen(body)
+            return
+
+        if self.path == '/api/mail/konto/alle-abrufen':
+            self._api_mail_konto_alle_abrufen(body)
+            return
+
+        if self.path == '/api/mail/konto/token-loeschen':
+            self._api_mail_konto_token_loeschen(body)
+            return
+
+        if self.path == '/api/mail/konto/standard':
+            self._api_mail_konto_standard(body)
+            return
+
+        if self.path == '/api/mail/konto/hinzufuegen':
+            self._api_mail_konto_hinzufuegen(body)
+            return
+
+        if self.path == '/api/whatsapp/secrets-speichern':
+            self._api_whatsapp_secrets_speichern(body)
             return
 
         # Server-Neustart: alle Port-8765-Instanzen beenden, dann neu starten
