@@ -103,10 +103,10 @@
   "partner_view": {
     "_kommentar": "GitHub Pages Konfiguration für Leni-Partner-View. Wird von generate_partner_view.py gelesen.",
     "partner_github_repo_dir": "",
-    "_repo_dir_anleitung": "Lokaler Pfad zum geclonten GitHub-Pages-Repo, z.B. C:\\Users\\kaimr\\kira-partner",
+    "_repo_dir_anleitung": "Lokaler Pfad zum geclonten GitHub-Pages-Repo (optional, nur fuer Python-Push). Token liegt in secrets.json.",
     "partner_github_branch": "main",
-    "partner_github_repo_url": "",
-    "_repo_url_anleitung": "z.B. https://github.com/DEIN-USERNAME/kira-partner",
+    "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner",
+    "partner_github_pages_url": "https://kaimarienfeld.github.io/kira-partner",
     "partner_pw_kai": "KaiAdmin2026",
     "partner_pw_leni": "HalloLeni2026",
     "_pw_anleitung": "Passwörter VOR dem ersten Leni-Link ändern! generate_partner_view.py injiziert sie ins HTML."

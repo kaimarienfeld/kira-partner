@@ -1330,7 +1330,7 @@ function startApp() {
   if (leniCount>0){document.getElementById('fb-leni').style.display='flex';}
 
   updateCounts();renderTiles('all');
-  if (isLeni&&!localStorage.getItem('kira_pv_tour')) startTour();
+  // Tour deaktiviert -- kann manuell per startTour() ausgeloest werden
   localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
 }
 
