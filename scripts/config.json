@@ -55,6 +55,21 @@
     "intervall_sekunden": 300,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
+  "mail_archiv": {
+    "_pflicht": true,
+    "_erklaerung": "KIRA benötigt ein lokales Archiv für vollständigen LLM-Kontext. IMAP zeigt nur aktuelle Mails — alle Aufgaben, Antworten und Anhänge liest Kira aus dem lokalen Archiv. Bei Software-Export ist der Archiv-Ordner deine exportierbare Datenbasis.",
+    "pfad": "C:/Users/kaimr/OneDrive - rauMKult Sichtbeton/0001_APPS_rauMKult/Mail Archiv/Archiv",
+    "anhaenge_unterordner": "attachments",
+    "neue_mails_archivieren": true,
+    "_neue_mails_erklaerung": "Neue Mails die per IMAP empfangen werden, werden automatisch als JSON+EML im Archiv gespeichert",
+    "sync_ordner": {
+      "kaimrf@rauMKultSichtbeton.onmicrosoft.com": ["INBOX", "Gesendete Elemente"],
+      "info@raumkult.eu": ["INBOX", "Gesendete Elemente"],
+      "anfrage@raumkult.eu": ["INBOX", "Gesendete Elemente"],
+      "shop@sichtbeton-cire.de": ["INBOX", "Gesendete Elemente"],
+      "invoice@sichtbeton-cire.de": ["INBOX", "Gesendete Elemente"]
+    }
+  },
   "llm": {
     "_kommentar": "Kira KI-Assistent Einstellungen. API Key wird separat in secrets.json gespeichert.",
     "model": "claude-sonnet-4-20250514",

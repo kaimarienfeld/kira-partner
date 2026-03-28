@@ -1983,6 +1983,24 @@ def build_einstellungen():
         else:                            db_size_str = f"{db_size_bytes/1024**2:.2f} MB"
     except: db_size_str = "unbekannt"
 
+    # Mail-Archiv Konfiguration
+    mail_archiv_cfg = config.get("mail_archiv", {})
+    archiv_pfad = mail_archiv_cfg.get("pfad", "")
+    neue_mails_archivieren = mail_archiv_cfg.get("neue_mails_archivieren", True)
+    sync_ordner_cfg = mail_archiv_cfg.get("sync_ordner", {})
+
+    # Sync-Ordner HTML pro Konto generieren
+    sync_ordner_html = ""
+    _pflicht_set = {"INBOX", "Gesendete Elemente"}
+    _alle_ordner = ["INBOX", "Gesendete Elemente", "Entwürfe", "Gelöschte Elemente", "Spam"]
+    for _ke, _aktive in sync_ordner_cfg.items():
+        _chips = ""
+        for _on in _alle_ordner:
+            _chk = "checked" if _on in _aktive else ""
+            _dis = 'disabled title="Pflicht"' if _on in _pflicht_set else ""
+            _chips += f'<label class="es-ord-chip"><input type="checkbox" class="es-ord-cb" {_chk} {_dis} data-konto="{esc(_ke)}" data-ordner="{esc(_on)}" onchange="esSyncOrdnerChange(this)"><span>{esc(_on)}</span></label>'
+        sync_ordner_html += f'<div class="es-ord-row"><div class="es-ord-email">{esc(_ke)}</div><div class="es-ord-chips">{_chips}</div></div>'
+
     # Multi-Provider Karten generieren
     providers = get_all_providers()
     provider_cards = ""
@@ -2188,7 +2206,7 @@ function esShowSec(id) {{
   if(panel) panel.classList.add('es-active');
   var nav = document.querySelector('.es-sn[data-essec="'+id+'"]');
   if(nav) nav.classList.add('act');
-  if(id==='mail') {{ esLoadMailKonten(); }}
+  if(id==='mail') {{ esLoadMailKonten(); esLoadMailArchiv(); }}
 }}
 function esShowProtoTab(id) {{
   document.querySelectorAll('.es-proto-tab-panel').forEach(function(p){{p.classList.remove('act');}});
@@ -2903,7 +2921,160 @@ function esShowProtoTab(id) {{
     </div>
   </div>
 
+  <!-- ── ARCHIV-ORDNER (PFLICHT) ───────────────────────────────────────── -->
+  <div class="es-grp" id="es-archiv-grp">
+    <div class="es-grp-h">
+      &#x1F4C1; Mail-Archiv-Ordner&nbsp;<span style="background:#c84444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">PFLICHT</span>
+    </div>
+    <div class="es-grp-sub">
+      KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext.
+      IMAP zeigt nur aktuelle Mails &mdash; alle historischen Mails, Aufgaben, Antworten und Anh&auml;nge liest KIRA aus dem lokalen Archiv.
+      Das Archiv ist deine exportierbare Datenbasis &mdash; bei Software-Weitergabe Archiv-Ordner + Datenbank mitnehmen.
+    </div>
+
+    <div id="es-archiv-fehlend-banner" style="display:{'none' if archiv_pfad else ''};background:rgba(200,68,68,.12);border:1px solid rgba(200,68,68,.3);border-radius:6px;padding:10px 14px;margin:8px 0;font-size:12px;color:#c84444;font-weight:600;">
+      &#x26A0; Kein Archiv-Pfad angegeben &mdash; KIRA hat keinen Zugriff auf historische Mail-Inhalte!
+    </div>
+
+    <div class="es-row" style="align-items:flex-start">
+      <div class="es-rl">Archiv-Ordner<div class="es-rd">Lokaler Pfad zum Mail-Archiv-Verzeichnis</div></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <input type="text" class="es-inp" id="cfg-archiv-pfad"
+               value="{esc(archiv_pfad)}"
+               placeholder="C:/Pfad/zum/Mail Archiv/Archiv"
+               oninput="esArchivPfadChanged(this.value)"
+               style="width:100%;box-sizing:border-box">
+        <div id="es-archiv-pfad-warnung" style="display:none;background:rgba(240,160,0,.12);border:1px solid rgba(240,160,0,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#d48000;">
+          &#x26A0; Pfad ge&auml;ndert &mdash; bitte Re-Index ausf&uuml;hren damit KIRA alle Mails findet.
+        </div>
+      </div>
+    </div>
+
+    <div class="es-row">
+      <div class="es-rl">Neue Mails archivieren<div class="es-rd">Eingehende Mails automatisch als JSON+EML im Archiv speichern</div></div>
+      <label class="es-toggle"><input type="checkbox" id="cfg-archiv-neue-mails" {'checked' if neue_mails_archivieren else ''} onchange="saveSettings()"><span class="es-slider"></span></label>
+    </div>
+
+    <div class="es-row">
+      <div class="es-rl">Archiv-Status<div id="es-archiv-status-text" class="es-rd">Wird geladen...</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div id="es-archiv-status-badge"></div>
+        <button class="es-mk-btn" id="es-archiv-reindex-btn" onclick="esArchivReindex()">Re-Index starten</button>
+      </div>
+    </div>
+
+    <div id="es-archiv-progress" style="display:none;padding:4px 0 8px">
+      <div style="background:var(--border);border-radius:3px;height:5px;overflow:hidden;margin-bottom:4px">
+        <div id="es-archiv-progress-bar" style="background:var(--accent);height:100%;width:0%;transition:width .4s"></div>
+      </div>
+      <div id="es-archiv-progress-text" style="font-size:11px;color:var(--text-muted)"></div>
+    </div>
+  </div>
+
+  <!-- ── SYNC-ORDNER PRO KONTO ─────────────────────────────────────────── -->
+  <div class="es-grp">
+    <div class="es-grp-h">Sync-Ordner pro Konto</div>
+    <div class="es-grp-sub">Welche IMAP-Ordner f&uuml;r neue Mails &uuml;berwacht und archiviert werden. Posteingang und Gesendete Elemente sind Pflicht.</div>
+    <style>
+    .es-ord-row{{padding:8px 0;border-bottom:1px solid var(--border)}}
+    .es-ord-row:last-child{{border-bottom:none}}
+    .es-ord-email{{font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px}}
+    .es-ord-chips{{display:flex;flex-wrap:wrap;gap:4px}}
+    .es-ord-chip{{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:12px;background:var(--bg-raised);cursor:pointer;user-select:none}}
+    .es-ord-chip input[disabled]{{opacity:.6;cursor:default}}
+    </style>
+    <div id="es-archiv-ordner-list">{sync_ordner_html}</div>
+  </div>
+
   <script>
+  var _esArchivOrigPfad = {repr(archiv_pfad)};
+  var _esReindexPollTimer = null;
+
+  function esLoadMailArchiv() {{
+    fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
+      const txt = document.getElementById('es-archiv-status-text');
+      const badge = document.getElementById('es-archiv-status-badge');
+      const banner = document.getElementById('es-archiv-fehlend-banner');
+      if(!txt) return;
+      if(d.pfad_vorhanden) {{
+        txt.textContent = d.mails_total.toLocaleString()+' Mails im Index · '+d.pfad;
+        if(badge) badge.innerHTML = '<span class="es-mk-status es-mk-ok">&#x2713; Archiv OK</span>';
+        if(banner) banner.style.display='none';
+      }} else {{
+        txt.textContent = d.pfad ? 'Pfad nicht gefunden: '+d.pfad : 'Kein Pfad konfiguriert';
+        if(badge) badge.innerHTML = '<span class="es-mk-status es-mk-missing">Nicht konfiguriert</span>';
+        if(banner) banner.style.display='';
+      }}
+    }}).catch(()=>{{
+      const txt = document.getElementById('es-archiv-status-text');
+      if(txt) txt.textContent = 'Fehler beim Laden';
+    }});
+  }}
+
+  function esArchivPfadChanged(val) {{
+    const w = document.getElementById('es-archiv-pfad-warnung');
+    const b = document.getElementById('es-archiv-fehlend-banner');
+    if(w) w.style.display = (val && val !== _esArchivOrigPfad) ? '' : 'none';
+    if(b) b.style.display = val ? 'none' : '';
+  }}
+
+  function esArchivReindex() {{
+    const pfad = document.getElementById('cfg-archiv-pfad')?.value.trim() || '';
+    const btn = document.getElementById('es-archiv-reindex-btn');
+    if(btn) {{ btn.disabled=true; btn.textContent='Läuft...'; }}
+    const prog = document.getElementById('es-archiv-progress');
+    if(prog) prog.style.display='';
+    fetch('/api/mail/archiv/reindex', {{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{pfad: pfad}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(d.ok) {{
+        showToast('Re-Index gestartet...','ok');
+        _esReindexPoll();
+      }} else {{
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+        if(btn) {{ btn.disabled=false; btn.textContent='Re-Index starten'; }}
+      }}
+    }}).catch(()=>{{ showToast('Verbindungsfehler','fehler'); if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}} }});
+  }}
+
+  function _esReindexPoll() {{
+    if(_esReindexPollTimer) clearInterval(_esReindexPollTimer);
+    _esReindexPollTimer = setInterval(()=>{{
+      fetch('/api/mail/archiv/reindex/progress').then(r=>r.json()).then(p=>{{
+        const bar = document.getElementById('es-archiv-progress-bar');
+        const ptxt = document.getElementById('es-archiv-progress-text');
+        const btn = document.getElementById('es-archiv-reindex-btn');
+        const pct = p.total > 0 ? Math.round(p.done/p.total*100) : 0;
+        if(bar) bar.style.width = pct+'%';
+        if(ptxt) ptxt.textContent = p.msg || (p.done+'/'+p.total+' verarbeitet');
+        if(p.finished) {{
+          clearInterval(_esReindexPollTimer);
+          _esReindexPollTimer = null;
+          if(btn) {{ btn.disabled=false; btn.textContent='Re-Index starten'; }}
+          showToast('Re-Index abgeschlossen: '+p.inserted+' neu, '+p.updated+' aktualisiert','ok');
+          esLoadMailArchiv();
+          const prog = document.getElementById('es-archiv-progress');
+          setTimeout(()=>{{ if(prog) prog.style.display='none'; }}, 3000);
+        }}
+      }});
+    }}, 1200);
+  }}
+
+  function esSyncOrdnerChange(el) {{
+    const konto = el.dataset.konto;
+    const ordner = el.dataset.ordner;
+    const aktiv = el.checked;
+    fetch('/api/mail/archiv/sync-ordner', {{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{konto:konto, ordner:ordner, aktiv:aktiv}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(!d.ok) showToast('Fehler beim Speichern der Ordner-Einstellung','fehler');
+    }});
+  }}
+
   function esLoadMailKonten() {{
     fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
       const list = document.getElementById('es-mail-konten-list');
@@ -5157,6 +5328,14 @@ function saveSettings() {{
       bounce_dist: parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
       idle_mode:   document.getElementById('cfg-kira-idle')?.checked              ?? true,
       idle_delay:  parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10')
+    }},
+    mail_monitor: {{
+      aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
+      intervall_sekunden: parseInt(document.getElementById('cfg-mail-intervall')?.value)||300
+    }},
+    mail_archiv: {{
+      pfad:                  document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
+      neue_mails_archivieren: document.getElementById('cfg-archiv-neue-mails')?.checked ?? true
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -7751,6 +7930,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/thread'):
             self._api_mail_thread()
 
+        elif self.path == '/api/mail/archiv/status':
+            self._api_mail_archiv_status()
+
+        elif self.path == '/api/mail/archiv/reindex/progress':
+            self._api_mail_archiv_reindex_progress()
+
         elif self.path.startswith('/api/ausgangsrechnungen'):
             self._api_ausgangsrechnungen()
 
@@ -8449,6 +8634,91 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_archiv_status(self):
+        """GET /api/mail/archiv/status — Archiv-Pfad + Mailanzahl."""
+        try:
+            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+            ma = cfg.get('mail_archiv', {})
+            pfad = ma.get('pfad', '')
+            pfad_ok = bool(pfad and Path(pfad).exists())
+            mails_total = 0
+            if pfad_ok:
+                try:
+                    conn2 = sqlite3.connect(str(MAIL_INDEX_DB))
+                    mails_total = conn2.execute("SELECT COUNT(*) FROM mails").fetchone()[0]
+                    conn2.close()
+                except Exception:
+                    pass
+            self._json({
+                'pfad': pfad,
+                'pfad_vorhanden': pfad_ok,
+                'mails_total': mails_total,
+                'neue_mails_archivieren': ma.get('neue_mails_archivieren', True),
+            })
+        except Exception as e:
+            self._json({'pfad': '', 'pfad_vorhanden': False, 'mails_total': 0, 'error': str(e)})
+
+    def _api_mail_archiv_reindex_progress(self):
+        """GET /api/mail/archiv/reindex/progress — Fortschritt des laufenden Re-Index."""
+        try:
+            from mail_archiv_reindex import get_progress
+            self._json(get_progress())
+        except Exception as e:
+            self._json({'running': False, 'finished': True, 'error': str(e)})
+
+    def _api_mail_archiv_reindex(self, body):
+        """POST /api/mail/archiv/reindex — Startet Re-Index als Hintergrund-Thread."""
+        import threading as _threading
+        pfad = (body.get('pfad') or '').strip()
+        if not pfad:
+            try:
+                cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                pfad = cfg.get('mail_archiv', {}).get('pfad', '')
+            except Exception:
+                pass
+        if not pfad:
+            self._json({'ok': False, 'error': 'Kein Archiv-Pfad angegeben'})
+            return
+        if not Path(pfad).exists():
+            self._json({'ok': False, 'error': f'Pfad nicht gefunden: {pfad}'})
+            return
+        def _run():
+            try:
+                from mail_archiv_reindex import reindex
+                reindex(archiv_pfad=pfad)
+            except Exception as ex:
+                import logging
+                logging.getLogger('server').error(f'Reindex-Fehler: {ex}')
+        _threading.Thread(target=_run, daemon=True).start()
+        self._json({'ok': True, 'pfad': pfad})
+
+    def _api_mail_archiv_sync_ordner(self, body):
+        """POST /api/mail/archiv/sync-ordner — Aktiviert/deaktiviert Sync-Ordner für ein Konto."""
+        try:
+            konto  = (body.get('konto') or '').strip()
+            ordner = (body.get('ordner') or '').strip()
+            aktiv  = bool(body.get('aktiv', True))
+            if not konto or not ordner:
+                self._json({'ok': False, 'error': 'konto und ordner erforderlich'})
+                return
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8'))
+            ma = cfg.setdefault('mail_archiv', {})
+            so = ma.setdefault('sync_ordner', {})
+            ordner_list = so.setdefault(konto, [])
+            pflicht = {'INBOX', 'Gesendete Elemente'}
+            if ordner in pflicht:
+                if ordner not in ordner_list:
+                    ordner_list.append(ordner)
+            elif aktiv and ordner not in ordner_list:
+                ordner_list.append(ordner)
+            elif not aktiv and ordner in ordner_list:
+                ordner_list.remove(ordner)
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_ausgangsrechnungen(self):
         """GET /api/ausgangsrechnungen — Listet Ausgangsrechnungen."""
         db = get_db()
@@ -8477,6 +8747,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/oauth/connect':
             self._api_mail_oauth_connect(body)
+            return
+
+        if self.path == '/api/mail/archiv/reindex':
+            self._api_mail_archiv_reindex(body)
+            return
+
+        if self.path == '/api/mail/archiv/sync-ordner':
+            self._api_mail_archiv_sync_ordner(body)
             return
 
         if self.path == '/api/mail/send':

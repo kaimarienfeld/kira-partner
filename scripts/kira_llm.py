@@ -24,6 +24,7 @@ KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
 DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 SECRETS_FILE  = SCRIPTS_DIR / "secrets.json"
 CONFIG_FILE   = SCRIPTS_DIR / "config.json"
 
@@ -368,6 +369,33 @@ def _build_data_context(config):
             ctx += f"  {r['kategorie']}: {r['n']} Einträge\n"
     except: pass
 
+    # Mail-Kontext aus Archiv: letzte 15 wichtige Mails (INBOX, nicht Newsletter)
+    try:
+        if MAIL_INDEX_DB.exists():
+            mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+            mdb.row_factory = sqlite3.Row
+            mail_rows = mdb.execute("""
+                SELECT absender_short, absender, betreff, datum_iso, datum,
+                       hat_anhaenge, anhaenge, message_id, folder, text_plain
+                FROM mails
+                WHERE (folder LIKE '%INBOX%' OR folder LIKE '%Eingang%' OR folder LIKE 'INBOX')
+                ORDER BY datum_iso DESC LIMIT 15
+            """).fetchall()
+            mdb.close()
+            if mail_rows:
+                ctx += f"\n=== LETZTE EINGANGSMAILS ({len(mail_rows)}) ===\n"
+                ctx += "(Für vollständigen Mailinhalt: mail_lesen(message_id) aufrufen)\n"
+                for m in mail_rows:
+                    absender_disp = m['absender_short'] or m['absender'] or '?'
+                    datum_disp = (m['datum_iso'] or m['datum'] or '')[:16]
+                    anhang_flag = " [Anhang]" if m['hat_anhaenge'] else ""
+                    text_preview = (m['text_plain'] or '')[:150].replace('\n', ' ')
+                    ctx += f"  [{m['message_id'][:30] if m['message_id'] else '?'}] {datum_disp} | {absender_disp[:40]} | {(m['betreff'] or '')[:60]}{anhang_flag}\n"
+                    if text_preview:
+                        ctx += f"    → {text_preview}...\n"
+    except Exception:
+        pass
+
     try:
         ddb = sqlite3.connect(str(DETAIL_DB))
         ddb.row_factory = sqlite3.Row
@@ -397,6 +425,69 @@ def _build_data_context(config):
 
     db.close()
     return ctx
+
+
+def mail_vollinhalt_lesen(message_id: str) -> dict:
+    """
+    Liest den vollständigen Inhalt einer Mail aus dem lokalen Archiv.
+    Gibt dict zurück: {ok, betreff, absender, datum, text, anhaenge, eml_path, error}
+    Sucht zuerst in mail_index.db → dann liest mail.json aus mail_folder_pfad.
+    """
+    if not MAIL_INDEX_DB.exists():
+        return {"ok": False, "error": "mail_index.db nicht vorhanden"}
+    try:
+        mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+        mdb.row_factory = sqlite3.Row
+        row = mdb.execute(
+            "SELECT * FROM mails WHERE message_id=?", (message_id,)
+        ).fetchone()
+        mdb.close()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    if not row:
+        return {"ok": False, "error": f"Mail nicht gefunden: {message_id}"}
+
+    result = {
+        "ok": True,
+        "message_id": message_id,
+        "betreff": row["betreff"] or "",
+        "absender": row["absender"] or "",
+        "datum": row["datum_iso"] or row["datum"] or "",
+        "text": row["text_plain"] or "",
+        "anhaenge": [],
+        "eml_path": row["eml_path"] or "",
+        "mail_folder_pfad": row["mail_folder_pfad"] or "",
+        "hat_anhaenge": bool(row["hat_anhaenge"]),
+    }
+
+    # Anhänge aus JSON
+    try:
+        if row["anhaenge"]:
+            result["anhaenge"] = json.loads(row["anhaenge"])
+    except Exception:
+        pass
+
+    # Vollständigen Text aus mail.json nachladen (falls text_plain kurz/leer)
+    mail_folder = row["mail_folder_pfad"] or ""
+    if mail_folder:
+        json_path = Path(mail_folder) / "mail.json"
+        try:
+            if json_path.exists():
+                mj = json.loads(json_path.read_text('utf-8'))
+                full_text = mj.get("text", "")
+                if full_text and len(full_text) > len(result["text"]):
+                    result["text"] = full_text[:20000]
+                if mj.get("anhaenge"):
+                    result["anhaenge"] = mj["anhaenge"]
+                anhaenge_pfad = mj.get("anhaenge_pfad", "")
+                if anhaenge_pfad and Path(anhaenge_pfad).exists():
+                    result["anhaenge_pfad"] = anhaenge_pfad
+                    result["anhaenge_dateien"] = [f.name for f in Path(anhaenge_pfad).iterdir() if f.is_file()]
+        except Exception:
+            pass
+
+    return result
 
 
 # ── Tool-Definitionen (Anthropic-Format = Canonical) ─────────────────────────
@@ -608,6 +699,34 @@ def get_tools(config=None):
     except Exception:
         pass
 
+    # Mail-Tools (immer aktiv wenn mail_index.db vorhanden)
+    if MAIL_INDEX_DB.exists():
+        tools.append({
+            "name": "mail_suchen",
+            "description": "Sucht in allen archivierten Mails (12.000+). Nutze dieses Tool wenn du nach Mails eines Kunden, zu einem Projekt oder mit bestimmtem Inhalt suchst. Gibt Absender, Betreff, Datum und Textvorschau zurück.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query":   {"type": "string", "description": "Suchbegriff — in Betreff, Absender und Mailtext"},
+                    "konto":   {"type": "string", "description": "Optional: nur dieses Konto durchsuchen (z.B. 'anfrage@raumkult.eu')"},
+                    "folder":  {"type": "string", "description": "Optional: nur diesen Ordner (INBOX, Gesendete Elemente)"},
+                    "limit":   {"type": "integer", "description": "Max. Ergebnisse (Standard: 20)", "default": 20}
+                },
+                "required": ["query"]
+            }
+        })
+        tools.append({
+            "name": "mail_lesen",
+            "description": "Liest den vollständigen Inhalt einer Mail aus dem Archiv inklusive komplettem Text und Anhang-Liste. Verwende die message_id aus den Suchergebnissen oder der Mailliste.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "message_id": {"type": "string", "description": "Message-ID der Mail (aus mail_suchen oder der Mailliste)"}
+                },
+                "required": ["message_id"]
+            }
+        })
+
     if config.get("internet_recherche", False):
         tools.append({
             "name": "web_recherche",
@@ -666,6 +785,8 @@ def execute_tool(name, params):
             "tasks_loeschen": _tool_tasks_loeschen,
             "task_erledigen": _tool_task_erledigen,
             "runtime_log_suchen": _tool_runtime_log_suchen,
+            "mail_suchen": _tool_mail_suchen,
+            "mail_lesen": _tool_mail_lesen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -1181,6 +1302,72 @@ def _tool_runtime_log_suchen(p):
         return {"ok": True, "message": "\n".join(lines), "total": total}
     except Exception as e:
         return {"error": str(e)}
+
+
+def _tool_mail_suchen(p):
+    """Sucht in mail_index.db nach Mails."""
+    if not MAIL_INDEX_DB.exists():
+        return {"error": "Mail-Archiv nicht verfügbar"}
+    query  = (p.get("query") or "").strip()
+    konto  = (p.get("konto") or "").strip()
+    folder = (p.get("folder") or "").strip()
+    limit  = min(int(p.get("limit", 20)), 100)
+    if not query:
+        return {"error": "Suchbegriff (query) erforderlich"}
+    try:
+        conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        conn.row_factory = sqlite3.Row
+        like = f"%{query}%"
+        where_parts = ["(betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"]
+        params = [like, like, like]
+        if konto:
+            where_parts.append("konto LIKE ?")
+            params.append(f"%{konto}%")
+        if folder:
+            where_parts.append("folder LIKE ?")
+            params.append(f"%{folder}%")
+        where = " AND ".join(where_parts)
+        total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
+        rows  = conn.execute(
+            f"SELECT message_id, absender_short, absender, betreff, datum_iso, datum, "
+            f"folder, hat_anhaenge, text_plain FROM mails WHERE {where} "
+            f"ORDER BY datum_iso DESC LIMIT ?",
+            params + [limit]
+        ).fetchall()
+        conn.close()
+        lines = [f"Mail-Suche '{query}': {total} Treffer (zeige {len(rows)})"]
+        for r in rows:
+            ab = r['absender_short'] or r['absender'] or '?'
+            dt = (r['datum_iso'] or r['datum'] or '')[:16]
+            anh = " [Anh]" if r['hat_anhaenge'] else ""
+            prev = (r['text_plain'] or '')[:100].replace('\n', ' ')
+            lines.append(f"[{r['message_id']}] {dt} | {ab[:35]} | {(r['betreff'] or '')[:60]}{anh}")
+            if prev:
+                lines.append(f"  → {prev}")
+        return {"ok": True, "message": "\n".join(lines), "total": total}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_mail_lesen(p):
+    """Liest vollständigen Mailinhalt aus dem Archiv."""
+    message_id = (p.get("message_id") or "").strip()
+    if not message_id:
+        return {"error": "message_id erforderlich"}
+    result = mail_vollinhalt_lesen(message_id)
+    if not result.get("ok"):
+        return {"error": result.get("error", "Mail nicht gefunden")}
+    text = result.get("text", "")
+    anhaenge = result.get("anhaenge", [])
+    anh_text = f"\nAnhänge: {', '.join(anhaenge)}" if anhaenge else ""
+    msg = (
+        f"Von: {result['absender']}\n"
+        f"An: {result.get('an','')}\n"
+        f"Datum: {result['datum']}\n"
+        f"Betreff: {result['betreff']}{anh_text}\n\n"
+        f"--- Mailinhalt ---\n{text[:15000]}"
+    )
+    return {"ok": True, "message": msg}
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────

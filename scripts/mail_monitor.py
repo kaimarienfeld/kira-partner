@@ -493,11 +493,107 @@ def _process_mail(mail_data, konto_label, folder_name):
     return result
 
 
+def _save_to_archive(mail_data: dict, raw_bytes: bytes, konto_label: str, folder_name: str) -> str:
+    """
+    Speichert eine neue Mail im lokalen Archiv-Ordner.
+    Struktur: archiv_root/konto_folder/FOLDER/YYYY-MM-DD_betreff_hash8/
+      - mail.json  — Metadaten + Text
+      - mail.eml   — Roh-MIME
+      - attachments/ — extrahierte Anhänge
+    Gibt den mail_folder_pfad zurück, oder "" bei Fehler / Deaktiviert.
+    """
+    try:
+        config = json.loads(CONFIG_FILE.read_text('utf-8'))
+        ma = config.get('mail_archiv', {})
+        if not ma.get('neue_mails_archivieren', True):
+            return ""
+        archiv_pfad = ma.get('pfad', '').strip()
+        if not archiv_pfad:
+            return ""
+        archiv_root = Path(archiv_pfad)
+        if not archiv_root.exists():
+            return ""
+    except Exception:
+        return ""
+
+    try:
+        # Konto-Ordner: anfrage@raumkult.eu → anfrage_raumkult_eu
+        konto_folder = konto_label.replace('@', '_').replace('.', '_').lower()
+        # Ordner: INBOX bleibt INBOX
+        safe_folder = re.sub(r'[<>:"/\\|?*]', '_', folder_name)
+        # Mail-Unterordner: YYYY-MM-DD_betreff_hash8
+        datum_part = (mail_data.get('datum_iso') or mail_data.get('datum', ''))[:10] or datetime.now().strftime('%Y-%m-%d')
+        betreff_clean = re.sub(r'[^a-zA-Z0-9\u00c0-\u024f\s_-]', '', mail_data.get('betreff', 'nosubject'))
+        betreff_clean = re.sub(r'\s+', '_', betreff_clean.strip())[:40]
+        msg_id = mail_data.get('message_id', '')
+        hash8 = hashlib.sha256((msg_id or datum_part).encode('utf-8', errors='replace')).hexdigest()[:8]
+        mail_dir = archiv_root / konto_folder / safe_folder / f"{datum_part}_{betreff_clean}_{hash8}"
+        mail_dir.mkdir(parents=True, exist_ok=True)
+
+        eml_path = mail_dir / 'mail.eml'
+        json_path = mail_dir / 'mail.json'
+
+        # Überspringen falls bereits vorhanden
+        if json_path.exists():
+            return str(mail_dir)
+
+        # mail.eml speichern
+        eml_path.write_bytes(raw_bytes)
+
+        # Anhänge extrahieren
+        anhaenge_info = []
+        att_dir = mail_dir / 'attachments'
+        try:
+            raw_msg = email.message_from_bytes(raw_bytes)
+            if raw_msg.is_multipart():
+                for part in raw_msg.walk():
+                    fn = part.get_filename()
+                    disp = str(part.get('Content-Disposition', ''))
+                    if fn and 'attachment' in disp:
+                        fn_safe = _decode_hdr(fn)
+                        fn_disk = re.sub(r'[<>:"/\\|?*]', '_', fn_safe)[:80]
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            att_dir.mkdir(exist_ok=True)
+                            (att_dir / fn_disk).write_bytes(payload)
+                            anhaenge_info.append(fn_safe)
+        except Exception:
+            pass
+
+        # mail.json speichern (gleiche Struktur wie Archiver)
+        mail_json = {
+            'konto': mail_data.get('konto', konto_label),
+            'betreff': mail_data.get('betreff', ''),
+            'absender': mail_data.get('absender', ''),
+            'an': mail_data.get('an', ''),
+            'cc': mail_data.get('cc', ''),
+            'datum': mail_data.get('datum', ''),
+            'datum_iso': mail_data.get('datum_iso', ''),
+            'message_id': msg_id,
+            'in_reply_to': mail_data.get('in_reply_to', ''),
+            'mail_references': mail_data.get('mail_references', ''),
+            'text': mail_data.get('text', ''),
+            'hat_anhaenge': bool(anhaenge_info or mail_data.get('hat_anhaenge')),
+            'anhaenge': anhaenge_info or mail_data.get('anhaenge', []),
+            'anhaenge_pfad': str(att_dir) if anhaenge_info else '',
+            'eml_pfad': str(eml_path),
+            'mail_folder_pfad': str(mail_dir),
+            'archiviert_am': datetime.now().isoformat(),
+            'sync_source': 'live_sync',
+        }
+        json_path.write_text(json.dumps(mail_json, ensure_ascii=False, indent=2), 'utf-8')
+        return str(mail_dir)
+    except Exception as e:
+        log.debug(f"Archiv-Speichern fehlgeschlagen: {e}")
+        return ""
+
+
 def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
     """
     Schreibt eine Mail in mail_index.db (zentraler Index).
     Idempotent: INSERT OR IGNORE verhindert Duplikate.
     Quelle: 'live_sync' (vom IMAP-Monitor in Echtzeit abgerufen).
+    Liest eml_path und mail_folder_pfad aus mail_data falls vorhanden.
     """
     if not MAIL_INDEX_DB.exists():
         return  # DB noch nicht initialisiert → still überspringen
@@ -505,14 +601,17 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
     try:
         conn = sqlite3.connect(str(MAIL_INDEX_DB))
         conn.execute("PRAGMA journal_mode=WAL")
+        eml_path = mail_data.get('eml_path', '')
+        mail_folder_pfad = mail_data.get('mail_folder_pfad', '')
         conn.execute("""
             INSERT OR IGNORE INTO mails
             (konto, konto_label, betreff, absender, an, cc,
              datum, datum_iso, message_id, folder,
              hat_anhaenge, anhaenge,
              in_reply_to, mail_references, thread_id,
-             sync_source, text_plain, archiviert_am)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             sync_source, text_plain, archiviert_am,
+             eml_path, mail_folder_pfad)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             mail_data.get("konto", konto_label),
             konto_label,
@@ -532,7 +631,17 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
             "live_sync",
             mail_data.get("text", "")[:8000],
             datetime.now().isoformat(),
+            eml_path,
+            mail_folder_pfad,
         ))
+        # Falls bereits vorhanden: eml_path + mail_folder_pfad nachfüllen wenn leer
+        if eml_path or mail_folder_pfad:
+            conn.execute("""
+                UPDATE mails SET
+                    eml_path = COALESCE(NULLIF(eml_path,''), ?),
+                    mail_folder_pfad = COALESCE(NULLIF(mail_folder_pfad,''), ?)
+                WHERE message_id=?
+            """, (eml_path, mail_folder_pfad, mail_data.get("message_id", "")))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -690,6 +799,11 @@ def poll_all_accounts():
                                 continue
 
                             mail_data = parse_raw_mail(raw, label)
+                            # Ins Archiv speichern (JSON+EML+Anhänge)
+                            pfad = _save_to_archive(mail_data, raw, label, folder_name)
+                            if pfad:
+                                mail_data['mail_folder_pfad'] = pfad
+                                mail_data['eml_path'] = str(Path(pfad) / 'mail.eml')
                             result = _process_mail(mail_data, label, folder_name)
                             if result and result.get("kategorie") not in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
                                 all_new_tasks.append(result)
