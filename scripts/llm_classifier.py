@@ -21,6 +21,7 @@ SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 
 # Generische E-Mail-Domains (kein Firmen-Domain-Match sinnvoll)
 _GENERIC_DOMAINS = {
@@ -47,7 +48,8 @@ PRIORITAETEN = ["hoch", "mittel", "niedrig"]
 
 def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent,
                                   angebote_kontext: str = "", correction_beispiele: str = "",
-                                  kira_wissen: str = "", kunden_profil: str = ""):
+                                  kira_wissen: str = "", kunden_profil: str = "",
+                                  mail_verlauf: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:2000]
 
@@ -59,6 +61,10 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
 → PFLICHT: Lies den Mailtext sorgfältig — nur wenn der INHALT auf ein Angebot, Auftrag,
   Preis, Projekt oder eine Zusammenarbeit Bezug nimmt: Kategorie = "Angebotsrueckmeldung".
   Reine Danke-Mails oder unrelated Themen → andere passende Kategorie wählen.
+→ Wenn Kategorie="Angebotsrueckmeldung": Setze auch angebot_aktion UND angebot_nummer!
+  angebot_aktion: "angenommen" wenn Kunde Projekt/Auftrag bestätigt/annimmt
+                  "abgelehnt" wenn Kunde ablehnt, absagt, kein Interesse
+                  "rueckfrage" wenn Rückfragen, Änderungswünsche, Verhandlung
 """
 
     corrections_block = ""
@@ -79,8 +85,15 @@ WISSEN (von Kira gelernte Erkenntnisse zur Klassifizierung):
     if kunden_profil:
         profil_block = f"\n{kunden_profil}\n"
 
+    verlauf_block = ""
+    if mail_verlauf:
+        verlauf_block = f"""
+BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
+{mail_verlauf}
+"""
+
     return f"""Klassifiziere diese E-Mail für rauMKult® Sichtbeton (Betonkosmetik-Fachbetrieb).
-{angebote_block}{corrections_block}{wissen_block}{profil_block}
+{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}
 MAIL-DATEN:
 - Konto: {konto}
 - Absender: {absender}
@@ -119,7 +132,9 @@ Antworte NUR als JSON:
   "mit_termin": true/false,
   "manuelle_pruefung": true/false,
   "beantwortet": true/false,
-  "organisation": {{"termin": "...", "rueckruf": true, "frist": "..."}} oder null
+  "organisation": {{"termin": "...", "rueckruf": true, "frist": "..."}} oder null,
+  "angebot_aktion": "angenommen" | "abgelehnt" | "rueckfrage" | null,
+  "angebot_nummer": "ANF-2026-001" | null
 }}
 
 mit_termin=true wenn Mail konkretes Datum, Besichtigungstermin oder Terminvereinbarung enthält.
@@ -310,6 +325,81 @@ def _get_kunden_profil(email: str) -> str:
         return ""
 
 
+def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
+    """
+    Lädt die letzten Mails von/an diesen Absender aus mail_index.db.
+    Gibt dem LLM vollständigen Kontext über bisherige Kommunikation.
+    Zeigt sowohl empfangene als auch gesendete Mails (Konversation).
+    """
+    if not absender_email or not MAIL_INDEX_DB.exists():
+        return ""
+    try:
+        email_clean = absender_email.lower().strip()
+        domain = email_clean.split("@")[1] if "@" in email_clean else ""
+        conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        conn.row_factory = sqlite3.Row
+
+        # Mails vom Absender (empfangen)
+        rows_von = conn.execute("""
+            SELECT betreff, datum_iso, datum, folder, text_plain, absender_short, absender
+            FROM mails
+            WHERE LOWER(absender) LIKE ?
+            ORDER BY datum_iso DESC LIMIT ?
+        """, (f"%{email_clean}%", max_mails)).fetchall()
+
+        # Gesendete Mails an diesen Kunden (Antworten, Angebote)
+        rows_an = conn.execute("""
+            SELECT betreff, datum_iso, datum, folder, text_plain, absender_short, absender
+            FROM mails
+            WHERE (folder LIKE '%Gesendete%' OR folder LIKE '%Sent%')
+              AND LOWER(an) LIKE ?
+            ORDER BY datum_iso DESC LIMIT 5
+        """, (f"%{email_clean}%",)).fetchall()
+
+        # Falls wenig direkte Treffer: Domain-Suche
+        if len(rows_von) < 2 and domain and domain not in {
+            "gmail.com","web.de","gmx.de","gmx.net","yahoo.com","hotmail.com","outlook.com"
+        }:
+            rows_domain = conn.execute("""
+                SELECT betreff, datum_iso, datum, folder, text_plain, absender_short, absender
+                FROM mails
+                WHERE LOWER(absender) LIKE ?
+                  AND LOWER(absender) NOT LIKE ?
+                ORDER BY datum_iso DESC LIMIT 5
+            """, (f"%@{domain}%", f"%{email_clean}%")).fetchall()
+            rows_von = list(rows_von) + list(rows_domain)
+
+        conn.close()
+
+        if not rows_von and not rows_an:
+            return ""
+
+        # Alle Mails nach Datum sortieren (kombinierter Verlauf)
+        all_mails = []
+        for r in rows_von:
+            all_mails.append(("→ Empfangen", r))
+        for r in rows_an:
+            all_mails.append(("← Gesendet", r))
+
+        all_mails.sort(key=lambda x: (x[1]["datum_iso"] or x[1]["datum"] or ""), reverse=False)
+        # Nur die letzten max_mails zeigen
+        all_mails = all_mails[-max_mails:]
+
+        lines = []
+        for richtung, r in all_mails:
+            dt = (r["datum_iso"] or r["datum"] or "")[:16]
+            ab = r["absender_short"] or r["absender"] or "?"
+            betr = (r["betreff"] or "")[:80]
+            preview = (r["text_plain"] or "")[:200].replace("\n", " ")
+            lines.append(f"  {dt} {richtung}: {betr}")
+            if preview:
+                lines.append(f"    ↳ {preview}")
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 def _get_kira_wissen(limit: int = 10) -> str:
     """
     Lädt Kiras gelernte Erkenntnisse aus wissen_regeln, die für die
@@ -428,12 +518,13 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         if not providers:
             raise RuntimeError("Kein Provider konfiguriert")
 
-        # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen + Kira-Wissen + Kundenprofil
+        # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen + Kira-Wissen + Kundenprofil + Mail-Verlauf
+        kunden_email_raw     = extract_email(absender)
         angebote_kontext     = _get_angebote_kontext(absender, text, mail_datum=mail_datum)
         correction_beispiele = _get_correction_beispiele()
         kira_wissen          = _get_kira_wissen()
-        kunden_email_raw     = extract_email(absender)
         kunden_profil        = _get_kunden_profil(kunden_email_raw)
+        mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw)
 
         prompt = _build_classification_prompt(
             konto, absender, betreff, text, folder, is_sent,
@@ -441,6 +532,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             correction_beispiele=correction_beispiele,
             kira_wissen=kira_wissen,
             kunden_profil=kunden_profil,
+            mail_verlauf=mail_verlauf,
         )
 
         # Leichtgewichtiger Direkt-Aufruf (Haiku, 512 max_tokens, kein System-Prompt)
@@ -461,6 +553,12 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             if isinstance(organisation, dict) and not any(organisation.values()):
                 organisation = None
 
+            angebot_aktion = parsed.get("angebot_aktion") or None
+            angebot_nummer = parsed.get("angebot_nummer") or None
+            # Validierung
+            if angebot_aktion not in ("angenommen", "abgelehnt", "rueckfrage", None):
+                angebot_aktion = None
+
             return {
                 "kategorie":          parsed["kategorie"],
                 "absender_rolle":     parsed.get("absender_rolle", ""),
@@ -475,6 +573,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                 "beantwortet":        1 if parsed.get("beantwortet") else 0,
                 "organisation":       organisation,
                 "geschaeft":          geschaeft,
+                "angebot_aktion":     angebot_aktion,
+                "angebot_nummer":     angebot_nummer,
             }
 
     except Exception as e:

@@ -396,6 +396,15 @@ def _process_mail(mail_data, konto_label, folder_name):
 
     kategorie = result.get("kategorie", "Zur Kenntnis")
     konfidenz = result.get("konfidenz", "?")
+
+    # Automatische Angebot-Aktion (Annahme/Ablehnung automatisch buchen)
+    if kategorie == "Angebotsrueckmeldung" and result.get("angebot_aktion"):
+        kunden_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
+        ke = kunden_email_m.group(1).lower() if kunden_email_m else absender.strip().lower()
+        auto_result = _auto_angebot_aktion(result, ke, betreff, msg_id)
+        if auto_result.get("aktion_durchgefuehrt"):
+            result["_auto_aktion"] = auto_result
+
     _alog("Klassifizierung", f"→ {kategorie}",
           f"{absender[:60]} | {betreff[:80]} | Konfidenz: {konfidenz}",
           "warnung" if konfidenz == "niedrig" else "ok",
@@ -646,6 +655,95 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
         conn.close()
     except Exception as e:
         log.debug(f"mail_index.db Schreiben fehlgeschlagen: {e}")
+
+
+def _auto_angebot_aktion(result: dict, kunden_email: str, betreff: str, msg_id: str):
+    """
+    Führt automatische Datenbankaktionen aus wenn der Classifier eine Angebotsrückmeldung
+    erkannt hat. Aktualisiert Angebot-Status und erstellt passenden Folge-Task.
+    Gibt dict zurück: {aktion_durchgefuehrt, angebot_nummer, neue_aufgabe}
+    """
+    angebot_aktion = result.get("angebot_aktion")
+    angebot_nummer = result.get("angebot_nummer")
+    if not angebot_aktion:
+        return {}
+
+    try:
+        import sqlite3 as _sq
+        db = _sq.connect(str(TASKS_DB))
+        db.row_factory = _sq.Row
+
+        # Angebot finden: zuerst per Nummer, dann per E-Mail
+        ang = None
+        if angebot_nummer:
+            ang = db.execute(
+                "SELECT * FROM angebote WHERE a_nummer=? AND status='offen'",
+                (angebot_nummer,)
+            ).fetchone()
+        if not ang and kunden_email:
+            ang = db.execute(
+                "SELECT * FROM angebote WHERE LOWER(kunde_email)=? AND status='offen' ORDER BY datum DESC LIMIT 1",
+                (kunden_email.lower(),)
+            ).fetchone()
+        if not ang:
+            db.close()
+            return {}
+
+        ang_id = ang["id"]
+        ang_nr = ang["a_nummer"]
+        kunde = ang["kunde_name"] or kunden_email
+
+        if angebot_aktion == "angenommen":
+            db.execute(
+                "UPDATE angebote SET status='angenommen', grund_angenommen=? WHERE id=?",
+                (f"Mail: {betreff[:200]}", ang_id)
+            )
+            # Folge-Task: Rechnung schreiben
+            db.execute("""
+                INSERT INTO tasks
+                (typ, kategorie, titel, zusammenfassung, beschreibung,
+                 kunden_email, empfohlene_aktion, betreff, konto,
+                 status, prioritaet, antwort_noetig, message_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                "Rechnung", "Angebotsrueckmeldung",
+                f"Rechnung schreiben: {kunde}",
+                f"Angebot {ang_nr} von {kunde} wurde angenommen.",
+                f"Angebot {ang_nr} wurde angenommen. Rechnung erstellen und senden.",
+                kunden_email, "Rechnung erstellen und an Kunden senden",
+                betreff[:200], "auto",
+                "offen", "hoch", 0,
+                f"auto-annahme-{msg_id[:40]}"
+            ))
+            _alog("Angebot", f"Angenommen: {ang_nr}",
+                  f"{kunde} | Angebot angenommen → Rechnung-Task erstellt", "ok")
+            _elog('system', 'angebot_angenommen', f"Angebot {ang_nr} angenommen von {kunde}",
+                  source='mail_monitor', modul='mail_monitor', submodul='auto_aktion',
+                  actor_type='system', status='ok', context_type='angebot', context_id=ang_nr)
+
+        elif angebot_aktion == "abgelehnt":
+            db.execute(
+                "UPDATE angebote SET status='abgelehnt', grund_abgelehnt=? WHERE id=?",
+                (f"Mail: {betreff[:200]}", ang_id)
+            )
+            _alog("Angebot", f"Abgelehnt: {ang_nr}",
+                  f"{kunde} | Angebot abgelehnt", "warnung")
+            _elog('system', 'angebot_abgelehnt', f"Angebot {ang_nr} abgelehnt von {kunde}",
+                  source='mail_monitor', modul='mail_monitor', submodul='auto_aktion',
+                  actor_type='system', status='warnung', context_type='angebot', context_id=ang_nr)
+
+        elif angebot_aktion == "rueckfrage":
+            # Nur loggen, kein Status-Update — Rückfrage = Angebot bleibt offen
+            _alog("Angebot", f"Rückfrage: {ang_nr}",
+                  f"{kunde} | Rückfrage zu Angebot", "ok")
+
+        db.commit()
+        db.close()
+        return {"aktion_durchgefuehrt": angebot_aktion, "angebot_nummer": ang_nr, "kunde": kunde}
+
+    except Exception as e:
+        log.error(f"_auto_angebot_aktion Fehler: {e}")
+        return {}
 
 
 def _send_notification(new_tasks):
