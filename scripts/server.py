@@ -1044,6 +1044,12 @@ window.pfOpenMail = function(m, el) {
       wrap.innerHTML=d.anhaenge.map(a=>'<div class="pf-att-chip" data-pfad="'+encodeURIComponent(a.pfad)+'" onclick="pfOpenAtt(this.dataset.pfad)">&#x1F4CE; '+esc(a.name)+' <small style="color:var(--text-muted)">'+a.typ+'</small></div>').join('');
     }
   });
+  // Als gelesen markieren
+  if(m.unread) {
+    fetch('/api/mail/mark-read?message_id='+encodeURIComponent(m.message_id));
+    const el=document.querySelector('[data-msgid="'+m.message_id+'"]');
+    if(el) el.classList.remove('unread');
+  }
 
   // Thread laden wenn thread_id vorhanden
   if(m.thread_id&&m.thread_id!==m.message_id) {
@@ -1164,6 +1170,35 @@ window.pfSearchDebounce=function(){
   },400);
 };
 window.pfLoadMore=function(){pfLoadList(false);};
+
+// Auto-Refresh: Ordner-Counts alle 60s aktualisieren, bei neuen Mails Banner zeigen
+let _pfAutoRefreshTimer = null;
+function pfStartAutoRefresh() {
+  if(_pfAutoRefreshTimer) clearInterval(_pfAutoRefreshTimer);
+  _pfAutoRefreshTimer = setInterval(()=>{
+    if(!document.getElementById('panel-postfach')?.classList.contains('active')) return;
+    fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
+      let totalUnread=0;
+      (data.konten||[]).forEach(k=>{
+        (k.ordner||[]).forEach(o=>{
+          totalUnread+=o.unread||0;
+          // Badge aktualisieren
+          const badge=document.querySelector('#pf-fi-'+k.email.replace(/[@.]/g,'_')+'_'+o.name.replace(/[^a-z0-9]/gi,'_')+' .pf-folder-badge');
+          if(o.unread>0){
+            if(badge) badge.textContent=o.unread;
+            else{
+              const fi=document.getElementById('pf-fi-'+k.email.replace(/[@.]/g,'_')+'_'+o.name.replace(/[^a-z0-9]/gi,'_'));
+              if(fi){const b=document.createElement('span');b.className='pf-folder-badge';b.textContent=o.unread;fi.appendChild(b);}
+            }
+          } else if(badge) badge.remove();
+        });
+      });
+      // Wenn aktiver Ordner neue Mails hat → Liste neu laden
+      if(totalUnread>0 && _pfCurrentKonto && _pfCurrentFolder) pfLoadList(true);
+    }).catch(()=>{});
+  }, 60000);
+}
+pfStartAutoRefresh();
 
 // Postfach aufrufen (bereits aktiv beim Laden)
 if(document.getElementById('panel-postfach')&&document.getElementById('panel-postfach').classList.contains('active')){
@@ -7930,6 +7965,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/thread'):
             self._api_mail_thread()
 
+        elif self.path.startswith('/api/mail/mark-read'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            msg_id = qs.get('message_id', [''])[0]
+            if msg_id:
+                try:
+                    conn = sqlite3.connect(str(MAIL_INDEX_DB))
+                    conn.execute("UPDATE mails SET gelesen=1 WHERE message_id=?", (msg_id,))
+                    conn.commit()
+                    conn.close()
+                    self._json({'ok': True})
+                except Exception as e:
+                    self._json({'ok': False, 'error': str(e)})
+            else:
+                self._json({'ok': False, 'error': 'missing message_id'})
+
         elif self.path == '/api/mail/archiv/status':
             self._api_mail_archiv_status()
 
@@ -8505,7 +8555,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     fn_low = fn.lower()
                     icon = next((v for key, v in folder_icons.items() if key in fn_low), '&#x1F4C2;')
                     lbl = next((v for key, v in folder_labels.items() if key in fn_low), fn)
-                    ordner.append({'name': fn, 'label': lbl, 'icon': icon, 'count': r['cnt'], 'unread': 0})
+                    unread_cnt = conn.execute(
+                        "SELECT COUNT(*) FROM mails WHERE konto=? AND folder=? AND gelesen=0",
+                        (email, fn)
+                    ).fetchone()[0]
+                    ordner.append({'name': fn, 'label': lbl, 'icon': icon, 'count': r['cnt'], 'unread': unread_cnt})
                 if ordner:
                     result['konten'].append({'email': email, 'label': label, 'ordner': ordner})
             conn.close()
@@ -8536,7 +8590,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
             rows  = conn.execute(
                 f"SELECT id,konto,konto_label,betreff,absender,an,datum,message_id,"
-                f"hat_anhaenge,thread_id,text_plain FROM mails WHERE {where} "
+                f"hat_anhaenge,thread_id,text_plain,gelesen FROM mails WHERE {where} "
                 f"ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -8568,7 +8622,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'hat_thread':    tc > 1,
                     'thread_count':  tc,
                     'text_plain':    (r['text_plain'] or '')[:120],
-                    'unread':        False,
+                    'unread':        (r['gelesen'] == 0) if r['gelesen'] is not None else False,
                 })
 
             conn.close()

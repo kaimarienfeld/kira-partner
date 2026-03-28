@@ -626,8 +626,8 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
              hat_anhaenge, anhaenge,
              in_reply_to, mail_references, thread_id,
              sync_source, text_plain, archiviert_am,
-             eml_path, mail_folder_pfad)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             eml_path, mail_folder_pfad, gelesen)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             mail_data.get("konto", konto_label),
             konto_label,
@@ -649,6 +649,7 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
             datetime.now().isoformat(),
             eml_path,
             mail_folder_pfad,
+            0,  # gelesen=0 → neue Mail ist ungelesen
         ))
         # Falls bereits vorhanden: eml_path + mail_folder_pfad nachfüllen wenn leer
         if eml_path or mail_folder_pfad:
@@ -866,11 +867,11 @@ def poll_all_accounts():
                         else:
                             new_uids = []
                     else:
-                        # Erster Lauf: nur die letzten 20 Mails
+                        # Erster Lauf: letzte 50 Mails für vollständige Ersterfassung
                         sr, ud = imap.uid("SEARCH", "ALL")
                         if sr == "OK" and ud[0]:
                             all_uids = ud[0].split()
-                            new_uids = all_uids[-20:] if len(all_uids) > 20 else all_uids
+                            new_uids = all_uids[-50:] if len(all_uids) > 50 else all_uids
                         else:
                             new_uids = []
 
@@ -920,8 +921,6 @@ def poll_all_accounts():
 
                     # State updaten
                     if max_uid > last_uid:
-                        if email_addr not in konto_state:
-                            konto_state = {}
                         konto_state.setdefault(folder_name, {})["last_uid"] = max_uid
 
                 except Exception as e:
