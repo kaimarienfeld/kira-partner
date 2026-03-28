@@ -601,10 +601,11 @@ body{
 
   <div class="welcome-banner">
     <div class="welcome-ava" id="welcome-ava">🌸</div>
-    <div>
+    <div style="flex:1">
       <div class="welcome-h" id="welcome-h">Hallo Leni! Schön, dass du da bist. 🎉</div>
       <div class="welcome-p" id="welcome-p">Hier siehst du, was Kai und Kira gerade bauen — und deine Meinung dazu ist Gold wert!</div>
     </div>
+    <button id="btn-leni-settings" onclick="openLeniSettings()" style="display:none;margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-dim);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap;flex-shrink:0" title="Meine Benachrichtigungseinstellungen">⚙ Einstellungen</button>
   </div>
 
   <!-- Status-Karten -->
@@ -723,6 +724,43 @@ body{
           </button>
         </div>
       </div>
+      <div class="settings-section">
+        <div class="settings-section-title">📧 E-Mail Benachrichtigungen für Leni</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Lenis E-Mail</strong><span>Für Willkommens- und Passwort-Mail</span></div>
+            <input type="email" class="settings-input" id="cfg-leni-email" placeholder="leni@beispiel.de">
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Benachrichtigung via</strong><span>Leni kann das selbst in ihren Einstellungen anpassen</span></div>
+            <select class="settings-select" id="cfg-leni-notif-method">
+              <option value="ntfy">ntfy (Push)</option>
+              <option value="mail">E-Mail</option>
+              <option value="beide">Beides</option>
+              <option value="keine">Keine</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Häufigkeit</strong></div>
+            <select class="settings-select" id="cfg-leni-notif-freq">
+              <option value="sofort">Sofort</option>
+              <option value="taeglich">Max. täglich</option>
+              <option value="woechentlich">Wöchentlich</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-export" onclick="sendWelcomeMail()" style="border-color:var(--accent);color:var(--accent)">
+            📧 Willkommens-Mail senden (Link, kein PW)
+          </button>
+          <button class="btn-export" onclick="sendPasswordMail()" style="border-color:var(--orange);color:var(--orange)">
+            🔑 Passwort-Mail senden
+          </button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+          Mail wird über dein lokales Kira-Dashboard gesendet (localhost:8765 muss laufen).
+        </div>
+      </div>
       <button class="btn-save-settings" onclick="saveAdminSettings()">💾 Einstellungen speichern</button>
       <div style="font-size:12px;color:var(--text-muted);margin-top:10px">Passwörter werden erst beim nächsten GitHub-Push live geschaltet.</div>
     </div>
@@ -769,6 +807,43 @@ body{
   </div><!-- /admin-panel -->
 
 </div><!-- /screen-app -->
+
+<!-- ═══════════════════ LENI SETTINGS MODAL ══════════════════ -->
+<div class="modal-bg" id="modal-leni-settings">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title">⚙️ Meine Benachrichtigungen</div><div class="modal-sub">Wie möchtest du informiert werden wenn es Neuigkeiten gibt?</div></div>
+      <button class="btn-x" onclick="closeModal('modal-leni-settings')">✕</button>
+    </div>
+    <div class="feature-desc-box">
+      Kai richtet deine bevorzugte Benachrichtigung ein. Deine E-Mail verlässt diese Seite nicht ohne deine Zustimmung.
+    </div>
+    <label class="form-label">Benachrichtigung per</label>
+    <select class="form-ta" id="leni-notif-method" style="min-height:0;resize:none;padding:12px 16px">
+      <option value="ntfy">Push-Nachricht (ntfy App)</option>
+      <option value="mail">E-Mail</option>
+      <option value="beide">Beides (Push + E-Mail)</option>
+      <option value="keine">Keine</option>
+    </select>
+    <div style="height:12px"></div>
+    <label class="form-label">Meine E-Mail-Adresse</label>
+    <input type="email" id="leni-notif-email" class="form-ta" style="min-height:0;resize:none;padding:12px 16px" placeholder="leni@beispiel.de">
+    <div style="height:12px"></div>
+    <label class="form-label">Mein ntfy-Topic (falls Push gewünscht)</label>
+    <input type="text" id="leni-notif-ntfy" class="form-ta" style="min-height:0;resize:none;padding:12px 16px" placeholder="z.B. kira-partner-leni-updates">
+    <div style="height:12px"></div>
+    <label class="form-label">Wie oft möchtest du informiert werden?</label>
+    <select class="form-ta" id="leni-notif-freq" style="min-height:0;resize:none;padding:12px 16px">
+      <option value="sofort">Sofort wenn es Neuigkeiten gibt</option>
+      <option value="taeglich">Maximal einmal täglich</option>
+      <option value="woechentlich">Wöchentliche Zusammenfassung</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-leni-settings')">Abbrechen</button>
+      <button class="btn-save" onclick="saveLeniSettings()">💾 Einstellungen speichern</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════ MODALS ══════════════════════════════ -->
 <div class="modal-bg" id="modal-feedback">
@@ -1139,7 +1214,8 @@ function loadAdminSettings() {
     pw_kai:'',pw_leni:'',ntfy_kai:CFG.ntfy_kai,ntfy_kai_mode:'immediate',
     ntfy_leni:CFG.ntfy_leni,ntfy_leni_auto:'1',
     ntfy_leni_msg:'Neue Funktionen bei KIRA Partner! Schau mal rein 🌟',
-    gh_token:'',last_push:'',last_push_ok:false
+    gh_token:'',last_push:'',last_push_ok:false,
+    leni_email:'',leni_notif_method:'ntfy',leni_notif_freq:'sofort'
   };
   return Object.assign(defaults, JSON.parse(localStorage.getItem('kira_pv_admin')||'{}'));
 }
@@ -1153,7 +1229,10 @@ function saveAdminSettings() {
     ntfy_leni:     document.getElementById('cfg-ntfy-leni').value.trim(),
     ntfy_leni_auto:document.getElementById('cfg-ntfy-leni-auto').value,
     ntfy_leni_msg: document.getElementById('cfg-ntfy-leni-msg').value.trim(),
-    gh_token:      document.getElementById('cfg-gh-token').value.trim(),
+    gh_token:           document.getElementById('cfg-gh-token').value.trim(),
+    leni_email:         document.getElementById('cfg-leni-email').value.trim(),
+    leni_notif_method:  document.getElementById('cfg-leni-notif-method').value,
+    leni_notif_freq:    document.getElementById('cfg-leni-notif-freq').value,
     last_push: s.last_push, last_push_ok: s.last_push_ok
   };
   localStorage.setItem('kira_pv_admin', JSON.stringify(upd));
@@ -1168,7 +1247,10 @@ function fillAdminForm() {
   document.getElementById('cfg-ntfy-leni').value      = s.ntfy_leni;
   document.getElementById('cfg-ntfy-leni-auto').value = s.ntfy_leni_auto;
   document.getElementById('cfg-ntfy-leni-msg').value  = s.ntfy_leni_msg;
-  document.getElementById('cfg-gh-token').value       = s.gh_token;
+  document.getElementById('cfg-gh-token').value           = s.gh_token;
+  document.getElementById('cfg-leni-email').value         = s.leni_email;
+  document.getElementById('cfg-leni-notif-method').value  = s.leni_notif_method;
+  document.getElementById('cfg-leni-notif-freq').value    = s.leni_notif_freq;
   const dot=document.getElementById('sync-dot'),label=document.getElementById('sync-label'),sub=document.getElementById('sync-sub');
   if (s.last_push) {
     dot.className = s.last_push_ok ? 'sync-dot ok' : 'sync-dot warn';
@@ -1212,6 +1294,56 @@ function sendNtfyLeni(customMsg) {
   sendNtfy(s.ntfy_leni,'✨ KIRA Partner wurde aktualisiert',customMsg||s.ntfy_leni_msg||'Kai hat die Liste aktualisiert!',3);
   showToast('Push-Benachrichtigung an Leni gesendet!','📲');
 }
+
+/* ─────────────────────────────────────────────────────────────
+   LENI BENACHRICHTIGUNGEN — Einstellungen + Mail-Versand
+───────────────────────────────────────────────────────────── */
+function openLeniSettings() {
+  const p=JSON.parse(localStorage.getItem('kira_pv_leni_prefs')||'{}');
+  document.getElementById('leni-notif-method').value = p.method||'ntfy';
+  document.getElementById('leni-notif-email').value  = p.email ||'';
+  document.getElementById('leni-notif-ntfy').value   = p.ntfy  ||'';
+  document.getElementById('leni-notif-freq').value   = p.freq  ||'sofort';
+  openModal('modal-leni-settings');
+}
+function saveLeniSettings() {
+  const p = {
+    method: document.getElementById('leni-notif-method').value,
+    email:  document.getElementById('leni-notif-email').value.trim(),
+    ntfy:   document.getElementById('leni-notif-ntfy').value.trim(),
+    freq:   document.getElementById('leni-notif-freq').value,
+    saved:  new Date().toISOString().slice(0,10)
+  };
+  localStorage.setItem('kira_pv_leni_prefs',JSON.stringify(p));
+  closeModal('modal-leni-settings');
+  // Kai via ntfy informieren
+  const s=loadAdminSettings();
+  if(s.ntfy_kai){
+    const msg=`Lenis Benachrichtigungs-Wunsch:\nMethode: ${p.method}\nE-Mail: ${p.email||'(keine)'}\nntfy: ${p.ntfy||'(kein)'}\nHäufigkeit: ${p.freq}`;
+    sendNtfy(s.ntfy_kai,'⚙️ Leni hat Benachrichtigungen eingestellt',msg,2);
+  }
+  showToast('Gespeichert — Kai wurde informiert!','✓');
+}
+async function _sendLeniMail(type) {
+  const s=loadAdminSettings();
+  const email=document.getElementById('cfg-leni-email').value.trim()||s.leni_email||'';
+  if(!email){showToast('Bitte Lenis E-Mail eintragen','⚠️');return;}
+  const payload={type,to:email,link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`};
+  if(type==='password'){
+    const pw=s.pw_leni||CFG.pw_leni;
+    if(!pw){showToast('Kein Leni-Passwort gesetzt','⚠️');return;}
+    payload.password=pw;
+  }
+  try{
+    const r=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`HTTP ${r.status}`);}
+    showToast(type==='welcome'?'Willkommens-Mail gesendet!':'Passwort-Mail gesendet!',type==='welcome'?'📧':'🔑');
+  }catch(e){showToast('Fehler: '+e.message+' — Kira-App aktiv?','✗');}
+}
+function sendWelcomeMail(){_sendLeniMail('welcome');}
+function sendPasswordMail(){_sendLeniMail('password');}
 
 /* ─────────────────────────────────────────────────────────────
    GITHUB PUSH
@@ -1298,6 +1430,7 @@ function doLogout() {
   document.getElementById('pw-input').value='';
   document.getElementById('fab-idea').style.display='none';
   document.getElementById('admin-panel').style.display='none';
+  document.getElementById('btn-leni-settings').style.display='none';
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1315,6 +1448,7 @@ function startApp() {
     document.getElementById('welcome-p').textContent='Hier siehst du, was Kai und Kira gerade bauen — deine Meinung dazu ist Gold wert!';
     document.getElementById('fab-idea').style.display='flex';
     document.getElementById('admin-panel').style.display='none';
+    document.getElementById('btn-leni-settings').style.display='inline-flex';
   } else {
     document.getElementById('welcome-ava').textContent='👋';
     document.getElementById('welcome-h').textContent='Willkommen zurück, Kai.';

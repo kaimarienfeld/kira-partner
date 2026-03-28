@@ -8054,6 +8054,64 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Partner-View: Mail an Leni senden (Willkommen oder Passwort)
+        if self.path == '/api/partner/send-leni-mail':
+            try:
+                import smtplib, ssl as _ssl
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+                mail_cfg = CFG.get('email_notification', {})
+                smtp_server  = mail_cfg.get('smtp_server', '')
+                smtp_port    = int(mail_cfg.get('smtp_port', 587))
+                absender     = mail_cfg.get('absender_email', '')
+                pw_smtp      = mail_cfg.get('absender_passwort', '')
+                if not smtp_server or not absender:
+                    self._json({'ok': False, 'error': 'SMTP nicht konfiguriert (Einstellungen > Mail)'})
+                    return
+                mail_type = body.get('type', 'welcome')
+                to_addr   = body.get('to', '').strip()
+                link      = body.get('link', '')
+                if not to_addr:
+                    self._json({'ok': False, 'error': 'Keine Empfaenger-E-Mail angegeben'})
+                    return
+                msg = MIMEMultipart('alternative')
+                msg['From'] = absender
+                msg['To']   = to_addr
+                if mail_type == 'welcome':
+                    msg['Subject'] = 'Du bist dabei! Kira wartet auf dich'
+                    text = (
+                        f"Hallo Leni,\n\n"
+                        f"Kai und Kira sind bereit! Dein persoenlicher Blick auf die neue rauMKult-App wartet auf dich.\n\n"
+                        f"Hier ist dein Link:\n{link}\n\n"
+                        f"Dein Passwort kommt in einer separaten Mail.\n\n"
+                        f"Auf der Seite kannst du direkt einstellen, wie und wie oft du ueber Neuigkeiten informiert werden moechtest.\n"
+                        f"Einfach nach dem Einloggen oben auf Einstellungen klicken.\n\n"
+                        f"Freue mich auf dein Feedback!\n"
+                        f"Kai"
+                    )
+                else:  # password
+                    pw = body.get('password', '')
+                    msg['Subject'] = 'Dein Zugang zu KIRA Partner'
+                    text = (
+                        f"Hallo Leni,\n\n"
+                        f"hier ist dein persoenliches Passwort fuer die KIRA Partner-Seite:\n\n"
+                        f"    {pw}\n\n"
+                        f"Link zur Seite: {link}\n\n"
+                        f"Bitte nicht weiterleiten!\n"
+                        f"Kai"
+                    )
+                msg.attach(MIMEText(text, 'plain', 'utf-8'))
+                ctx = _ssl.create_default_context()
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as s:
+                    s.ehlo()
+                    s.starttls(context=ctx)
+                    s.login(absender, pw_smtp)
+                    s.sendmail(absender, to_addr, msg.as_string())
+                self._json({'ok': True, 'type': mail_type, 'to': to_addr})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Config zurücksetzen auf Werkseinstellungen
         if self.path == '/api/config/reset':
             try:
