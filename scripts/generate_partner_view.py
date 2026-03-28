@@ -120,8 +120,8 @@ def build_cfg_js(config: dict, today: str) -> str:
     ntfy    = config.get('ntfy', {})
 
     cfg = {
-        'pw_kai':      partner.get('partner_pw_kai',   'KaiAdmin2026'),
-        'pw_leni':     partner.get('partner_pw_leni',  'HalloLeni2026'),
+        'pw_kai':      partner.get('partner_pw_kai',   'Kai2026'),
+        'pw_leni':     partner.get('partner_pw_leni',  'Leni2026'),
         'app_start':   today,
         'ntfy_kai':    ntfy.get('topic_name',          ''),
         'ntfy_leni':   partner.get('ntfy_leni',        ''),

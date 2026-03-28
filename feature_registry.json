@@ -84,16 +84,16 @@
     },
     {
       "id": "kira-tools",
-      "name": "Kira Tools (8 Stück)",
+      "name": "Kira Tools (12 Stück)",
       "icon": "🤖",
       "leni_name": "Kira erledigt Dinge selbständig",
-      "leni_desc": "Kira kann nicht nur antworten — sie kann auch handeln: Rechnungen abhaken, Angebote aktualisieren, E-Mail-Entwürfe schreiben, Kundeninfos nachschlagen. Du sagst was, Kira erledigt es — du überprüfst und bestätigst.",
+      "leni_desc": "Kira kann nicht nur antworten — sie kann auch handeln: Rechnungen abhaken, Angebote aktualisieren, E-Mail-Entwürfe schreiben, Kundeninfos nachschlagen, Duplikate finden, Aufgaben erledigen. Du sagst was, Kira erledigt es — du überprüfst und bestätigst.",
       "leni_visible": true,
       "leni_note": null,
       "module": "kira_llm.py",
       "status": "done",
-      "last_updated": "2026-03-25",
-      "description": "rechnung_bezahlt, angebot_status, eingangsrechnung_erledigt, kunde_nachschlagen, nachfass_email_entwerfen, wissen_speichern, rechnungsdetails_abrufen, web_recherche"
+      "last_updated": "2026-03-28",
+      "description": "rechnung_bezahlt, angebot_status, eingangsrechnung_erledigt, kunde_nachschlagen, nachfass_email_entwerfen, wissen_speichern, rechnungsdetails_abrufen, web_recherche, runtime_log_suchen, angebot_pruefen, task_erledigen, tasks_loeschen"
     },
     {
       "id": "kira-launcher",
@@ -192,6 +192,32 @@
       "last_updated": "2026-03-27",
       "description": "get_recent_for_kira(limit=20) wird in build_system_prompt() injiziert",
       "session": "session-j"
+    },
+    {
+      "id": "organisation-panel",
+      "name": "Organisation Panel (Termine & Fristen)",
+      "icon": "📅",
+      "leni_name": "Termine, Fristen & Rückrufe — alles im Blick",
+      "leni_desc": "Kira erkennt in E-Mails automatisch Terminwünsche, Fristen und Rückrufbitten — und zeigt sie übersichtlich an. Kein Termin geht mehr unter, kein Rückruf wird vergessen.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "Erkannte Termine mit Datum, Fristen, Rückrufbitten — jeweils mit Kunde, Konto, Kontext"
+    },
+    {
+      "id": "antwort-generierung",
+      "name": "Automatische Antwort-Entwürfe (response_gen.py)",
+      "icon": "✍️",
+      "leni_name": "Kira schreibt schon mal vor",
+      "leni_desc": "Für jede eingehende Anfrage erstellt Kira automatisch einen fertigen Antwort-Entwurf — im Schreibstil von Kai, passend zur Situation. Kein Copy-Paste, sondern ein durchdachter Vorschlag, der nur noch angepasst und abgeschickt werden muss.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "response_gen.py",
+      "status": "done",
+      "last_updated": "2026-03-25",
+      "description": "5 Situationen (Erstanfrage/Fotos/Preisanfrage/Termin/Folgemail), Stil aus 525 Mails gelernt, Nachfass-Sequenz 3-stufig (10/21/45 Tage)"
     },
     {
       "id": "mail-monitor",
@@ -302,6 +328,84 @@
       "status": "planned",
       "last_updated": "2026-03-25",
       "description": "Erwartete Eingänge basierend auf offenen Rechnungen + Zahlungsverhalten"
+    },
+    {
+      "id": "kalender-integration",
+      "name": "Kalender-Integration (Google / Outlook)",
+      "icon": "📆",
+      "leni_name": "Termine automatisch in den Kalender",
+      "leni_desc": "Geplant: Erkannte Termine werden direkt in Google Kalender oder Outlook eingetragen — ohne manuelles Abtippen. Kira setzt auch Erinnerungen wenn wichtige Fristen oder Rückrufe nahen.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Google Calendar / Outlook Sync für erkannte Termine, Auto-Erinnerung bei Fristen"
+    },
+    {
+      "id": "dokument-vorlagen",
+      "name": "Dokument-Vorlagen & PDF-Export",
+      "icon": "📝",
+      "leni_name": "Angebote & Rechnungen direkt aus der App",
+      "leni_desc": "Geplant: Angebots- und Rechnungs-PDFs direkt im Dashboard erstellen — mit rauMKult-Layout und automatisch befüllten Feldern. Inklusive Mahnschreiben in drei Eskalationsstufen. Kein extra Programm mehr nötig.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Angebots-PDF, Rechnungs-PDF, Mahnschreiben 3-stufig — direkt aus Dashboard generieren"
+    },
+    {
+      "id": "foto-analyse",
+      "name": "Foto & Video Analyse für Angebote",
+      "icon": "📸",
+      "leni_name": "Foto hochladen — Angebot rausbekommen",
+      "leni_desc": "Geplant: Fotos oder kurze Videos von der Baustelle hochladen — KI erkennt Betonart, Schadensumfang und Fläche, und schlägt die passende Leistung mit Richtpreis vor. Schätzungen die nicht mehr ins Blaue gehen.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kira_llm.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Multimodales LLM (Claude/GPT-4o), Betonart/Schadenstyp/Fläche-Erkennung, Richtpreis aus Vergleichsprojekten"
+    },
+    {
+      "id": "whatsapp-integration",
+      "name": "WhatsApp / Telegram Integration",
+      "icon": "💬",
+      "leni_name": "Kunden schreiben per WhatsApp — Kira ist dabei",
+      "leni_desc": "Geplant: WhatsApp- und Telegram-Nachrichten von Kunden erscheinen direkt im Dashboard — wie alle anderen Mails. Schnellantworten mit einem Klick. Viele Kunden kommunizieren lieber per Messenger.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Webhook-Infrastruktur vorbereitet, Anzeige + Schnellantworten aus Dashboard"
+    },
+    {
+      "id": "zeiterfassung",
+      "name": "Zeiterfassung pro Projekt",
+      "icon": "⏱️",
+      "leni_name": "Wie lange braucht ein Projekt wirklich?",
+      "leni_desc": "Geplant: Zeiterfassung direkt im Dashboard — starten, stoppen, der Rechnung zuordnen. Am Ende siehst du: Wie hoch war der Stundensatz wirklich? War das Projekt profitabel? Integration mit der ProjektZeit-App ist geplant.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Start/Stop Timer, Zuordnung zu Rechnung, Stundensatz effektiv vs. kalkuliert, ProjektZeit-App Integration"
+    },
+    {
+      "id": "crm-pipeline",
+      "name": "CRM Lead-Pipeline",
+      "icon": "🎯",
+      "leni_name": "Vom ersten Kontakt bis zur Rechnung",
+      "leni_desc": "Geplant: Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt — Anfrage, Angebot, Auftrag, Abrechnung. Conversion-Raten auf einen Blick, automatische Wiedervorlage bei vergessenen Kontakten.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "planned",
+      "last_updated": "2026-03-28",
+      "description": "Lead-Pipeline Anfrage→Angebot→Auftrag→Abrechnung, Conversion-Rate, Auto-Wiedervorlage"
     }
   ]
 }
