@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KIRA Partner – Mitgestalten & Feedback</title>
+<!-- generated: 2026-03-28 -->
+<script>(function(){var t=localStorage.getItem('kira_pv_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<style>
+/* ============================================================
+   TOKENS – DARK (Basis)
+   ============================================================ */
+:root {
+  --bg:          #0b0b0e;
+  --bg-card:     #14141a;
+  --bg-raised:   #1c1c24;
+  --bg-hover:    #222230;
+  --border:      rgba(255,255,255,0.07);
+  --border-hi:   rgba(124,77,255,0.45);
+  --text:        #e0e0e8;
+  --text-dim:    #9090a0;
+  --text-muted:  #5a5a6a;
+  --accent:      #7c4dff;
+  --accent-glow: rgba(124,77,255,0.22);
+  --accent-dim:  rgba(124,77,255,0.12);
+  --green:       #4caf50;
+  --green-dim:   rgba(76,175,80,0.13);
+  --blue:        #42a5f5;
+  --blue-dim:    rgba(66,165,245,0.13);
+  --orange:      #ff9800;
+  --orange-dim:  rgba(255,152,0,0.13);
+  --pink:        #e91e8c;
+  --pink-dim:    rgba(233,30,140,0.13);
+  --gold:        #ffd700;
+  --gold-dim:    rgba(255,215,0,0.10);
+  --red:         #f44336;
+  --red-dim:     rgba(244,67,54,0.13);
+  --teal:        #26c6da;
+  --teal-dim:    rgba(38,198,218,0.13);
+  --radius:      12px;
+  --radius-sm:   7px;
+  --shadow:      0 6px 32px rgba(0,0,0,0.45);
+  --trans:       0.18s ease;
+  --hdr-bg:      rgba(20,20,26,0.96);
+  --filter-bg:   rgba(11,11,14,0.6);
+}
+/* ============================================================
+   TOKENS – LIGHT
+   ============================================================ */
+[data-theme="light"] {
+  --bg:          #f4f3ef;
+  --bg-card:     #ffffff;
+  --bg-raised:   #eceae5;
+  --bg-hover:    #e4e2dc;
+  --border:      rgba(0,0,0,0.08);
+  --border-hi:   rgba(108,61,224,0.32);
+  --text:        #19191f;
+  --text-dim:    #55555e;
+  --text-muted:  #9898a6;
+  --accent:      #6c3de0;
+  --accent-glow: rgba(108,61,224,0.16);
+  --accent-dim:  rgba(108,61,224,0.08);
+  --green:       #2a7030;
+  --green-dim:   rgba(42,112,48,0.09);
+  --blue:        #1455b0;
+  --blue-dim:    rgba(20,85,176,0.09);
+  --orange:      #c95200;
+  --orange-dim:  rgba(201,82,0,0.09);
+  --pink:        #b01555;
+  --pink-dim:    rgba(176,21,85,0.09);
+  --gold:        #9a7000;
+  --gold-dim:    rgba(154,112,0,0.10);
+  --red:         #b52020;
+  --red-dim:     rgba(181,32,32,0.09);
+  --teal:        #006b5e;
+  --teal-dim:    rgba(0,107,94,0.09);
+  --shadow:      0 2px 16px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.05);
+  --hdr-bg:      rgba(255,255,255,0.94);
+  --filter-bg:   rgba(244,243,239,0.88);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;
+  min-height:100vh;line-height:1.55;font-size:15px;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── LOGIN ─────────────────────────────────────────────────── */
+#screen-login{
+  min-height:100vh;display:flex;align-items:center;
+  justify-content:center;padding:24px;
+  background:
+    radial-gradient(ellipse at 45% 25%,rgba(124,77,255,0.13) 0%,transparent 55%),
+    radial-gradient(ellipse at 80% 75%,rgba(66,165,245,0.07) 0%,transparent 50%),
+    var(--bg);
+}
+[data-theme="light"] #screen-login{
+  background:
+    radial-gradient(ellipse at 45% 25%,rgba(108,61,224,0.07) 0%,transparent 55%),
+    radial-gradient(ellipse at 80% 75%,rgba(20,85,176,0.05) 0%,transparent 50%),
+    var(--bg);
+}
+.login-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:20px;padding:52px 44px 44px;
+  width:100%;max-width:420px;text-align:center;
+  box-shadow:var(--shadow),0 0 60px rgba(124,77,255,0.07);
+}
+.login-logo{
+  width:60px;height:60px;margin:0 auto 28px;
+  background:linear-gradient(135deg,#7c4dff,#b24dff);
+  border-radius:17px;display:flex;align-items:center;
+  justify-content:center;font-size:26px;
+  box-shadow:0 0 32px var(--accent-glow);
+}
+.login-title{font-size:23px;font-weight:700;margin-bottom:6px;letter-spacing:-.3px}
+.login-sub{color:var(--text-dim);font-size:13px;margin-bottom:36px;line-height:1.65}
+.login-input{
+  width:100%;background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 18px;color:var(--text);
+  font-size:16px;font-family:inherit;outline:none;text-align:center;
+  letter-spacing:3px;transition:border-color var(--trans);margin-bottom:14px;
+}
+.login-input::placeholder{letter-spacing:0;font-size:14px;color:var(--text-muted)}
+.login-input:focus{border-color:var(--accent)}
+.btn-primary{
+  width:100%;background:var(--accent);color:#fff;border:none;
+  border-radius:var(--radius);padding:14px 24px;font-size:15px;
+  font-weight:600;cursor:pointer;font-family:inherit;transition:all var(--trans);
+}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 5px 20px var(--accent-glow)}
+.login-error{
+  color:var(--red);font-size:13px;margin-top:14px;display:none;
+  background:var(--red-dim);padding:10px 14px;border-radius:var(--radius-sm);
+}
+
+/* ── APP LAYOUT ─────────────────────────────────────────────── */
+#screen-app{display:none;flex-direction:column;min-height:100vh}
+#screen-app.active{display:flex}
+
+/* Header */
+.app-header{
+  background:var(--hdr-bg);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);height:62px;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;flex-shrink:0;
+}
+.hdr-brand{display:flex;align-items:center;gap:12px}
+.hdr-logo{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,#7c4dff,#b24dff);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.hdr-name{font-weight:700;font-size:16px;letter-spacing:-.2px}
+.hdr-sub{font-size:11px;color:var(--text-muted)}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.user-chip{
+  background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:20px;padding:6px 14px;font-size:13px;
+  display:flex;align-items:center;gap:7px;
+}
+.user-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:dotpulse 2.4s infinite}
+@keyframes dotpulse{0%,100%{opacity:1}50%{opacity:.35}}
+.btn-logout{
+  background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:6px 12px;color:var(--text-muted);font-size:12px;cursor:pointer;
+  font-family:inherit;transition:all var(--trans);
+}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+.btn-theme{
+  background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:5px 9px;color:var(--text-muted);font-size:15px;cursor:pointer;
+  line-height:1;transition:all var(--trans);
+}
+.btn-theme:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Welcome */
+.welcome-banner{
+  background:linear-gradient(135deg,rgba(124,77,255,0.08) 0%,rgba(66,165,245,0.04) 100%);
+  border-bottom:1px solid var(--border);padding:18px 24px;
+  display:flex;align-items:center;gap:16px;
+}
+[data-theme="light"] .welcome-banner{
+  background:linear-gradient(135deg,rgba(108,61,224,0.05) 0%,rgba(20,85,176,0.03) 100%);
+}
+.welcome-ava{
+  width:46px;height:46px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pink),var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+.welcome-h{font-size:17px;font-weight:700;margin-bottom:3px;letter-spacing:-.2px}
+.welcome-p{color:var(--text-dim);font-size:13px}
+
+/* ── STATUS KARTEN ──────────────────────────────────────────── */
+.status-cards{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:14px;padding:20px 24px;border-bottom:1px solid var(--border);
+}
+.sc-card{
+  background:var(--bg-card);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:22px 20px 18px;
+  cursor:pointer;transition:all var(--trans);
+  position:relative;overflow:hidden;
+}
+.sc-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--sc-color);opacity:.6;transition:opacity var(--trans);
+}
+.sc-card:hover{border-color:var(--sc-color);transform:translateY(-2px);box-shadow:var(--shadow)}
+.sc-card:hover::before,.sc-card.active::before{opacity:1}
+.sc-card.active{border-color:var(--sc-color);background:var(--sc-bg)}
+.sc-done   {--sc-color:var(--green); --sc-bg:var(--green-dim)}
+.sc-partial{--sc-color:var(--orange);--sc-bg:var(--orange-dim)}
+.sc-planned{--sc-color:var(--blue);  --sc-bg:var(--blue-dim)}
+.sc-num{
+  font-size:50px;font-weight:800;line-height:1;
+  color:var(--sc-color);letter-spacing:-3px;
+  display:block;margin-bottom:5px;
+}
+.sc-label{font-size:13px;font-weight:600;color:var(--text-dim)}
+.sc-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
+.sc-ico{
+  position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:36px;opacity:.09;color:var(--sc-color);
+  font-weight:900;line-height:1;pointer-events:none;
+}
+[data-theme="light"] .sc-card{box-shadow:0 1px 5px rgba(0,0,0,0.06)}
+[data-theme="light"] .sc-card:hover{box-shadow:0 4px 18px rgba(0,0,0,0.11)}
+
+/* Filter */
+.filter-bar{
+  padding:12px 24px;display:flex;gap:8px;flex-wrap:wrap;
+  border-bottom:1px solid var(--border);
+  background:var(--filter-bg);backdrop-filter:blur(8px);
+  position:sticky;top:62px;z-index:100;
+}
+.filter-btn{
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:20px;
+  padding:7px 15px;font-size:13px;cursor:pointer;color:var(--text-muted);
+  font-family:inherit;display:flex;align-items:center;gap:6px;
+  transition:all var(--trans);white-space:nowrap;
+}
+.filter-btn:hover{border-color:var(--accent);color:var(--text)}
+.filter-btn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--text);font-weight:500}
+.f-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.f-cnt{
+  font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;
+  background:rgba(128,128,128,0.12);color:var(--text-dim);
+}
+
+/* Tiles */
+.tiles-section{padding:24px;flex:1}
+.tiles-meta{font-size:13px;color:var(--text-muted);margin-bottom:18px}
+.tiles-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(286px,1fr));
+  gap:16px;
+}
+.tile{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;cursor:pointer;transition:all var(--trans);
+  position:relative;display:flex;flex-direction:column;
+}
+[data-theme="light"] .tile{box-shadow:0 1px 5px rgba(0,0,0,0.05)}
+.tile:hover{
+  border-color:rgba(124,77,255,0.28);transform:translateY(-2px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.22),0 0 0 1px rgba(124,77,255,0.08);
+}
+[data-theme="light"] .tile:hover{
+  box-shadow:0 6px 22px rgba(0,0,0,0.12),0 0 0 1px rgba(108,61,224,0.14);
+}
+.tile[data-s="done"]     {border-top:2px solid var(--green)}
+.tile[data-s="partial"]  {border-top:2px solid var(--orange)}
+.tile[data-s="planned"]  {border-top:2px solid var(--blue)}
+.tile[data-s="leni_idea"]{border-top:2px solid var(--pink)}
+.tile[data-s="leni_done"]{
+  border-top:2px solid var(--gold);
+  background:linear-gradient(160deg,var(--bg-card) 60%,var(--gold-dim) 100%);
+}
+.tile-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:12px}
+.tile-icon{font-size:26px;flex-shrink:0;line-height:1}
+.tile-badges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
+.badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;line-height:1.4}
+.b-done   {background:var(--green-dim); color:var(--green)}
+.b-partial{background:var(--orange-dim);color:var(--orange)}
+.b-planned{background:var(--blue-dim);  color:var(--blue)}
+.b-leni   {background:var(--pink-dim);  color:var(--pink)}
+.b-gold   {background:var(--gold-dim);  color:var(--gold)}
+.b-new    {background:var(--orange-dim);color:var(--orange);animation:newpulse 2s infinite}
+@keyframes newpulse{0%,100%{opacity:1}50%{opacity:.55}}
+.tile-name{font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text);letter-spacing:-.1px}
+.leni-done-box{
+  background:var(--gold-dim);border:1px solid rgba(255,215,0,.2);
+  border-radius:8px;padding:9px 13px;margin-bottom:10px;
+  font-size:12px;color:var(--gold);line-height:1.5;
+}
+.tile-desc{font-size:13px;color:var(--text-dim);line-height:1.7;flex:1;margin-bottom:14px}
+.tile-foot{
+  display:flex;justify-content:space-between;align-items:center;
+  border-top:1px solid var(--border);padding-top:12px;margin-top:auto;
+}
+.tile-fb-info{font-size:12px;color:var(--text-muted)}
+.btn-tile-fb{
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:6px 12px;font-size:12px;cursor:pointer;color:var(--text-dim);
+  font-family:inherit;transition:all var(--trans);
+}
+.btn-tile-fb:hover{border-color:var(--accent);color:var(--accent)}
+.tile[data-s="leni_done"] .btn-tile-fb{border-color:rgba(255,215,0,.3);color:var(--gold)}
+.tiles-empty{grid-column:1/-1;text-align:center;padding:70px 24px;color:var(--text-muted)}
+.tiles-empty-icon{font-size:38px;margin-bottom:12px}
+
+/* FAB */
+#fab-idea{
+  position:fixed;bottom:28px;right:28px;z-index:300;
+  background:linear-gradient(135deg,var(--pink),var(--accent));
+  border:none;border-radius:50px;padding:14px 22px;
+  color:#fff;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:inherit;
+  display:none;align-items:center;gap:8px;
+  box-shadow:0 4px 24px rgba(233,30,140,.35);transition:all var(--trans);
+}
+#fab-idea:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 32px rgba(233,30,140,.45)}
+
+/* ── ADMIN PANEL ────────────────────────────────────────────── */
+.admin-panel{border-top:2px solid var(--accent);padding:0}
+.admin-panel-head{padding:20px 24px 0;display:flex;align-items:center;gap:10px}
+.admin-panel-title{font-size:16px;font-weight:700}
+.admin-chip{
+  background:var(--accent-dim);color:var(--accent);
+  font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+}
+.admin-tabs{
+  display:flex;gap:0;padding:16px 24px 0;border-bottom:1px solid var(--border);
+}
+.atab-btn{
+  background:transparent;border:none;border-bottom:2px solid transparent;
+  padding:8px 16px;font-size:13px;cursor:pointer;
+  color:var(--text-muted);font-family:inherit;transition:all var(--trans);
+  position:relative;bottom:-1px;
+}
+.atab-btn:hover{color:var(--text)}
+.atab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.atab-content{display:none;padding:20px 24px 28px}
+.atab-content.active{display:block}
+.fb-item{
+  background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;margin-bottom:12px;
+}
+.fb-item-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.fb-item-feat{font-weight:600;font-size:14px}
+.fb-item-meta{font-size:11px;color:var(--text-muted)}
+.fb-item-react{font-size:12px;color:var(--text-dim);margin-bottom:5px}
+.fb-item-text{font-size:13px;color:var(--text-dim);line-height:1.6;font-style:italic}
+.admin-empty{color:var(--text-muted);font-size:14px}
+.idea-item{
+  background:var(--bg-raised);border:1px solid var(--border);
+  border-left:3px solid var(--pink);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:10px;
+}
+.idea-item-head{font-weight:600;margin-bottom:5px;display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)}
+.idea-item-text{color:var(--text-dim);font-size:13px;line-height:1.6}
+.btn-export{
+  background:transparent;border:1px solid var(--accent);border-radius:var(--radius);
+  padding:10px 20px;color:var(--accent);font-size:13px;cursor:pointer;
+  font-family:inherit;transition:all var(--trans);margin-top:16px;display:inline-flex;align-items:center;gap:8px;
+}
+.btn-export:hover{background:var(--accent-dim)}
+
+/* Settings */
+.settings-section{margin-bottom:28px}
+.settings-section-title{
+  font-size:13px;font-weight:700;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.07em;
+  margin-bottom:14px;display:flex;align-items:center;gap:8px;
+}
+.settings-group{
+  background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+}
+.settings-row{
+  display:flex;align-items:center;padding:14px 16px;gap:16px;
+  border-bottom:1px solid var(--border);
+}
+.settings-row:last-child{border-bottom:none}
+.settings-row-label{flex:1}
+.settings-row-label strong{font-size:14px;display:block;margin-bottom:2px}
+.settings-row-label span{font-size:12px;color:var(--text-muted)}
+.settings-input{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;
+  outline:none;transition:border-color var(--trans);width:220px;
+}
+.settings-input:focus{border-color:var(--accent)}
+.settings-select{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;
+  outline:none;cursor:pointer;width:220px;
+}
+.pw-wrap{position:relative;display:flex;align-items:center}
+.pw-wrap .settings-input{padding-right:38px}
+.btn-pw-toggle{position:absolute;right:10px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0}
+.btn-save-settings{
+  background:var(--accent);border:none;border-radius:var(--radius);
+  padding:12px 24px;color:#fff;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:all var(--trans);margin-top:20px;
+}
+.btn-save-settings:hover{filter:brightness(1.1);box-shadow:0 4px 16px var(--accent-glow)}
+
+/* GitHub Sync */
+.sync-status{
+  background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;margin-bottom:20px;
+  display:flex;align-items:center;gap:14px;
+}
+.sync-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sync-dot.ok  {background:var(--green);box-shadow:0 0 6px var(--green)}
+.sync-dot.warn{background:var(--orange)}
+.sync-dot.off {background:var(--text-muted)}
+.sync-label{font-weight:600;font-size:14px;margin-bottom:2px}
+.sync-sub{font-size:12px;color:var(--text-muted)}
+.gh-token-wrap{position:relative}
+.gh-token-wrap .settings-input{width:100%;font-family:'Courier New',monospace;font-size:12px}
+.btn-gh-push{
+  background:var(--teal);border:none;border-radius:var(--radius);
+  padding:13px 24px;color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:all var(--trans);
+  display:flex;align-items:center;gap:8px;margin-top:16px;
+}
+.btn-gh-push:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-gh-push:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.sync-log{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;
+  color:var(--text-dim);max-height:160px;overflow-y:auto;
+  margin-top:14px;display:none;line-height:1.8;
+}
+.sync-log.show{display:block}
+.sync-log .ok  {color:var(--green)}
+.sync-log .err {color:var(--red)}
+.sync-log .info{color:var(--blue)}
+
+/* Modals */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.72);
+  backdrop-filter:blur(5px);z-index:500;
+  display:none;align-items:center;justify-content:center;padding:24px;
+}
+[data-theme="light"] .modal-bg{background:rgba(0,0,0,.42)}
+.modal-bg.active{display:flex}
+.modal{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:18px;
+  padding:32px;width:100%;max-width:520px;
+  max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);
+}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.modal-title{font-size:18px;font-weight:700;letter-spacing:-.2px}
+.modal-sub{font-size:13px;color:var(--text-muted);margin-top:3px}
+.btn-x{
+  background:transparent;border:none;color:var(--text-muted);font-size:18px;
+  cursor:pointer;padding:2px 6px;line-height:1;transition:color var(--trans);border-radius:4px;
+}
+.btn-x:hover{color:var(--text);background:var(--bg-raised)}
+.feature-desc-box{
+  background:var(--bg-raised);border-radius:var(--radius);
+  padding:14px 16px;font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:20px;
+}
+.form-label{display:block;font-size:13px;font-weight:500;color:var(--text-dim);margin-bottom:9px}
+.react-row{display:flex;gap:8px;margin-bottom:18px}
+.react-btn{
+  flex:1;background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 6px;font-size:13px;
+  cursor:pointer;text-align:center;font-family:inherit;color:var(--text-dim);transition:all var(--trans);
+}
+.react-btn:hover{border-color:var(--accent);color:var(--text)}
+.react-btn.sel{border-color:var(--accent);background:var(--accent-dim);color:var(--text);font-weight:600}
+.form-ta{
+  width:100%;background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);padding:13px 16px;color:var(--text);
+  font-size:14px;font-family:inherit;resize:vertical;min-height:100px;
+  outline:none;transition:border-color var(--trans);
+}
+.form-ta:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn-cancel{
+  flex:1;background:var(--bg-raised);border:1px solid var(--border);
+  border-radius:var(--radius);padding:13px;font-size:14px;cursor:pointer;
+  color:var(--text-muted);font-family:inherit;transition:all var(--trans);
+}
+.btn-cancel:hover{color:var(--text);border-color:var(--text-muted)}
+.btn-save{
+  flex:2;background:var(--accent);border:none;border-radius:var(--radius);
+  padding:13px;font-size:14px;font-weight:600;cursor:pointer;
+  color:#fff;font-family:inherit;transition:all var(--trans);
+}
+.btn-save:hover{filter:brightness(1.1);box-shadow:0 4px 16px var(--accent-glow)}
+.modal-thanks{text-align:center;padding:12px 0 4px}
+.ty-icon {font-size:52px;margin-bottom:18px}
+.ty-title{font-size:22px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px}
+.ty-text {color:var(--text-dim);font-size:14px;line-height:1.75;margin-bottom:28px;white-space:pre-line}
+
+/* Tour */
+#tour-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(6px);
+  z-index:800;display:none;align-items:center;justify-content:center;padding:24px;
+}
+[data-theme="light"] #tour-overlay{background:rgba(0,0,0,.60)}
+#tour-overlay.active{display:flex}
+.tour-card{
+  background:var(--bg-card);border:1px solid var(--border-hi);border-radius:22px;
+  padding:44px 40px;max-width:480px;width:100%;text-align:center;
+  box-shadow:var(--shadow),0 0 80px var(--accent-glow);
+}
+.tour-dots{display:flex;gap:7px;justify-content:center;margin-bottom:28px}
+.tour-dot{width:8px;height:8px;border-radius:50%;background:var(--bg-raised);border:1px solid var(--border);transition:all var(--trans)}
+.tour-dot.on{background:var(--accent);border-color:var(--accent);transform:scale(1.2)}
+.tour-icon {font-size:50px;margin-bottom:20px}
+.tour-title{font-size:21px;font-weight:700;margin-bottom:12px;letter-spacing:-.3px}
+.tour-text {color:var(--text-dim);font-size:14px;line-height:1.75;margin-bottom:30px}
+.tour-btns{display:flex;gap:12px}
+.btn-tour-skip{
+  flex:1;background:transparent;border:1px solid var(--border);border-radius:var(--radius);
+  padding:13px;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;transition:all var(--trans);
+}
+.btn-tour-skip:hover{border-color:var(--text-muted);color:var(--text)}
+.btn-tour-next{
+  flex:2;background:var(--accent);border:none;border-radius:var(--radius);
+  padding:13px;color:#fff;font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;transition:all var(--trans);
+}
+.btn-tour-next:hover{filter:brightness(1.1);box-shadow:0 4px 16px var(--accent-glow)}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);
+  padding:13px 22px;display:flex;align-items:center;gap:10px;
+  font-size:14px;box-shadow:var(--shadow);z-index:900;
+  opacity:0;transition:all .28s ease;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(128,128,128,.18);border-radius:3px}
+
+@media(max-width:680px){
+  .status-cards{gap:8px;padding:14px 16px}
+  .sc-num{font-size:36px;letter-spacing:-2px}
+  .sc-card{padding:16px 14px}
+  .sc-ico{font-size:26px}
+}
+@media(max-width:600px){
+  .tiles-grid{grid-template-columns:1fr}
+  .tiles-section{padding:16px}
+  .filter-bar{padding:10px 16px}
+  .welcome-banner{padding:14px 16px}
+  .app-header{padding:0 16px}
+  .react-row{flex-wrap:wrap}
+  .react-btn{flex:calc(50% - 4px)}
+  #fab-idea{bottom:16px;right:16px;padding:12px 18px;font-size:13px}
+  .tour-card{padding:32px 24px}
+  .settings-input,.settings-select{width:100%}
+  .settings-row{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════════════════ -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-logo">✦</div>
+    <div class="login-title">KIRA Partner</div>
+    <div class="login-sub">Ideen einbringen, Entwicklung mitverfolgen,<br>gemeinsam etwas Tolles bauen.</div>
+    <input type="password" id="pw-input" class="login-input"
+           placeholder="Dein Zugangswort"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-primary" onclick="doLogin()">Einloggen →</button>
+    <div class="login-error" id="login-error">Das Passwort stimmt leider nicht.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ HAUPT-APP ══════════════════════════ -->
+<div id="screen-app">
+
+  <header class="app-header">
+    <div class="hdr-brand">
+      <div class="hdr-logo">✦</div>
+      <div><div class="hdr-name">KIRA Partner</div><div class="hdr-sub">Ideen &amp; Feedback</div></div>
+    </div>
+    <div class="hdr-right">
+      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Hell / Dunkel">🌙</button>
+      <div class="user-chip"><div class="user-dot"></div><span id="user-label">Leni</span></div>
+      <button class="btn-logout" onclick="doLogout()">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="welcome-banner">
+    <div class="welcome-ava" id="welcome-ava">🌸</div>
+    <div>
+      <div class="welcome-h" id="welcome-h">Hallo Leni! Schön, dass du da bist. 🎉</div>
+      <div class="welcome-p" id="welcome-p">Hier siehst du, was Kai und Kira gerade bauen — und deine Meinung dazu ist Gold wert!</div>
+    </div>
+  </div>
+
+  <!-- Status-Karten -->
+  <div class="status-cards">
+    <div class="sc-card sc-done" id="sc-done-card" onclick="filterFromCard('done')">
+      <span class="sc-num" id="sc-num-done">0</span>
+      <div class="sc-label">Fertig eingebaut</div>
+      <div class="sc-sub">Funktioniert jetzt schon</div>
+      <div class="sc-ico">✓</div>
+    </div>
+    <div class="sc-card sc-partial" id="sc-partial-card" onclick="filterFromCard('partial')">
+      <span class="sc-num" id="sc-num-partial">0</span>
+      <div class="sc-label">Teilweise fertig</div>
+      <div class="sc-sub">Fast geschafft</div>
+      <div class="sc-ico">⟳</div>
+    </div>
+    <div class="sc-card sc-planned" id="sc-planned-card" onclick="filterFromCard('planned')">
+      <span class="sc-num" id="sc-num-planned">0</span>
+      <div class="sc-label">In Planung</div>
+      <div class="sc-sub">Kommt noch</div>
+      <div class="sc-ico">◌</div>
+    </div>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-btn active" id="fb-all"     onclick="setFilter('all',this)">Alle <span class="f-cnt" id="cnt-all"></span></button>
+    <button class="filter-btn"        id="fb-done"    onclick="setFilter('done',this)"><span class="f-dot" style="background:var(--green)"></span>Fertig <span class="f-cnt" id="cnt-done"></span></button>
+    <button class="filter-btn"        id="fb-partial" onclick="setFilter('partial',this)"><span class="f-dot" style="background:var(--orange)"></span>Teilweise <span class="f-cnt" id="cnt-partial"></span></button>
+    <button class="filter-btn"        id="fb-planned" onclick="setFilter('planned',this)"><span class="f-dot" style="background:var(--blue)"></span>Geplant <span class="f-cnt" id="cnt-planned"></span></button>
+    <button class="filter-btn"        id="fb-leni"    onclick="setFilter('leni',this)"  style="display:none"><span class="f-dot" style="background:var(--pink)"></span>Deine Ideen <span class="f-cnt" id="cnt-leni"></span></button>
+    <button class="filter-btn"        id="fb-new"     onclick="setFilter('new',this)"   style="display:none">🔥 Neu <span class="f-cnt" id="cnt-new"></span></button>
+  </div>
+
+  <div class="tiles-section">
+    <div class="tiles-meta" id="tiles-meta-txt"></div>
+    <div class="tiles-grid" id="tiles-grid"></div>
+  </div>
+
+  <!-- ADMIN PANEL — nur Kai, wird per JS eingeblendet -->
+  <div class="admin-panel" id="admin-panel" style="display:none">
+    <div class="admin-panel-head">
+      <span class="admin-panel-title">⚙️ Admin-Bereich</span>
+      <span class="admin-chip">Nur für Kai</span>
+    </div>
+    <div class="admin-tabs">
+      <button class="atab-btn active" onclick="showAdminTab('feedback',this)">📬 Feedback</button>
+      <button class="atab-btn"        onclick="showAdminTab('ideen',this)">💡 Lenis Ideen</button>
+      <button class="atab-btn"        onclick="showAdminTab('einstellungen',this)">⚙️ Einstellungen</button>
+      <button class="atab-btn"        onclick="showAdminTab('github',this)">🚀 GitHub Sync</button>
+    </div>
+
+    <div class="atab-content active" id="atab-feedback">
+      <div id="admin-feedback-list"></div>
+      <button class="btn-export" onclick="exportForClaude()">📋 Alles für Claude kopieren</button>
+    </div>
+
+    <div class="atab-content" id="atab-ideen">
+      <div id="admin-ideas-list"></div>
+      <button class="btn-export" onclick="exportForClaude()" style="margin-top:8px">📋 Alles für Claude kopieren</button>
+    </div>
+
+    <div class="atab-content" id="atab-einstellungen">
+      <div class="settings-section">
+        <div class="settings-section-title">🔑 Zugangsdaten</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Passwort Kai (Admin)</strong><span>Dein eigener Zugang</span></div>
+            <div class="pw-wrap"><input type="password" class="settings-input" id="cfg-pw-kai" placeholder="Kai-Passwort"><button class="btn-pw-toggle" onclick="togglePw('cfg-pw-kai')">👁</button></div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Passwort Leni (Partner)</strong><span>Lenis Zugang — teile es mit ihr</span></div>
+            <div class="pw-wrap"><input type="password" class="settings-input" id="cfg-pw-leni" placeholder="Leni-Passwort"><button class="btn-pw-toggle" onclick="togglePw('cfg-pw-leni')">👁</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">🔔 Push an Kai — wenn Leni aktiv wird</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>ntfy-Topic (Kai)</strong><span>Dein bestehender Benachrichtigungs-Kanal</span></div>
+            <input type="text" class="settings-input" id="cfg-ntfy-kai" placeholder="raumkult-kai-2026-x7k">
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Benachrichtigungs-Modus</strong><span>Wann wirst du informiert?</span></div>
+            <select class="settings-select" id="cfg-ntfy-kai-mode">
+              <option value="immediate">Sofort bei jedem Feedback</option>
+              <option value="daily">Max. 1x täglich (erstes Feedback)</option>
+              <option value="off">Ausgeschaltet</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">📲 Push an Leni — wenn du etwas veröffentlichst</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>ntfy-Topic (Leni)</strong><span>z.B. kira-partner-leni-updates</span></div>
+            <input type="text" class="settings-input" id="cfg-ntfy-leni" placeholder="kira-partner-leni-updates">
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Automatisch benachrichtigen</strong><span>Beim GitHub-Push wird Leni direkt informiert</span></div>
+            <select class="settings-select" id="cfg-ntfy-leni-auto">
+              <option value="1">Ja, automatisch beim Push</option>
+              <option value="0">Nein, manuell über Button</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label"><strong>Nachricht an Leni</strong><span>Was soll Leni bei einer Aktualisierung sehen?</span></div>
+            <input type="text" class="settings-input" id="cfg-ntfy-leni-msg" placeholder="Neue Funktionen bei KIRA Partner! Schau mal rein 🌟">
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn-export" style="border-color:var(--pink);color:var(--pink)"
+                  onclick="sendNtfyLeni('Test: Hallo Leni, das ist eine Test-Benachrichtigung von Kai! 👋')">
+            📲 Test-Benachrichtigung an Leni senden
+          </button>
+        </div>
+      </div>
+      <button class="btn-save-settings" onclick="saveAdminSettings()">💾 Einstellungen speichern</button>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:10px">Passwörter werden erst beim nächsten GitHub-Push live geschaltet.</div>
+    </div>
+
+    <div class="atab-content" id="atab-github">
+      <div class="sync-status" id="sync-status-box">
+        <div class="sync-dot off" id="sync-dot"></div>
+        <div><div class="sync-label" id="sync-label">Noch kein Sync</div><div class="sync-sub" id="sync-sub">Repository: kaimarienfeld/kira-partner</div></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">🔐 GitHub Personal Access Token</div>
+        <div class="settings-group">
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div class="settings-row-label">
+              <strong>Token</strong>
+              <span>github.com → Settings → Developer settings → Personal access tokens → Fine-grained → Contents: Read &amp; Write für kira-partner</span>
+            </div>
+            <div class="gh-token-wrap" style="width:100%">
+              <input type="password" class="settings-input" id="cfg-gh-token" placeholder="github_pat_...">
+            </div>
+            <div style="font-size:12px;color:var(--text-muted)">⚠️ Wird nur in deinem Browser (localStorage) gespeichert — nie auf GitHub.</div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">📦 Was wird gepusht?</div>
+        <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-size:13px;color:var(--text-dim);line-height:1.8">
+          ✓ Aktuelle partner_view.html vom GitHub-Repo wird geholt<br>
+          ✓ Passwörter + ntfy-Einstellungen werden aktualisiert<br>
+          ✓ Geänderte Version wird committet und gepusht<br>
+          ✓ GitHub Pages baut automatisch neu (~1 Minute)<br>
+          ✓ Optional: Leni wird per Push-Benachrichtigung informiert
+        </div>
+      </div>
+      <button class="btn-gh-push" id="btn-gh-push" onclick="pushToGitHub()">🚀 Zu GitHub pushen &amp; live schalten</button>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-export" style="margin-top:0" onclick="sendNtfyLeni()">📲 Leni manuell benachrichtigen</button>
+        <a id="gh-pages-link" href="https://kaimarienfeld.github.io/kira-partner" target="_blank" style="display:none">
+          <button class="btn-export" style="margin-top:0;border-color:var(--teal);color:var(--teal)">🌐 Live-Seite öffnen</button>
+        </a>
+      </div>
+      <div class="sync-log" id="sync-log"></div>
+    </div>
+  </div><!-- /admin-panel -->
+
+</div><!-- /screen-app -->
+
+<!-- ═══════════════════ MODALS ══════════════════════════════ -->
+<div class="modal-bg" id="modal-feedback">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="mf-name"></div><div class="modal-sub" id="mf-status"></div></div>
+      <button class="btn-x" onclick="closeModal('modal-feedback')">✕</button>
+    </div>
+    <div class="feature-desc-box" id="mf-desc"></div>
+    <label class="form-label">Wie reagierst du darauf?</label>
+    <div class="react-row">
+      <button class="react-btn" id="r-super"    onclick="setReact('super')">👍 Super so!</button>
+      <button class="react-btn" id="r-idea"     onclick="setReact('idea')">💡 Idee dazu</button>
+      <button class="react-btn" id="r-question" onclick="setReact('question')">❓ Frage</button>
+      <button class="react-btn" id="r-wish"     onclick="setReact('wish')">✨ Wunsch</button>
+    </div>
+    <label class="form-label">Dein Kommentar — schreib einfach drauf los!</label>
+    <textarea class="form-ta" id="mf-text" placeholder="Alles ist willkommen: Was magst du? Was fehlt dir? Was würde dir den Alltag erleichtern?"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-feedback')">Abbrechen</button>
+      <button class="btn-save"   onclick="saveFeedback()">💾 Feedback speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-idea">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title">💡 Neue Idee einreichen</div><div class="modal-sub">Fehlt dir etwas? Wäre etwas praktisch? Her damit!</div></div>
+      <button class="btn-x" onclick="closeModal('modal-idea')">✕</button>
+    </div>
+    <div class="feature-desc-box" style="background:var(--pink-dim);border:1px solid rgba(233,30,140,.15)">
+      Deine Ideen werden von Kai und Kira geprüft — und wenn es Sinn macht, wird es gebaut und du siehst es hier mit einem goldenen Stern. 🌟
+    </div>
+    <label class="form-label">Wie würde deine Idee heißen?</label>
+    <input type="text" id="idea-title" class="form-ta" style="min-height:0;resize:none;padding:12px 16px" placeholder="z.B. „Erinnerung bei überfälligen Aufgaben"">
+    <div style="height:14px"></div>
+    <label class="form-label">Beschreib deine Idee — je mehr Details, desto besser!</label>
+    <textarea class="form-ta" id="idea-text" placeholder="Was soll die Funktion können? Wann würde sie dir helfen? Alles erlaubt!"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-idea')">Abbrechen</button>
+      <button class="btn-save"   onclick="saveIdea()">✨ Idee einreichen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-thanks">
+  <div class="modal">
+    <div class="modal-thanks">
+      <div class="ty-icon"  id="ty-icon">🙏</div>
+      <div class="ty-title" id="ty-title">Vielen Dank, Leni!</div>
+      <div class="ty-text"  id="ty-text">Dein Feedback ist wirklich wertvoll und wird direkt in die Planung einfließen.\n\nKai und Kira schauen sich alles genau an. Wenn deine Idee umgesetzt wird, siehst du das hier mit einem goldenen Stern. 🌟</div>
+      <button class="btn-save" style="width:100%" onclick="closeModal('modal-thanks')">Perfekt, weiter! 🎉</button>
+    </div>
+  </div>
+</div>
+
+<button id="fab-idea" onclick="openIdeaModal()">💡 Neue Idee einreichen</button>
+
+<div id="tour-overlay">
+  <div class="tour-card">
+    <div class="tour-dots" id="tour-dots"></div>
+    <div class="tour-icon"  id="tour-icon"></div>
+    <div class="tour-title" id="tour-title"></div>
+    <div class="tour-text"  id="tour-text"></div>
+    <div class="tour-btns">
+      <button class="btn-tour-skip" onclick="endTour()">Überspringen</button>
+      <button class="btn-tour-next" id="btn-tour-next" onclick="nextTourStep()">Weiter →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><span id="toast-ico">✓</span><span id="toast-txt"></span></div>
+
+<!-- ═══════════════════ JAVASCRIPT ══════════════════════════ -->
+<script>
+'use strict';
+
+/* ── KONFIGURATION ── generiert durch generate_partner_view.py ─ */
+const CFG = {
+  "pw_kai": "KaiAdmin2026",
+  "pw_leni": "HalloLeni2026",
+  "app_start": "2026-03-28",
+  "ntfy_kai": "raumkult-kai-2026-x7k",
+  "ntfy_leni": "",
+  "ntfy_server": "https://ntfy.sh",
+  "gh_owner": "kaimarienfeld",
+  "gh_repo": "kira-partner"
+};
+
+/* ── FEATURE-DATEN ── generiert durch generate_partner_view.py ─ */
+const FEATURES = [
+  {
+    "id": "dashboard-ui",
+    "icon": "🏠",
+    "name": "Das Cockpit — alles auf einen Blick",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Auf einen Blick siehst du hier alles Wichtige: offene Aufgaben, wie viel Geld noch aussteht, was heute ansteht und was zuletzt passiert ist. Wie ein Kontrollzentrum — immer griffbereit.",
+    "leni_note": null
+  },
+  {
+    "id": "kommunikation-panel",
+    "icon": "📬",
+    "name": "Posteingang & Kommunikation",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Eingehende Anfragen, Kundenmails und wichtige Nachrichten — übersichtlich sortiert nach Priorität. Kira erkennt selbst was wichtig ist, was eine Anfrage ist und was nur Newsletter. Mit einem Klick kannst du direkt reagieren oder Kira um Hilfe bitten.",
+    "leni_note": null
+  },
+  {
+    "id": "geschaeft-panel",
+    "icon": "📄",
+    "name": "Rechnungen, Angebote & Mahnungen",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Alle Geschäftsvorgänge an einem Ort: offene Angebote, versendete Rechnungen, eingehende Rechnungen von Lieferanten und Mahnungen. Nichts geht mehr unter — der Überblick ist immer da.",
+    "leni_note": null
+  },
+  {
+    "id": "wissen-panel",
+    "icon": "🧠",
+    "name": "Kiras Gedächtnis & Wissensspeicher",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Hier lebt alles, was Kira über das Unternehmen wissen muss: Preisregeln, besondere Kundenwünsche, Abläufe und Entscheidungen. Je mehr Kira weiß, desto besser und persönlicher werden ihre Antworten. Und du kannst ihr direkt neue Dinge beibringen.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-workspace-ui",
+    "icon": "💬",
+    "name": "Chat mit Kira — dein persönlicher Assistent",
+    "status": "done",
+    "added": "2026-03-27",
+    "desc": "Dein direktes Gespräch mit Kira — wie WhatsApp, nur dass Kira wirklich zuhört und echte Dinge erledigt. Links siehst du immer den Kontext (worüber reden wir gerade?), rechts Schnellaktionen. Keine blinden Antworten — Kira kennt den aktuellen Stand.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-multi-llm",
+    "icon": "🔄",
+    "name": "Kira ist immer erreichbar",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Kira nutzt verschiedene KI-Dienste im Hintergrund (z.B. Claude von Anthropic, ChatGPT). Wenn einer mal nicht erreichbar ist, springt automatisch ein anderer ein — ohne dass du es merkst. Kira ist einfach immer da.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-tools",
+    "icon": "🤖",
+    "name": "Kira erledigt Dinge selbständig",
+    "status": "done",
+    "added": "2026-03-28",
+    "desc": "Kira kann nicht nur antworten — sie kann auch handeln: Rechnungen abhaken, Angebote aktualisieren, E-Mail-Entwürfe schreiben, Kundeninfos nachschlagen, Duplikate finden, Aufgaben erledigen. Du sagst was, Kira erledigt es — du überprüfst und bestätigst.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-launcher",
+    "icon": "✨",
+    "name": "Kira hat einen eigenen Charakter",
+    "status": "done",
+    "added": "2026-03-27",
+    "desc": "Kira erscheint als animierter Charakter-Button in der App. Ihre Augen folgen dem Mauszeiger, sie 'freut sich' wenn du in der Nähe bist und döst ein wenig wenn lange nichts passiert. Wählbar in drei verschiedenen Stilen — von minimalistisch bis verspielt.",
+    "leni_note": null
+  },
+  {
+    "id": "runtime-log",
+    "icon": "📋",
+    "name": "Kiras Aktivitätsprotokoll",
+    "status": "done",
+    "added": "2026-03-27",
+    "desc": "Was hat Kira eigentlich den ganzen Tag gemacht? Hier ist es schwarz auf weiß: jede Aktion, jede Antwort, jedes erledigte To-do — transparent einsehbar. Nichts passiert im Verborgenen, du behältst jederzeit die Kontrolle.",
+    "leni_note": null
+  },
+  {
+    "id": "organisation-panel",
+    "icon": "📅",
+    "name": "Termine, Fristen & Rückrufe — alles im Blick",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Kira erkennt in E-Mails automatisch Terminwünsche, Fristen und Rückrufbitten — und zeigt sie übersichtlich an. Kein Termin geht mehr unter, kein Rückruf wird vergessen.",
+    "leni_note": null
+  },
+  {
+    "id": "antwort-generierung",
+    "icon": "✍️",
+    "name": "Kira schreibt schon mal vor",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Für jede eingehende Anfrage erstellt Kira automatisch einen fertigen Antwort-Entwurf — im Schreibstil von Kai, passend zur Situation. Kein Copy-Paste, sondern ein durchdachter Vorschlag, der nur noch angepasst und abgeschickt werden muss.",
+    "leni_note": null
+  },
+  {
+    "id": "mail-monitor",
+    "icon": "📡",
+    "name": "E-Mails werden automatisch überwacht",
+    "status": "done",
+    "added": "2026-03-25",
+    "desc": "Neue E-Mails werden sofort geprüft — auch wenn die App im Hintergrund läuft. Kira erkennt selbst: Ist das eine Anfrage? Eine Beschwerde? Eine Bestellung? Und legt automatisch die passende Aufgabe an, bevor du die Mail überhaupt gesehen hast.",
+    "leni_note": null
+  },
+  {
+    "id": "einstellungen-panel",
+    "icon": "⚙️",
+    "name": "Einstellungen — die App nach deinem Geschmack",
+    "status": "done",
+    "added": "2026-03-28",
+    "desc": "Die App lässt sich vollständig anpassen: Schriftart, Farbschema (hell/dunkel), Arbeitszeiten (wann darf Kira mich stören?), Urlaubsmodus, Push-Benachrichtigungen aufs Handy — und vieles mehr. Deine App, deine Regeln.",
+    "leni_note": null
+  },
+  {
+    "id": "direktmail-antwort",
+    "icon": "📤",
+    "name": "Direkt aus der App auf E-Mails antworten",
+    "status": "planned",
+    "added": "2026-03-27",
+    "desc": "Geplant: E-Mails direkt aus dem Dashboard beantworten — kein extra Öffnen von Gmail nötig. Kira entwirft den Text, du schaust kurz drüber, ein Klick und fertig. Alles bleibt an einem Ort, kein Hin- und Herwechseln mehr.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-tagesstart-briefing",
+    "icon": "☀️",
+    "name": "Kiras Morgenbriefing",
+    "status": "partial",
+    "added": "2026-03-27",
+    "desc": "Jeden Morgen eine kurze Zusammenfassung von Kira: Was steht heute an? Was kam über Nacht rein? Worauf solltest du besonders achten? — Die Funktion ist halb fertig: Kira kann das Briefing schon erstellen, die schöne Anzeige auf der Startseite fehlt noch.",
+    "leni_note": null
+  },
+  {
+    "id": "kunden-360",
+    "icon": "👤",
+    "name": "Vollständiges Kundenprofil",
+    "status": "planned",
+    "added": "2026-03-25",
+    "desc": "Geplant: Alles über einen Kunden auf einer Seite — alle bisherigen Mails, Angebote, Rechnungen und die komplette Geschichte. Perfekt für den Moment wenn jemand anruft und du sofort weißt: Wer ist das? Was haben wir miteinander gemacht?",
+    "leni_note": null
+  },
+  {
+    "id": "angebots-kalkulation",
+    "icon": "🧮",
+    "name": "Kira hilft beim Angebot schreiben",
+    "status": "planned",
+    "added": "2026-03-25",
+    "desc": "Geplant: Du beschreibst kurz ein neues Projekt — Kira schlägt daraus ein vollständiges Angebot vor, basierend auf echten Vergleichsprojekten aus der Vergangenheit. Kein Schätzen mehr ins Blaue, sondern fundierte Preise aus echten Erfahrungen.",
+    "leni_note": null
+  },
+  {
+    "id": "cashflow-prognose",
+    "icon": "💰",
+    "name": "Geldfluss-Vorschau: Wann kommt was rein?",
+    "status": "planned",
+    "added": "2026-03-25",
+    "desc": "Geplant: Eine Vorschau für die nächsten Wochen — wann kommt wie viel Geld? Kira berechnet das aus offenen Rechnungen und dem bisherigen Zahlungsverhalten der Kunden. Keine bösen Überraschungen mehr beim Blick aufs Konto.",
+    "leni_note": null
+  },
+  {
+    "id": "kalender-integration",
+    "icon": "📆",
+    "name": "Termine automatisch in den Kalender",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Erkannte Termine werden direkt in Google Kalender oder Outlook eingetragen — ohne manuelles Abtippen. Kira setzt auch Erinnerungen wenn wichtige Fristen oder Rückrufe nahen.",
+    "leni_note": null
+  },
+  {
+    "id": "dokument-vorlagen",
+    "icon": "📝",
+    "name": "Angebote & Rechnungen direkt aus der App",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Angebots- und Rechnungs-PDFs direkt im Dashboard erstellen — mit rauMKult-Layout und automatisch befüllten Feldern. Inklusive Mahnschreiben in drei Eskalationsstufen. Kein extra Programm mehr nötig.",
+    "leni_note": null
+  },
+  {
+    "id": "foto-analyse",
+    "icon": "📸",
+    "name": "Foto hochladen — Angebot rausbekommen",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Fotos oder kurze Videos von der Baustelle hochladen — KI erkennt Betonart, Schadensumfang und Fläche, und schlägt die passende Leistung mit Richtpreis vor. Schätzungen die nicht mehr ins Blaue gehen.",
+    "leni_note": null
+  },
+  {
+    "id": "whatsapp-integration",
+    "icon": "💬",
+    "name": "Kunden schreiben per WhatsApp — Kira ist dabei",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: WhatsApp- und Telegram-Nachrichten von Kunden erscheinen direkt im Dashboard — wie alle anderen Mails. Schnellantworten mit einem Klick. Viele Kunden kommunizieren lieber per Messenger.",
+    "leni_note": null
+  },
+  {
+    "id": "zeiterfassung",
+    "icon": "⏱️",
+    "name": "Wie lange braucht ein Projekt wirklich?",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Zeiterfassung direkt im Dashboard — starten, stoppen, der Rechnung zuordnen. Am Ende siehst du: Wie hoch war der Stundensatz wirklich? War das Projekt profitabel? Integration mit der ProjektZeit-App ist geplant.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-pipeline",
+    "icon": "🎯",
+    "name": "Vom ersten Kontakt bis zur Rechnung",
+    "status": "planned",
+    "added": "2026-03-28",
+    "desc": "Geplant: Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt — Anfrage, Angebot, Auftrag, Abrechnung. Conversion-Raten auf einen Blick, automatische Wiedervorlage bei vergessenen Kontakten.",
+    "leni_note": null
+  }
+];
+
+/* ─────────────────────────────────────────────────────────────
+   THEME
+───────────────────────────────────────────────────────────── */
+function toggleTheme() {
+  const html = document.documentElement;
+  const newTheme = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', newTheme);
+  document.getElementById('btn-theme').textContent = newTheme === 'light' ? '🌙' : '☀️';
+  localStorage.setItem('kira_pv_theme', newTheme);
+}
+function initTheme() {
+  const t = localStorage.getItem('kira_pv_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
+}
+initTheme();
+
+/* ─────────────────────────────────────────────────────────────
+   APP STATE
+───────────────────────────────────────────────────────────── */
+let currentUser  = null;
+let activeFilter = 'all';
+let fbFeatureId  = null;
+let currentReact = null;
+let tourStep     = 0;
+
+const STATUS_LABEL = {
+  done:      '✓ Fertig eingebaut',
+  partial:   '⟳ Teilweise fertig',
+  planned:   '◌ In Planung',
+  leni_idea: '💡 Deine Idee — wird geprüft',
+  leni_done: '⭐ Deine Idee wurde umgesetzt!'
+};
+
+const TOUR_LENI = [
+  { icon:'🌸', title:'Herzlich willkommen, Leni!',
+    text:'Schön, dass du hier bist! Diese Seite ist speziell für dich gemacht — damit du siehst, was Kai und Kira gerade bauen, und damit deine Ideen direkt in die Entwicklung einfließen können. Du bist wirklich wichtiger Teil davon!' },
+  { icon:'🗂️', title:'Die Kacheln — das Herzstück',
+    text:'Jede Kachel zeigt eine Funktion der App. Grüner Streifen = fertig eingebaut, orange = halb fertig, blau = noch geplant. Klick auf eine Kachel die dich interessiert — dann siehst du Details und kannst deine Meinung sagen.' },
+  { icon:'🔍', title:'Filter & Statuskarten',
+    text:'Die drei großen Karten oben zeigen auf einen Blick: wie viel schon fertig ist, was fast fertig ist, und was noch kommt. Klick drauf um zu filtern — oder nutze die Filterschaltflächen für noch mehr Optionen.' },
+  { icon:'💡', title:'Deine Ideen zählen wirklich!',
+    text:'Über den pinken Button unten rechts kannst du jederzeit eine neue Idee einreichen — egal wie groß oder klein. Kai und Kira schauen sich alles an. Was Sinn macht, wird gebaut. Und dann siehst du es hier mit einem goldenen Stern! ⭐' },
+  { icon:'🎉', title:'Was passiert als nächstes?',
+    text:'Dein Feedback geht direkt an Kai — er bekommt sofort eine Benachrichtigung. Er bespricht alles mit Kira und entscheidet, was als nächstes kommt. Wenn deine Idee umgesetzt wurde, siehst du das besonders hervorgehoben. Danke, dass du dabei bist! ✨' }
+];
+const TOUR_KAI = [
+  { icon:'⚙️', title:'Admin-Ansicht aktiv',
+    text:'Du siehst alle Features und unten Lenis Feedback, ihre Ideen, alle Einstellungen und den GitHub-Sync. Im Tab "Einstellungen" kannst du Passwörter, ntfy-Topics und Benachrichtigungen konfigurieren.' }
+];
+
+/* ─────────────────────────────────────────────────────────────
+   ADMIN SETTINGS
+───────────────────────────────────────────────────────────── */
+function loadAdminSettings() {
+  const defaults = {
+    pw_kai:'',pw_leni:'',ntfy_kai:CFG.ntfy_kai,ntfy_kai_mode:'immediate',
+    ntfy_leni:CFG.ntfy_leni,ntfy_leni_auto:'1',
+    ntfy_leni_msg:'Neue Funktionen bei KIRA Partner! Schau mal rein 🌟',
+    gh_token:'',last_push:'',last_push_ok:false
+  };
+  return Object.assign(defaults, JSON.parse(localStorage.getItem('kira_pv_admin')||'{}'));
+}
+function saveAdminSettings() {
+  const s = loadAdminSettings();
+  const upd = {
+    pw_kai:        document.getElementById('cfg-pw-kai').value        || s.pw_kai,
+    pw_leni:       document.getElementById('cfg-pw-leni').value       || s.pw_leni,
+    ntfy_kai:      document.getElementById('cfg-ntfy-kai').value.trim(),
+    ntfy_kai_mode: document.getElementById('cfg-ntfy-kai-mode').value,
+    ntfy_leni:     document.getElementById('cfg-ntfy-leni').value.trim(),
+    ntfy_leni_auto:document.getElementById('cfg-ntfy-leni-auto').value,
+    ntfy_leni_msg: document.getElementById('cfg-ntfy-leni-msg').value.trim(),
+    gh_token:      document.getElementById('cfg-gh-token').value.trim(),
+    last_push: s.last_push, last_push_ok: s.last_push_ok
+  };
+  localStorage.setItem('kira_pv_admin', JSON.stringify(upd));
+  showToast('Einstellungen gespeichert! Jetzt im Tab "GitHub Sync" pushen.','✓');
+}
+function fillAdminForm() {
+  const s = loadAdminSettings();
+  document.getElementById('cfg-pw-kai').value         = s.pw_kai;
+  document.getElementById('cfg-pw-leni').value        = s.pw_leni;
+  document.getElementById('cfg-ntfy-kai').value       = s.ntfy_kai;
+  document.getElementById('cfg-ntfy-kai-mode').value  = s.ntfy_kai_mode;
+  document.getElementById('cfg-ntfy-leni').value      = s.ntfy_leni;
+  document.getElementById('cfg-ntfy-leni-auto').value = s.ntfy_leni_auto;
+  document.getElementById('cfg-ntfy-leni-msg').value  = s.ntfy_leni_msg;
+  document.getElementById('cfg-gh-token').value       = s.gh_token;
+  const dot=document.getElementById('sync-dot'),label=document.getElementById('sync-label'),sub=document.getElementById('sync-sub');
+  if (s.last_push) {
+    dot.className = s.last_push_ok ? 'sync-dot ok' : 'sync-dot warn';
+    label.textContent = s.last_push_ok ? `Zuletzt gepusht: ${s.last_push}` : `Letzter Push fehlgeschlagen: ${s.last_push}`;
+    sub.textContent = `Repository: ${CFG.gh_owner}/${CFG.gh_repo}`;
+    document.getElementById('gh-pages-link').style.display = 'inline';
+  }
+}
+function togglePw(id) {
+  const inp=document.getElementById(id);inp.type=inp.type==='password'?'text':'password';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   NTFY
+───────────────────────────────────────────────────────────── */
+async function sendNtfy(topic,title,message,priority) {
+  if (!topic) return;
+  try {
+    await fetch(`${CFG.ntfy_server||'https://ntfy.sh'}/${topic}`,{
+      method:'POST',
+      headers:{'Title':title,'Priority':String(priority||3),'Tags':'sparkles'},
+      body:message
+    });
+  } catch(_){}
+}
+function notifyKai(featureName,react,text) {
+  const s=loadAdminSettings();
+  if (!s.ntfy_kai||s.ntfy_kai_mode==='off') return;
+  if (s.ntfy_kai_mode==='daily') {
+    const today=new Date().toISOString().slice(0,10);
+    const last=localStorage.getItem('kira_pv_last_notify_kai');
+    if (last===today) return;
+    localStorage.setItem('kira_pv_last_notify_kai',today);
+  }
+  const msg=[featureName?`Funktion: ${featureName}`:'',react?`Reaktion: ${react}`:'',text?`"${text}"`:''].filter(Boolean).join('\n');
+  sendNtfy(s.ntfy_kai,'📬 Leni hat Feedback gegeben',msg||'(ohne Text)',3);
+}
+function sendNtfyLeni(customMsg) {
+  const s=loadAdminSettings();
+  if (!s.ntfy_leni){showToast('Kein ntfy-Topic für Leni konfiguriert','⚠️');return;}
+  sendNtfy(s.ntfy_leni,'✨ KIRA Partner wurde aktualisiert',customMsg||s.ntfy_leni_msg||'Kai hat die Liste aktualisiert!',3);
+  showToast('Push-Benachrichtigung an Leni gesendet!','📲');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   GITHUB PUSH
+───────────────────────────────────────────────────────────── */
+function syncLog(msg,type) {
+  const el=document.getElementById('sync-log');
+  el.classList.add('show');
+  const line=document.createElement('div');
+  line.className=type||'info';
+  line.textContent=`[${new Date().toLocaleTimeString('de-DE')}] ${msg}`;
+  el.appendChild(line);el.scrollTop=el.scrollHeight;
+}
+async function pushToGitHub() {
+  const s=loadAdminSettings();
+  if (!s.gh_token){showToast('Bitte erst GitHub Token eingeben','⚠️');return;}
+  const owner=CFG.gh_owner,repo=CFG.gh_repo,path='index.html';
+  const btn=document.getElementById('btn-gh-push');
+  btn.disabled=true;btn.textContent='⏳ Verbinde...';
+  document.getElementById('sync-log').innerHTML='';
+  syncLog(`Verbinde: ${owner}/${repo}`,'info');
+  try {
+    syncLog('Hole aktuelle Version...','info');
+    const getResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      {headers:{'Authorization':`token ${s.gh_token}`,'Accept':'application/vnd.github.v3+json'}});
+    if (!getResp.ok){const e=await getResp.json();throw new Error(e.message||`HTTP ${getResp.status}`);}
+    const getData=await getResp.json();
+    const sha=getData.sha;
+    const currentHtml=decodeURIComponent(escape(atob(getData.content.replace(/\n/g,''))));
+    syncLog('OK Version geladen','ok');
+    syncLog('Aktualisiere Einstellungen...','info');
+    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo};
+    let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
+    syncLog('OK Einstellungen aktualisiert','ok');
+    syncLog('Pushe zu GitHub...','info');
+    const content=btoa(unescape(encodeURIComponent(newHtml)));
+    const putResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
+      method:'PUT',
+      headers:{'Authorization':`token ${s.gh_token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body:JSON.stringify({message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha})
+    });
+    if (!putResp.ok){const e=await putResp.json();throw new Error(e.message||`HTTP ${putResp.status}`);}
+    syncLog('OK Erfolgreich gepusht!','ok');
+    syncLog('GitHub Pages baut neu (~1 Minute)','info');
+    const now=new Date().toLocaleString('de-DE');
+    s.last_push=now;s.last_push_ok=true;
+    localStorage.setItem('kira_pv_admin',JSON.stringify(s));
+    fillAdminForm();showToast('Erfolgreich gepusht!','🚀');
+    if (s.ntfy_leni_auto==='1'&&s.ntfy_leni){
+      syncLog('Sende Push an Leni...','info');
+      await sendNtfy(s.ntfy_leni,'✨ KIRA Partner wurde aktualisiert',s.ntfy_leni_msg||'Kai hat die Liste aktualisiert!',3);
+      syncLog('OK Leni benachrichtigt','ok');
+    }
+  } catch(e) {
+    syncLog(`FEHLER: ${e.message}`,'err');
+    const s2=loadAdminSettings();s2.last_push=new Date().toLocaleString('de-DE');s2.last_push_ok=false;
+    localStorage.setItem('kira_pv_admin',JSON.stringify(s2));fillAdminForm();
+    showToast('Push fehlgeschlagen — Details im Log','✗');
+  } finally {
+    btn.disabled=false;btn.textContent='🚀 Zu GitHub pushen & live schalten';
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AUTH
+───────────────────────────────────────────────────────────── */
+function doLogin() {
+  const pw=document.getElementById('pw-input').value;
+  const err=document.getElementById('login-error');
+  const s=loadAdminSettings();
+  const pwKai  = s.pw_kai  || CFG.pw_kai;
+  const pwLeni = s.pw_leni || CFG.pw_leni;
+  if (pw===pwKai) { currentUser='kai'; startApp(); }
+  else if (pw===pwLeni) { currentUser='leni'; startApp(); }
+  else {
+    err.style.display='block';
+    document.getElementById('pw-input').style.borderColor='var(--red)';
+    setTimeout(()=>{err.style.display='none';document.getElementById('pw-input').style.borderColor='var(--border)';},4000);
+  }
+}
+function doLogout() {
+  currentUser=null;
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-login').style.display='flex';
+  document.getElementById('pw-input').value='';
+  document.getElementById('fab-idea').style.display='none';
+  document.getElementById('admin-panel').style.display='none';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   APP START
+───────────────────────────────────────────────────────────── */
+function startApp() {
+  document.getElementById('screen-login').style.display='none';
+  document.getElementById('screen-app').classList.add('active');
+  const isLeni=currentUser==='leni';
+  document.getElementById('user-label').textContent=isLeni?'Leni':'Kai (Admin)';
+
+  if (isLeni) {
+    document.getElementById('welcome-ava').textContent='🌸';
+    document.getElementById('welcome-h').textContent='Hallo Leni! Schön, dass du da bist. 🎉';
+    document.getElementById('welcome-p').textContent='Hier siehst du, was Kai und Kira gerade bauen — deine Meinung dazu ist Gold wert!';
+    document.getElementById('fab-idea').style.display='flex';
+    document.getElementById('admin-panel').style.display='none';
+  } else {
+    document.getElementById('welcome-ava').textContent='👋';
+    document.getElementById('welcome-h').textContent='Willkommen zurück, Kai.';
+    document.getElementById('welcome-p').textContent='Admin-Ansicht: Features, Lenis Feedback, Einstellungen und GitHub-Sync.';
+    document.getElementById('admin-panel').style.display='block';
+    renderAdminPanel();fillAdminForm();
+  }
+
+  const lastVisit=localStorage.getItem('kira_pv_last')||CFG.app_start;
+  const newCount =FEATURES.filter(f=>f.added>lastVisit).length;
+  const leniCount=FEATURES.filter(f=>f.status.startsWith('leni')).length;
+  if (newCount>0){document.getElementById('fb-new').style.display='flex';document.getElementById('cnt-new').textContent=newCount;}
+  if (leniCount>0){document.getElementById('fb-leni').style.display='flex';}
+
+  updateCounts();renderTiles('all');
+  // Tour deaktiviert -- kann manuell per startTour() ausgeloest werden
+  localStorage.setItem('kira_pv_last',new Date().toISOString().slice(0,10));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TILES
+───────────────────────────────────────────────────────────── */
+function statusBadge(s) {
+  return ({
+    done:     '<span class="badge b-done">✓ Eingebaut</span>',
+    partial:  '<span class="badge b-partial">⟳ Teilweise</span>',
+    planned:  '<span class="badge b-planned">◌ Geplant</span>',
+    leni_idea:'<span class="badge b-leni">💡 Deine Idee</span>',
+    leni_done:'<span class="badge b-gold">⭐ Deine Idee — umgesetzt!</span>'
+  })[s]||'';
+}
+function renderTiles(filter) {
+  activeFilter=filter;
+  const lastVisit=localStorage.getItem('kira_pv_last')||CFG.app_start;
+  const feedbacks=JSON.parse(localStorage.getItem('kira_pv_fb')||'{}');
+  let list=FEATURES;
+  if (filter==='done')    list=FEATURES.filter(f=>f.status==='done');
+  if (filter==='partial') list=FEATURES.filter(f=>f.status==='partial');
+  if (filter==='planned') list=FEATURES.filter(f=>f.status==='planned');
+  if (filter==='leni')    list=FEATURES.filter(f=>f.status.startsWith('leni'));
+  if (filter==='new')     list=FEATURES.filter(f=>f.added>lastVisit);
+  document.getElementById('tiles-meta-txt').textContent=list.length===1?'1 Funktion':`${list.length} Funktionen`;
+  const grid=document.getElementById('tiles-grid');
+  if (!list.length){grid.innerHTML='<div class="tiles-empty"><div class="tiles-empty-icon">🔍</div><div>Nichts in dieser Kategorie — noch nicht!</div></div>';return;}
+  grid.innerHTML=list.map(f=>{
+    const isNew=f.added>lastVisit;
+    const hasFb=!!feedbacks[f.id];
+    const newBadge=isNew?'<span class="badge b-new">✦ Neu</span>':'';
+    const leniDoneBox=f.status==='leni_done'?`<div class="leni-done-box">🎉 <strong>Deine Idee wurde umgesetzt!</strong><br>Schau es dir an und sag uns, ob es so passt!</div>`:'';
+    return `<div class="tile" data-s="${f.status}" onclick="openFeedbackModal('${f.id}')">
+      <div class="tile-head"><span class="tile-icon">${f.icon}</span><div class="tile-badges">${newBadge}${statusBadge(f.status)}</div></div>
+      <div class="tile-name">${f.name}</div>
+      ${leniDoneBox}
+      <div class="tile-desc">${f.desc}</div>
+      <div class="tile-foot">
+        <span class="tile-fb-info">${hasFb?'💬 Feedback gegeben':'· Noch kein Feedback'}</span>
+        <button class="btn-tile-fb" onclick="event.stopPropagation();openFeedbackModal('${f.id}')">${hasFb?'✏️ Ändern':'💬 Meinung sagen'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function updateCounts() {
+  const doneN   =FEATURES.filter(f=>f.status==='done').length;
+  const partialN=FEATURES.filter(f=>f.status==='partial').length;
+  const plannedN=FEATURES.filter(f=>f.status==='planned').length;
+  document.getElementById('cnt-all').textContent    =FEATURES.length;
+  document.getElementById('cnt-done').textContent   =doneN;
+  document.getElementById('cnt-partial').textContent=partialN;
+  document.getElementById('cnt-planned').textContent=plannedN;
+  document.getElementById('cnt-leni').textContent   =FEATURES.filter(f=>f.status.startsWith('leni')).length;
+  document.getElementById('sc-num-done').textContent   =doneN;
+  document.getElementById('sc-num-partial').textContent=partialN;
+  document.getElementById('sc-num-planned').textContent=plannedN;
+}
+function filterFromCard(filter) {
+  document.querySelectorAll('.sc-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('sc-'+filter+'-card')?.classList.add('active');
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('fb-'+filter)?.classList.add('active');
+  renderTiles(filter);
+}
+function setFilter(filter,btn) {
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.sc-card').forEach(c=>c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (['done','partial','planned'].includes(filter))
+    document.getElementById('sc-'+filter+'-card')?.classList.add('active');
+  renderTiles(filter);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FEEDBACK MODAL
+───────────────────────────────────────────────────────────── */
+function openFeedbackModal(featureId) {
+  fbFeatureId=featureId;currentReact=null;
+  const f=FEATURES.find(x=>x.id===featureId);if(!f)return;
+  document.getElementById('mf-name').textContent  =f.name;
+  document.getElementById('mf-status').textContent=STATUS_LABEL[f.status]||'';
+  document.getElementById('mf-desc').textContent  =f.desc;
+  const fb=(JSON.parse(localStorage.getItem('kira_pv_fb')||'{}')||{})[featureId];
+  document.getElementById('mf-text').value=fb?fb.text:'';
+  document.querySelectorAll('.react-btn').forEach(b=>b.classList.remove('sel'));
+  if (fb&&fb.react) setReact(fb.react);
+  openModal('modal-feedback');
+}
+function setReact(r) {
+  currentReact=r;
+  document.querySelectorAll('.react-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('r-'+r)?.classList.add('sel');
+}
+function saveFeedback() {
+  const text=document.getElementById('mf-text').value.trim();
+  if (!text&&!currentReact){showToast('Wähl eine Reaktion oder schreib kurz was 😊','💬');return;}
+  const feedbacks=JSON.parse(localStorage.getItem('kira_pv_fb')||'{}');
+  feedbacks[fbFeatureId]={text,react:currentReact,date:new Date().toLocaleDateString('de-DE'),user:currentUser};
+  localStorage.setItem('kira_pv_fb',JSON.stringify(feedbacks));
+  const f=FEATURES.find(x=>x.id===fbFeatureId);
+  if (currentUser==='leni') {
+    notifyKai(f?.name,currentReact,text);
+    closeModal('modal-feedback');
+    document.getElementById('ty-icon').textContent ='🙏';
+    document.getElementById('ty-title').textContent='Vielen Dank, Leni!';
+    document.getElementById('ty-text').textContent ='Dein Feedback ist wirklich wertvoll und wird direkt in die Planung einfließen.\n\nKai und Kira schauen sich alles genau an. Wenn deine Idee umgesetzt wird, siehst du das hier mit einem goldenen Stern. 🌟';
+    openModal('modal-thanks');
+  } else {
+    showToast('Feedback gespeichert!','✓');closeModal('modal-feedback');renderAdminPanel();
+  }
+  renderTiles(activeFilter);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   NEUE IDEE
+───────────────────────────────────────────────────────────── */
+function openIdeaModal(){document.getElementById('idea-title').value='';document.getElementById('idea-text').value='';openModal('modal-idea');}
+function saveIdea() {
+  const title=document.getElementById('idea-title').value.trim();
+  const text =document.getElementById('idea-text').value.trim();
+  if (!title&&!text){showToast('Schreib kurz, was du dir vorstellst 💡','💡');return;}
+  const ideas=JSON.parse(localStorage.getItem('kira_pv_ideas')||'[]');
+  ideas.push({title:title||'(kein Titel)',text:text||'(keine Details)',date:new Date().toLocaleDateString('de-DE')});
+  localStorage.setItem('kira_pv_ideas',JSON.stringify(ideas));
+  if (currentUser==='leni') {
+    notifyKai(null,'💡 Neue freie Idee',title+(text?': '+text.slice(0,80):''));
+    closeModal('modal-idea');
+    document.getElementById('ty-icon').textContent ='🌟';
+    document.getElementById('ty-title').textContent='Was für eine tolle Idee, Leni!';
+    document.getElementById('ty-text').textContent =`Deine Idee "${title||'ohne Titel'}" wurde gespeichert und geht direkt an Kai.\n\nEr bespricht sie mit Kira und schaut, ob und wie sie umgesetzt werden kann. Wenn es so weit ist, siehst du sie hier mit einem goldenen Stern. Danke! 🙏`;
+    openModal('modal-thanks');
+  } else {
+    showToast('Idee gespeichert!','✓');closeModal('modal-idea');renderAdminPanel();
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ADMIN PANEL
+───────────────────────────────────────────────────────────── */
+function showAdminTab(tab,btn) {
+  document.querySelectorAll('.atab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.atab-content').forEach(c=>c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.atab-btn[onclick*="'${tab}'"]`)?.classList.add('active');
+  document.getElementById('atab-'+tab)?.classList.add('active');
+}
+function renderAdminPanel() {
+  const feedbacks=JSON.parse(localStorage.getItem('kira_pv_fb')||'{}');
+  const ideas    =JSON.parse(localStorage.getItem('kira_pv_ideas')||'[]');
+  const emoji={super:'👍',idea:'💡',question:'❓',wish:'✨'};
+  const fbList=document.getElementById('admin-feedback-list');
+  const fbEntries=Object.entries(feedbacks);
+  fbList.innerHTML=fbEntries.length?fbEntries.map(([fid,fb])=>{
+    const feat=FEATURES.find(f=>f.id===fid);
+    return `<div class="fb-item"><div class="fb-item-head"><span class="fb-item-feat">${feat?feat.icon+' '+feat.name:fid}</span><span class="fb-item-meta">${fb.date}</span></div>${fb.react?`<div class="fb-item-react">${emoji[fb.react]||''} ${fb.react}</div>`:''}${fb.text?`<div class="fb-item-text">"${escHtml(fb.text)}"</div>`:''}</div>`;
+  }).join(''):'<div class="admin-empty">Noch kein Feedback zu einzelnen Funktionen.</div>';
+  const ideaList=document.getElementById('admin-ideas-list');
+  ideaList.innerHTML=ideas.length?ideas.map(idea=>`<div class="idea-item"><div class="idea-item-head"><span>${escHtml(idea.title)}</span><span>${idea.date}</span></div><div class="idea-item-text">${escHtml(idea.text)}</div></div>`).join(''):'<div class="admin-empty">Noch keine freien Ideen von Leni.</div>';
+}
+function exportForClaude() {
+  const feedbacks=JSON.parse(localStorage.getItem('kira_pv_fb')||'{}');
+  const ideas    =JSON.parse(localStorage.getItem('kira_pv_ideas')||'[]');
+  const emoji={super:'👍 Super',idea:'💡 Idee',question:'❓ Frage',wish:'✨ Wunsch'};
+  const lines=['=== LENI PARTNER-FEEDBACK — Export für Claude ===',`Datum: ${new Date().toLocaleDateString('de-DE')}`,''];
+  const fbEntries=Object.entries(feedbacks);
+  if (fbEntries.length){
+    lines.push('── FEEDBACK ZU FUNKTIONEN ──','');
+    fbEntries.forEach(([fid,fb])=>{
+      const feat=FEATURES.find(f=>f.id===fid);
+      lines.push(`Funktion: ${feat?feat.name:fid} [${fid}]`);
+      if (fb.react) lines.push(`Reaktion: ${emoji[fb.react]||fb.react}`);
+      if (fb.text)  lines.push(`Kommentar: "${fb.text}"`);
+      lines.push(`Datum: ${fb.date}`,'');
+    });
+  }
+  if (ideas.length){
+    lines.push('── LENIS FREIE IDEEN ──','');
+    ideas.forEach((idea,i)=>{lines.push(`Idee ${i+1}: ${idea.title}`);if(idea.text)lines.push(`Details: ${idea.text}`);lines.push(`Eingereicht: ${idea.date}`,'');});
+  }
+  if (!fbEntries.length&&!ideas.length){showToast('Noch kein Feedback vorhanden.','ℹ️');return;}
+  const text=lines.join('\n');
+  navigator.clipboard.writeText(text).then(()=>showToast('Kopiert! In Claude einfügen.','📋'))
+    .catch(()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Kopiert!','📋');});
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TOUR
+───────────────────────────────────────────────────────────── */
+function startTour(){tourStep=0;const steps=currentUser==='kai'?TOUR_KAI:TOUR_LENI;document.getElementById('tour-dots').innerHTML=steps.map((_,i)=>`<div class="tour-dot ${i===0?'on':''}" id="td${i}"></div>`).join('');showTourStep(0);document.getElementById('tour-overlay').classList.add('active');}
+function showTourStep(step){const steps=currentUser==='kai'?TOUR_KAI:TOUR_LENI;const s=steps[step];document.getElementById('tour-icon').textContent=s.icon;document.getElementById('tour-title').textContent=s.title;document.getElementById('tour-text').textContent=s.text;steps.forEach((_,i)=>{const d=document.getElementById('td'+i);if(d)d.classList.toggle('on',i===step);});document.getElementById('btn-tour-next').textContent=step===steps.length-1?"Los geht's! 🎉":"Weiter →";}
+function nextTourStep(){const steps=currentUser==='kai'?TOUR_KAI:TOUR_LENI;tourStep++;if(tourStep>=steps.length)endTour();else showTourStep(tourStep);}
+function endTour(){document.getElementById('tour-overlay').classList.remove('active');localStorage.setItem('kira_pv_tour','1');}
+
+/* ─────────────────────────────────────────────────────────────
+   UTILS
+───────────────────────────────────────────────────────────── */
+function openModal(id) {document.getElementById(id).classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+document.querySelectorAll('.modal-bg').forEach(el=>{el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-bg.active').forEach(m=>m.classList.remove('active'));});
+let _tt;
+function showToast(msg,icon='✓'){
+  const t=document.getElementById('toast');
+  document.getElementById('toast-ico').textContent=icon;
+  document.getElementById('toast-txt').textContent=msg;
+  t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),4200);
+}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
