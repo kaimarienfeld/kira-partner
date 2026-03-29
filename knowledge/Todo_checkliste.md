@@ -365,12 +365,36 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 ---
 
+## OFFENE BUGS (Pflicht vor neuen Features!)
+
+| Prio | Bug | ID | Details |
+|------|-----|-----|---------|
+| 🔴 KRITISCH | Task-Löschen funktioniert nicht | `task-loeschen-bug` | Einzeln + Multi: Kira fragt Grund, nach Bestätigung passiert nichts — Einträge werden nicht gelöscht. Kira arbeitet danach nicht mehr. |
+
+---
+
+## KAIS WUNSCHLISTE (aus only_kais checkliste.md, 2026-03-29)
+
+| Prio | Feature | ID | Status |
+|------|---------|-----|--------|
+| 🔴 Hoch | Stats-Zeile Dashboard: Klick → Tab + Filter | `stats-zeile-filter-klick` | 📋 Geplant |
+| 🔴 Hoch | Wissen-Bibliothek: Zeitstempel erstellt/geändert | `wissen-zeitstempel` | 📋 Geplant |
+| 🔴 Hoch | Eingangsrechnungen auto-scan + Offene-Posten-DB | `eingangsrechnungen-auto-scan` | 📋 Geplant |
+| 🟡 Mittel | Kira LLM: Datenbanken + Wissen automatisch pflegen | `kira-llm-datenbanken-autopflege` | 📋 Geplant |
+| 🟡 Mittel | Konto löschen vollständig verdrahten | `mail-konten-settings-overhaul` | 🔧 Teilweise |
+| 🟡 Mittel | WhatsApp-Token eintragen (Kai-Aktion) | — | ⏳ Wartet auf Kai |
+
+---
+
 ## PRIORISIERTE ARBEITSREIHENFOLGE
+
+### Phase 0 – Bugs (sofort)
+0. 🔴 Task-Löschen reparieren (einzeln + multi) → `task-loeschen-bug`
 
 ### Phase 1 – Lücken schließen (bestehende config.json-Keys ohne UI)
 1. ❌ E-Mail-Benachrichtigungen (SMTP) → Sektion Benachrichtigungen erweitern
-2. ❌ Mail-Monitor-Intervall → Sektion Mail & Konten
-3. ❌ Mail-Monitor aktiv/inaktiv → Sektion Mail & Konten
+2. ✅ Mail-Monitor-Intervall → erledigt session-y
+3. ✅ Mail-Monitor aktiv/inaktiv → erledigt session-y
 4. ❌ `llm.max_kontext_items` → Sektion Dashboard/LLM
 5. ❌ `llm.auto_wissen_extrahieren` → Sektion LLM
 6. ❌ Config-Export/Import echte Implementierung → Sektion Konfiguration

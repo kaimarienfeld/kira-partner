@@ -516,6 +516,71 @@
       "category": "mail",
       "leni_visible": false,
       "notes": "Konto-Karten mit echten Stats (Index+Archiv), Per-Konto Abrufen/Testen/Verbinden/Token-loeschen/Loeschen, Standard-Konto Radio, IMAP-Ordner Accordion, Sync-Ordner KIRA-Zugang, Archiv-Pflicht-Panel mit Pruefen+Re-Index, Mail-Monitor Status+Vorladen-Spinner. APIs: /api/mail/konten/stats, /api/mail/konten/ordner, /api/mail/archiv/pruefen, /api/mail/konto/imap-test, /api/mail/konto/abrufen, /api/mail/konto/alle-abrufen, /api/mail/konto/standard, /api/mail/konto/hinzufuegen."
+    },
+    {
+      "id": "task-loeschen-bug",
+      "name": "Task Löschen (einzeln + multi) reparieren",
+      "icon": "🗑️",
+      "leni_name": "Aufgaben löschen",
+      "leni_desc": "Einzelne und mehrere Aufgaben können gelöscht werden",
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "dashboard",
+      "status": "open_bug",
+      "last_updated": "2026-03-29",
+      "description": "Löschen (einzeln + multi) funktioniert nicht. Kira fragt nach Grund, nach Bestätigung passiert nichts, Fenster schließt sich, Einträge werden nicht gelöscht."
+    },
+    {
+      "id": "stats-zeile-filter-klick",
+      "name": "Stats-Zeile im Dashboard klickbar mit Filter",
+      "icon": "📊",
+      "leni_name": "Dashboard Schnellfilter",
+      "leni_desc": "Klick auf Statistik-Zahlen öffnet direkt den passenden gefilterten Bereich",
+      "leni_visible": true,
+      "leni_note": "z.B. Klick auf Leads-Zahl → Kommunikation mit Filter Neue Leads",
+      "module": "dashboard",
+      "status": "planned",
+      "last_updated": "2026-03-29",
+      "description": "Stats-Zeile (n offen / n Leads / n Angebote) ist klickbar, springt aber nur zum Tab ohne Filter. Soll auch gleich den passenden Filter aktivieren."
+    },
+    {
+      "id": "wissen-zeitstempel",
+      "name": "Wissen-Bibliothek: Zeitstempel (erstellt/geändert)",
+      "icon": "📚",
+      "leni_name": null,
+      "leni_desc": null,
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "wissen",
+      "status": "planned",
+      "last_updated": "2026-03-29",
+      "description": "Wissensregeln haben keine Zeitstempel. Soll: erstellt_am, geaendert_am. Bei nächster Änderung setzen. Kira soll Wissen automatisch pflegen, Duplikate/Widersprüche erkennen und anpassen."
+    },
+    {
+      "id": "eingangsrechnungen-auto-scan",
+      "name": "Eingangsrechnungen automatisch scannen + Offene-Posten-DB",
+      "icon": "📨",
+      "leni_name": "Rechnungs-Erkennung",
+      "leni_desc": "Eingehende Rechnungen werden automatisch erkannt, erfasst und verfolgt",
+      "leni_visible": true,
+      "leni_note": "Kira erkennt Rechnungen automatisch und verfolgt ob bezahlt",
+      "module": "geschaeft",
+      "status": "planned",
+      "last_updated": "2026-03-29",
+      "description": "Eingangsrechnungen aus definierten Postfächern automatisch erkennen (Betreff-Keywords: Rechnung, Beleg, invoice etc. + Anhang-Check). Body-Scan wenn kein Anhang (z.B. Apple). PDF als Anhang weiterleiten. Rechnungsdaten in DB. Offene-Posten-DB die Kira LLM laufend abarbeitet bis qualifizierter Status. Keine Aufgaben dafür anlegen."
+    },
+    {
+      "id": "kira-llm-datenbanken-autopflege",
+      "name": "Kira LLM: Datenbanken + Wissen automatisch pflegen",
+      "icon": "🤖",
+      "leni_name": null,
+      "leni_desc": null,
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "kira",
+      "status": "planned",
+      "last_updated": "2026-03-29",
+      "description": "Kira soll bei jeder Abfrage/Angebot/Rechnung/Antwort Muster erkennen, Wissen aktualisieren, Preise anpassen wenn sich etwas ändert, Widersprüche erkennen und dokumentieren (vorher/nachher). Wissensregeln sollen von Kira aktiv erweitert und gepflegt werden, nicht nur starr bleiben."
     }
   ]
 }

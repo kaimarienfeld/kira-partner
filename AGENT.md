@@ -48,6 +48,25 @@
     → **KEIN Push**: wenn Änderung auf der KEIN-PUSH-Liste steht (siehe Abschnitt 1d)
     → **Mail an Leni + BCC Kai**: Wenn Versand fehlschlägt → sofort im Chat: "⚠️ Mail an Leni konnte nicht gesendet werden: [Fehlerdetail]. Bitte manuell prüfen."
 
+### Abschluss-Tabelle (PFLICHT nach jeder erledigten Aufgabe)
+
+Nach jeder abgeschlossenen Aufgabe IMMER diese Tabelle im Chat ausgeben — gibt Kai Kontrolle und Gewissheit:
+
+```
+## ✅ Erledigt — [Aufgaben-Titel] · [DATUM] [UHRZEIT]
+
+| Was | Details |
+|-----|---------|
+| 🔧 Geänderte Dateien | [Datei 1, Datei 2, ...] |
+| 📝 Git Commit | [Commit-Hash] — [Commit-Message] |
+| 📋 Tracking aktualisiert | session_handoff ✓ / known_issues ✓ / feature_registry ✓ / Todo_checkliste ✓ |
+| 🤝 Partner-View | generiert ✓ / Push ✓ oder: kein Push (Grund) |
+| ⚠️ Offen geblieben | [Was nicht fertig wurde — oder: —] |
+| 🔜 Empfohlener nächster Schritt | [Was als nächstes sinnvoll wäre] |
+```
+
+Regel: Tabelle kommt IMMER — auch bei kleinen Aufgaben (1 Zeile reicht dann). Kai soll nicht nachfragen müssen ob alles gemacht wurde.
+
 ### Nach Leni-Feedback (Workflow)
 1. Kai gibt Leni-Feedback mit "Alles für Claude kopieren" (Admin-Panel) → fügt in Chat ein
 2. Claude prüft jedes Feedback-Item:
