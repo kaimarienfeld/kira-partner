@@ -96,6 +96,131 @@ def detect_provider(email_addr: str) -> dict:
     settings["domain"] = domain
     return settings
 
+
+def _provider_stage1(domain: str, email_addr: str) -> dict:
+    """Stufe 1: Domain-Heuristik + bekannte Provider."""
+    provider = _DOMAIN_PROVIDER.get(domain, None)
+    if domain.endswith(".onmicrosoft.com"):
+        provider = "microsoft"
+    if provider:
+        s = dict(_PROVIDER_SETTINGS.get(provider, _PROVIDER_SETTINGS["imap"]))
+        s.update({"stage": 1, "provider": provider, "confidence": "high", "reason": "known_domain"})
+        return s
+    return {"stage": 1, "provider": None, "confidence": "low", "reason": "unknown_domain"}
+
+
+def _provider_stage2(domain: str) -> dict:
+    """Stufe 2: DNS MX + Autodiscover HTTP-Check."""
+    import subprocess, urllib.request as _ur
+    result = {"stage": 2, "provider": None, "confidence": "low"}
+
+    # MX-Record via nslookup prüfen (Windows)
+    try:
+        out = subprocess.run(
+            ["nslookup", "-type=MX", domain],
+            capture_output=True, text=True, timeout=5, creationflags=0x08000000
+        ).stdout.lower()
+        ms_mx_hints = ["protection.outlook.com", "mail.protection.outlook.com", "microsoft.com", "outlook.com"]
+        if any(h in out for h in ms_mx_hints):
+            s = dict(_PROVIDER_SETTINGS["microsoft"])
+            s.update({"stage": 2, "provider": "microsoft", "confidence": "high", "reason": "mx_microsoft"})
+            return s
+    except Exception:
+        pass
+
+    # Autodiscover HTTP-Check
+    autodiscover_urls = [
+        f"https://autodiscover.{domain}/autodiscover/autodiscover.xml",
+        f"https://autodiscover-s.outlook.com/autodiscover/autodiscover.xml",
+    ]
+    for url in autodiscover_urls:
+        try:
+            req = _ur.Request(url, method="HEAD")
+            with _ur.urlopen(req, timeout=4) as r:
+                server_hdr = r.headers.get("Server", "").lower()
+                if "microsoft" in server_hdr or "exchange" in server_hdr or r.status in (200, 401):
+                    s = dict(_PROVIDER_SETTINGS["microsoft"])
+                    s.update({"stage": 2, "provider": "microsoft", "confidence": "high", "reason": f"autodiscover_{url[:30]}"})
+                    return s
+        except Exception:
+            pass
+
+    return result
+
+
+def _provider_stage3(email_addr: str, domain: str) -> dict:
+    """Stufe 3: Aktiver Microsoft-Probe via OAuth-Discovery."""
+    import urllib.request as _ur
+    result = {"stage": 3, "is_microsoft": False}
+    try:
+        # Microsoft OpenID-Config für diese Domain abfragen
+        url = f"https://login.microsoftonline.com/{domain}/v2.0/.well-known/openid-configuration"
+        with _ur.urlopen(url, timeout=6) as r:
+            data = json.loads(r.read())
+        if "authorization_endpoint" in data and "microsoft" in data.get("issuer", "").lower():
+            result["is_microsoft"] = True
+            result["reason"] = "ms_openid_config"
+            result["tenant_hint"] = data.get("issuer", "")
+    except Exception:
+        pass
+
+    # Fallback: IMAP Autodiscover via outlook EWS
+    if not result["is_microsoft"]:
+        try:
+            import socket
+            sock = socket.create_connection(("outlook.office365.com", 993), timeout=3)
+            sock.close()
+            # Wenn EWS erreichbar: als Microsoft-Kandidat merken
+            result["ews_reachable"] = True
+        except Exception:
+            pass
+
+    return result
+
+
+def detect_provider_advanced(email_addr: str) -> dict:
+    """3-stufige Provider-Erkennung: Domain → DNS/Autodiscover → MS-Probe."""
+    domain = email_addr.split("@")[-1].lower() if "@" in email_addr else ""
+    base = {"email": email_addr, "domain": domain, "stages": []}
+
+    # Stufe 1
+    s1 = _provider_stage1(domain, email_addr)
+    base["stages"].append(s1)
+    if s1.get("confidence") == "high":
+        base.update({k: v for k, v in s1.items() if k not in ("stage", "confidence", "reason", "stages")})
+        base["confidence"] = "high"
+        base["detection_stage"] = 1
+        return base
+
+    # Stufe 2: DNS + Autodiscover
+    s2 = _provider_stage2(domain)
+    base["stages"].append(s2)
+    if s2.get("provider"):
+        base.update({k: v for k, v in s2.items() if k not in ("stage", "confidence", "reason", "stages")})
+        base["confidence"] = s2.get("confidence", "medium")
+        base["detection_stage"] = 2
+        if base.get("confidence") == "high":
+            return base
+
+    # Stufe 3: MS-Probe
+    s3 = _provider_stage3(email_addr, domain)
+    base["stages"].append(s3)
+    if s3.get("is_microsoft"):
+        s = dict(_PROVIDER_SETTINGS["microsoft"])
+        base.update(s)
+        base["provider"] = "microsoft"
+        base["confidence"] = "high"
+        base["detection_stage"] = 3
+        return base
+
+    # Fallback: IMAP
+    if not base.get("provider"):
+        base.update(dict(_PROVIDER_SETTINGS["imap"]))
+        base["provider"] = "imap"
+        base["confidence"] = "low"
+        base["detection_stage"] = 0
+    return base
+
 # ── Account Health Status (in-memory) ───────────────────────────────────────
 _account_health: dict = {}  # email → {status, last_check, error, inbox_count}
 _health_lock = threading.Lock()
@@ -365,6 +490,123 @@ def get_all_health_status() -> dict:
     """Gibt gecachten Health-Status aller Konten zurück."""
     with _health_lock:
         return dict(_account_health)
+
+
+def get_smtp_settings(konto: dict) -> dict:
+    """Gibt SMTP-Einstellungen für ein Konto zurück (basierend auf Provider/IMAP-Server)."""
+    imap_server = konto.get("imap_server", "")
+    if "outlook.office365" in imap_server or konto.get("auth_methode") == "oauth2":
+        return {"server": "smtp.office365.com", "port": 587, "starttls": True, "auth": "oauth2"}
+    if "gmail" in imap_server:
+        return {"server": "smtp.gmail.com", "port": 587, "starttls": True, "auth": "password"}
+    if "gmx" in imap_server:
+        return {"server": "mail.gmx.net", "port": 587, "starttls": True, "auth": "password"}
+    if "web.de" in imap_server:
+        return {"server": "smtp.web.de", "port": 587, "starttls": True, "auth": "password"}
+    # Generic SMTP guess
+    domain = konto.get("email", "").split("@")[-1]
+    return {"server": f"smtp.{domain}", "port": 587, "starttls": True, "auth": "password"}
+
+
+def run_full_connection_test(email_addr: str) -> dict:
+    """Voller Verbindungstest: IMAP read + SMTP send an sich selbst + Empfangscheck."""
+    import smtplib, imaplib, email as _email
+    from email.mime.text import MIMEText
+    result = {"email": email_addr, "imap_ok": False, "smtp_ok": False, "roundtrip_ok": False,
+              "imap_error": None, "smtp_error": None, "roundtrip_error": None,
+              "inbox_count": 0, "timestamp": datetime.utcnow().isoformat()}
+
+    konten = _load_accounts()
+    konto = next((k for k in konten if k["email"] == email_addr), None)
+    if not konto:
+        result["imap_error"] = "Konto nicht gefunden"
+        return result
+
+    # 1. IMAP-Test
+    try:
+        imap = imap_connect(konto)
+        typ, data = imap.select("INBOX", readonly=True)
+        result["inbox_count"] = int(data[0]) if data and data[0] and str(data[0]).isdigit() else 0
+        imap.logout()
+        result["imap_ok"] = True
+    except Exception as e:
+        result["imap_error"] = str(e)[:200]
+
+    # 2. SMTP-Sendetest (nur wenn IMAP ok)
+    if result["imap_ok"]:
+        smtp_cfg = get_smtp_settings(konto)
+        test_subject = f"KIRA Verbindungstest {datetime.utcnow().strftime('%H:%M:%S')}"
+        try:
+            token = get_oauth2_token(konto)
+            # XOAUTH2 für SMTP
+            auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01"
+            import base64 as _b64
+            auth_b64 = _b64.b64encode(auth_string.encode()).decode()
+
+            msg = MIMEText(f"Dies ist ein automatischer KIRA-Verbindungstest.\nZeitpunkt: {datetime.utcnow().isoformat()}", "plain", "utf-8")
+            msg["Subject"] = test_subject
+            msg["From"] = email_addr
+            msg["To"] = email_addr
+
+            smtp = smtplib.SMTP(smtp_cfg["server"], smtp_cfg["port"], timeout=15)
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.docmd("AUTH", f"XOAUTH2 {auth_b64}")
+            smtp.sendmail(email_addr, [email_addr], msg.as_string())
+            smtp.quit()
+            result["smtp_ok"] = True
+            result["test_subject"] = test_subject
+
+            # 3. Empfangs-Check: 30s warten, dann INBOX nach Testmail suchen
+            import time as _time
+            _time.sleep(30)
+            try:
+                imap2 = imap_connect(konto)
+                imap2.select("INBOX")
+                _, ids = imap2.search(None, f'SUBJECT "{test_subject}"')
+                imap2.logout()
+                result["roundtrip_ok"] = bool(ids and ids[0])
+                if not result["roundtrip_ok"]:
+                    result["roundtrip_error"] = "Testmail nicht in INBOX gefunden (ggf. noch nicht angekommen)"
+            except Exception as e:
+                result["roundtrip_error"] = str(e)[:200]
+        except Exception as e:
+            result["smtp_error"] = str(e)[:200]
+
+    with _health_lock:
+        _account_health[email_addr] = {
+            "status": "ok" if result["imap_ok"] else "fehler",
+            "error": result["imap_error"],
+            "inbox_count": result["inbox_count"],
+            "last_check": result["timestamp"],
+            "volltest": result,
+        }
+
+    return result
+
+
+# Job-System für async Volltest
+_volltest_jobs: dict = {}
+_volltest_lock = threading.Lock()
+
+def start_volltest(email_addr: str, job_id: str):
+    """Startet Volltest (IMAP + SMTP + Roundtrip) in Thread."""
+    def _run():
+        try:
+            r = run_full_connection_test(email_addr)
+            with _volltest_lock:
+                _volltest_jobs[job_id] = {"status": "done", "result": r}
+        except Exception as e:
+            with _volltest_lock:
+                _volltest_jobs[job_id] = {"status": "error", "error": str(e)}
+    with _volltest_lock:
+        _volltest_jobs[job_id] = {"status": "pending", "email": email_addr}
+    threading.Thread(target=_run, daemon=True).start()
+
+def get_volltest_status(job_id: str) -> dict:
+    with _volltest_lock:
+        return dict(_volltest_jobs.get(job_id, {"status": "unbekannt"}))
 
 
 def imap_connect(konto):

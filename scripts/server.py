@@ -2962,8 +2962,10 @@ function esShowProtoTab(id) {{
   .es-mk-ampel-gelb{{color:#f0a000}}
   .es-mk-ampel-rot{{color:#c83c3c}}
   /* ── Konto-Wizard ── */
-  .kira-wiz-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}}
-  .kira-wiz-box{{background:var(--bg-card);border-radius:20px;width:600px;max-width:96vw;box-shadow:0 20px 80px rgba(0,0,0,.45);overflow:hidden;border:1px solid var(--border)}}
+  .kira-wiz-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center}}
+  .kira-wiz-box{{background:var(--bg-card,#ffffff);border-radius:20px;width:600px;max-width:96vw;box-shadow:0 20px 80px rgba(0,0,0,.45);overflow:hidden;border:1px solid var(--border);isolation:isolate;position:relative}}
+  [data-theme="dark"] .kira-wiz-box{{background:#1e1e2e}}
+  [data-theme="light"] .kira-wiz-box,.kira-wiz-box{{background-color:#ffffff}}
   .kira-wiz-step{{padding:52px 60px;text-align:center}}
   .kira-wiz-dots{{display:flex;justify-content:center;gap:10px;margin-bottom:40px}}
   .kira-wiz-dot{{width:9px;height:9px;border-radius:50%;background:var(--border);transition:background .3s}}
@@ -3102,6 +3104,56 @@ function esShowProtoTab(id) {{
 
   <script>
   // ── Mail-Konten laden ──────────────────────────────────────────────────────
+  function esRefreshAmpeln() {{
+    fetch('/api/mail/konto/health').then(r=>r.json()).then(healthData=>{{
+      const health=healthData.health||{{}};
+      Object.entries(health).forEach(([email,h])=>{{
+        const safe=email.replace(/[@.]/g,'_');
+        const dot=document.getElementById('es-ampel-'+safe);
+        if(!dot) return;
+        if(h.status==='ok') {{dot.className='es-mk-ampel es-mk-ampel-gruen';dot.title='Verbunden ('+new Date(h.last_check||0).toLocaleTimeString()+')';}}
+        else if(h.status==='auth_fehler') {{dot.className='es-mk-ampel es-mk-ampel-rot';dot.title='Authentifizierung fehlgeschlagen';}}
+        else {{dot.className='es-mk-ampel es-mk-ampel-gelb';dot.title='Verbindungsfehler';}}
+      }});
+    }}).catch(()=>{{}});
+  }}
+  window.esMkVolltest = function(email, btn) {{
+    if(btn){{btn.disabled=true;btn.textContent='Teste\u2026';}}
+    fetch('/api/mail/konto/volltest',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(!d.ok){{showToast('Fehler: '+(d.error||'?'),'fehler');if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}return;}}
+      const jobId=d.job_id;
+      showToast('Volltest gestartet (IMAP + SMTP + Roundtrip) \u2014 ca. 45s\u2026','info');
+      let polls=0;
+      const timer=setInterval(()=>{{
+        polls++;
+        fetch('/api/mail/konto/volltest-status?job_id='+jobId).then(r=>r.json()).then(s=>{{
+          if(s.status==='done'){{
+            clearInterval(timer);
+            if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}
+            const r=s.result||{{}};
+            const lines=[];
+            if(r.imap_ok) lines.push('\u2713 IMAP: '+r.inbox_count+' Mails');
+            else lines.push('\u2717 IMAP: '+(r.imap_error||'Fehler'));
+            if(r.smtp_ok) lines.push('\u2713 SMTP: Testmail gesendet');
+            else lines.push('\u2717 SMTP: '+(r.smtp_error||'nicht getestet'));
+            if(r.roundtrip_ok) lines.push('\u2713 Roundtrip: Testmail empfangen');
+            else if(r.smtp_ok) lines.push('\u26A0 Roundtrip: '+(r.roundtrip_error||'nicht verifiziert'));
+            showToast(lines.join(' \u2022 '), r.imap_ok?'ok':'fehler');
+            esRefreshAmpeln();
+          }} else if(s.status==='error'){{
+            clearInterval(timer);
+            if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}
+            showToast('Volltest Fehler: '+(s.error||'?'),'fehler');
+          }} else if(polls>40){{
+            clearInterval(timer);
+            if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}
+            showToast('Timeout beim Volltest','warnung');
+          }}
+        }}).catch(()=>{{}});
+      }},3000);
+    }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}showToast('Fehler','fehler');}});
+  }};
   function esLoadMailKonten() {{
     fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
       const list = document.getElementById('es-mail-konten-list');
@@ -3146,7 +3198,7 @@ function esShowProtoTab(id) {{
                 <div class="es-mk-email">${{k.email}} ${{k.email===std?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
                 <div class="es-mk-desc">${{k.beschreibung||''}}</div>
               </div>
-              <span class="es-mk-ampel ${{ampelClass}}" title="${{ampelTip}}">${{ampel}}</span>
+              <span class="es-mk-ampel ${{ampelClass}}" id="es-ampel-${{safe}}" title="${{ampelTip}}">${{ampel}}</span>
             </div>
             <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
               <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
@@ -3154,7 +3206,7 @@ function esShowProtoTab(id) {{
             </div>
             <div class="es-mk-actions">
               <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
-              <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
+              <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
               ${{needsReconnect
                 ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
                 : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Erneut verbinden</button>`
@@ -3168,12 +3220,19 @@ function esShowProtoTab(id) {{
         // Stats lazy laden + Health Check auto-starten
         konten.forEach(k=>esMkLoadStats(k.email));
         esLoadTotalCount();
-        // Health-Check für alle Konten starten (async, ampel aktualisiert sich nach ~8s)
+        // Health-Check beim ersten Laden (nur einmalig, danach 30-Min-Intervall)
         konten.forEach(k=>{{
           fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:k.email}})}}).catch(()=>{{}});
         }});
-        // Nach 8s Ampel neu rendern mit echten Ergebnissen
-        setTimeout(()=>esLoadMailKonten(), 8000);
+        // Ampel nach 15s einmalig aktualisieren (nur ampel, kein komplettes reload)
+        setTimeout(()=>esRefreshAmpeln(), 15000);
+        // Danach alle 30 Minuten Health-Check + Ampel im Hintergrund
+        if(!window._pfHealthTimer) {{
+          window._pfHealthTimer = setInterval(()=>{{
+            konten.forEach(k=>fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:k.email}})}}).catch(()=>{{}}));
+            setTimeout(()=>esRefreshAmpeln(), 15000);
+          }}, 1800000);
+        }}
       }}).catch(()=>{{
         // Fallback ohne Health
         list.innerHTML = konten.map(k=>{{
@@ -3370,12 +3429,30 @@ function esShowProtoTab(id) {{
     </div>`;
   }}
   function _wizDetectProvider() {{
+    const box=document.getElementById('kira-wiz-box');
+    // Status-Updates während Erkennung (Stufen-Anzeige)
+    let stageText=['Stufe 1: Domain-Analyse\u2026','Stufe 2: DNS-Abfrage + Autodiscover\u2026','Stufe 3: Microsoft-Probe\u2026'];
+    let si=0;
+    const stageTimer=setInterval(()=>{{
+      const sub=box?.querySelector('.kira-wiz-sub');
+      if(sub && stageText[si]) sub.textContent=stageText[si++];
+      if(si>=stageText.length) clearInterval(stageTimer);
+    }},1200);
     fetch('/api/mail/provider-detect?email='+encodeURIComponent(_wiz.email))
     .then(r=>r.json()).then(d=>{{
+      clearInterval(stageTimer);
       _wiz.provider=d.provider||'imap';
-      _wiz.settings={{imap_server:d.imap_server||'',imap_port:d.imap_port||993,imap_ssl:true,auth:d.auth||'imap_password'}};
+      _wiz.detectionStage=d.detection_stage||0;
+      _wiz.settings={{
+        imap_server:d.imap_server||'',
+        imap_port:d.imap_port||993,
+        imap_ssl:true,
+        auth:d.auth||'imap_password',
+        protocol:d.protocol||'imap',
+        confidence:d.confidence||'low'
+      }};
       _wiz.step=3; _wizRender();
-    }}).catch(()=>{{_wiz.provider='imap';_wiz.step=3;_wizRender();}});
+    }}).catch(()=>{{clearInterval(stageTimer);_wiz.provider='imap';_wiz.step=3;_wizRender();}});
   }}
 
   function _wizStep3() {{
@@ -3415,6 +3492,8 @@ function esShowProtoTab(id) {{
 
   function _wizStep4() {{
     const s=_wiz.settings;
+    const proto=s.protocol||'imap';
+    const isExchange=proto==='exchange';
     return `<div class="kira-wiz-step">
       ${{_wizDots(4)}}
       <div class="kira-wiz-step-label">Erweiterte Einstellungen</div>
@@ -3424,13 +3503,28 @@ function esShowProtoTab(id) {{
         <div class="kira-wiz-field"><label>Authentifizierung</label><select id="wiz-auth" onchange="_wizAuthChange()">
           <option value="oauth2_microsoft" ${{s.auth==='oauth2_microsoft'?'selected':''}}>Microsoft OAuth 2.0 (empfohlen)</option>
           <option value="oauth2_google" ${{s.auth==='oauth2_google'?'selected':''}}>Google OAuth 2.0</option>
-          <option value="imap_password" ${{s.auth==='imap_password'?'selected':''}}>Benutzername und Passwort (IMAP)</option>
+          <option value="imap_password" ${{s.auth==='imap_password'?'selected':''}}>Benutzername und Passwort</option>
         </select></div>
-        <div class="kira-wiz-field"><label>Protokoll</label><select id="wiz-proto">
-          <option value="imap" selected>IMAP</option>
+        <div class="kira-wiz-field"><label>Posteingangserver &mdash; Protokoll</label><select id="wiz-proto" onchange="_wizProtoChange()">
+          <option value="imap" ${{proto==='imap'?'selected':''}}>IMAP</option>
+          <option value="exchange" ${{proto==='exchange'?'selected':''}}>Exchange / EWS (Microsoft)</option>
+          <option value="pop3" ${{proto==='pop3'?'selected':''}}>POP3</option>
         </select></div>
-        <div class="kira-wiz-field"><label>IMAP-Server</label><input id="wiz-server" type="text" value="${{s.imap_server}}" placeholder="imap.provider.de"></div>
-        <div class="kira-wiz-field"><label>Port</label><input id="wiz-port" type="number" value="${{s.imap_port}}"></div>
+        <div id="wiz-server-row" class="kira-wiz-field">
+          <label>Server-Adresse
+            ${{isExchange?'<span style="font-size:11px;color:var(--text-muted);margin-left:6px">(leer lassen f\u00fcr automatische Erkennung)</span>':''}}
+          </label>
+          <input id="wiz-server" type="text" value="${{isExchange?(s.ews_server||''):(s.imap_server||'')}}"
+            placeholder="${{isExchange?'https://outlook.office365.com/EWS/Exchange.asmx (optional)':'imap.provider.de'}}">
+        </div>
+        <div id="wiz-port-row" class="kira-wiz-field" style="${{isExchange?'display:none':''}}">
+          <label>Port</label>
+          <input id="wiz-port" type="number" value="${{s.imap_port||993}}">
+        </div>
+        <div id="wiz-email-row" class="kira-wiz-field" style="${{isExchange?'':'display:none'}}">
+          <label>E-Mail-Adresse</label>
+          <input id="wiz-konto-email" type="email" value="${{_wiz.email}}" readonly>
+        </div>
         <div id="wiz-pw-fields" style="${{s.auth==='imap_password'?'':'display:none'}}">
           <div class="kira-wiz-field"><label>Passwort / App-Passwort</label><input id="wiz-pw" type="password" placeholder="App-Passwort aus den Kontoeinstellungen"></div>
         </div>
@@ -3441,14 +3535,36 @@ function esShowProtoTab(id) {{
       )}}
     </div>`;
   }}
+  window._wizProtoChange = function() {{
+    const p=document.getElementById('wiz-proto')?.value;
+    const portRow=document.getElementById('wiz-port-row');
+    const emailRow=document.getElementById('wiz-email-row');
+    const serverInput=document.getElementById('wiz-server');
+    if(p==='exchange') {{
+      if(portRow) portRow.style.display='none';
+      if(emailRow) emailRow.style.display='';
+      if(serverInput) serverInput.placeholder='https://outlook.office365.com/EWS/Exchange.asmx (optional)';
+    }} else {{
+      if(portRow) portRow.style.display='';
+      if(emailRow) emailRow.style.display='none';
+      if(serverInput) serverInput.placeholder='imap.provider.de';
+    }}
+  }};
   window._wizAuthChange = function() {{
     const v=document.getElementById('wiz-auth')?.value;
     const pw=document.getElementById('wiz-pw-fields');
     if(pw) pw.style.display=v==='imap_password'?'':'none';
   }};
   window._wizStep4Next = function() {{
-    _wiz.settings.imap_server=document.getElementById('wiz-server').value;
-    _wiz.settings.imap_port=parseInt(document.getElementById('wiz-port').value)||993;
+    const proto=document.getElementById('wiz-proto')?.value||'imap';
+    _wiz.settings.protocol=proto;
+    if(proto==='exchange') {{
+      _wiz.settings.ews_server=document.getElementById('wiz-server').value;
+      _wiz.settings.imap_server='outlook.office365.com';
+    }} else {{
+      _wiz.settings.imap_server=document.getElementById('wiz-server').value;
+      _wiz.settings.imap_port=parseInt(document.getElementById('wiz-port')?.value)||993;
+    }}
     _wiz.settings.auth=document.getElementById('wiz-auth').value;
     _wiz.settings.passwort=document.getElementById('wiz-pw')?.value||'';
     if(_wiz.settings.auth==='imap_password') _wizSaveImap();
@@ -8603,6 +8719,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/konto/oauth-status'):
             self._api_mail_konto_oauth_status()
 
+        elif self.path.startswith('/api/mail/konto/volltest-status'):
+            self._api_mail_konto_volltest_status()
+
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
@@ -9535,7 +9654,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({'ok': False, 'error': str(e)})
 
     def _api_mail_provider_detect(self):
-        """GET /api/mail/provider-detect?email= — Anbieter aus E-Mail-Domain erkennen."""
+        """GET /api/mail/provider-detect?email= — 3-stufige Anbieter-Erkennung."""
         try:
             import sys as _sys
             if str(SCRIPTS_DIR) not in _sys.path:
@@ -9543,7 +9662,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             import mail_monitor as _mm
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             email = qs.get('email', [''])[0]
-            result = _mm.detect_provider(email)
+            # Erweiterte 3-stufige Erkennung
+            result = _mm.detect_provider_advanced(email)
             self._json({'ok': True, **result})
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
@@ -9625,6 +9745,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _mm.check_account_health(email)
         _t.Thread(target=_do, daemon=True).start()
         self._json({'ok': True, 'status': 'gestartet', 'email': email})
+
+    def _api_mail_konto_volltest_start(self, body):
+        """POST /api/mail/konto/volltest — Volltest starten (IMAP + SMTP + Roundtrip)."""
+        import uuid, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        job_id = str(uuid.uuid4())[:8]
+        _mm.start_volltest(email, job_id)
+        self._json({'ok': True, 'job_id': job_id, 'email': email, 'hinweis': 'Volltest läuft (IMAP + SMTP + 30s Roundtrip). ca. 45s.'})
+
+    def _api_mail_konto_volltest_status(self):
+        """GET /api/mail/konto/volltest-status?job_id= — Volltest-Status abfragen."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            job_id = qs.get('job_id', [''])[0]
+            status = _mm.get_volltest_status(job_id)
+            self._json({'ok': True, **status})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
 
     def _api_mail_microsoft_app_test(self):
         """POST /api/mail/microsoft-app/test — Zentrale KIRA Entra App auf Erreichbarkeit testen."""
@@ -9738,6 +9886,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/health-check':
             self._api_mail_konto_health_check(body)
+            return
+
+        if self.path == '/api/mail/konto/volltest':
+            self._api_mail_konto_volltest_start(body)
             return
 
         if self.path == '/api/mail/microsoft-app/test':
