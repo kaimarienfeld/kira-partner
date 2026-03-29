@@ -37,3 +37,15 @@
 **Erledigt:** AGENT.md vollständig aktualisiert mit 5 neuen Regeln + 4 Korrekturen. session_log.md Datei erstellt. MEMORY.md aktualisiert. Alle committed.
 **Offen geblieben:** —
 **Status:** erledigt
+
+---
+
+## 2026-03-29 05:30 — Session-Start (session-aa)
+
+**Auftrag:** Regeln aus AGENT.md ausführen als wäre es ein neuer Auftrag — alle Session-Start-Schritte durchführen und Kai zeigen was gemacht wurde.
+**Status:** erledigt
+
+## 2026-03-29 05:35 — Session-Ende (session-aa)
+**Erledigt:** Alle 6 Session-Start-Schritte ausgeführt. session_log.md gelesen (kein Crash). Auftrag eingetragen. feature_registry abgeglichen (42 Features, done=26). Todo_checkliste.md Abschnitt 7+8 aktualisiert (session-y Änderungen eingetragen). Partner-View lokal generiert — kein Push (keine leni_visible Features geändert diese Session).
+**Offen geblieben:** —
+**Status:** erledigt
