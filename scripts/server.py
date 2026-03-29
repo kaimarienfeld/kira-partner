@@ -3222,7 +3222,10 @@ function esShowProtoTab(id) {{
           }} else {{
             ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Nicht verbunden';
           }}
-          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler';
+          // Reconnect nötig bei: IMAP-Auth-Fehler ODER letzter Volltest hatte SMTP-Auth-Fehler
+          const lastTest = k.last_volltest || {{}};
+          const smtpAuthFehler = lastTest.smtp_error && String(lastTest.smtp_error).includes('530');
+          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler' || smtpAuthFehler;
           const isDeaktiv = k.aktiv === false;
           return `<div class="es-mk-card${{isDeaktiv?' es-mk-card-deaktiv':''}}" id="es-mk-card-${{safe}}">
             ${{isDeaktiv?'<div class="es-mk-deaktiv-banner">&#x23F8; Deaktiviert &mdash; kein Abruf/Senden &bull; <span style="color:var(--success,#2e9e5b)">&#x2713; Archiv-Zugang aktiv</span></div>':''}}

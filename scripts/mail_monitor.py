@@ -51,8 +51,11 @@ TOKEN_DIR     = ARCHIVER_DIR / "tokens"
 STATE_FILE    = KNOWLEDGE_DIR / "mail_monitor_state.json"
 
 IMAP_TIMEOUT  = 60
-OAUTH_SCOPES  = ["https://outlook.office.com/IMAP.AccessAsUser.All"]
-OAUTH_SCOPE_VERSION = "v4_office_com"
+OAUTH_SCOPES  = [
+    "https://outlook.office.com/IMAP.AccessAsUser.All",
+    "https://outlook.office.com/SMTP.Send",
+]
+OAUTH_SCOPE_VERSION = "v5_imap_smtp"  # Geändert → erzwingt Token-Refresh bei allen Konten
 
 # ── Zentrale KIRA Microsoft Entra App ───────────────────────────────────────
 KIRA_MS_CLIENT_ID    = "a0591b2d-86c3-4bc1-adf0-a10e197da07f"
