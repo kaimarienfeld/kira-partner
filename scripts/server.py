@@ -18,6 +18,7 @@ TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
 MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 _MAIL_OAUTH_STATE = {}   # {email: {'status': 'connecting'|'ok'|'error', 'message': str}}
+_BROWSE_RESULTS   = {}   # {job_id: path_or_None}
 DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
 ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
@@ -856,10 +857,10 @@ def build_postfach():
 .pf-folder-item{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
 .pf-folder-item:hover{background:var(--bg-hover)}
 .pf-folder-item.active{background:rgba(124,77,255,.1);border-left-color:var(--accent);color:var(--accent);font-weight:600}
-.pf-folder-badge{margin-left:auto;color:var(--accent);font-size:11px;font-weight:700;min-width:16px;text-align:right}
+.pf-folder-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700;min-width:16px;text-align:right}
 .pf-mail-item{padding:10px 14px 10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:3px solid transparent}
 .pf-mail-item:hover{background:var(--bg-hover)}
-.pf-mail-item.unread{border-left-color:var(--accent);background:rgba(124,77,255,.04)}
+.pf-mail-item.unread{border-left-color:#0ea5e9;background:rgba(14,165,233,.04)}
 .pf-mail-item.unread .pf-item-absender{color:var(--text);font-weight:700}
 .pf-mail-item.unread .pf-item-betreff{font-weight:700;color:var(--text)}
 .pf-mid{width:320px;min-width:240px;max-width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
@@ -877,7 +878,7 @@ def build_postfach():
 .pf-item-preview{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-item-badges{display:flex;gap:4px;margin-top:3px}
 .pf-item-badge{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--bg-raised);color:var(--text-muted)}
-.pf-item-badge.att{background:rgba(124,77,255,.1);color:var(--accent)}
+.pf-item-badge.att{background:rgba(100,116,139,.12);color:#64748b}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
 .pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
@@ -977,9 +978,13 @@ function pfInit() {
       const ib = first.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || first.ordner?.[0];
       if(ib) pfSelectFolder(first.email, ib.name, ib.label||ib.name);
     }
-    // Periodisches Refresh: Unread-Badge + Ampeln alle 60s (ohne Tree-Rebuild)
+    // Periodisches Refresh: Unread-Badge + Ampeln (Intervall aus Einstellungen)
     if(_pfRefreshTimer) clearInterval(_pfRefreshTimer);
-    _pfRefreshTimer = setInterval(pfRefreshBadge, 60000);
+    fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{
+      const mins=(cfg.mail_postfach?.refresh_intervall_min)||0;
+      if(mins>0) _pfRefreshTimer=setInterval(pfRefreshBadge, mins*60000);
+      // else: kein automatisches Refresh → nur bei Abruf via pfRefreshBadge()
+    }).catch(()=>{}); // Bei Fehler: kein Auto-Refresh
   }).catch(e=>{
     document.getElementById('pf-folders-loading').textContent='Konten konnten nicht geladen werden.';
   });
@@ -2308,6 +2313,9 @@ def build_einstellungen():
 .es-grp-sub{{font-size:var(--fs-xs);color:var(--muted);margin-bottom:12px;line-height:1.4;}}
 .es-row{{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border);}}
 .es-row:last-child{{border-bottom:none;}}
+.es-row-label{{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;}}
+.es-row-label span:first-child{{font-size:13px;color:var(--text);font-weight:500;}}
+.es-row-hint{{font-size:11px;color:var(--muted,var(--text-muted));line-height:1.4;}}
 .es-rl{{font-size:var(--fs-sm);color:var(--text);flex:1;min-width:0;}}
 .es-rd{{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;line-height:1.4;}}
 .es-toggle-wrap{{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;}}
@@ -3150,23 +3158,42 @@ function esShowProtoTab(id) {{
 
   <!-- Mail-Monitor -->
   <div class="es-grp" style="margin-top:24px">
-    <div class="es-grp-h">Mail-Monitor</div>
-    <div class="es-grp-sub">Automatisches IMAP-Polling. L&auml;uft im Hintergrund.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div class="es-grp-h" style="margin-bottom:0">Mail-Monitor</div>
+      <div id="es-mail-monitor-badge"></div>
+    </div>
+    <div class="es-grp-sub">Automatisches IMAP-Polling l&auml;uft im Hintergrund und benachrichtigt KIRA bei neuen Mails.</div>
     <div class="es-row">
-      <div class="es-row-label"><span>Mail-Monitor aktiv</span><span class="es-row-hint">Neue Mails werden alle 5 Min. gepr&uuml;ft und als Aufgaben eingetragen</span></div>
+      <div class="es-row-label"><span>Mail-Monitor aktiv</span><span class="es-row-hint">Eingehende Mails werden automatisch gepr&uuml;ft und als Aufgaben eingetragen</span></div>
       <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-monitor-aktiv"><div class="es-toggle-vis"></div></label>
     </div>
     <div class="es-row">
-      <div class="es-row-label"><span>Polling-Intervall (Sekunden)</span><span class="es-row-hint">Wie oft neue Mails abgerufen werden</span></div>
-      <input type="number" id="cfg-mail-intervall" min="60" max="3600" style="width:90px;text-align:right;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
+      <div class="es-row-label"><span>Abruf-Intervall</span><span class="es-row-hint">Wie h&auml;ufig neue Mails per IMAP abgerufen werden</span></div>
+      <select id="cfg-mail-intervall" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text);cursor:pointer">
+        <option value="2">2 Minuten</option>
+        <option value="5" selected>5 Minuten</option>
+        <option value="10">10 Minuten</option>
+        <option value="15">15 Minuten</option>
+        <option value="30">30 Minuten</option>
+        <option value="60">60 Minuten</option>
+      </select>
     </div>
     <div class="es-row">
-      <div class="es-row-label"><span>Mails vorgeladen im Postfach</span><span class="es-row-hint">Anzahl Mails die initial im Postfach angezeigt werden</span></div>
-      <input type="number" id="cfg-mail-vorladen" min="10" max="500" value="50" style="width:90px;text-align:right;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
+      <div class="es-row-label"><span>Postfach-Aktualisierung</span><span class="es-row-hint">Wann der Ungelesen-Z&auml;hler im Postfach aktualisiert wird</span></div>
+      <select id="cfg-postfach-refresh" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text);cursor:pointer">
+        <option value="0">Bei Abruf (Standard)</option>
+        <option value="2">alle 2 Minuten</option>
+        <option value="5">alle 5 Minuten</option>
+        <option value="10">alle 10 Minuten</option>
+        <option value="30">alle 30 Minuten</option>
+      </select>
     </div>
-    <div class="es-row">
-      <div class="es-row-label"><span>Status</span><span id="es-mail-monitor-status" class="es-row-hint">–</span></div>
-      <div id="es-mail-monitor-badge"></div>
+    <div class="es-row" style="border-bottom:none">
+      <div class="es-row-label">
+        <span>Letzter Abruf</span>
+        <span id="es-mail-monitor-status" class="es-row-hint">–</span>
+      </div>
+      <button class="es-mk-btn sec" style="font-size:11px;padding:4px 10px" onclick="esMailMonitorNow(this)">&#x25BA; Jetzt abrufen</button>
     </div>
   </div>
 
@@ -3194,8 +3221,9 @@ function esShowProtoTab(id) {{
     <div class="es-grp-sub">KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext. Das Archiv ist deine exportierbare Datenbasis.</div>
     <div class="es-row">
       <div class="es-row-label"><span>Archiv-Ordner</span><span class="es-row-hint">Lokaler Pfad zum Mail-Archiv-Verzeichnis</span></div>
-      <div style="display:flex;gap:6px;flex:1;max-width:420px">
+      <div style="display:flex;gap:6px;flex:1;max-width:460px">
         <input type="text" id="cfg-archiv-pfad" placeholder="C:/Pfad/zum/Mail Archiv/Archiv" style="flex:1;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
+        <button class="es-mk-btn sec" onclick="esArchivOrdnerWaehlen(this)" style="white-space:nowrap" title="Ordner im Explorer ausw&auml;hlen">&#x1F4C2;</button>
         <button class="es-mk-btn sec" onclick="esMkArchivPruefen()" style="white-space:nowrap">&#x2713; Pr&uuml;fen</button>
       </div>
     </div>
@@ -3288,12 +3316,35 @@ function esShowProtoTab(id) {{
       const mon = data.monitor || {{}};
       const mstat = document.getElementById('es-mail-monitor-status');
       const mbadge = document.getElementById('es-mail-monitor-badge');
-      if(mstat) mstat.textContent = mon.last_sync ? 'Zuletzt: '+mon.last_sync : 'Noch kein Sync';
-      if(mbadge) mbadge.innerHTML = mon.aktiv ? '<span class="es-mk-status es-mk-ok">Aktiv</span>' : '<span class="es-mk-status es-mk-missing">Inaktiv</span>';
+      // Status: formatierte Zeitanzeige
+      if(mstat) {{
+        if(mon.last_sync) {{
+          try {{
+            const d=new Date(mon.last_sync);
+            const now=new Date();
+            const diffMin=Math.floor((now-d)/60000);
+            let txt='';
+            if(diffMin<1) txt='gerade eben';
+            else if(diffMin<60) txt='vor '+diffMin+' Min.';
+            else if(diffMin<1440) txt='heute '+d.toLocaleTimeString('de-DE',{{hour:'2-digit',minute:'2-digit'}})+' Uhr';
+            else txt=d.toLocaleDateString('de-DE',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('de-DE',{{hour:'2-digit',minute:'2-digit'}})+' Uhr';
+            mstat.textContent=txt;
+          }} catch(e){{ mstat.textContent=mon.last_sync; }}
+        }} else mstat.textContent='Noch kein Sync';
+      }}
+      if(mbadge) mbadge.innerHTML = mon.aktiv
+        ? '<span class="es-badge on">&#x25CF; Aktiv</span>'
+        : '<span class="es-badge off">&#x25CF; Inaktiv</span>';
       const mmAktiv = document.getElementById('cfg-mail-monitor-aktiv');
       const mmInt = document.getElementById('cfg-mail-intervall');
       if(mmAktiv) mmAktiv.checked = !!mon.aktiv;
-      if(mmInt && mon.intervall) mmInt.value = mon.intervall;
+      if(mmInt && mon.intervall) {{
+        // intervall in Minuten (intern: Sekunden)
+        const mins = Math.round(mon.intervall/60);
+        const opt = mmInt.querySelector('option[value="'+mins+'"]');
+        if(opt) opt.selected=true;
+        else mmInt.value = '5';
+      }}
       const std = data.standard_konto || '';
       const konten = data.konten || [];
       if(!konten.length) {{ list.innerHTML='<div style="padding:12px;color:var(--text-muted);font-size:13px">Keine Konten konfiguriert.</div>'; return; }}
@@ -3819,7 +3870,7 @@ function esShowProtoTab(id) {{
   }};
   // Sync-Ordner laden (bestehende Funktion)
   function esLoadMailArchiv() {{
-    // Mail-Klassifizierung laden
+    // Mail-Klassifizierung + Postfach-Refresh laden
     fetch('/api/einstellungen').then(r=>r.json()).then(d=>{{
       const mk=d.mail_klassifizierung||{{}};
       const c1=document.getElementById('cfg-mail-classify');
@@ -3828,6 +3879,13 @@ function esShowProtoTab(id) {{
       if(c1) c1.checked=!!mk.classify;
       if(c2) c2.checked=!!mk.auto_tasks;
       if(c3) c3.checked=!!mk.ignore_newsletter;
+      // Postfach-Refresh-Intervall
+      const pr=d.mail_postfach?.refresh_intervall_min??0;
+      const prSel=document.getElementById('cfg-postfach-refresh');
+      if(prSel) {{
+        const opt=prSel.querySelector('option[value="'+pr+'"]');
+        if(opt) opt.selected=true; else prSel.value='0';
+      }}
     }}).catch(()=>{{}});
     // Archiv laden
     fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
@@ -3865,6 +3923,38 @@ function esShowProtoTab(id) {{
   window.esSyncOrdnerChange = function(konto,ordner,aktiv) {{
     fetch('/api/mail/archiv/sync-ordner',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{konto,ordner,aktiv}})}})
     .then(r=>r.json()).then(d=>{{ if(!d.ok) showToast('Fehler beim Speichern','fehler'); }}).catch(()=>{{}});
+  }};
+  window.esArchivOrdnerWaehlen = function(btn) {{
+    if(btn) {{ btn.disabled=true; btn.textContent='…'; }}
+    fetch('/api/browse/folder').then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{ if(btn) {{btn.disabled=false;btn.textContent='&#x1F4C2;';}} return; }}
+      const jobId=d.job_id;
+      let polls=0;
+      const t=setInterval(()=>{{
+        polls++;
+        fetch('/api/browse/result?job_id='+jobId).then(r=>r.json()).then(s=>{{
+          if(s.done) {{
+            clearInterval(t);
+            if(btn) {{btn.disabled=false;btn.textContent='&#x1F4C2;';}}
+            if(s.path) {{
+              const inp=document.getElementById('cfg-archiv-pfad');
+              if(inp) inp.value=s.path;
+            }}
+          }} else if(polls>60) {{
+            clearInterval(t);
+            if(btn) {{btn.disabled=false;btn.textContent='&#x1F4C2;';}}
+          }}
+        }}).catch(()=>{{}});
+      }}, 500);
+    }}).catch(()=>{{ if(btn) {{btn.disabled=false;btn.textContent='&#x1F4C2;';}} }});
+  }};
+  window.esMailMonitorNow = function(btn) {{
+    if(btn) {{btn.disabled=true;btn.textContent='L\u00e4dt…';}}
+    fetch('/api/mail/monitor/trigger',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn) {{btn.disabled=false;btn.textContent='\u25ba Jetzt abrufen';}}
+      showToast(d.ok?'Abruf gestartet':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
+    }}).catch(()=>{{ if(btn) {{btn.disabled=false;btn.textContent='\u25ba Jetzt abrufen';}} }});
   }};
   </script>
 </div>
@@ -6141,7 +6231,10 @@ function saveSettings() {{
     }},
     mail_monitor: {{
       aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
-      intervall_sekunden: parseInt(document.getElementById('cfg-mail-intervall')?.value)||300
+      intervall_sekunden: (parseInt(document.getElementById('cfg-mail-intervall')?.value)||5)*60
+    }},
+    mail_postfach: {{
+      refresh_intervall_min: parseInt(document.getElementById('cfg-postfach-refresh')?.value)||0
     }},
     mail_klassifizierung: {{
       classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
@@ -8917,6 +9010,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
+        elif self.path.startswith('/api/browse/result'):
+            self._api_browse_result()
+
+        elif self.path == '/api/browse/folder':
+            self._api_browse_folder()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
 
@@ -9445,7 +9544,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
             rows  = conn.execute(
                 f"SELECT id,konto,konto_label,betreff,absender,an,datum,message_id,"
-                f"hat_anhaenge,thread_id,text_plain,gelesen FROM mails WHERE {where} "
+                f"hat_anhaenge,anhaenge,thread_id,text_plain,gelesen FROM mails WHERE {where} "
                 f"ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -9472,7 +9571,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'absender':      absender_full,
                     'absender_short': absender_short[:40],
                     'datum':         (r['datum'] or '')[:16],
-                    'hat_anhaenge':  bool(r['hat_anhaenge']),
+                    'hat_anhaenge':  bool(r['hat_anhaenge']) and len(json.loads(r['anhaenge'] or '[]')) > 0,
                     'thread_id':     tid,
                     'hat_thread':    tc > 1,
                     'thread_count':  tc,
@@ -9893,6 +9992,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'phone_number_id': secrets.get('whatsapp_phone_number_id', ''),
                 },
                 'mail_klassifizierung': cfg.get('mail_klassifizierung', {}),
+                'mail_postfach': cfg.get('mail_postfach', {'refresh_intervall_min': 0}),
             })
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
@@ -9989,6 +10089,37 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _mm.check_account_health(email)
         _t.Thread(target=_do, daemon=True).start()
         self._json({'ok': True, 'status': 'gestartet', 'email': email})
+
+    def _api_browse_folder(self):
+        """GET /api/browse/folder — Öffnet nativen OS-Ordner-Auswahldialog (tkinter)."""
+        import threading, uuid
+        job_id = str(uuid.uuid4())[:8]
+        _BROWSE_RESULTS[job_id] = None
+        def _pick():
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.wm_attributes('-topmost', 1)
+                path = filedialog.askdirectory(title='Ordner wählen')
+                root.destroy()
+                _BROWSE_RESULTS[job_id] = path or ''
+            except Exception as e:
+                _BROWSE_RESULTS[job_id] = ''
+        threading.Thread(target=_pick, daemon=True).start()
+        self._json({'ok': True, 'job_id': job_id})
+
+    def _api_browse_result(self):
+        """GET /api/browse/result?job_id= — Ergebnis des Ordner-Dialogs."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        job_id = qs.get('job_id', [''])[0]
+        result = _BROWSE_RESULTS.get(job_id)
+        if result is None:
+            self._json({'done': False})
+        else:
+            del _BROWSE_RESULTS[job_id]
+            self._json({'done': True, 'path': result})
 
     def _api_mail_konto_display_name(self, body):
         """POST /api/mail/konto/display-name — Setzt benutzerdefinierten Anzeigenamen für ein Konto."""
