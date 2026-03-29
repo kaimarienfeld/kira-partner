@@ -38,13 +38,14 @@
    - `_archiv/only_kais checkliste.md` aktualisieren
    - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
    → Alle drei mit `feature_registry.json` abgleichen
-10. **Partner-View generieren** (PFLICHT — automatisch, kein Nachfragen):
+10. **Partner-View generieren + automatisch pushen** (PFLICHT):
     ```
-    python scripts/generate_partner_view.py
+    python scripts/generate_partner_view.py        # immer: lokal aktualisieren
+    python scripts/generate_partner_view.py --push # wenn Push-Kriterien erfüllt
     ```
-    → läuft automatisch am Session-Ende, prüft ob HTML aktuell ist, aktualisiert falls nötig
-    → Push zu GitHub NUR nach expliziter Freigabe durch Kai: `--push` Flag
-    → Kai sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
+    → Lokal generieren: immer, kein Nachfragen
+    → **Auto-Push zu GitHub**: wenn die Änderung für Leni relevant ist (siehe Abschnitt 1d)
+    → **KEIN Push**: wenn Änderung auf der KEIN-PUSH-Liste steht (siehe Abschnitt 1d)
     → **Mail an Leni + BCC Kai**: Wenn Versand fehlschlägt → sofort im Chat: "⚠️ Mail an Leni konnte nicht gesendet werden: [Fehlerdetail]. Bitte manuell prüfen."
 
 ### Nach Leni-Feedback (Workflow)
@@ -114,6 +115,43 @@ Bei Status "offen" oder "crash": session_log.md + App/Git-Zustand prüfen → se
 | `feature_registry.json` | Maschinenlesbare Feature-Liste (für Partner-View) |
 | `_archiv/feature_list.md` | Technische Übersicht mit Datei:Zeile Referenzen |
 | `_archiv/only_kais checkliste.md` | Kais persönliche Wunschliste + Prioritäten |
+
+---
+
+## 1d. Partner-View Push-Entscheidung
+
+**Faustregel:** Würde Leni etwas Neues oder Geändertes sehen? → Push. Sonst nicht.
+
+### KEIN Push — technische/interne Änderungen
+
+| Kategorie | Beispiele |
+|---|---|
+| Regeländerungen | AGENT.md, MEMORY.md, session_log.md, feedback_*.md |
+| Tracking-Dateien | session_handoff.json, known_issues.json, server_map.md, change_log.jsonl |
+| Reparaturen / Bugfixes | Mail-Monitor-Bug, Server-Crashes, Encoding-Fixes, API-404-Fixes |
+| Konfiguration | config.json, secrets.json Änderungen |
+| Interne Infra | runtime_log.py, activity_log.py, diff_to_changelog.py |
+| feature_registry ohne leni-Effekt | Nur `notes`-Feld oder interne Status-Tags geändert, keine neuen sichtbaren Features |
+| Session-Bookkeeping | Nur Tracking-Commits (chore/fix/docs ohne App-Änderung) |
+
+### PUSH — Leni-relevante Änderungen
+
+| Kategorie | Beispiele |
+|---|---|
+| Neues Feature eingebaut | Status `planned` → `done` bei leni_visible=true Feature |
+| Neues Feature in Registry | Neues Feature mit `leni_visible=true` hinzugefügt |
+| Leni-Idee umgesetzt | Status `leni_idea` → `leni_done` |
+| Sichtbare UI-Verbesserung | Dashboard-Redesign, neue Ansicht, neue Funktion die Leni kennt |
+| Wichtige Funktion repariert | Wenn die Funktion Leni-sichtbar ist (z.B. Mail-Eingang, Kira-Chat) |
+
+### Entscheidungs-Check (2 Sekunden)
+```
+Hat sich feature_registry.json geändert UND
+  ist mindestens 1 Feature mit leni_visible=true betroffen UND
+  ist es kein reiner Tracking/Bookkeeping-Commit?
+→ JA: python scripts/generate_partner_view.py --push
+→ NEIN: python scripts/generate_partner_view.py  (nur lokal)
+```
 
 ---
 
