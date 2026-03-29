@@ -408,7 +408,9 @@ def start_oauth_browser_flow(email_addr: str, job_id: str):
             result = app.acquire_token_interactive(
                 scopes=OAUTH_SCOPES,
                 login_hint=email_addr,
-                redirect_uri=KIRA_MS_REDIRECT_URI,  # http://localhost — muss in Azure registriert sein
+                # redirect_uri wird von MSAL automatisch auf http://localhost:PORT gesetzt.
+                # http://localhost muss in Azure App (a0591b2d) unter
+                # Mobile and desktop applications eingetragen sein (ist es).
             )
             if "access_token" in result:
                 _save_token_cache(cache, cache_path)
