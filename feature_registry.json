@@ -377,9 +377,10 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
-      "description": "Webhook-Infrastruktur vorbereitet, Anzeige + Schnellantworten aus Dashboard"
+      "description": "Webhook-Infrastruktur vorbereitet, Anzeige + Schnellantworten aus Dashboard",
+      "notes": "WhatsApp Business Cloud API vollständig implementiert: GET Hub-Verifizierung, POST HMAC-SHA256-Signaturprüfung, Meta entry[].changes[].value.messages[] Parsing, verarbeite_kanal_eingang() Aufruf. Einstellungen UI in Integrationen-Sektion."
     },
     {
       "id": "zeiterfassung",
@@ -507,6 +508,14 @@
       "last_updated": "2026-03-28",
       "description": "SMTP XOAUTH2 über smtp.office365.com:587, MSAL Device Code Flow, HTML+Plain MIME, Threading-Header, sent_mails.db Speicherung, Template-Rendering",
       "session": "session-y"
+    },
+    {
+      "id": "mail-konten-settings-overhaul",
+      "name": "Mail & Konten Einstellungen Komplettumbau",
+      "status": "done",
+      "category": "mail",
+      "leni_visible": false,
+      "notes": "Konto-Karten mit echten Stats (Index+Archiv), Per-Konto Abrufen/Testen/Verbinden/Token-loeschen/Loeschen, Standard-Konto Radio, IMAP-Ordner Accordion, Sync-Ordner KIRA-Zugang, Archiv-Pflicht-Panel mit Pruefen+Re-Index, Mail-Monitor Status+Vorladen-Spinner. APIs: /api/mail/konten/stats, /api/mail/konten/ordner, /api/mail/archiv/pruefen, /api/mail/konto/imap-test, /api/mail/konto/abrufen, /api/mail/konto/alle-abrufen, /api/mail/konto/standard, /api/mail/konto/hinzufuegen."
     }
   ]
 }

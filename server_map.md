@@ -1,6 +1,6 @@
 # server.py — Funktionskarte
 
-> server.py: ~7200 Zeilen | Stand: 2026-03-27 | Zuletzt aktualisiert: session-h
+> server.py: ~9250 Zeilen | Stand: 2026-03-29 | Zuletzt aktualisiert: session-y
 
 ## Python-Funktionen (Top-Level)
 
@@ -59,6 +59,11 @@
 | ~5950 | `/api/kira/briefing/regenerate` | Briefing neu generieren |
 | ~5960 | `/api/kira/provider/status` | Provider-Status prüfen |
 | ~5970 | `/api/monitor/status` | Mail-Monitor Status |
+| ~8268 | `/api/einstellungen` (GET) | WhatsApp-Tokens aus secrets.json laden (NEU session-y) |
+| ~8271 | `/api/mail/konten/stats` | Index+Archiv-Stats pro Konto (NEU session-y) |
+| ~8273 | `/api/mail/konten/ordner` | IMAP-Ordnerliste eines Kontos (NEU session-y) |
+| ~8277 | `/api/mail/archiv/pruefen` | Archiv-Pfad-Existenz prüfen (NEU session-y) |
+| ~8265 | `/api/webhook/whatsapp` (GET) | Meta Hub-Verifizierung (NEU session-x) |
 
 ## POST-Endpunkte (do_POST)
 
@@ -73,7 +78,14 @@
 | ~6376 | `/api/kira/provider/toggle` | Provider aktiv/inaktiv |
 | ~6392 | `/api/kira/provider/move` | Provider-Priorität ändern |
 | ~6414 | `/api/kira/provider/delete` | Provider löschen |
-| ~6430 | `/api/einstellungen` | Einstellungen speichern (mit rlog) |
+| ~6430 | `/api/einstellungen` (POST) | Einstellungen speichern (mit rlog) |
+| ~9281 | `/api/whatsapp/secrets-speichern` | WhatsApp-Tokens in secrets.json (NEU session-x) |
+| ~9270 | `/api/webhook/whatsapp` (POST) | WhatsApp Business Cloud Webhook (NEU session-x) |
+| ~9270 | `/api/mail/konto/imap-test` | IMAP-Verbindung testen (NEU session-y) |
+| ~9270 | `/api/mail/konto/abrufen` | Einzelnes Konto manuell abrufen (NEU session-y) |
+| ~9270 | `/api/mail/konto/alle-abrufen` | Alle Konten manuell abrufen (NEU session-y) |
+| ~9270 | `/api/mail/konto/standard` | Standard-Konto setzen (NEU session-y) |
+| ~9270 | `/api/mail/konto/hinzufuegen` | Neues Konto hinzufügen (NEU session-y) |
 | ~6620 | `/api/task/{id}/status` | Task-Status ändern |
 | ~6620 | `/api/task/{id}/korrektur` | Task-Kategorie korrigieren |
 | ~6620 | `/api/task/{id}/loeschen` | Task löschen |

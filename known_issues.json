@@ -1,7 +1,22 @@
 {
-  "_updated": "2026-03-27 session-p",
+  "_updated": "2026-03-29 session-y",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
+    {
+      "id": "ISS-015",
+      "status": "fixed",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "einstellungen",
+      "title": "GET /api/einstellungen fehlte — 404 beim Laden der Integrationen-Sektion",
+      "description": "esIntegLoad() in der Integrationen-Sektion rief GET /api/einstellungen auf um WhatsApp-Tokens zu laden. Dieser GET-Endpunkt war nicht implementiert — nur POST /api/einstellungen existierte. Resultat: 404 beim Öffnen der Integrationen-Sektion, Felder blieben leer.",
+      "discovered": "2026-03-29",
+      "fixed": "2026-03-29",
+      "session": "session-y",
+      "fix_summary": "_api_einstellungen_get() Methode hinzugefügt: liest whatsapp_verify_token + whatsapp_phone_number_id aus secrets.json, gibt JSON zurück. Route in do_GET registriert.",
+      "workaround": null,
+      "to_verify": []
+    },
     {
       "id": "ISS-014",
       "status": "fixed",
