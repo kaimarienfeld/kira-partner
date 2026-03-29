@@ -1,5 +1,5 @@
 # Einstellungen – Vollständige Checkliste & Erweiterungsvorschläge
-_Stand: 2026-03-28 · session-u · Analyse-Basis: config.json, server.py (~8800 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
+_Stand: 2026-03-28 · session-t · Analyse-Basis: config.json, server.py (~8700 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
 
 ---
 
@@ -24,8 +24,6 @@ _Stand: 2026-03-28 · session-u · Analyse-Basis: config.json, server.py (~8800 
 | ✅ | Dichte (compact/comfortable) | `cfg-density` / localStorage | applyDensity() verbunden |
 | ✅ | Firmenname | `cfg-company-name` / localStorage | applyCompanyName() verbunden |
 | ✅ | Logo (URL oder Emoji) | `cfg-logo` / localStorage | applyLogo() verbunden |
-| ✅ | Logo Datei-Upload | `cfg-logo-file` / localStorage | handleLogoUpload() → FileReader → base64 data URL, max 512KB, session-u |
-| ✅ | Tabellen Trennlinien | `cfg-table-lines` / localStorage | applyTableLines() + CSS [data-table-lines], session-u |
 | ✅ | Kartenradius | `cfg-card-radius` / localStorage | applyCardRadius() verbunden |
 | ✅ | Schatten | `cfg-shadow` / localStorage | applyShadow() verbunden |
 | ✅ | Animationen reduzieren | `cfg-reduce-motion` / localStorage | applyReduceMotion() verbunden |
@@ -33,7 +31,7 @@ _Stand: 2026-03-28 · session-u · Analyse-Basis: config.json, server.py (~8800 
 | ✅ | Sidebar-Breite (px) | `cfg-sidebar-width` / localStorage | applySidebarWidth() + restoreDesign() verbunden, session-s |
 | ✅ | Schriftfamilie | `cfg-font-family` / localStorage | applyFontFamily() + CSS [data-font-family] verbunden, session-s |
 | ✅ | Tabellen-Zeilenhöhe | `cfg-row-height` / localStorage | applyRowHeight() + CSS [data-row-height] verbunden, session-s |
-| ✅ | Toast-Position | `cfg-toast-pos` / localStorage | applyToastPos() + CSS [data-toast-pos], 6 Optionen (unten/oben × rechts/mitte/links), session-s+u |
+| ✅ | Toast-Position | `cfg-toast-pos` / localStorage | applyToastPos() + CSS [data-toast-pos] verbunden, session-s |
 | ✅ | Tabellen Zebrastreifen | `cfg-table-zebra` / localStorage | applyTableZebra() + CSS [data-table-zebra] verbunden, session-s |
 
 ---
@@ -51,10 +49,7 @@ _Stand: 2026-03-28 · session-u · Analyse-Basis: config.json, server.py (~8800 
 | ✅ | Arbeitszeit von | `cfg-ntfy-az-von` / `ntfy.arbeitszeit_von` | time-Input, session-t |
 | ✅ | Arbeitszeit bis | `cfg-ntfy-az-bis` / `ntfy.arbeitszeit_bis` | time-Input, session-t |
 | ✅ | Urlaubsmodus | `cfg-ntfy-urlaub` / `ntfy.urlaub_modus` | Toggle + Badge, session-t |
-| ✅ | Urlaubsmodus planen (von) | `cfg-urlaub-von` / `ntfy.urlaub_von` | datetime-local, saveSettings(), session-u |
-| ✅ | Urlaubsmodus planen (bis) | `cfg-urlaub-bis` / `ntfy.urlaub_bis` | datetime-local, saveSettings(), session-u |
-| ✅ | Urlaub-Header-Chip | — | Roter Chip im Header wenn `ntfy.urlaub_modus=true`, session-u |
-| ✅ | Test-Push Button | `testPush()` / `POST /api/ntfy/test` | JS-Funktion + Backend-Endpoint (urllib.request, timeout 8s), session-u |
+| 🔧 | Test-Push Button | `testPush()` | Funktion vorhanden, ntfy-Server muss erreichbar sein |
 | 💡 | Notification-Priorität | `ntfy.prioritaet` | low/default/high/urgent |
 | 💡 | Welche Events → Push | `ntfy.events[]` | Mail / Aufgabe fällig / Fehler / Daily-Check |
 
@@ -102,7 +97,7 @@ _Stand: 2026-03-28 · session-u · Analyse-Basis: config.json, server.py (~8800 
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
 | ✅ | Nachfass aktiv | `cfg-nf-aktiv` / `nachfass.aktiv` | Toggle, session-t |
-| ✅ | Benachrichtigung via | `cfg-nf-typ` / `nachfass.benachrichtigung` | push/toast/beide/aufgabe(Kira LLM)/alle, session-t+u |
+| ✅ | Benachrichtigung via | `cfg-nf-typ` / `nachfass.benachrichtigung` | push/toast/beide/aufgabe, session-t |
 | ✅ | Kira schreibt Nachfass-Text | `cfg-nf-kira-text` / `nachfass.kira_nachfass_text` | LLM-Vorschlag, session-t |
 | ✅ | Stufe 1 (Tage) | `cfg-nf-1` / `nachfass.intervall_1_tage` | saveSettings verbunden |
 | ✅ | Stufe 2 (Tage) | `cfg-nf-2` / `nachfass.intervall_2_tage` | saveSettings verbunden |
@@ -159,8 +154,7 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 |--------|---------|---------------|-----------|
 | ✅ | Erklärungs-Tabelle (Haiku vs Sonnet) | — | Info-Tabelle mit Kostenvergleich, session-t |
 | ✅ | Auto-Budget Hinweis | — | Anthropic→Haiku, OpenAI→gpt-4o-mini, session-t |
-| ✅ | Aktives Klassifizierungs-Modell | `active_budget_model` (Python) | Zeigt aktuell aktives Budget-Modell mit grünem Haken, session-u |
-| 💡 | Manuelles Klassifizierungs-Modell | `llm.classifier_model` | Eigenes Modell festlegen statt Auto (nach Rollen-System) |
+| 💡 | Manuelles Klassifizierungs-Modell | `llm.classifier_model` | Eigenes Modell festlegen statt Auto |
 
 ### 6d. LLM-Verhalten
 | Status | Element | ID / Schlüssel | Anmerkung |
@@ -211,6 +205,26 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | 💡 | Mail-Archiv-Ordner | `mail.archiv_ordner` | Nach Verarbeitung verschieben |
 | 💡 | Maximale Mails pro Durchlauf | `mail.max_per_run` | Throttle für große Postfächer |
 | 💡 | Mehrere Konten | `mail.konten[]` | Privat + Geschäft |
+
+### 7b. Postfach UI (session-dd + session-ee)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Favoriten-Sterne auf Ordner | `mail_favorites[]` | config.json, Star-Toggle, re-render |
+| ✅ | Gemeinsames Postfach Ordner-Expand | `_pfCombinedExpanded` | Posteingang/Gesendet/Entwürfe |
+| ✅ | Ordner-Filter (folder_type) | `?folder_type=inbox\|sent\|drafts\|all` | API-Param, server.py |
+| ✅ | Hover-Aktionen auf Mail-Items | – | Gelesen/Ungelesen, Kennzeichnen, Anheften, Löschen |
+| ✅ | Mehrfachauswahl via Checkbox | `_pfSelected` | Bulk-Bar erscheint |
+| ✅ | Bulk gelesen/ungelesen/löschen | `POST /api/mail/gelesen` + `/loeschen` | Mit 3-Schritt-Bestätigung |
+| ✅ | SVG-Toolbar im Preview | `#pf-prev-toolbar` | Antworten/Allen/Weiterleiten/Flag/Pin/Delete/Kira |
+| ✅ | Kennzeichnen (Flag) | `POST /api/mail/flag` / `flagged` | DB-Spalte + Badge |
+| ✅ | Anheften (Pin) | `POST /api/mail/pin` / `pinned` | DB-Spalte + Badge |
+| ✅ | Kira-verwendet-Badge | `POST /api/mail/kira-markieren` / `kira_verwendet` | Lila Badge auf Item |
+| ✅ | Als gelesen markieren Einstellung | `cfg-lese-markierung` / `mail_postfach.lese_markierung` | sofort/5s/30s/manuell |
+| ✅ | Pane-Resize Persistenz | `localStorage pf_pane_w` | pfInitResize() fix |
+| ✅ | Sidebar-Badge (alle Posteingänge) | `_pfTotalUnread` | Alle Konten korrekt gezählt |
+| 💡 | Kira markiert verwendete Mails | `kira_llm.py` | kira_verwendet in _build_data_context() |
+| 💡 | Sortierung (Datum/Absender/Betreff) | – | Sortier-Header in mid-hdr |
+| 💡 | Mail-Suche global | – | Aktuell nur in Ordner |
 
 ### 7a. Mail-Klassifizierung
 | Status | Element | ID / Schlüssel | Anmerkung |
@@ -391,35 +405,4 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 - **ISS-003**: SyntaxWarnings in server.py → raw-strings wenn Zeilen angefasst werden
 
 ---
-
-## SESSION-u FIXES (2026-03-28)
-
-### Schriftgröße-Bug behoben
-| Status | Fix | Details |
-|--------|-----|---------|
-| ✅ | es-* CSS: hardcoded px → CSS-Variablen | `.es-sec-h{font-size:var(--fs-lg)}`, `.es-grp-h{font-size:var(--fs-sm)}`, `.es-badge{font-size:var(--fs-xs)}` etc. — Einstellungen-Panel reagiert jetzt auf Schriftgröße-Einstellung |
-| ✅ | Playwright-Verifikation | `computed fontSize` von `.es-sec-h` = 20px bei Einstellung "Groß" ✓ |
-
-### Neue Design-Features
-| Status | Feature | Details |
-|--------|---------|---------|
-| ✅ | Toast: 6 Positionsoptionen | Unten rechts(Standard)/Mitte/links + Oben rechts/Mitte/links; CSS transforms für Zentrierung |
-| ✅ | Tabellen Trennlinien | `applyTableLines()` + CSS `[data-table-lines] .proto-table tbody tr td{border-bottom:0.5px solid var(--border)}` |
-| ✅ | Tabellen Live-Vorschau | proto-table in Design-Sektion reagiert auf alle 3 Tabellen-Einstellungen in Echtzeit |
-| ✅ | Logo File-Upload | `<input type="file" id="cfg-logo-file">` + `handleLogoUpload()` via FileReader, max 512KB, base64 in localStorage |
-
-### Benachrichtigungen-Fixes
-| Status | Feature | Details |
-|--------|---------|---------|
-| ✅ | testPush() ReferenceError behoben | Funktion war nie definiert (Zeile 3481). Jetzt: fetch POST /api/ntfy/test → urllib.request → ntfy.sh |
-| ✅ | POST /api/ntfy/test Backend | urllib.request, timeout=8s, headers: Title/Priority, gibt `{ok, error}` zurück |
-| ✅ | Urlaubsmodus planen | datetime-local Inputs (von/bis) → ntfy.urlaub_von/urlaub_bis in config.json |
-| ✅ | Urlaub-Header-Chip | Roter Chip erscheint in Header wenn ntfy.urlaub_modus=true (Python page-render-time check) |
-
-### Nachfass-Erweiterung
-| Status | Feature | Details |
-|--------|---------|---------|
-| ✅ | Benachrichtigung 'alle' | cfg-nf-typ: push/toast/beide/aufgabe(Kira LLM)/alle (Push+Toast+Aufgabe kombiniert) |
-
----
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-u · 2026-03-28_
+_Erstellt: session-r · 2026-03-27_

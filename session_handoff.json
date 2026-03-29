@@ -1,5 +1,5 @@
 {
-  "last_session": "session-cc",
+  "last_session": "session-ee",
   "date": "2026-03-29",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
@@ -22,7 +22,9 @@
     "session-x (Kontext-Fortsetzung): GitHub + Partner-View Erweiterungen + Mail-Modul-Start. (1) GitHub-Token ghp_* in secrets.json hinterlegt, Verbindung via Python urllib getestet (kira-partner Repo gefunden). (2) Lenis Partner-View: Tour re-enabled (einmalig, dann auto-disabled), Neuigkeiten-Banner (bleibt sichtbar bis dismissiert, lastVisit erst beim Dismiss setzen), neue Tiles sortiert nach oben + purple is-new Glowborder, Admin-Panel E-Mail-Sektion, Leni-Einstellungen-Modal. (3) feature_registry.json: 33→38 Features (sprachmodul/dokument-export/lexware-anbindung/cloud-backup/urlaubsmodus-smart aus Archiv-Discovery). (4) Mail-Modul Planung: 3 HTML-Templates (Kira-Branding) erstellt: knowledge/mail_templates/einladung.html (Var: {{LINK}}), passwort.html (Var: {{PASSWORT}},{{LINK}}), benachrichtigung.html (Var: {{TITEL}},{{DATUM}},{{INTRO_TEXT}},{{FEATURES_BLOCK}},{{LINK}}). (5) Gmail-Drafts erstellt via MCP an marlenabraham@gmail.com, BCC: info@raumkult.eu: Draft-1 Einladung ID r251255831736144918, Draft-2 Passwort ID r1565559517660587330 (Platzhalter [PASSWORT] muss ersetzt werden). (6) server.py: /api/partner/send-leni-mail Endpoint für SMTP-Versand. (7) feedback_feature_list_rule.md: 5 Referenzquellen ergänzt (_archiv/feature_list.md + _archiv/only_kais checkliste.md).",
     "session-y (2026-03-29): Mail-Bug-Fix + WhatsApp + Mail-Konten-Overhaul + Integrationen. (1) KRITISCHER MAIL-BUG BEHOBEN: _process_mail() rief _index_mail() NICHT auf bei Newsletter/Ignorieren/Abgeschlossen → Mails verschwanden aus Index. Fix: _index_mail() VOR skip_task-Check, skip_task verhindert nur Task-Erstellung. State-Rollback: alle Konten last_uid -50 für Re-Fetch. (2) WhatsApp Business Cloud API vollständig implementiert: GET hub.challenge-Verifizierung, POST HMAC-SHA256-Signaturprüfung, Meta entry[].changes[].value.messages[] Parsing, verarbeite_kanal_eingang() Aufruf. (3) Mail & Konten Einstellungen komplett neu: Konto-Karten mit echten Index/Archiv-Stats, Per-Konto Abrufen/Testen/Token-Buttons, Archiv-Pflicht-Panel mit Prüfen+Re-Index, Mail-Monitor Spinner, Sync-Ordner KIRA-Zugang Checkboxen. Verifiziert via Playwright (Testen=OK, Abrufen=gestartet, Archiv=✓). (4) Integrationen-Sektion: WhatsApp-Konfigurationsformular. (5) ISS-015: GET /api/einstellungen 404 gefixt (_api_einstellungen_get() hinzugefügt).",
     "session-bb (2026-03-29): Mail-Login-Komplett-Umbau + AGENT.md Rule. (1) AGENT.md: change_log.jsonl-Prüfung als Session-Start Step 7 + Kapitel 1e. (2) Microsoft OAuth mit zentraler KIRA Entra App (a0591b2d): _msal_app_kira(), start_oauth_browser_flow(), MSAL acquire_token_interactive(). (3) 3-stufige Provider-Erkennung: Stage1 Domain-Heuristik, Stage2 DNS-MX+Autodiscover (info@raumkult.eu korrekt erkannt!), Stage3 MS OpenID-Config-Probe. detect_provider_advanced() orchestriert alle Stufen. (4) Mailbird-Stil 6-Schritt-Wizard: kira-wiz-overlay CSS, opaker Hintergrund (kein transparent), Wizard-Steps, Anbietererkennung mit Stufen-Text, Expert-Mode mit IMAP/Exchange/EWS/POP3, _wizProtoChange() für EWS-Felder. (5) Echte Verbindungsampel: Einstellungen+Postfach+Sidebar, Background-IMAP-Health (30min-Intervall), Volltest mit SMTP XOAUTH2+30s Roundtrip. (6) Token/Client-ID aus UI entfernt. (7) 9 neue API-Endpunkte. (8) Commits: 750253d (AGENT.md) + weitere.",
-    "session-cc (2026-03-29): Bugfixes + AGENT.md Plan-Regel. (1) AGENT.md: Neue Pflicht-Regel — Plan-Agent bei großen Aufträgen vor Implementierung nutzen. (2) KRITISCHER BUG: mail_archiv.pfad war in config.json leer → KIRA konnte keine archivierten Mails lesen. Wiederhergestellt auf korrekten Pfad. (3) mail_monitor.py: _save_to_archive() Ordner-Bug — erhielt label=anfrage statt email_addr=anfrage@raumkult.eu → falsche Ordnernamen. Fix: email_addr übergeben. (4) Toast-Kopierbutton: größer + JS-Fallback via execCommand."
+    "session-cc (2026-03-29): Bugfixes + AGENT.md Plan-Regel. (1) AGENT.md: Neue Pflicht-Regel — Plan-Agent bei großen Aufträgen vor Implementierung nutzen. (2) KRITISCHER BUG: mail_archiv.pfad war in config.json leer → KIRA konnte keine archivierten Mails lesen. Wiederhergestellt auf korrekten Pfad. (3) mail_monitor.py: _save_to_archive() Ordner-Bug — erhielt label=anfrage statt email_addr=anfrage@raumkult.eu → falsche Ordnernamen. Fix: email_addr übergeben. (4) Toast-Kopierbutton: größer + JS-Fallback via execCommand.",
+    "session-dd (2026-03-29): Postfach UI — Favoriten-Sterne + Kombiniertes Postfach Ordnerstruktur + folder_type-Filter + JS-Regex-SyntaxError-Fix. Commits fe30af0 + 2ab44da.",
+    "session-ee (2026-03-29): Postfach Outlook-Style Komplett-Upgrade (8 Phasen). (1) DB: _ensure_mail_columns() fügt flagged/pinned/kira_verwendet zu mail_index.db. (2) pfInitResize() von IIFE auf reguläre Funktion (DOM-Timing-Fix). (3) 5 neue POST-Endpunkte: /api/mail/gelesen + /flag + /pin + /loeschen + /kira-markieren. (4) Hover-Aktionen auf Mail-Items: Checkbox + 4 SVG-Icons (Gelesen/Flag/Pin/Trash). (5) Bulk-Bar: Mehrfachauswahl → gelesen/ungelesen/löschen (3-Schritt showKritischModal). (6) SVG Preview-Toolbar: Antworten/Allen/Weiterleiten | Gelesen/Flag/Pin | Löschen | Kira. (7) Lese-Markierung Einstellung: sofort/5s/30s/manuell → cfg-lese-markierung → mail_postfach.lese_markierung. (8) kira_verwendet Badge: lila Chip auf Items. Commit 2aadedc. Alle Tests via Playwright: 0 JS-Fehler, Hover-Aktionen ✓, Bulk-Bar ✓, Toolbar ✓."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -68,7 +70,11 @@
     "partner-view-premium-redesign-light-mode",
     "partner-view-status-cards-interactive",
     "partner-view-admin-panel-kai-only",
-    "feature-registry-discovery-8-new-entries"
+    "feature-registry-discovery-8-new-entries",
+    "postfach-favoriten-sterne-combined-subfolder",
+    "postfach-hover-aktionen-bulk-svg-toolbar",
+    "postfach-lese-markierung-einstellung",
+    "postfach-flag-pin-kira-verwendet-db"
   ],
   "open_tasks": [
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
@@ -79,7 +85,7 @@
     "Urlaubsmodus Auto-Aktivierung: urlaub_von/bis werden gespeichert, aber Backend-Check (ist aktuelle Zeit im Urlaubsfenster?) fehlt noch",
     "Config-Export/Import: Buttons vorhanden, Funktion noch showToast-Platzhalter"
   ],
-  "next_step": "Offene Punkte für nächste Session: (1) Google OAuth verdrahten — Wizard Step 3 für google-Provider noch nicht implementiert. (2) IMAP-Passwort-Konten: SMTP-Passwort-Auth-Pfad für Volltest fehlt (run_full_connection_test() nutzt nur XOAUTH2). (3) Provider nach erfolgreichem OAuth-Login in Konto-Config persistieren (aktuell nicht gespeichert). (4) Mail-Archiv-Plan umsetzen: Plan liegt vor (snuggly-kindling-boot.md) — Archiv→KIRA-LLM-Kontext, mail_archiv_reindex.py, Einstellungen-Ordnerauswahl. (5) Falsch benannte Archiv-Ordner (anfrage/ info/ invoice/ kaimrf/ shop/) kann Kai manuell löschen — nur wenige Test-Mails drin.",
+  "next_step": "Offene Punkte: (1) kira_llm.py: kira_verwendet setzen wenn Mail in _build_data_context() genutzt wird + Badge in Postfach aktualisieren. (2) Mail-Archiv-Plan (snuggly-kindling-boot.md): Archiv→KIRA-LLM-Kontext, mail_archiv_reindex.py, Einstellungen-Ordnerauswahl. (3) Google OAuth verdrahten. (4) Postfach: Gesendete-Zählung im Badge (momentan nur Ungelesen-Inbox).",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
