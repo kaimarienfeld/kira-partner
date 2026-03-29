@@ -18,6 +18,11 @@
    - `knowledge/Todo_checkliste.md` lesen
    → Mit `feature_registry.json` abgleichen, alle drei Dateien bei Bedarf aktualisieren
 
+7. **`change_log.jsonl` aufgabenbezogen prüfen** (PFLICHT bei jeder neuen Aufgabe):
+   → Relevante Einträge zum Auftrag sammeln: Was ist bereits eingebaut? Was ist noch offen? Was fehlt ganz?
+   → Konflikte, Doppelarbeit und überflüssige Eingriffe vermeiden
+   → Siehe Abschnitt 1e für Details
+
 ### Session-Start: Größerer Auftrag kommt rein
 1. **Sofort** in `user_briefs.md` festhalten — Original-Wortlaut oder treue Rekonstruktion
 2. Dann mit der Arbeit beginnen
@@ -186,6 +191,36 @@ Hat sich feature_registry.json geändert UND
 > Wenn das Repo-Verzeichnis fehlt oder beschädigt ist:
 > `git clone https://[PAT]@github.com/kaimarienfeld/kira-partner.git C:/Users/kaimr/kira-partner`
 > dann `git config user.email` + `user.name` im Repo setzen.
+
+---
+
+## 1e. change_log.jsonl — Aufgabenbezogene Vorprüfung
+
+**Zweck:** Bevor eine neue Aufgabe umgesetzt wird, change_log.jsonl nach relevanten Einträgen durchsuchen — um zu wissen was bereits eingebaut ist, was noch offen ist, und was noch nie angefasst wurde. Verhindert Konflikte, Doppelarbeit und sinnlose Eingriffe.
+
+**Wann:** Pflicht bei jeder neuen Aufgabe — besonders bei Features, Bugfixes oder Umbauten.
+
+**Wie:**
+```
+API-Aufruf: GET /api/changelog?limit=200&search=[Stichwort]
+oder: python scripts/change_log.py --search "[Stichwort]"
+```
+
+**Auswertung — 3 Kategorien:**
+
+| Kategorie | Bedeutung | Konsequenz |
+|---|---|---|
+| ✅ Bereits eingebaut | Eintrag zeigt Feature/Fix existiert | Nur prüfen ob noch aktuell, nicht neu bauen |
+| 🔧 Teilweise / WIP | Mehrere Einträge aber kein abschließender | Fortführen, nicht von Null beginnen |
+| ❌ Nicht enthalten | Kein passender Eintrag | Neu implementieren ohne Rücksicht auf Altlasten |
+
+**Suchstrategie:** Auftragsbezogene Schlüsselwörter (Dateiname, Funktion, Feature-ID, Modul) → Ergebnis kurz zusammenfassen → dann erst umsetzen.
+
+**Beispiel:**
+> Auftrag: "Mail-Archiv einbauen"
+> → Search: "archiv", "mail_monitor", "eml", "sync_source"
+> → Findet: 12 Einträge für mail_monitor.py, letzter 2026-03-29 — archiv_import sync_source bereits vorhanden
+> → Konsequenz: Nicht neu erfinden, vorhandene Struktur erweitern
 
 ---
 
