@@ -51,7 +51,7 @@
     "_kommentar": "0 = niemals löschen. Aktivitätsprotokoll (aktivitaeten-Tabelle in tasks.db). change_log.jsonl ist davon unabhängig und wird nie automatisch bereinigt."
   },
   "mail_monitor": {
-    "aktiv": true,
+    "aktiv": false,
     "intervall_sekunden": 300,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
@@ -145,5 +145,8 @@
   },
   "partner_github_repo_dir": "C:/Users/kaimr/kira-partner",
   "partner_github_branch": "main",
-  "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner"
+  "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner",
+  "mail_konten": {
+    "standard_konto": "kaimrf@rauMKultSichtbeton.onmicrosoft.com"
+  }
 }

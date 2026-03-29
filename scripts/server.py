@@ -4947,7 +4947,7 @@ def generate_html() -> str:
   </div>
 </div>
 
-<div class="status-toast" id="toast"><span id="toast-msg"></span><button id="toast-copy-btn" title="Inhalt kopieren" onclick="navigator.clipboard.writeText(document.getElementById('toast-msg').textContent).then(()=>{{const b=this;b.textContent='✓';setTimeout(()=>b.textContent='⧉',900);}})">&#x29C9;</button></div>
+<div class="status-toast" id="toast"><span id="toast-msg"></span><button id="toast-copy-btn" title="Inhalt kopieren" onclick="(function(b){{var txt=document.getElementById('toast-msg').textContent;if(navigator.clipboard){{navigator.clipboard.writeText(txt).then(function(){{b.textContent='✓';setTimeout(function(){{b.textContent='⧉';}},1200);}},function(){{var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);b.textContent='✓';setTimeout(function(){{b.textContent='⧉';}},1200);}});}}else{{var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);b.textContent='✓';setTimeout(function(){{b.textContent='⧉';}},1200);}}}}})(this)">&#x29C9;</button></div>
 <footer>Kira Assistenz &middot; <a href="javascript:location.reload()">Aktualisieren</a></footer>
 </div><!-- /main-area -->
 </div><!-- /app-shell -->
@@ -8276,8 +8276,9 @@ a:hover{text-decoration:underline;}
 .status-toast.fehler{background:#c0392b;color:#fff;border-color:#c0392b;}
 .status-toast.warnung{background:#c87417;color:#fff;border-color:#c87417;}
 .status-toast.info{background:var(--accent);color:#fff;border-color:var(--accent);}
-#toast-copy-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:0 0 0 10px;opacity:.6;vertical-align:middle;color:inherit;line-height:1;}
-#toast-copy-btn:hover{opacity:1;}
+#toast-copy-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:5px;cursor:pointer;font-size:16px;padding:3px 8px;margin-left:10px;opacity:.85;vertical-align:middle;color:inherit;line-height:1;flex-shrink:0;}
+#toast-copy-btn:hover{opacity:1;background:rgba(255,255,255,.25);}
+.status-toast{display:flex;align-items:center;gap:0;}
 
 /* ═══ Kira FAB — Animierter Launcher ═══ */
 .kira-fab{position:fixed;bottom:20px;right:20px;z-index:200;

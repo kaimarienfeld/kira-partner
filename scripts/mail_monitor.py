@@ -1330,7 +1330,9 @@ def poll_all_accounts():
 
                             mail_data = parse_raw_mail(raw, label)
                             # Ins Archiv speichern (JSON+EML+Anhänge)
-                            pfad = _save_to_archive(mail_data, raw, label, folder_name)
+                            # email_addr (z.B. anfrage@raumkult.eu) statt label (anfrage)
+                            # → Ordnername anfrage_raumkult_eu, passend zum alten Archiver
+                            pfad = _save_to_archive(mail_data, raw, email_addr, folder_name)
                             if pfad:
                                 mail_data['mail_folder_pfad'] = pfad
                                 mail_data['eml_path'] = str(Path(pfad) / 'mail.eml')
