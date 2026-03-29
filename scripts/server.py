@@ -755,6 +755,7 @@ def build_postfach():
   <div id="pf-folders-loading" style="padding:16px;color:var(--text-muted);font-size:13px">Lade Konten...</div>
   <div id="pf-folder-tree"></div>
 </div>
+<div class="pf-resize-h" id="pf-resize-1"></div>
 
 <!-- MIDDLE: Mail-Liste -->
 <div class="pf-mid" id="pf-mid">
@@ -774,6 +775,7 @@ def build_postfach():
     </div>
   </div>
 </div>
+<div class="pf-resize-h" id="pf-resize-2"></div>
 
 <!-- RIGHT: Preview / Compose -->
 <div class="pf-right" id="pf-right">
@@ -843,9 +845,9 @@ def build_postfach():
 
 <style>
 /* ── Postfach Shell ─────────────────────────────────────── */
-.pf-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;gap:0}
+.pf-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
 /* LEFT SIDEBAR */
-.pf-left{width:245px;min-width:160px;max-width:300px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
+.pf-left{width:var(--pf-left-w);min-width:160px;max-width:380px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
 .pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-left-title{font-weight:700;font-size:14px;color:var(--text)}
 .pf-compose-btn{background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-weight:600}
@@ -870,7 +872,7 @@ def build_postfach():
 .pf-folder-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
 .pf-folder-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700;min-width:16px;text-align:right}
 /* MIDDLE LIST */
-.pf-mid{width:350px;min-width:260px;max-width:440px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.pf-mid{width:var(--pf-mid-w);min-width:240px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
 .pf-mid-hdr{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:5px;flex-shrink:0}
 .pf-mid-title{font-weight:700;font-size:15px;color:var(--text)}
 .pf-search{border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;background:var(--bg);color:var(--text);width:100%;outline:none}
@@ -933,6 +935,37 @@ def build_postfach():
 .pf-comp-body{flex:1;border:none;resize:none;background:transparent;color:var(--text);font-size:13px;padding:14px 20px;outline:none;min-height:200px;font-family:inherit;line-height:1.6}
 .pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:900px){.pf-left{width:52px}.pf-left-title,.pf-folder-konto,.pf-fav-section,.pf-fav-item span:not(.pf-fav-badge),.pf-folder-item span:not(.pf-folder-badge){display:none}.pf-mid{width:260px}}
+/* Resize handles */
+.pf-resize-h{width:4px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background .15s;position:relative;z-index:2}
+.pf-resize-h::after{content:'';position:absolute;top:0;left:-3px;right:-3px;bottom:0}
+.pf-resize-h:hover,.pf-resize-h.dragging{background:rgba(59,130,246,.45)}
+/* SVG folder icons */
+.pf-fi-icon{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-muted);opacity:.8}
+.pf-fi-icon svg{width:18px;height:18px}
+.pf-folder-item.active .pf-fi-icon,.pf-fav-item.active .pf-fi-icon,.pf-combined-btn.active .pf-fi-icon{color:#3b82f6;opacity:1}
+/* Combined Inbox button */
+.pf-combined-btn{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text);font-weight:600;border-bottom:1px solid var(--border);transition:background .12s;border-left:3px solid transparent}
+.pf-combined-btn:hover{background:var(--bg-hover)}
+.pf-combined-btn.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6}
+.pf-combined-cfg{padding:8px 14px;border-bottom:1px solid var(--border);display:none;background:var(--bg-raised)}
+.pf-combined-cfg label{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer}
+/* Light mode — white backgrounds */
+[data-theme="light"] .pf-left{background:#ffffff}
+[data-theme="light"] .pf-mid{background:#ffffff}
+[data-theme="light"] .pf-right{background:#ffffff}
+[data-theme="light"] .pf-mid-hdr{background:#ffffff}
+[data-theme="light"] .pf-mail-item{background:#ffffff}
+[data-theme="light"] .pf-mail-item:hover{background:#f3f4f6}
+[data-theme="light"] .pf-mail-item.unread{background:rgba(14,165,233,.04)}
+[data-theme="light"] .pf-mail-item.active{background:rgba(59,130,246,.07)}
+[data-theme="light"] .pf-prev-hdr{background:#ffffff}
+[data-theme="light"] .pf-prev-body{background:#ffffff}
+[data-theme="light"] .pf-preview-empty{background:#ffffff}
+[data-theme="light"] .pf-folder-item:hover{background:#f3f4f6}
+[data-theme="light"] .pf-fav-item:hover{background:#f3f4f6}
+[data-theme="light"] .pf-combined-btn:hover{background:#f3f4f6}
+[data-theme="light"] .pf-combined-cfg{background:#f8f9fa}
+[data-theme="light"] .pf-item-folder-badge{background:#f3f4f6;border-color:rgba(0,0,0,.09)}
 </style>
 
 <script>
@@ -1038,6 +1071,92 @@ function pfRefreshBadge() {
   pfLoadHealth();
 }
 
+// ── Pane Resize ──────────────────────────────────────────
+(function pfInitResize() {
+  const saved = JSON.parse(localStorage.getItem('pf_pane_w')||'{}');
+  const shell = document.querySelector('.pf-shell');
+  if(!shell) return;
+  if(saved.left) shell.style.setProperty('--pf-left-w', saved.left+'px');
+  if(saved.mid) shell.style.setProperty('--pf-mid-w', saved.mid+'px');
+
+  function makeHandle(handleId, paneId, varName, min, max, key) {
+    const handle = document.getElementById(handleId);
+    if(!handle) return;
+    let startX, startW;
+    handle.addEventListener('mousedown', function(e) {
+      const pane = document.getElementById(paneId);
+      startX = e.clientX; startW = pane.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cssText += ';cursor:col-resize;user-select:none';
+      const onMove = e2 => { const w=Math.max(min,Math.min(max,startW+e2.clientX-startX)); shell.style.setProperty(varName,w+'px'); };
+      const onUp = () => {
+        const w=parseInt(shell.style.getPropertyValue(varName))||startW;
+        const s=JSON.parse(localStorage.getItem('pf_pane_w')||'{}');
+        s[key]=w; localStorage.setItem('pf_pane_w',JSON.stringify(s));
+        handle.classList.remove('dragging');
+        document.body.style.cursor=''; document.body.style.userSelect='';
+        document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp);
+      };
+      document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+      e.preventDefault();
+    });
+  }
+  makeHandle('pf-resize-1','pf-left','--pf-left-w',160,380,'left');
+  makeHandle('pf-resize-2','pf-mid','--pf-mid-w',240,600,'mid');
+})();
+
+// ── SVG Folder Icons ─────────────────────────────────────
+function pfFolderIconWrap(name) {
+  const n=(name||'').toLowerCase();
+  let svg;
+  if(n.includes('inbox')||n.includes('posteingang')||n.includes('eingang'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 7.45 5.11z"/></svg>';
+  else if(n.includes('sent')||n.includes('gesendet'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+  else if(n.includes('draft')||n.includes('entwurf'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  else if(n.includes('delet')||n.includes('trash')||n.includes('gelöscht')||n.includes('papierkorb')||n.includes('papier'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+  else if(n.includes('junk')||n.includes('spam'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
+  else if(n.includes('archiv')||n.includes('archive'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>';
+  else if(n.includes('star')||n.includes('starred'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+  else if(n.includes('outbox')||n.includes('postausgang'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+  else if(n.includes('note')||n.includes('notiz'))
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+  else
+    svg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+  return '<span class="pf-fi-icon">'+svg+'</span>';
+}
+
+// ── Combined Inbox ────────────────────────────────────────
+let _pfCombinedKonten = [];  // loaded from API
+window.pfToggleCombinedCfg = function() {
+  const cfg = document.getElementById('pf-combined-cfg');
+  if(cfg) cfg.style.display = cfg.style.display==='none' ? 'block' : 'none';
+};
+window.pfSaveCombinedKonten = function() {
+  const checks = document.querySelectorAll('#pf-combined-cfg input[type=checkbox]');
+  const konten = Array.from(checks).filter(c=>c.checked).map(c=>c.value);
+  fetch('/api/mail/combined/konten',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({konten})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){showToast('Gemeinsames Postfach gespeichert','ok');_pfCombinedKonten=konten;document.getElementById('pf-combined-cfg').style.display='none';}
+    else showToast('Fehler: '+(d.error||'?'),'fehler');
+  }).catch(()=>{});
+};
+window.pfSelectCombined = function() {
+  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch='';
+  document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach';
+  document.getElementById('pf-search').value='';
+  document.querySelectorAll('.pf-folder-item,.pf-fav-item').forEach(el=>el.classList.remove('active'));
+  const cb = document.getElementById('pf-combined-btn');
+  if(cb) { document.querySelectorAll('.pf-combined-btn').forEach(e=>e.classList.remove('active')); cb.classList.add('active'); }
+  pfLoadList(true);
+};
+
 // ── Folder Tree ──────────────────────────────────────────
 let _pfCollapsed = {};
 try { _pfCollapsed = JSON.parse(localStorage.getItem('pf_collapsed')||'{}'); } catch(e){}
@@ -1051,7 +1170,26 @@ function pfRenderFolders(data) {
   tree.innerHTML = '';
   _pfTotalUnread = 0;
 
-  // ── Favoriten: Ungelesen-Shortcuts für Konten mit ungelesenen Inbox-Mails ──
+  // ── Gemeinsames Postfach Button ───────────────────────────────────────────
+  fetch('/api/mail/combined/konten').then(r=>r.json()).then(d=>{
+    _pfCombinedKonten = d.konten||[];
+    const cb = document.createElement('div');
+    cb.className='pf-combined-btn'; cb.id='pf-combined-btn';
+    cb.innerHTML=pfFolderIconWrap('inbox combined')
+      +'<span style="flex:1">Gemeinsames Postfach</span>'
+      +'<button onclick="pfToggleCombinedCfg()" style="border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px" title="Konfigurieren">&#x2699;</button>';
+    cb.addEventListener('click',e=>{ if(e.target.tagName!=='BUTTON') pfSelectCombined(); });
+    tree.insertBefore(cb, tree.firstChild);
+
+    const cfgDiv=document.createElement('div'); cfgDiv.className='pf-combined-cfg'; cfgDiv.id='pf-combined-cfg'; cfgDiv.style.display='none';
+    const allKonten=(data.konten||[]).map(k=>k.email);
+    cfgDiv.innerHTML='<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-muted)">Konten im Gemeinsamen Postfach:</div>'
+      +allKonten.map(e=>`<label><input type="checkbox" value="${e}" ${_pfCombinedKonten.includes(e)?'checked':''}> ${e}</label>`).join('')
+      +'<div style="margin-top:8px"><button onclick="pfSaveCombinedKonten()" style="font-size:11px;padding:3px 10px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer">Speichern</button></div>';
+    tree.insertBefore(cfgDiv, cb.nextSibling);
+  }).catch(()=>{});
+
+  // ── Favoriten: Ungelesen-Shortcuts ────────────────────────────────────────
   const favItems = [];
   (data.konten||[]).forEach(konto=>{
     const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
@@ -1070,7 +1208,7 @@ function pfRenderFolders(data) {
     favItems.forEach(({konto, displayName, inbox})=>{
       const fi = document.createElement('div');
       fi.className = 'pf-fav-item';
-      fi.innerHTML = '<span style="font-size:14px;flex-shrink:0">&#x1F4E5;</span>'
+      fi.innerHTML = pfFolderIconWrap('inbox')
         +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
         +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
       fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName);
@@ -1109,7 +1247,7 @@ function pfRenderFolders(data) {
       const item = document.createElement('div');
       item.className = 'pf-folder-item';
       item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
-      item.innerHTML = '<span style="font-size:14px;flex-shrink:0">'+(ord.icon||'&#x1F4C2;')+'</span>'
+      item.innerHTML = pfFolderIconWrap(ord.name)
         +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
         +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
       item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
@@ -1145,7 +1283,12 @@ window.pfSelectFolder = function(email, folder, label) {
 function pfLoadList(reset) {
   if(reset) { _pfOffset=0; document.getElementById('pf-list').innerHTML=''; _pfLastGroup=null; }
   if(!_pfCurrentKonto) return;
-  let url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset='+_pfOffset+'&limit=50';
+  let url;
+  if(_pfCurrentKonto==='_combined_') {
+    url='/api/mail/combined?offset='+_pfOffset+'&limit=50';
+  } else {
+    url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset='+_pfOffset+'&limit=50';
+  }
   if(_pfSearch) url+='&q='+encodeURIComponent(_pfSearch);
   fetch(url).then(r=>r.json()).then(data=>{
     _pfTotal=data.total||0;
@@ -8950,6 +9093,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/oauth/status'):
             self._api_mail_oauth_status()
 
+        elif self.path.startswith('/api/mail/combined/konten'):
+            self._api_mail_combined_konten_get()
+
+        elif self.path.startswith('/api/mail/combined'):
+            self._api_mail_combined()
+
         elif self.path.startswith('/api/mail/list'):
             self._api_mail_list()
 
@@ -9641,6 +9790,82 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json(result)
         except Exception as e:
             self._json({"konten": [], "error": str(e)})
+
+    def _api_mail_combined_konten_get(self):
+        """GET /api/mail/combined/konten — Liefert konfigurierte Konten für Gemeinsames Postfach."""
+        try:
+            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8')) if (SCRIPTS_DIR / 'config.json').exists() else {}
+            konten = cfg.get('combined_postfach', {}).get('konten', [])
+            self._json({'konten': konten})
+        except Exception as e:
+            self._json({'konten': [], 'error': str(e)})
+
+    def _api_mail_combined_konten_set(self, body):
+        """POST /api/mail/combined/konten — Setzt Konten für Gemeinsames Postfach."""
+        konten = body.get('konten', [])
+        try:
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8')) if cfg_path.exists() else {}
+            cfg.setdefault('combined_postfach', {})['konten'] = konten
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True, 'konten': konten})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_combined(self):
+        """GET /api/mail/combined?q=&offset=&limit= — Gemeinsames Postfach aus mehreren Konten."""
+        import re as _re
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        q      = qs.get('q', [''])[0].strip()
+        offset = int(qs.get('offset', ['0'])[0])
+        limit  = min(int(qs.get('limit', ['50'])[0]), 200)
+        try:
+            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8')) if (SCRIPTS_DIR / 'config.json').exists() else {}
+            konten = cfg.get('combined_postfach', {}).get('konten', [])
+        except Exception:
+            konten = []
+        if not konten:
+            self._json({'total': 0, 'mails': [], 'hint': 'Keine Konten konfiguriert'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            placeholders = ','.join(['?' for _ in konten])
+            where  = f"konto IN ({placeholders}) AND (LOWER(folder) LIKE '%inbox%' OR LOWER(folder) LIKE '%posteingang%')"
+            params = list(konten)
+            if q:
+                where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
+                like = f"%{q}%"
+                params += [like, like, like]
+            total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
+            rows  = conn.execute(
+                f"SELECT id,konto,betreff,absender,datum,message_id,hat_anhaenge,anhaenge,thread_id,text_plain,gelesen "
+                f"FROM mails WHERE {where} ORDER BY datum DESC LIMIT ? OFFSET ?",
+                params + [limit, offset]
+            ).fetchall()
+            mails = []
+            for r in rows:
+                af = r['absender'] or ''
+                m  = _re.search(r'^([^<]+)<', af)
+                short = m.group(1).strip() if m else af.split('@')[0]
+                mails.append({
+                    'message_id':     r['message_id'],
+                    'betreff':        r['betreff'] or '(kein Betreff)',
+                    'absender':       af,
+                    'absender_short': short[:40],
+                    'datum':          (r['datum'] or '')[:16],
+                    'hat_anhaenge':   bool(r['hat_anhaenge']) and len(json.loads(r['anhaenge'] or '[]')) > 0,
+                    'thread_id':      r['thread_id'] or '',
+                    'hat_thread':     False,
+                    'thread_count':   1,
+                    'text_plain':     (r['text_plain'] or '')[:120],
+                    'unread':         (r['gelesen'] == 0) if r['gelesen'] is not None else False,
+                    'konto':          r['konto'] or '',
+                })
+            conn.close()
+            self._json({'total': total, 'mails': mails})
+        except Exception as e:
+            self._json({'total': 0, 'mails': [], 'error': str(e)})
 
     def _api_mail_list(self):
         """GET /api/mail/list?konto=&folder=&offset=&limit=&q= — Mailsliste aus mail_index.db."""
@@ -10387,6 +10612,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/toggle-aktiv':
             self._api_mail_konto_toggle_aktiv(body)
+            return
+
+        if self.path == '/api/mail/combined/konten':
+            self._api_mail_combined_konten_set(body)
             return
 
         if self.path == '/api/mail/konto/standard':
