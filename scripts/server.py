@@ -10252,7 +10252,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._api_mail_konto_imap_test(body)
             return
 
-        if self.path == '/api/mail/konto/abrufen':
+        if self.path in ('/api/mail/konto/abrufen', '/api/mail/monitor/trigger'):
             self._api_mail_konto_abrufen(body)
             return
 
