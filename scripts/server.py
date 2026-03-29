@@ -900,7 +900,8 @@ def build_postfach():
 .pf-item-row3{display:flex;align-items:center;gap:5px;min-width:0}
 .pf-item-preview{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .pf-item-folder-badge{font-size:10px;color:var(--text-muted);background:var(--bg-raised);padding:1px 5px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0}
-.pf-item-att{font-size:12px;color:var(--text-muted);flex-shrink:0;line-height:1}
+.pf-item-att{width:16px;height:16px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:.7}
+.pf-item-att svg{width:16px;height:16px}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
 /* RIGHT PREVIEW */
 .pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column}
@@ -966,6 +967,23 @@ def build_postfach():
 [data-theme="light"] .pf-combined-btn:hover{background:#f3f4f6}
 [data-theme="light"] .pf-combined-cfg{background:#f8f9fa}
 [data-theme="light"] .pf-item-folder-badge{background:#f3f4f6;border-color:rgba(0,0,0,.09)}
+/* Star/Favourite toggle on folder items */
+.pf-star-btn{background:none;border:none;cursor:pointer;padding:0 3px;font-size:14px;color:var(--text-muted);opacity:0;transition:opacity .15s,color .15s;flex-shrink:0;line-height:1}
+.pf-folder-item:hover .pf-star-btn,.pf-star-btn.starred{opacity:1}
+.pf-star-btn.starred{color:#f59e0b}
+/* Combined inbox expand arrow */
+.pf-combined-arrow{font-size:10px;transition:transform .2s;display:inline-block;color:var(--text-muted);flex-shrink:0;cursor:pointer;padding:0 2px}
+.pf-combined-btn.expanded .pf-combined-arrow{transform:rotate(0deg)}
+.pf-combined-btn:not(.expanded) .pf-combined-arrow{transform:rotate(-90deg)}
+/* Combined inbox sub-folders */
+.pf-combined-sub{display:none;border-bottom:1px solid var(--border)}
+.pf-combined-sub.open{display:block}
+.pf-combined-sub-item{display:flex;align-items:center;gap:9px;padding:7px 14px 7px 36px;cursor:pointer;font-size:13px;color:var(--text);transition:background .12s;border-left:3px solid transparent}
+.pf-combined-sub-item:hover{background:var(--bg-hover)}
+.pf-combined-sub-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6}
+.pf-combined-sub-item .pf-fi-icon{width:16px;height:16px}
+.pf-combined-sub-item .pf-fi-icon svg{width:16px;height:16px}
+[data-theme="light"] .pf-combined-sub-item:hover{background:#f3f4f6}
 </style>
 
 <script>
@@ -1148,13 +1166,47 @@ window.pfSaveCombinedKonten = function() {
   }).catch(()=>{});
 };
 window.pfSelectCombined = function() {
-  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch='';
+  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType='all'; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch='';
   document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach';
   document.getElementById('pf-search').value='';
-  document.querySelectorAll('.pf-folder-item,.pf-fav-item').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
   const cb = document.getElementById('pf-combined-btn');
   if(cb) { document.querySelectorAll('.pf-combined-btn').forEach(e=>e.classList.remove('active')); cb.classList.add('active'); }
   pfLoadList(true);
+};
+window.pfToggleCombinedExpand = function(e) {
+  if(e) e.stopPropagation();
+  _pfCombinedExpanded = !_pfCombinedExpanded;
+  const sub = document.getElementById('pf-combined-sub');
+  const btn = document.getElementById('pf-combined-btn');
+  if(sub) sub.classList.toggle('open', _pfCombinedExpanded);
+  if(btn) btn.classList.toggle('expanded', _pfCombinedExpanded);
+};
+window.pfSelectCombinedSub = function(folderType, label, el, e) {
+  if(e) e.stopPropagation();
+  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType=folderType;
+  _pfCurrentFolderLabel=label; _pfOffset=0; _pfSearch='';
+  document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach — '+label;
+  document.getElementById('pf-search').value='';
+  document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.pf-combined-sub-item').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+  pfLoadList(true);
+};
+window.pfToggleFavorite = function(konto, folder, label, btn, e) {
+  if(e) e.stopPropagation();
+  const isStarred = btn.classList.contains('starred');
+  const action = isStarred ? 'remove' : 'add';
+  fetch('/api/mail/favorites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({konto,folder,label,action})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      _pfFavorites = d.favorites;
+      btn.classList.toggle('starred', !isStarred);
+      btn.innerHTML = isStarred ? '&#x2606;' : '&#x2605;';
+      btn.title = isStarred ? 'Zu Favoriten hinzuf\u00fcgen' : 'Aus Favoriten entfernen';
+      if(_pfFolderData) pfRenderFolders(_pfFolderData);
+    }
+  }).catch(()=>{});
 };
 
 // ── Folder Tree ──────────────────────────────────────────
@@ -1162,99 +1214,146 @@ let _pfCollapsed = {};
 try { _pfCollapsed = JSON.parse(localStorage.getItem('pf_collapsed')||'{}'); } catch(e){}
 let _pfLastGroup = null;
 let _pfCurrentFolderLabel = '';
+let _pfFavorites = [];          // saved favorites from /api/mail/favorites
+let _pfCombinedExpanded = true; // combined inbox sub-folders open
+let _pfCurrentFolderType = '';  // for combined sub-folder filter (inbox|sent|drafts|all)
+let _pfFolderData = null;       // cached last /api/mail/folders response for re-render
 
 function pfRenderFolders(data) {
+  _pfFolderData = data; // cache for re-render after star toggle
   const tree = document.getElementById('pf-folder-tree');
   const fromSel = document.getElementById('pf-comp-from');
   if(fromSel) fromSel.innerHTML='';
   tree.innerHTML = '';
   _pfTotalUnread = 0;
 
-  // ── Gemeinsames Postfach Button ───────────────────────────────────────────
-  fetch('/api/mail/combined/konten').then(r=>r.json()).then(d=>{
-    _pfCombinedKonten = d.konten||[];
-    const cb = document.createElement('div');
-    cb.className='pf-combined-btn'; cb.id='pf-combined-btn';
-    cb.innerHTML=pfFolderIconWrap('inbox combined')
-      +'<span style="flex:1">Gemeinsames Postfach</span>'
-      +'<button onclick="pfToggleCombinedCfg()" style="border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px" title="Konfigurieren">&#x2699;</button>';
-    cb.addEventListener('click',e=>{ if(e.target.tagName!=='BUTTON') pfSelectCombined(); });
-    tree.insertBefore(cb, tree.firstChild);
+  Promise.all([
+    fetch('/api/mail/combined/konten').then(r=>r.json()).catch(()=>({konten:[]})),
+    fetch('/api/mail/favorites').then(r=>r.json()).catch(()=>({favorites:[]}))
+  ]).then(([combinedData, favData])=>{
+    _pfCombinedKonten = combinedData.konten||[];
+    _pfFavorites = favData.favorites||[];
 
-    const cfgDiv=document.createElement('div'); cfgDiv.className='pf-combined-cfg'; cfgDiv.id='pf-combined-cfg'; cfgDiv.style.display='none';
+    // ── Gemeinsames Postfach ─────────────────────────────────────────────────
+    const cb = document.createElement('div');
+    cb.className = 'pf-combined-btn'+(_pfCombinedExpanded?' expanded':'');
+    cb.id = 'pf-combined-btn';
+    cb.innerHTML = '<span class="pf-combined-arrow" onclick="pfToggleCombinedExpand(event)">&#x25BC;</span>'
+      +pfFolderIconWrap('inbox combined')
+      +'<span style="flex:1" onclick="pfSelectCombined()">Gemeinsames Postfach</span>'
+      +'<button onclick="pfToggleCombinedCfg()" style="border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px" title="Konfigurieren">&#x2699;</button>';
+    tree.appendChild(cb);
+
+    // Sub-folders
+    const subDiv = document.createElement('div');
+    subDiv.className = 'pf-combined-sub'+(_pfCombinedExpanded?' open':'');
+    subDiv.id = 'pf-combined-sub';
+    [{type:'inbox',icon:'inbox',label:'Posteingang'},{type:'sent',icon:'sent',label:'Gesendet'},{type:'drafts',icon:'draft',label:'Entw\u00fcrfe'}].forEach(sf=>{
+      const si = document.createElement('div');
+      si.className = 'pf-combined-sub-item';
+      si.dataset.folderType = sf.type;
+      si.innerHTML = pfFolderIconWrap(sf.icon)+'<span style="flex:1">'+sf.label+'</span>';
+      si.onclick = e=>pfSelectCombinedSub(sf.type, sf.label, si, e);
+      subDiv.appendChild(si);
+    });
+    tree.appendChild(subDiv);
+
+    // Config panel
+    const cfgDiv = document.createElement('div');
+    cfgDiv.className = 'pf-combined-cfg'; cfgDiv.id = 'pf-combined-cfg'; cfgDiv.style.display='none';
     const allKonten=(data.konten||[]).map(k=>k.email);
-    cfgDiv.innerHTML='<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-muted)">Konten im Gemeinsamen Postfach:</div>'
+    cfgDiv.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-muted)">Konten im Gemeinsamen Postfach:</div>'
       +allKonten.map(e=>`<label><input type="checkbox" value="${e}" ${_pfCombinedKonten.includes(e)?'checked':''}> ${e}</label>`).join('')
       +'<div style="margin-top:8px"><button onclick="pfSaveCombinedKonten()" style="font-size:11px;padding:3px 10px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer">Speichern</button></div>';
-    tree.insertBefore(cfgDiv, cb.nextSibling);
-  }).catch(()=>{});
+    tree.appendChild(cfgDiv);
 
-  // ── Favoriten: Ungelesen-Shortcuts ────────────────────────────────────────
-  const favItems = [];
-  (data.konten||[]).forEach(konto=>{
-    const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
-    (konto.ordner||[]).forEach(ord=>{
-      const isInbox = ord.name.toLowerCase().includes('inbox')||ord.name.toLowerCase().includes('posteingang');
-      if(isInbox) {
-        _pfTotalUnread += (ord.unread||0);
-        if(ord.unread > 0) favItems.push({konto, displayName, inbox: ord});
-      }
+    // ── Favoriten ─────────────────────────────────────────────────────────────
+    const unreadInboxes = [];
+    (data.konten||[]).forEach(konto=>{
+      const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
+      (konto.ordner||[]).forEach(ord=>{
+        const isInbox = /inbox|posteingang/i.test(ord.name);
+        if(isInbox) {
+          _pfTotalUnread += (ord.unread||0);
+          if(ord.unread>0) unreadInboxes.push({konto, displayName, inbox:ord});
+        }
+      });
     });
-  });
-  if(favItems.length > 0) {
-    const favHdr = document.createElement('div');
-    favHdr.className='pf-fav-section'; favHdr.textContent='Favoriten';
-    tree.appendChild(favHdr);
-    favItems.forEach(({konto, displayName, inbox})=>{
-      const fi = document.createElement('div');
-      fi.className = 'pf-fav-item';
-      fi.innerHTML = pfFolderIconWrap('inbox')
-        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
-        +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
-      fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName);
-      tree.appendChild(fi);
-    });
-    const sep = document.createElement('div'); sep.className='pf-fav-sep'; tree.appendChild(sep);
-  }
-
-  // ── Konten mit Ordner-Baum ────────────────────────────────────────────────
-  (data.konten||[]).forEach(konto=>{
-    const safe = konto.email.replace(/[@.]/g,'_');
-    const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
-    const isCollapsed = !!_pfCollapsed[konto.email];
-
-    const lbl = document.createElement('div');
-    lbl.className = 'pf-folder-konto'+(isCollapsed?' collapsed':'');
-    lbl.id = 'pf-konto-hdr-'+safe;
-    lbl.innerHTML = '<span class="pf-konto-arrow">&#x25BC;</span>'
-      +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+displayName+'</span>'
-      +'<span id="pf-ampel-'+safe+'" style="margin-left:6px;font-size:10px;color:#f0a000;flex-shrink:0" title="Prüfe Verbindung…">&#x25CF;</span>';
-    lbl.onclick = ()=>pfToggleKonto(konto.email, safe);
-    tree.appendChild(lbl);
-
-    if(fromSel) {
-      const opt = document.createElement('option');
-      opt.value = konto.email; opt.textContent = konto.email;
-      fromSel.appendChild(opt);
+    const hasFavs = _pfFavorites.length>0 || unreadInboxes.length>0;
+    if(hasFavs) {
+      const favHdr = document.createElement('div');
+      favHdr.className='pf-fav-section'; favHdr.textContent='Favoriten';
+      tree.appendChild(favHdr);
+      // Saved config favorites first
+      _pfFavorites.forEach(fav=>{
+        const fi = document.createElement('div');
+        fi.className = 'pf-fav-item';
+        const domain = (fav.konto||'').split('@')[1]||fav.konto;
+        fi.innerHTML = pfFolderIconWrap(fav.folder)
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+fav.label+'</span>'
+          +'<span style="font-size:10px;color:var(--text-muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:80px">'+domain+'</span>';
+        fi.onclick = ()=>pfSelectFolder(fav.konto, fav.folder, fav.label);
+        tree.appendChild(fi);
+      });
+      // Unread inboxes (dedup with saved favorites)
+      unreadInboxes.forEach(({konto, displayName, inbox})=>{
+        if(_pfFavorites.some(f=>f.konto===konto.email && f.folder===inbox.name)) return;
+        const fi = document.createElement('div');
+        fi.className = 'pf-fav-item';
+        fi.innerHTML = pfFolderIconWrap('inbox')
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
+          +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
+        fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName);
+        tree.appendChild(fi);
+      });
+      const sep = document.createElement('div'); sep.className='pf-fav-sep'; tree.appendChild(sep);
     }
 
-    const folderWrap = document.createElement('div');
-    folderWrap.className = 'pf-konto-folders'+(isCollapsed?' collapsed':'');
-    folderWrap.id = 'pf-konto-folders-'+safe;
-    tree.appendChild(folderWrap);
+    // ── Konten mit Ordner-Baum + Stern-Buttons ───────────────────────────────
+    (data.konten||[]).forEach(konto=>{
+      const safe = konto.email.replace(/[@.]/g,'_');
+      const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
+      const isCollapsed = !!_pfCollapsed[konto.email];
 
-    (konto.ordner||[]).forEach(ord=>{
-      const item = document.createElement('div');
-      item.className = 'pf-folder-item';
-      item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
-      item.innerHTML = pfFolderIconWrap(ord.name)
-        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
-        +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
-      item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
-      folderWrap.appendChild(item);
+      const lbl = document.createElement('div');
+      lbl.className = 'pf-folder-konto'+(isCollapsed?' collapsed':'');
+      lbl.id = 'pf-konto-hdr-'+safe;
+      lbl.innerHTML = '<span class="pf-konto-arrow">&#x25BC;</span>'
+        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+displayName+'</span>'
+        +'<span id="pf-ampel-'+safe+'" style="margin-left:6px;font-size:10px;color:#f0a000;flex-shrink:0" title="Pr\u00fcfe Verbindung\u2026">&#x25CF;</span>';
+      lbl.onclick = ()=>pfToggleKonto(konto.email, safe);
+      tree.appendChild(lbl);
+
+      if(fromSel){
+        const opt=document.createElement('option');
+        opt.value=konto.email; opt.textContent=konto.email;
+        fromSel.appendChild(opt);
+      }
+
+      const folderWrap = document.createElement('div');
+      folderWrap.className = 'pf-konto-folders'+(isCollapsed?' collapsed':'');
+      folderWrap.id = 'pf-konto-folders-'+safe;
+      tree.appendChild(folderWrap);
+
+      (konto.ordner||[]).forEach(ord=>{
+        const isStarred = _pfFavorites.some(f=>f.konto===konto.email && f.folder===ord.name);
+        const ke = konto.email.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const fn = ord.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const fl = (ord.label||ord.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const item = document.createElement('div');
+        item.className = 'pf-folder-item';
+        item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+        item.innerHTML = pfFolderIconWrap(ord.name)
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
+          +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'')
+          +'<button class="pf-star-btn'+(isStarred?' starred':'')+'" title="'+(isStarred?'Aus Favoriten entfernen':'Zu Favoriten hinzuf\u00fcgen')+'" onclick="pfToggleFavorite(\''+ke+'\',\''+fn+'\',\''+fl+'\',this,event)">'+(isStarred?'&#x2605;':'&#x2606;')+'</button>';
+        item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
+        folderWrap.appendChild(item);
+      });
     });
+
+    _pfUpdateSidebarBadge();
   });
-  _pfUpdateSidebarBadge();
 }
 
 function pfToggleKonto(email, safe) {
@@ -1286,6 +1385,7 @@ function pfLoadList(reset) {
   let url;
   if(_pfCurrentKonto==='_combined_') {
     url='/api/mail/combined?offset='+_pfOffset+'&limit=50';
+    if(_pfCurrentFolderType && _pfCurrentFolderType!=='all') url+='&folder_type='+encodeURIComponent(_pfCurrentFolderType);
   } else {
     url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset='+_pfOffset+'&limit=50';
   }
@@ -1378,7 +1478,7 @@ function pfRenderMailItem(m, container) {
       +'<div class="pf-item-row3">'
         +'<span class="pf-item-preview">'+esc(preview)+'</span>'
         +(_pfCurrentFolderLabel?'<span class="pf-item-folder-badge">'+esc(_pfCurrentFolderLabel)+'</span>':'')
-        +(m.hat_anhaenge?'<span class="pf-item-att" title="Anhang">&#x1F4CE;</span>':'')
+        +(m.hat_anhaenge?'<span class="pf-item-att" title="Anhang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>':'')
       +'</div>'
     +'</div>';
   el.onclick = ()=>pfOpenMail(m, el);
@@ -1404,12 +1504,30 @@ window.pfOpenMail = function(m, el) {
   document.getElementById('pf-thread-wrap').style.display='none';
 
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
-    document.getElementById('pf-prev-body').textContent=d.text||'(kein Inhalt)';
+    const body = document.getElementById('pf-prev-body');
+    body.innerHTML = '';
+    if(d.html) {
+      // HTML-Mail: in sandboxed iframe rendern (Scripts blockiert, CSS/Bilder erlaubt)
+      body.style.padding = '0';
+      body.style.overflow = 'hidden';
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('sandbox', 'allow-same-origin allow-popups-to-escape-sandbox');
+      iframe.style.cssText = 'width:100%;height:100%;border:none;background:#fff;display:block';
+      iframe.srcdoc = d.html;
+      body.appendChild(iframe);
+    } else {
+      // Plaintext
+      body.style.padding = '20px';
+      body.style.overflow = 'auto';
+      body.style.whiteSpace = 'pre-wrap';
+      body.textContent = d.text || '(kein Inhalt)';
+    }
     // Anhänge
     if(d.anhaenge&&d.anhaenge.length>0) {
       const wrap=document.getElementById('pf-prev-anhaenge');
       wrap.style.display='flex';
-      wrap.innerHTML=d.anhaenge.map(a=>'<div class="pf-att-chip" data-pfad="'+encodeURIComponent(a.pfad)+'" onclick="pfOpenAtt(this.dataset.pfad)">&#x1F4CE; '+esc(a.name)+' <small style="color:var(--text-muted)">'+a.typ+'</small></div>').join('');
+      const attIcon='<svg style="width:14px;height:14px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+      wrap.innerHTML=d.anhaenge.map(a=>'<div class="pf-att-chip" data-pfad="'+encodeURIComponent(a.pfad)+'" onclick="pfOpenAtt(this.dataset.pfad)">'+attIcon+' '+esc(a.name)+' <small style="color:var(--text-muted)">'+a.typ+'</small></div>').join('');
     }
   });
   // Als gelesen markieren
@@ -9093,6 +9211,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/oauth/status'):
             self._api_mail_oauth_status()
 
+        elif self.path.startswith('/api/mail/favorites'):
+            self._api_mail_favorites_get()
+
         elif self.path.startswith('/api/mail/combined/konten'):
             self._api_mail_combined_konten_get()
 
@@ -9496,46 +9617,117 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 })
         self._json(files)
 
+    @staticmethod
+    def _parse_eml_content(eml_path):
+        """Parst EML-Datei, liefert (text_plain, html_sanitized).
+        html_sanitized ist HTML mit entfernten Scripts/Formularen für sichere Browser-Anzeige.
+        KIRA soll weiterhin text_plain aus mail_index.db nutzen."""
+        import email as _email
+        from email import policy as _ep
+        import re as _re
+        text, html = '', ''
+        try:
+            with open(str(eml_path), 'rb') as f:
+                raw = f.read()
+            msg = _email.message_from_bytes(raw, policy=_ep.compat32)
+            if msg.is_multipart():
+                for part in msg.walk():
+                    ct  = part.get_content_type()
+                    cd  = str(part.get('Content-Disposition', ''))
+                    if 'attachment' in cd.lower():
+                        continue
+                    if ct == 'text/plain' and not text:
+                        try:
+                            charset = part.get_content_charset('utf-8') or 'utf-8'
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                text = payload.decode(charset, errors='replace')
+                        except: pass
+                    elif ct == 'text/html' and not html:
+                        try:
+                            charset = part.get_content_charset('utf-8') or 'utf-8'
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                html = payload.decode(charset, errors='replace')
+                        except: pass
+            else:
+                ct = msg.get_content_type()
+                charset = msg.get_content_charset('utf-8') or 'utf-8'
+                try:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        content = payload.decode(charset, errors='replace')
+                        if ct == 'text/html':
+                            html = content
+                        else:
+                            text = content
+                except: pass
+        except Exception:
+            pass
+        # HTML sanitieren — Scripts, Forms, iframes entfernen
+        if html:
+            for tag in ['script','style','form','iframe','object','embed','meta','base','link']:
+                html = _re.sub(rf'<{tag}[^>]*>.*?</{tag}>', '', html, flags=_re.DOTALL|_re.IGNORECASE)
+                html = _re.sub(rf'<{tag}[^>]*/>', '', html, flags=_re.IGNORECASE)
+            html = _re.sub(r'\son\w+\s*=\s*["\'][^"\']*["\']', '', html, flags=_re.IGNORECASE)
+            html = _re.sub(r'\son\w+\s*=\s*[^\s>]+', '', html, flags=_re.IGNORECASE)
+            html = _re.sub(r'(href|src)\s*=\s*["\']javascript:[^"\']*["\']', 'href="#"', html, flags=_re.IGNORECASE)
+        return text, html
+
     def _read_mail(self):
-        """GET /api/mail/read?message_id=... — Liest Mail-Inhalt."""
+        """GET /api/mail/read — EML ist primäre Quelle (beste Formatierung für Anzeige).
+        KIRA nutzt weiterhin text_plain aus mail_index.db."""
         qs = urllib.parse.urlparse(self.path).query
         params = urllib.parse.parse_qs(qs)
         msg_id = params.get('message_id',[''])[0]
         if not msg_id:
             self._json({"error": "Missing message_id"})
             return
-        result = {"betreff":"","absender":"","an":"","datum":"","text":"","anhaenge":[]}
-        # 1. Versuche aus kunden.db
+        result = {"betreff":"","absender":"","an":"","datum":"","text":"","html":"","anhaenge":[]}
+
+        # ── 1. Primär: mail_index.db → EML → beste Qualität ──────────────────
+        mail_folder = ''
+        eml_path_str = ''
         try:
-            kdb = sqlite3.connect(str(KUNDEN_DB))
-            kdb.row_factory = sqlite3.Row
-            row = kdb.execute("SELECT * FROM interaktionen WHERE message_id=?", (msg_id,)).fetchone()
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT betreff,absender,an,datum,text_plain,mail_folder_pfad,eml_path,anhaenge,anhaenge_pfad "
+                "FROM mails WHERE message_id=?", (msg_id,)
+            ).fetchone()
             if row:
-                result["betreff"] = row["betreff"] or ""
+                result["betreff"]  = row["betreff"]  or ""
                 result["absender"] = row["absender"] or ""
-                result["datum"] = row["datum"] or ""
-                result["text"] = row["text_plain"] or ""
-                mail_folder = row["mail_folder_pfad"] or ""
-                anh_pfad = row["anhaenge_pfad"] or ""
-                # Volltext aus mail.json lesen falls text_plain abgeschnitten
+                result["an"]       = row["an"]       or ""
+                result["datum"]    = (row["datum"]   or "")[:16]
+                mail_folder     = row["mail_folder_pfad"] or ""
+                eml_path_str    = row["eml_path"]    or ""
+                # Fallback-Text aus DB (für schnelle Anzeige und KIRA-Kontext)
+                result["text"]  = row["text_plain"]  or ""
+
+                # EML lesen — beste Qualität, Original-Formatierung
+                eml_to_try = []
+                if eml_path_str and Path(eml_path_str).exists():
+                    eml_to_try.append(Path(eml_path_str))
                 if mail_folder:
-                    mj = Path(mail_folder) / "mail.json"
-                    if mj.exists():
-                        try:
-                            md = json.loads(mj.read_text('utf-8'))
-                            result["an"] = md.get("an","")
-                            # Volltext wenn vorhanden
-                            plain = md.get("text","")
-                            if plain and len(plain) > len(result["text"]):
-                                # Strip HTML
-                                import re as re2
-                                clean = re2.sub(r'<[^>]+>',' ',plain)
-                                clean = re2.sub(r'\s+',' ',clean).strip()
-                                if len(clean) > len(result["text"]):
-                                    result["text"] = clean
-                        except: pass
-                # Anhänge auflisten
+                    candidate = Path(mail_folder) / "mail.eml"
+                    if candidate.exists():
+                        eml_to_try.append(candidate)
+
+                for ep in eml_to_try:
+                    t, h = self._parse_eml_content(ep)
+                    if h:
+                        result["html"] = h
+                        if not result["text"] and t:
+                            result["text"] = t
+                        break
+                    elif t:
+                        result["text"] = t
+                        break
+
+                # Anhänge aus DB-JSON-Liste oder Dateisystem
                 att_dir = None
+                anh_pfad = row["anhaenge_pfad"] or ""
                 if anh_pfad and Path(anh_pfad).is_dir():
                     att_dir = Path(anh_pfad)
                 elif mail_folder:
@@ -9544,25 +9736,49 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         att_dir = att_check
                 if att_dir:
                     for f in sorted(att_dir.iterdir()):
-                        if f.is_file():
+                        if f.is_file() and not f.name.startswith('.'):
                             mime = mimetypes.guess_type(str(f))[0] or ''
                             ftype = 'PDF' if 'pdf' in mime else 'Bild' if mime.startswith('image') else 'Datei'
-                            result["anhaenge"].append({"name":f.name,"pfad":str(f),"typ":ftype})
-            kdb.close()
-        except: pass
-        # 2. Fallback: Suche in geschaeft.mail_ref
-        if not result["text"]:
+                            result["anhaenge"].append({"name": f.name, "pfad": str(f), "typ": ftype})
+            conn.close()
+        except Exception:
+            pass
+
+        # ── 2. Fallback: kunden.db interaktionen ──────────────────────────────
+        if not result["text"] and not result["html"]:
             try:
-                db = get_db()
-                grow = db.execute("SELECT * FROM geschaeft WHERE mail_ref=?", (msg_id,)).fetchone()
-                if grow:
-                    result["betreff"] = grow["betreff"] or ""
-                    result["datum"] = grow["datum"] or ""
-                    # Versuche mail_folder aus kunden.db
-                    if not result["text"]:
-                        result["text"] = f"Typ: {grow['typ']}\nBetrag: {grow['betrag'] or ''}\nGegenpartei: {grow['gegenpartei_email'] or ''}"
-                db.close()
+                kdb = sqlite3.connect(str(KUNDEN_DB))
+                kdb.row_factory = sqlite3.Row
+                krow = kdb.execute("SELECT * FROM interaktionen WHERE message_id=?", (msg_id,)).fetchone()
+                if krow:
+                    if not result["betreff"]:
+                        result["betreff"] = krow["betreff"] or ""
+                        result["absender"] = krow["absender"] or ""
+                        result["datum"]    = krow["datum"] or ""
+                    kfolder = krow["mail_folder_pfad"] or ""
+                    result["text"] = krow["text_plain"] or ""
+                    if kfolder and not result["html"]:
+                        for ep in [Path(kfolder)/"mail.eml"]:
+                            if ep.exists():
+                                t, h = self._parse_eml_content(ep)
+                                if h: result["html"] = h
+                                elif t and len(t) > len(result["text"]): result["text"] = t
+                                break
+                        if not result["text"]:
+                            mj = Path(kfolder) / "mail.json"
+                            if mj.exists():
+                                try:
+                                    import re as _re2
+                                    md = json.loads(mj.read_text('utf-8'))
+                                    plain = md.get("text","")
+                                    if plain:
+                                        clean = _re2.sub(r'<[^>]+>',' ',plain)
+                                        clean = _re2.sub(r'\s+',' ',clean).strip()
+                                        result["text"] = clean
+                                except: pass
+                kdb.close()
             except: pass
+
         self._json(result)
 
     # ── MAIL KONTEN / OAuth ────────────────────────────────────────────────
@@ -9791,6 +10007,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({"konten": [], "error": str(e)})
 
+    def _api_mail_favorites_get(self):
+        """GET /api/mail/favorites — Gespeicherte Favoriten."""
+        try:
+            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8')) if (SCRIPTS_DIR / 'config.json').exists() else {}
+            self._json({'favorites': cfg.get('mail_favorites', [])})
+        except Exception as e:
+            self._json({'favorites': [], 'error': str(e)})
+
+    def _api_mail_favorites_set(self, body):
+        """POST /api/mail/favorites — Favorit hinzufügen oder entfernen."""
+        konto  = body.get('konto', '')
+        folder = body.get('folder', '')
+        label  = body.get('label', folder)
+        action = body.get('action', 'add')  # 'add' oder 'remove'
+        if not konto or not folder:
+            self._json({'ok': False, 'error': 'konto/folder fehlt'})
+            return
+        try:
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8')) if cfg_path.exists() else {}
+            favs = cfg.get('mail_favorites', [])
+            if action == 'remove':
+                favs = [f for f in favs if not (f['konto'] == konto and f['folder'] == folder)]
+            else:
+                if not any(f['konto'] == konto and f['folder'] == folder for f in favs):
+                    favs.append({'konto': konto, 'folder': folder, 'label': label})
+            cfg['mail_favorites'] = favs
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True, 'favorites': favs})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_combined_konten_get(self):
         """GET /api/mail/combined/konten — Liefert konfigurierte Konten für Gemeinsames Postfach."""
         try:
@@ -9813,12 +10061,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({'ok': False, 'error': str(e)})
 
     def _api_mail_combined(self):
-        """GET /api/mail/combined?q=&offset=&limit= — Gemeinsames Postfach aus mehreren Konten."""
+        """GET /api/mail/combined?q=&offset=&limit=&folder_type= — Gemeinsames Postfach aus mehreren Konten."""
         import re as _re
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        q      = qs.get('q', [''])[0].strip()
-        offset = int(qs.get('offset', ['0'])[0])
-        limit  = min(int(qs.get('limit', ['50'])[0]), 200)
+        q           = qs.get('q', [''])[0].strip()
+        offset      = int(qs.get('offset', ['0'])[0])
+        limit       = min(int(qs.get('limit', ['50'])[0]), 200)
+        folder_type = qs.get('folder_type', ['all'])[0].lower()  # inbox|sent|drafts|all
         try:
             cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8')) if (SCRIPTS_DIR / 'config.json').exists() else {}
             konten = cfg.get('combined_postfach', {}).get('konten', [])
@@ -9827,11 +10076,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if not konten:
             self._json({'total': 0, 'mails': [], 'hint': 'Keine Konten konfiguriert'})
             return
+        # Build folder filter based on folder_type
+        _FOLDER_PATTERNS = {
+            'inbox':  ["LOWER(folder) LIKE '%inbox%'", "LOWER(folder) LIKE '%posteingang%'"],
+            'sent':   ["LOWER(folder) LIKE '%sent%'", "LOWER(folder) LIKE '%gesendet%'"],
+            'drafts': ["LOWER(folder) LIKE '%draft%'", "LOWER(folder) LIKE '%entwurf%'"],
+        }
+        if folder_type in _FOLDER_PATTERNS:
+            folder_clause = '(' + ' OR '.join(_FOLDER_PATTERNS[folder_type]) + ')'
+        else:  # 'all' — inbox + sent (skip internal/spam/trash)
+            inbox_parts  = ' OR '.join(_FOLDER_PATTERNS['inbox'])
+            sent_parts   = ' OR '.join(_FOLDER_PATTERNS['sent'])
+            folder_clause = f"({inbox_parts} OR {sent_parts})"
         try:
             conn = sqlite3.connect(str(MAIL_INDEX_DB))
             conn.row_factory = sqlite3.Row
             placeholders = ','.join(['?' for _ in konten])
-            where  = f"konto IN ({placeholders}) AND (LOWER(folder) LIKE '%inbox%' OR LOWER(folder) LIKE '%posteingang%')"
+            where  = f"konto IN ({placeholders}) AND {folder_clause}"
             params = list(konten)
             if q:
                 where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
@@ -10612,6 +10873,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/toggle-aktiv':
             self._api_mail_konto_toggle_aktiv(body)
+            return
+
+        if self.path == '/api/mail/favorites':
+            self._api_mail_favorites_set(body)
             return
 
         if self.path == '/api/mail/combined/konten':
