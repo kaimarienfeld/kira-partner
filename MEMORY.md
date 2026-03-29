@@ -3,8 +3,10 @@
 ## Pflicht vor jeder Session
 - [AGENT.md](AGENT.md) — Verbindliche Arbeitsregeln, Projektstruktur, kritische technische Regeln
 - [session_handoff.json](session_handoff.json) — Letzter Arbeitsstand, offene Punkte, nächster Schritt
-- [feature_registry.json](feature_registry.json) — Alle Features mit Status (Schema v2, 21 Einträge)
+- [knowledge/session_log.md](knowledge/session_log.md) — Crash-Backup: Kai's Prompts + Session-Status (letzten Eintrag prüfen!)
+- [feature_registry.json](feature_registry.json) — Alle Features mit Status (42 Einträge)
 - [known_issues.json](known_issues.json) — Bekannte offene Probleme (immer prüfen!)
+- [knowledge/Todo_checkliste.md](knowledge/Todo_checkliste.md) — Detaillierte Feature-Checkliste (Pflicht: nach jeder Session aktualisieren!)
 
 ## Grundprinzip
 - [feedback_commit_and_memory_update.md](feedback_commit_and_memory_update.md) — PFLICHT: Nach jeder Änderung committen + alle Tracking-Dateien aktualisieren

@@ -1,6 +1,6 @@
 # AGENT.md — Verbindliche Arbeitsregeln für Claude Code
 
-> Immer lesen vor Arbeitsbeginn. Stand: 2026-03-27
+> Immer lesen vor Arbeitsbeginn. Stand: 2026-03-29
 
 ---
 
@@ -10,6 +10,13 @@
 1. Diese Datei lesen (Regeln)
 2. `session_handoff.json` lesen (letzter Arbeitsstand, offene Punkte, nächster Schritt)
 3. `feature_registry.json` lesen (Feature-Status aller Module)
+4. **`knowledge/session_log.md` lesen** — prüfen ob offene Punkte aus vorheriger Session (Crash-Recovery!)
+5. **Kai's Arbeitsanweisung/Prompt sofort in `knowledge/session_log.md` eintragen** mit Datum+Uhrzeit-Stempel (Pflicht, auch bei kleinen Aufträgen — Crash-Backup)
+6. **Feature-Listen scannen und abgleichen** (PFLICHT, auch bei kleinen Änderungen):
+   - `_archiv/feature_list.md` lesen
+   - `_archiv/only_kais checkliste.md` lesen
+   - `knowledge/Todo_checkliste.md` lesen
+   → Mit `feature_registry.json` abgleichen, alle drei Dateien bei Bedarf aktualisieren
 
 ### Session-Start: Größerer Auftrag kommt rein
 1. **Sofort** in `user_briefs.md` festhalten — Original-Wortlaut oder treue Rekonstruktion
@@ -25,13 +32,20 @@
 5. `MEMORY.md` prüfen und bei Bedarf ergänzen
 6. `KIRA_KOMPLETT_UEBERSICHT.md` bei größeren Änderungen aktualisieren
 7. `server_map.md` aktualisieren wenn neue Funktionen in server.py hinzukamen
-8. **Partner-View generieren** (PFLICHT nach Änderungen an feature_registry.json):
-   ```
-   python scripts/generate_partner_view.py
-   ```
-   → prüft ob HTML aktuell ist, aktualisiert falls nötig
-   → Push zu GitHub NUR nach expliziter Freigabe durch Kai: `--push` Flag
-   → Kai sieht diff und sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
+8. **`knowledge/session_log.md` abschließen** — Status der Session eintragen (erledigt / was offen blieb)
+9. **Feature-Listen abgleichen** (PFLICHT, auch bei kleinen Änderungen):
+   - `_archiv/feature_list.md` aktualisieren
+   - `_archiv/only_kais checkliste.md` aktualisieren
+   - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
+   → Alle drei mit `feature_registry.json` abgleichen
+10. **Partner-View generieren** (PFLICHT nach Änderungen an feature_registry.json):
+    ```
+    python scripts/generate_partner_view.py
+    ```
+    → prüft ob HTML aktuell ist, aktualisiert falls nötig
+    → Push zu GitHub NUR nach expliziter Freigabe durch Kai: `--push` Flag
+    → Kai sieht diff und sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
+    → **Mail an Leni + BCC Kai**: Wenn Versand fehlschlägt → sofort explizite Fehlermeldung im Chat ausgeben: "⚠️ Mail an Leni konnte nicht gesendet werden: [Fehlerdetail]. Bitte manuell prüfen."
 
 ### Nach Leni-Feedback (Workflow)
 1. Kai gibt Leni-Feedback mit "Alles für Claude kopieren" (Admin-Panel) → fügt in Chat ein
@@ -46,6 +60,50 @@
 > `scripts/diff_to_changelog.py --staged` — ein Eintrag pro CSS-Property, Funktion, HTML-Attribut, Farbe, Schriftart
 > Manuell ausführen: `python scripts/diff_to_changelog.py --since HEAD~1 --dry-run`
 > Bei Bedarf nachträglich: `python scripts/diff_to_changelog.py --since COMMIT_HASH`
+
+---
+
+## 1b. Crash-Backup: session_log.md
+
+**Datei:** `knowledge/session_log.md` (append-only, niemals überschreiben)
+
+**Format für jeden Eintrag:**
+```
+## [DATUM] [UHRZEIT] — Session-Start
+**Auftrag:** [Kai's vollständiger Prompt / Arbeitsanweisung — Original-Wortlaut]
+**Status:** offen
+
+---
+[Session-Ende-Nachtrag:]
+**Erledigt:** [Was wurde fertig]
+**Offen geblieben:** [Was nicht fertig wurde oder beim nächsten Start weitergehen muss]
+**Status:** erledigt / teilweise / crash
+```
+
+**Zweck:** Wenn Claude oder der Server crasht und der Kontext verloren geht, kann die nächste Session anhand dieser Datei sofort weitermachen — ohne dass Kai alles neu erklären muss.
+
+**Regel beim Start:** Letzten Eintrag prüfen — wenn Status = "offen" oder "crash" → Kai sofort informieren: "Ich sehe eine offene Aufgabe vom [Datum]: [Auftrag]. Weiterführen?"
+
+---
+
+## 1c. Todo_checkliste.md — Pflicht-Aktualisierung
+
+**Datei:** `knowledge/Todo_checkliste.md`
+
+- Enthält ALLE Features und Aufgaben mit Status (✅/🔧/❌/💡/📋)
+- **Pflicht: nach jeder Session aktualisieren** — auch bei kleinen Änderungen
+- Neue Features sofort eintragen, erledigte auf ✅ setzen
+- Ist die **Grundlage unserer Arbeit** — immer aktuell halten
+- Dient zusammen mit `feature_registry.json` als Single Source of Truth
+
+**Die 3 Listen immer synchron halten:**
+
+| Datei | Zweck |
+|---|---|
+| `knowledge/Todo_checkliste.md` | Detaillierte Status-Checkliste pro Feature-Element |
+| `feature_registry.json` | Maschinenlesbare Feature-Liste (für Partner-View) |
+| `_archiv/feature_list.md` | Technische Übersicht mit Datei:Zeile Referenzen |
+| `_archiv/only_kais checkliste.md` | Kais persönliche Wunschliste + Prioritäten |
 
 ---
 
