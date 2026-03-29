@@ -44,94 +44,20 @@ TOKEN_DIR    = ARCHIVER_DIR / "tokens"
 SMTP_HOST = "smtp.office365.com"
 SMTP_PORT = 587
 
-OAUTH_SCOPES       = ["https://outlook.office.com/SMTP.Send"]
-OAUTH_SCOPE_VERSION = "v1_smtp_send"
-
 SENT_MAILS_DB = KNOWLEDGE_DIR / "sent_mails.db"
 
 log = logging.getLogger("mail_sender")
 
 
-# ── Token-Stack (identisch mit mail_monitor.py) ───────────────────────────────
-def _token_cache_path(email_addr: str) -> Path:
-    TOKEN_DIR.mkdir(exist_ok=True)
-    safe = email_addr.replace("@", "_").replace(".", "_")
-    return TOKEN_DIR / f"{safe}_smtp_token.json"
-
-
-def _msal_app(konto: dict):
-    if not MSAL_OK:
-        raise RuntimeError("msal nicht installiert: pip install msal")
-    client_id = konto.get("oauth2_client_id", "").strip()
-    tenant_id = konto.get("oauth2_tenant_id", "common").strip() or "common"
-    if not client_id:
-        raise RuntimeError(f"Keine OAuth2 Client-ID für {konto['email']}")
-
-    cache = msal.SerializableTokenCache()
-    cache_path = _token_cache_path(konto["email"])
-    if cache_path.exists():
-        cache.deserialize(cache_path.read_text(encoding="utf-8"))
-
-    app = msal.PublicClientApplication(
-        client_id=client_id,
-        authority=f"https://login.microsoftonline.com/{tenant_id}",
-        token_cache=cache,
-    )
-    return app, cache, cache_path
-
-
-def _save_token_cache(cache, path: Path):
-    if cache.has_state_changed:
-        path.write_text(cache.serialize(), encoding="utf-8")
-
-
+# ── Token: zentraler KIRA Token-Stack (identisch mit mail_monitor.py) ────────
 def get_smtp_token(konto: dict) -> str:
     """
-    Holt OAuth2 Access Token für SMTP.Send Scope.
-    Separate Token-Datei vom IMAP-Token (anderer Scope).
+    Holt OAuth2 Access Token über die zentrale KIRA Entra App.
+    Verwendet denselben Token-Cache und MSAL-Stack wie mail_monitor.py
+    (Token hat IMAP.AccessAsUser.All + SMTP.Send Scopes).
     """
-    app, cache, cache_path = _msal_app(konto)
-    email_addr = konto["email"]
-
-    version_path = cache_path.parent / (cache_path.stem + "_version.txt")
-    if version_path.exists() and version_path.read_text().strip() != OAUTH_SCOPE_VERSION:
-        if cache_path.exists(): cache_path.unlink()
-        if version_path.exists(): version_path.unlink()
-        app, cache, cache_path = _msal_app(konto)
-
-    # 1. Silent
-    accounts = app.get_accounts(username=email_addr)
-    if accounts:
-        result = app.acquire_token_silent(OAUTH_SCOPES, account=accounts[0])
-        if result and "access_token" in result:
-            _save_token_cache(cache, cache_path)
-            version_path.write_text(OAUTH_SCOPE_VERSION)
-            return result["access_token"]
-
-    # 2. Device-Code-Flow
-    import webbrowser
-    log.info(f"SMTP OAuth2 Login für {email_addr}")
-    flow = app.initiate_device_flow(scopes=OAUTH_SCOPES)
-    if "user_code" not in flow:
-        raise RuntimeError(f"Device-Flow fehlgeschlagen: {flow.get('error_description', '?')}")
-
-    url = flow["verification_uri"]
-    code = flow["user_code"]
-    log.warning(f"SMTP OAUTH2: {email_addr} → {url} Code: {code}")
-
-    try:
-        webbrowser.open(url)
-    except Exception:
-        pass
-
-    result = app.acquire_token_by_device_flow(flow)
-    if "access_token" not in result:
-        raise RuntimeError(f"SMTP OAuth2 fehlgeschlagen: {result.get('error_description', '?')}")
-
-    _save_token_cache(cache, cache_path)
-    version_path.write_text(OAUTH_SCOPE_VERSION)
-    log.info(f"SMTP OAuth2 OK für {email_addr}")
-    return result["access_token"]
+    from mail_monitor import get_oauth2_token
+    return get_oauth2_token(konto)
 
 
 def _load_konto(from_email: str) -> dict:
@@ -267,10 +193,9 @@ def send_mail(
         msg["Bcc"] = bcc  # in Header für Transparenz wenn gewollt
 
     try:
-        ctx = ssl.create_default_context()
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
             smtp.ehlo()
-            smtp.starttls(context=ctx)
+            smtp.starttls()
             smtp.ehlo()
 
             # XOAUTH2 Auth
@@ -286,6 +211,9 @@ def send_mail(
         # In sent_mails.db speichern
         if save_to_db:
             _save_sent_mail(from_email, to, subject, body_plain or "", message_id, bcc)
+
+        # Sofort in mail_index.db indexieren (Postfach zeigt es sofort)
+        _index_sent_mail(from_email, to, subject, body_plain or "", message_id, in_reply_to, references)
 
         return {
             "ok": True,
@@ -322,6 +250,50 @@ def _save_sent_mail(from_email, to, subject, body_plain, message_id, bcc=""):
         conn.close()
     except Exception as e:
         log.error(f"sent_mails.db Speichern fehlgeschlagen: {e}")
+
+
+def _index_sent_mail(from_email, to, subject, body_plain, message_id, in_reply_to="", references=""):
+    """Indexiert gesendete Mail sofort in mail_index.db → erscheint im Postfach."""
+    import sqlite3
+    MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
+    if not MAIL_INDEX_DB.exists():
+        return
+    try:
+        konto_label = from_email.split("@")[0].lower()
+        now = datetime.now()
+        # Thread-ID aus References/In-Reply-To ableiten
+        thread_id = ""
+        if references:
+            parts = references.strip().split()
+            thread_id = parts[0] if parts else ""
+        elif in_reply_to:
+            thread_id = in_reply_to.strip()
+
+        conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            INSERT OR IGNORE INTO mails
+            (konto, konto_label, betreff, absender, an, cc,
+             datum, datum_iso, message_id, folder,
+             hat_anhaenge, anhaenge,
+             in_reply_to, mail_references, thread_id,
+             sync_source, text_plain, archiviert_am,
+             eml_path, mail_folder_pfad, gelesen)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            from_email, konto_label, subject, from_email, to, "",
+            now.strftime("%Y-%m-%d %H:%M:%S"), now.astimezone(timezone.utc).isoformat(),
+            message_id, "Gesendete Elemente",
+            0, "[]",
+            in_reply_to, references, thread_id,
+            "kira_gesendet", body_plain[:8000], now.isoformat(),
+            "", "", 1,  # gelesen=1 → eigene Mail
+        ))
+        conn.commit()
+        conn.close()
+        log.info(f"Gesendete Mail in mail_index.db indexiert: {subject[:40]}")
+    except Exception as e:
+        log.error(f"mail_index.db Index fehlgeschlagen: {e}")
 
 
 # ── Template-Versand (für Partner-Mails) ─────────────────────────────────────

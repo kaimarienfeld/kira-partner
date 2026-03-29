@@ -292,6 +292,7 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 ## 5. Verbote
 
 - `scripts/secrets.json` NIEMALS lesen, anzeigen, committen
+- `scripts/config.json` NIEMALS direkt editieren — enthält Kais persönliche Einstellungen. Alle Config-Änderungen müssen über Code-Defaults (Python) oder die API/UI laufen. Neue Config-Keys werden im Python-Code mit Defaults eingeführt, NICHT durch Editieren der config.json.
 - `knowledge/mail_index.db` nicht ohne Reason anfassen (groß, langsam)
 - Keine Änderungen an `activity_log.py` (Backward-Compat)
 - Gmail-Tool NIEMALS verwenden — immer Mail-Archiv-Ordner nutzen

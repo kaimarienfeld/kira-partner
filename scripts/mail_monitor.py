@@ -453,7 +453,11 @@ def check_account_health(email_addr: str) -> dict:
         try:
             imap = imap_connect(konto)
             typ, data = imap.select("INBOX", readonly=True)
-            inbox_count = int(data[0]) if data and data[0] and data[0].isdigit() else 0
+            try:
+                v = data[0]
+                inbox_count = int(v.decode('ascii', errors='ignore').strip() if isinstance(v, bytes) else v)
+            except Exception:
+                inbox_count = 0
             imap.logout()
             result = {"status": "ok", "error": None, "inbox_count": inbox_count}
         except Exception as e:
@@ -510,7 +514,11 @@ def run_full_connection_test(email_addr: str) -> dict:
     try:
         imap = imap_connect(konto)
         typ, data = imap.select("INBOX", readonly=True)
-        result["inbox_count"] = int(data[0]) if data and data[0] and str(data[0]).isdigit() else 0
+        try:
+            v = data[0]
+            result["inbox_count"] = int(v.decode('ascii', errors='ignore').strip() if isinstance(v, bytes) else v)
+        except Exception:
+            result["inbox_count"] = 0
         imap.logout()
         result["imap_ok"] = True
     except Exception as e:
@@ -1253,7 +1261,21 @@ def poll_all_accounts():
         except Exception as e:
             log.error(f"IMAP-Verbindung fehlgeschlagen für {email_addr}: {e}")
             _update_status(last_error=f"{email_addr}: {e}")
+            err_str = str(e).lower()
+            with _health_lock:
+                _account_health[email_addr] = {
+                    "status": "auth_fehler" if any(k in err_str for k in ("auth", "login", "token")) else "fehler",
+                    "error": str(e)[:200], "inbox_count": 0,
+                    "last_check": datetime.now().isoformat(),
+                }
             continue
+
+        # IMAP verbunden → Health auf ok setzen
+        with _health_lock:
+            _account_health[email_addr] = {
+                "status": "ok", "error": None, "inbox_count": 0,
+                "last_check": datetime.now().isoformat(),
+            }
 
         try:
             # Ordner auflisten
@@ -1280,10 +1302,14 @@ def poll_all_accounts():
                         continue
 
                     # Neue UIDs suchen
+                    # Hinweis: imaplib gibt UIDs als bytes zurück (b'7703') — immer decoden vor int()
+                    def _uid2int(u):
+                        return int(u.decode('ascii', errors='ignore').strip() if isinstance(u, bytes) else u)
+
                     if last_uid > 0:
                         sr, ud = imap.uid("SEARCH", f"UID {last_uid + 1}:*")
                         if sr == "OK" and ud[0]:
-                            new_uids = [u for u in ud[0].split() if u and int(u) > last_uid]
+                            new_uids = [u for u in ud[0].split() if u and _uid2int(u) > last_uid]
                         else:
                             new_uids = []
                     else:
@@ -1325,6 +1351,8 @@ def poll_all_accounts():
                                 continue
 
                             mail_data = parse_raw_mail(raw, label)
+                            # Volle E-Mail-Adresse setzen (für korrekte mail_index.db Zuordnung)
+                            mail_data['konto'] = email_addr
                             # Ins Archiv speichern (JSON+EML+Anhänge)
                             # email_addr (z.B. anfrage@raumkult.eu) statt label (anfrage)
                             # → Ordnername anfrage_raumkult_eu, passend zum alten Archiver
@@ -1337,7 +1365,7 @@ def poll_all_accounts():
                                 all_new_tasks.append(result)
 
                         # Max UID tracken
-                        batch_max = max(int(u) for u in batch)
+                        batch_max = max(_uid2int(u) for u in batch)
                         if batch_max > max_uid:
                             max_uid = batch_max
 

@@ -847,11 +847,21 @@ def build_postfach():
 .pf-left-title{font-weight:700;font-size:14px;color:var(--text)}
 .pf-compose-btn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600}
 .pf-compose-btn:hover{opacity:.88}
-.pf-folder-konto{padding:10px 14px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)}
+.pf-folder-konto{padding:10px 14px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
+.pf-folder-konto:hover{color:var(--text)}
+.pf-folder-konto .pf-konto-arrow{font-size:9px;transition:transform .15s;display:inline-block}
+.pf-folder-konto.collapsed .pf-konto-arrow{transform:rotate(-90deg)}
+.pf-konto-folders{overflow:hidden;transition:max-height .2s}
+.pf-konto-folders.collapsed{max-height:0!important}
 .pf-folder-item{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
 .pf-folder-item:hover{background:var(--bg-hover)}
 .pf-folder-item.active{background:rgba(124,77,255,.1);border-left-color:var(--accent);color:var(--accent);font-weight:600}
-.pf-folder-badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-weight:700}
+.pf-folder-badge{margin-left:auto;color:var(--accent);font-size:11px;font-weight:700;min-width:16px;text-align:right}
+.pf-mail-item{padding:10px 14px 10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:3px solid transparent}
+.pf-mail-item:hover{background:var(--bg-hover)}
+.pf-mail-item.unread{border-left-color:var(--accent);background:rgba(124,77,255,.04)}
+.pf-mail-item.unread .pf-item-absender{color:var(--text);font-weight:700}
+.pf-mail-item.unread .pf-item-betreff{font-weight:700;color:var(--text)}
 .pf-mid{width:320px;min-width:240px;max-width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
 .pf-mid-hdr{padding:12px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
 .pf-mid-title{font-weight:700;font-size:14px;color:var(--text)}
@@ -859,10 +869,7 @@ def build_postfach():
 .pf-search:focus{border-color:var(--accent)}
 .pf-mid-meta{font-size:11px;color:var(--text-muted)}
 #pf-list-wrap{overflow-y:auto;flex:1}
-.pf-mail-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
-.pf-mail-item:hover{background:var(--bg-hover)}
-.pf-mail-item.active{background:rgba(124,77,255,.08);border-left:3px solid var(--accent)}
-.pf-mail-item.unread .pf-item-betreff{font-weight:700}
+.pf-mail-item.active{background:rgba(124,77,255,.08);border-left-color:var(--accent)!important}
 .pf-item-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px}
 .pf-item-absender{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
 .pf-item-datum{font-size:11px;color:var(--text-muted);flex-shrink:0}
@@ -919,28 +926,46 @@ let _pfThreadOpen = false;
 // ── Init ─────────────────────────────────────────────────
 // ── Konto-Ampel für Postfach ─────────────────────────────
 let _pfHealthCache = {};
+let _pfTotalUnread = 0;
+let _pfHasHealthError = false;
+
+function _pfUpdateSidebarBadge() {
+  const badge = document.getElementById('nav-postfach-badge');
+  if(!badge) return;
+  if(_pfTotalUnread > 0) {
+    badge.textContent = _pfTotalUnread > 999 ? '999+' : _pfTotalUnread;
+    badge.style.display = '';
+    if(_pfHasHealthError) {
+      badge.style.background='rgba(200,60,60,.12)';badge.style.color='#c83c3c';badge.style.borderColor='rgba(200,60,60,.25)';
+    } else {
+      badge.style.background='rgba(59,130,246,.12)';badge.style.color='#3b82f6';badge.style.borderColor='rgba(59,130,246,.25)';
+    }
+  } else if(_pfHasHealthError) {
+    badge.textContent='⚠';badge.style.display='';
+    badge.style.background='rgba(200,60,60,.12)';badge.style.color='#c83c3c';badge.style.borderColor='rgba(200,60,60,.25)';
+  } else {
+    badge.style.display='none';
+  }
+}
+
 function pfLoadHealth() {
   fetch('/api/mail/konto/health').then(r=>r.json()).then(d=>{
     _pfHealthCache = d.health || {};
-    // Ampeln in Folder-Tree aktualisieren
+    _pfHasHealthError = false;
+    // Ampeln in Folder-Tree aktualisieren — nur sichtbare Konten prüfen
     Object.entries(_pfHealthCache).forEach(([email, h])=>{
       const safe=email.replace(/[@.]/g,'_');
       const dot=document.getElementById('pf-ampel-'+safe);
-      if(!dot) return;
+      if(!dot) return; // Konto nicht im Postfach sichtbar → ignorieren
       if(h.status==='ok') { dot.style.color='#28c850'; dot.title='Verbunden'; }
-      else if(h.status==='auth_fehler') { dot.style.color='#c83c3c'; dot.title='Anmeldung fehlgeschlagen'; }
-      else { dot.style.color='#f0a000'; dot.title='Verbindungsproblem: '+(h.error||''); }
+      else if(h.status==='auth_fehler') { dot.style.color='#c83c3c'; dot.title='Anmeldung fehlgeschlagen'; _pfHasHealthError=true; }
+      else { dot.style.color='#f0a000'; dot.title='Verbindungsproblem: '+(h.error||''); _pfHasHealthError=true; }
     });
-    // Sidebar-Badge aktualisieren
-    const anyError = Object.values(_pfHealthCache).some(h=>h.status!=='ok');
-    const navBadge = document.getElementById('nav-postfach-badge');
-    if(navBadge) {
-      navBadge.textContent = anyError ? '⚠' : '';
-      navBadge.style.display = anyError ? '' : 'none';
-    }
+    _pfUpdateSidebarBadge();
   }).catch(()=>{});
 }
 
+let _pfRefreshTimer = null;
 function pfInit() {
   fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
     pfRenderFolders(data);
@@ -952,39 +977,99 @@ function pfInit() {
       const ib = first.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || first.ordner?.[0];
       if(ib) pfSelectFolder(first.email, ib.name, ib.label||ib.name);
     }
+    // Periodisches Refresh: Unread-Badge + Ampeln alle 60s (ohne Tree-Rebuild)
+    if(_pfRefreshTimer) clearInterval(_pfRefreshTimer);
+    _pfRefreshTimer = setInterval(pfRefreshBadge, 60000);
   }).catch(e=>{
     document.getElementById('pf-folders-loading').textContent='Konten konnten nicht geladen werden.';
   });
 }
 
+function pfRefreshBadge() {
+  fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
+    _pfTotalUnread = 0;
+    (data.konten||[]).forEach(konto=>{
+      const safe=konto.email.replace(/[@.]/g,'_');
+      (konto.ordner||[]).forEach(ord=>{
+        const fid='pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+        const el=document.getElementById(fid);
+        if(el) {
+          const b=el.querySelector('.pf-folder-badge');
+          if(ord.unread>0) {
+            if(b) b.textContent=ord.unread;
+            else { const s=document.createElement('span');s.className='pf-folder-badge';s.textContent=ord.unread;el.appendChild(s); }
+          } else if(b) b.remove();
+        }
+        if(ord.name.toLowerCase().includes('inbox')||ord.name.toLowerCase().includes('posteingang')) {
+          _pfTotalUnread+=(ord.unread||0);
+        }
+      });
+    });
+    _pfUpdateSidebarBadge();
+  }).catch(()=>{});
+  pfLoadHealth();
+}
+
 // ── Folder Tree ──────────────────────────────────────────
+let _pfCollapsed = {};
+try { _pfCollapsed = JSON.parse(localStorage.getItem('pf_collapsed')||'{}'); } catch(e){}
+
 function pfRenderFolders(data) {
   const tree = document.getElementById('pf-folder-tree');
   // Fill from-select in compose
   const fromSel = document.getElementById('pf-comp-from');
+  if(fromSel) fromSel.innerHTML='';
   tree.innerHTML = '';
+  _pfTotalUnread = 0;
   (data.konten||[]).forEach(konto=>{
     const safe=konto.email.replace(/[@.]/g,'_');
+    const displayName = konto.display_name || (konto.label||konto.email).toUpperCase();
+    const isCollapsed = !!_pfCollapsed[konto.email];
+
     const lbl = document.createElement('div');
-    lbl.className='pf-folder-konto';
-    lbl.innerHTML=(konto.label||konto.email)
+    lbl.className='pf-folder-konto'+(isCollapsed?' collapsed':'');
+    lbl.id='pf-konto-hdr-'+safe;
+    lbl.innerHTML='<span class="pf-konto-arrow">&#x25BC;</span>'
+      +'<span>'+displayName+'</span>'
       +`<span id="pf-ampel-${safe}" style="margin-left:6px;font-size:10px;color:#f0a000" title="Prüfe Verbindung…">&#x25CF;</span>`;
+    lbl.onclick=()=>pfToggleKonto(konto.email, safe);
     tree.appendChild(lbl);
+
     if(fromSel) {
       const opt=document.createElement('option');
       opt.value=konto.email; opt.textContent=konto.email;
       fromSel.appendChild(opt);
     }
+
+    const folderWrap = document.createElement('div');
+    folderWrap.className='pf-konto-folders'+(isCollapsed?' collapsed':'');
+    folderWrap.id='pf-konto-folders-'+safe;
+    tree.appendChild(folderWrap);
+
     (konto.ordner||[]).forEach(ord=>{
       const item=document.createElement('div');
       item.className='pf-folder-item';
-      item.id='pf-fi-'+konto.email.replace(/[@.]/g,'_')+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+      item.id='pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
       item.innerHTML='<span>'+(ord.icon||'&#x1F4C2;')+'</span><span>'+(ord.label||ord.name)+'</span>'
         + (ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
       item.onclick=()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
-      tree.appendChild(item);
+      folderWrap.appendChild(item);
+      // Unread-Summe für Sidebar-Badge (nur INBOX)
+      if(ord.name.toLowerCase().includes('inbox') || ord.name.toLowerCase().includes('posteingang')) {
+        _pfTotalUnread += (ord.unread||0);
+      }
     });
   });
+  _pfUpdateSidebarBadge();
+}
+
+function pfToggleKonto(email, safe) {
+  _pfCollapsed[email] = !_pfCollapsed[email];
+  try { localStorage.setItem('pf_collapsed', JSON.stringify(_pfCollapsed)); } catch(e){}
+  const hdr=document.getElementById('pf-konto-hdr-'+safe);
+  const fw=document.getElementById('pf-konto-folders-'+safe);
+  if(hdr) hdr.classList.toggle('collapsed', !!_pfCollapsed[email]);
+  if(fw) fw.classList.toggle('collapsed', !!_pfCollapsed[email]);
 }
 
 // ── Select Folder ────────────────────────────────────────
@@ -3069,7 +3154,7 @@ function esShowProtoTab(id) {{
     <div class="es-grp-sub">Automatisches IMAP-Polling. L&auml;uft im Hintergrund.</div>
     <div class="es-row">
       <div class="es-row-label"><span>Mail-Monitor aktiv</span><span class="es-row-hint">Neue Mails werden alle 5 Min. gepr&uuml;ft und als Aufgaben eingetragen</span></div>
-      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-monitor-aktiv"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-monitor-aktiv"><div class="es-toggle-vis"></div></label>
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Polling-Intervall (Sekunden)</span><span class="es-row-hint">Wie oft neue Mails abgerufen werden</span></div>
@@ -3091,15 +3176,15 @@ function esShowProtoTab(id) {{
     <div class="es-grp-sub">KI-basierte Kategorisierung eingehender Mails mit LLM.</div>
     <div class="es-row">
       <div class="es-row-label"><span>Klassifizierung (LLM)</span><span class="es-row-hint">Eingehende Mails automatisch kategorisieren (Anfrage / Newsletter / intern / etc.)</span></div>
-      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-classify"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-classify"><div class="es-toggle-vis"></div></label>
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Aufgaben automatisch erstellen</span><span class="es-row-hint">Aus Anfragen und wichtigen Mails direkt Aufgaben generieren</span></div>
-      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-tasks"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-tasks"><div class="es-toggle-vis"></div></label>
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Newsletter ignorieren</span><span class="es-row-hint">Newsletter-Mails werden nicht als Aufgaben eingetragen</span></div>
-      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-mail-ignore-newsletter"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-ignore-newsletter"><div class="es-toggle-vis"></div></label>
     </div>
   </div>
 
@@ -3116,7 +3201,7 @@ function esShowProtoTab(id) {{
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Neue Mails archivieren</span><span class="es-row-hint">Eingehende Mails automatisch als JSON+EML im Archiv speichern</span></div>
-      <label class="es-toggle" onclick="this.querySelector('input').click()"><input type="checkbox" id="cfg-archiv-aktiv"><span class="es-toggle-track"><span class="es-toggle-thumb"></span></span></label>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-archiv-aktiv"><div class="es-toggle-vis"></div></label>
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Archiv-Status</span><span id="es-archiv-status-text" class="es-row-hint">–</span></div>
@@ -3143,10 +3228,19 @@ function esShowProtoTab(id) {{
       Object.entries(health).forEach(([email,h])=>{{
         const safe=email.replace(/[@.]/g,'_');
         const dot=document.getElementById('es-ampel-'+safe);
-        if(!dot) return;
-        if(h.status==='ok') {{dot.className='es-mk-ampel es-mk-ampel-gruen';dot.title='Verbunden ('+new Date(h.last_check||0).toLocaleTimeString()+')';}}
-        else if(h.status==='auth_fehler') {{dot.className='es-mk-ampel es-mk-ampel-rot';dot.title='Authentifizierung fehlgeschlagen';}}
-        else {{dot.className='es-mk-ampel es-mk-ampel-gelb';dot.title='Verbindungsfehler';}}
+        if(dot) {{
+          if(h.status==='ok') {{dot.className='es-mk-ampel es-mk-ampel-gruen';dot.title='Verbunden ('+new Date(h.last_check||0).toLocaleTimeString()+')';}}
+          else if(h.status==='auth_fehler') {{dot.className='es-mk-ampel es-mk-ampel-rot';dot.title='Authentifizierung fehlgeschlagen';}}
+          else {{dot.className='es-mk-ampel es-mk-ampel-gelb';dot.title='Verbindungsfehler';}}
+        }}
+        const liveEl=document.getElementById('es-mk-live-'+safe);
+        const liveWrap=document.getElementById('es-mk-live-wrap-'+safe);
+        if(liveEl&&liveWrap) {{
+          if(h.status==='ok'&&h.inbox_count!=null) {{liveEl.textContent=h.inbox_count.toLocaleString();liveWrap.style.display='';}}
+          else liveWrap.style.display='none';
+        }}
+        const reconWrap=document.getElementById('es-mk-recon-'+safe);
+        if(reconWrap) reconWrap.style.display=h.status==='ok'?'none':'';
       }});
     }}).catch(()=>{{}});
   }}
@@ -3222,10 +3316,8 @@ function esShowProtoTab(id) {{
           }} else {{
             ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Nicht verbunden';
           }}
-          // Reconnect nötig bei: IMAP-Auth-Fehler ODER letzter Volltest hatte SMTP-Auth-Fehler
-          const lastTest = k.last_volltest || {{}};
-          const smtpAuthFehler = lastTest.smtp_error && String(lastTest.smtp_error).includes('530');
-          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler' || smtpAuthFehler;
+          // Reconnect bei allem außer ok (auth_fehler, fehler, unbekannt, nie-geprüft)
+          const needsReconnect = h.status!=='ok';
           const isDeaktiv = k.aktiv === false;
           return `<div class="es-mk-card${{isDeaktiv?' es-mk-card-deaktiv':''}}" id="es-mk-card-${{safe}}">
             ${{isDeaktiv?'<div class="es-mk-deaktiv-banner">&#x23F8; Deaktiviert &mdash; kein Abruf/Senden &bull; <span style="color:var(--success,#2e9e5b)">&#x2713; Archiv-Zugang aktiv</span></div>':''}}
@@ -3234,23 +3326,24 @@ function esShowProtoTab(id) {{
               <div class="es-mk-ico" style="${{isDeaktiv?'opacity:.4':''}}">&#x2709;</div>
               <div class="es-mk-body">
                 <div class="es-mk-email">${{k.email}} ${{k.email===std&&!isDeaktiv?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
-                <div class="es-mk-desc">${{k.beschreibung||''}}</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                  <input type="text" id="es-mk-dname-${{safe}}" value="${{k.display_name||''}}" placeholder="Anzeigename (z.B. INFO rauMKult)" style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;background:var(--bg-input,var(--bg-raised));color:var(--text);width:180px" title="Anzeigename im Postfach">
+                  <button style="font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:5px;background:var(--bg-raised);color:var(--text);cursor:pointer" onclick="esMkSaveName('${{k.email}}','${{safe}}')">&#x2713;</button>
+                </div>
               </div>
               ${{!isDeaktiv?`<span class="es-mk-ampel ${{ampelClass}}" id="es-ampel-${{safe}}" title="${{ampelTip}}">${{ampel}}</span>`:''}}
             </div>
             <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
               <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
               <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-arc-${{safe}}">–</div><div class="es-mk-stat-lbl">Archiviert</div></div>
+              <div class="es-mk-stat" id="es-mk-live-wrap-${{safe}}" style="display:none"><div class="es-mk-stat-val" id="es-mk-live-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Postfach</div></div>
             </div>
             <div class="es-mk-actions">
               ${{isDeaktiv
                 ? `<button class="es-mk-btn sec" onclick="esMkToggleAktiv('${{k.email}}',true,this)">&#x25B6; Aktivieren</button>`
                 : `<button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
                    <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
-                   ${{needsReconnect
-                     ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
-                     : ''
-                   }}
+                   <span id="es-mk-recon-${{safe}}" style="${{needsReconnect?'':'display:none'}}"><button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button></span>
                    <button class="es-mk-btn warn" onclick="esMkToggleAktiv('${{k.email}}',false,this)" title="Konto deaktivieren — Archiv bleibt erhalten">&#x23F8; Deaktivieren</button>`
               }}
               <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">&#x1F5D1; L&ouml;schen</button>
@@ -3309,6 +3402,16 @@ function esShowProtoTab(id) {{
       if(arc) arc.textContent=d.archiv?.archiviert!=null?d.archiv.archiviert.toLocaleString():'–';
     }}).catch(()=>{{}});
   }}
+  window.esMkSaveName = function(email, safe) {{
+    const inp = document.getElementById('es-mk-dname-'+safe);
+    if(!inp) return;
+    const name = inp.value.trim();
+    fetch('/api/mail/konto/display-name',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email,name}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok) showToast('Anzeigename gespeichert','ok');
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }}).catch(()=>{{}});
+  }};
   window.esMkSetStandard = function(email) {{
     fetch('/api/mail/konto/standard',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
     .then(r=>r.json()).then(d=>{{ if(d.ok) {{ showToast(email+' als Standardkonto gesetzt','ok'); esLoadMailKonten(); }} }}).catch(()=>{{}});
@@ -3374,7 +3477,7 @@ function esShowProtoTab(id) {{
         const poll=setInterval(()=>{{
           polls++;
           fetch('/api/mail/oauth/status?email='+encodeURIComponent(email)).then(r=>r.json()).then(s=>{{
-            if(s.status==='ok') {{clearInterval(poll);showToast(email+' erfolgreich verbunden','ok');esLoadMailKonten();}}
+            if(s.status==='ok') {{clearInterval(poll);showToast(email+' erfolgreich verbunden \u2014 Verbindung wird gepr\u00fcft\u2026','ok');fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}}).catch(()=>{{}});setTimeout(()=>esLoadMailKonten(),5000);}}
             else if(s.status==='error') {{clearInterval(poll);showToast('Fehler: '+(s.message||'?'),'fehler');esLoadMailKonten();}}
             else if(polls>60) {{clearInterval(poll);showToast('Timeout','warnung');esLoadMailKonten();}}
           }});
@@ -3659,7 +3762,7 @@ function esShowProtoTab(id) {{
     const timer=setInterval(()=>{{
       polls++;
       fetch('/api/mail/konto/oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
-        if(s.status==='done'){{clearInterval(timer);_wiz.step=6;_wizRender();}}
+        if(s.status==='done'){{clearInterval(timer);fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}}).catch(()=>{{}});_wiz.step=6;_wizRender();}}
         else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error;_wizRender();}}
         else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
       }}).catch(()=>{{}});
@@ -3716,6 +3819,17 @@ function esShowProtoTab(id) {{
   }};
   // Sync-Ordner laden (bestehende Funktion)
   function esLoadMailArchiv() {{
+    // Mail-Klassifizierung laden
+    fetch('/api/einstellungen').then(r=>r.json()).then(d=>{{
+      const mk=d.mail_klassifizierung||{{}};
+      const c1=document.getElementById('cfg-mail-classify');
+      const c2=document.getElementById('cfg-mail-tasks');
+      const c3=document.getElementById('cfg-mail-ignore-newsletter');
+      if(c1) c1.checked=!!mk.classify;
+      if(c2) c2.checked=!!mk.auto_tasks;
+      if(c3) c3.checked=!!mk.ignore_newsletter;
+    }}).catch(()=>{{}});
+    // Archiv laden
     fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
       const pfad=document.getElementById('cfg-archiv-pfad');
       const aktiv=document.getElementById('cfg-archiv-aktiv');
@@ -6029,9 +6143,14 @@ function saveSettings() {{
       aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
       intervall_sekunden: parseInt(document.getElementById('cfg-mail-intervall')?.value)||300
     }},
+    mail_klassifizierung: {{
+      classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
+      auto_tasks:         document.getElementById('cfg-mail-tasks')?.checked ?? false,
+      ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false
+    }},
     mail_archiv: {{
-      pfad:                  document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
-      neue_mails_archivieren: document.getElementById('cfg-archiv-neue-mails')?.checked ?? true
+      pfad:                    document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
+      neue_mails_archivieren:  document.getElementById('cfg-archiv-aktiv')?.checked ?? true
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -9103,6 +9222,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 cfg = json.loads(archiver_cfg.read_text('utf-8'))
                 konten_raw = cfg.get('konten', [])
 
+            # Custom-Labels aus config.json laden
+            konto_display_names = {}
+            try:
+                _lcfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                konto_display_names = _lcfg.get('mail_konto_labels', {})
+            except Exception:
+                pass
+
             konten = []
             for k in konten_raw:
                 email = k.get('email', '')
@@ -9126,6 +9253,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'aktiv':       k.get('aktiv', True),
                     'auth_methode': k.get('auth_methode', ''),
                     'token_status': status,
+                    'display_name': konto_display_names.get(email, ''),
                 })
 
             # Mail-Monitor-Status
@@ -9255,6 +9383,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 'archiv': 'Archiv', 'archive': 'Archiv',
             }
 
+            # Custom-Labels aus config.json laden
+            konto_labels = {}
+            try:
+                from pathlib import Path as _P
+                _cfg_path = _P(__file__).parent / 'config.json'
+                if _cfg_path.exists():
+                    import json as _json
+                    _cfg = _json.loads(_cfg_path.read_text('utf-8'))
+                    konto_labels = _cfg.get('mail_konto_labels', {})
+            except Exception:
+                pass
+
             result = {"konten": []}
             for k in konten_raw:
                 email = k['email']
@@ -9275,7 +9415,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     ).fetchone()[0]
                     ordner.append({'name': fn, 'label': lbl, 'icon': icon, 'count': r['cnt'], 'unread': unread_cnt})
                 if ordner:
-                    result['konten'].append({'email': email, 'label': label, 'ordner': ordner})
+                    display_name = konto_labels.get(email, '')
+                    result['konten'].append({'email': email, 'label': label, 'display_name': display_name, 'ordner': ordner})
             conn.close()
             self._json(result)
         except Exception as e:
@@ -9453,11 +9594,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     conn2.close()
                 except Exception:
                     pass
+            sync_ordner = ma.get('sync_ordner', cfg.get('mail_archiv', {}).get('sync_ordner', {}))
             self._json({
                 'pfad': pfad,
+                'pfad_ok': pfad_ok,
                 'pfad_vorhanden': pfad_ok,
+                'mails_index': mails_total,
                 'mails_total': mails_total,
+                'aktiv': ma.get('neue_mails_archivieren', True),
                 'neue_mails_archivieren': ma.get('neue_mails_archivieren', True),
+                'sync_ordner': sync_ordner,
             })
         except Exception as e:
             self._json({'pfad': '', 'pfad_vorhanden': False, 'mails_total': 0, 'error': str(e)})
@@ -9734,16 +9880,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({'ok': False, 'error': str(e)})
 
     def _api_einstellungen_get(self):
-        """GET /api/einstellungen — Lädt aktuelle Einstellungen (WhatsApp-Tokens aus secrets.json)."""
+        """GET /api/einstellungen — Lädt aktuelle Einstellungen inkl. mail_klassifizierung."""
         try:
             secrets_path = SCRIPTS_DIR / 'secrets.json'
             secrets = json.loads(secrets_path.read_text('utf-8')) if secrets_path.exists() else {}
+            config_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(config_path.read_text('utf-8')) if config_path.exists() else {}
             self._json({
                 'ok': True,
                 'whatsapp': {
                     'verify_token': secrets.get('whatsapp_verify_token', ''),
                     'phone_number_id': secrets.get('whatsapp_phone_number_id', ''),
-                }
+                },
+                'mail_klassifizierung': cfg.get('mail_klassifizierung', {}),
             })
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
@@ -9840,6 +9989,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _mm.check_account_health(email)
         _t.Thread(target=_do, daemon=True).start()
         self._json({'ok': True, 'status': 'gestartet', 'email': email})
+
+    def _api_mail_konto_display_name(self, body):
+        """POST /api/mail/konto/display-name — Setzt benutzerdefinierten Anzeigenamen für ein Konto."""
+        email = body.get('email', '').strip()
+        name  = body.get('name', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        try:
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8')) if cfg_path.exists() else {}
+            if 'mail_konto_labels' not in cfg:
+                cfg['mail_konto_labels'] = {}
+            if name:
+                cfg['mail_konto_labels'][email] = name
+            else:
+                cfg['mail_konto_labels'].pop(email, None)
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._json({'ok': True, 'email': email, 'name': name})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
 
     def _api_mail_konto_volltest_start(self, body):
         """POST /api/mail/konto/volltest — Volltest starten (IMAP + SMTP + Roundtrip)."""
@@ -9985,6 +10155,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/health-check':
             self._api_mail_konto_health_check(body)
+            return
+
+        if self.path == '/api/mail/konto/display-name':
+            self._api_mail_konto_display_name(body)
             return
 
         if self.path == '/api/mail/konto/volltest':
