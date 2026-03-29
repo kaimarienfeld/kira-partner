@@ -63,11 +63,26 @@
     "neue_mails_archivieren": true,
     "_neue_mails_erklaerung": "Neue Mails die per IMAP empfangen werden, werden automatisch als JSON+EML im Archiv gespeichert",
     "sync_ordner": {
-      "kaimrf@rauMKultSichtbeton.onmicrosoft.com": ["INBOX", "Gesendete Elemente"],
-      "info@raumkult.eu": ["INBOX", "Gesendete Elemente"],
-      "anfrage@raumkult.eu": ["INBOX", "Gesendete Elemente"],
-      "shop@sichtbeton-cire.de": ["INBOX", "Gesendete Elemente"],
-      "invoice@sichtbeton-cire.de": ["INBOX", "Gesendete Elemente"]
+      "kaimrf@rauMKultSichtbeton.onmicrosoft.com": [
+        "INBOX",
+        "Gesendete Elemente"
+      ],
+      "info@raumkult.eu": [
+        "INBOX",
+        "Gesendete Elemente"
+      ],
+      "anfrage@raumkult.eu": [
+        "INBOX",
+        "Gesendete Elemente"
+      ],
+      "shop@sichtbeton-cire.de": [
+        "INBOX",
+        "Gesendete Elemente"
+      ],
+      "invoice@sichtbeton-cire.de": [
+        "INBOX",
+        "Gesendete Elemente"
+      ]
     }
   },
   "llm": {
@@ -117,7 +132,7 @@
   },
   "partner_view": {
     "_kommentar": "GitHub Pages Konfiguration für Leni-Partner-View. Wird von generate_partner_view.py gelesen.",
-    "partner_github_repo_dir": "",
+    "partner_github_repo_dir": "C:/Users/kaimr/kira-partner",
     "_repo_dir_anleitung": "Lokaler Pfad zum geclonten GitHub-Pages-Repo (optional, nur fuer Python-Push). Token liegt in secrets.json.",
     "partner_github_branch": "main",
     "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner",
@@ -127,5 +142,8 @@
     "_pw_anleitung": "Passwörter VOR dem ersten Leni-Link ändern! generate_partner_view.py injiziert sie ins HTML.",
     "leni_mail_bcc": "info@raumkult.eu",
     "_bcc_anleitung": "BCC-Adresse fuer alle Mails an Leni (Kai bekommt immer eine Kopie)"
-  }
+  },
+  "partner_github_repo_dir": "C:/Users/kaimr/kira-partner",
+  "partner_github_branch": "main",
+  "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner"
 }
