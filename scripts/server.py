@@ -778,9 +778,9 @@ def build_postfach():
 <!-- RIGHT: Preview / Compose -->
 <div class="pf-right" id="pf-right">
   <div id="pf-preview-empty" class="pf-preview-empty">
-    <div style="font-size:40px;margin-bottom:12px">&#x2709;</div>
-    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Mail auswählen</div>
-    <div style="font-size:13px;color:var(--text-muted)">Klicke auf eine Mail um sie hier zu lesen</div>
+    <div style="font-size:64px;margin-bottom:16px;opacity:.35">&#x1F4E8;</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">Zu lesendes Element auswählen</div>
+    <div style="font-size:13px;color:var(--text-muted)">Es wurde keine Auswahl vorgenommen.</div>
   </div>
   <div id="pf-preview" style="display:none">
     <div class="pf-prev-hdr">
@@ -842,44 +842,65 @@ def build_postfach():
 </div>
 
 <style>
+/* ── Postfach Shell ─────────────────────────────────────── */
 .pf-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;gap:0}
-.pf-left{width:220px;min-width:160px;max-width:280px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
-.pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;border-bottom:1px solid var(--border)}
+/* LEFT SIDEBAR */
+.pf-left{width:245px;min-width:160px;max-width:300px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
+.pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-left-title{font-weight:700;font-size:14px;color:var(--text)}
-.pf-compose-btn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600}
-.pf-compose-btn:hover{opacity:.88}
-.pf-folder-konto{padding:10px 14px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
+.pf-compose-btn{background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-weight:600}
+.pf-compose-btn:hover{background:#2563eb}
+/* Favoriten */
+.pf-fav-section{padding:10px 14px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
+.pf-fav-item{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;cursor:pointer;font-size:12px;color:var(--text);transition:background .12s;border-left:3px solid transparent}
+.pf-fav-item:hover{background:var(--bg-hover)}
+.pf-fav-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
+.pf-fav-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700}
+.pf-fav-sep{height:1px;background:var(--border);margin:6px 0}
+/* Account headers */
+.pf-folder-konto{padding:8px 14px 3px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:5px;user-select:none;margin-top:4px}
 .pf-folder-konto:hover{color:var(--text)}
 .pf-folder-konto .pf-konto-arrow{font-size:9px;transition:transform .15s;display:inline-block}
 .pf-folder-konto.collapsed .pf-konto-arrow{transform:rotate(-90deg)}
-.pf-konto-folders{overflow:hidden;transition:max-height .2s}
+.pf-konto-folders{overflow:hidden;transition:max-height .25s}
 .pf-konto-folders.collapsed{max-height:0!important}
-.pf-folder-item{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
+/* Folder items */
+.pf-folder-item{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
 .pf-folder-item:hover{background:var(--bg-hover)}
-.pf-folder-item.active{background:rgba(124,77,255,.1);border-left-color:var(--accent);color:var(--accent);font-weight:600}
+.pf-folder-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
 .pf-folder-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700;min-width:16px;text-align:right}
-.pf-mail-item{padding:10px 14px 10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:3px solid transparent}
+/* MIDDLE LIST */
+.pf-mid{width:350px;min-width:260px;max-width:440px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.pf-mid-hdr{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.pf-mid-title{font-weight:700;font-size:15px;color:var(--text)}
+.pf-search{border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;background:var(--bg);color:var(--text);width:100%;outline:none}
+.pf-search:focus{border-color:#3b82f6}
+.pf-mid-meta{font-size:11px;color:var(--text-muted)}
+#pf-list-wrap{overflow-y:auto;flex:1}
+/* DATE GROUP HEADERS */
+.pf-date-group{padding:8px 14px 3px;font-size:11px;font-weight:600;color:var(--text-muted);display:flex;align-items:center;gap:8px;user-select:none}
+.pf-date-group::after{content:'';flex:1;height:1px;background:var(--border)}
+/* MAIL ITEMS — Outlook-Style */
+.pf-mail-item{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:3px solid transparent;display:flex;align-items:flex-start;gap:10px}
 .pf-mail-item:hover{background:var(--bg-hover)}
 .pf-mail-item.unread{border-left-color:#0ea5e9;background:rgba(14,165,233,.04)}
 .pf-mail-item.unread .pf-item-absender{color:var(--text);font-weight:700}
-.pf-mail-item.unread .pf-item-betreff{font-weight:700;color:var(--text)}
-.pf-mid{width:320px;min-width:240px;max-width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
-.pf-mid-hdr{padding:12px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
-.pf-mid-title{font-weight:700;font-size:14px;color:var(--text)}
-.pf-search{border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;background:var(--bg);color:var(--text);width:100%;outline:none}
-.pf-search:focus{border-color:var(--accent)}
-.pf-mid-meta{font-size:11px;color:var(--text-muted)}
-#pf-list-wrap{overflow-y:auto;flex:1}
-.pf-mail-item.active{background:rgba(124,77,255,.08);border-left-color:var(--accent)!important}
-.pf-item-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px}
-.pf-item-absender{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
-.pf-item-datum{font-size:11px;color:var(--text-muted);flex-shrink:0}
-.pf-item-betreff{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px}
-.pf-item-preview{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf-item-badges{display:flex;gap:4px;margin-top:3px}
-.pf-item-badge{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--bg-raised);color:var(--text-muted)}
-.pf-item-badge.att{background:rgba(100,116,139,.12);color:#64748b}
+.pf-mail-item.unread .pf-item-betreff{font-weight:600;color:#0ea5e9}
+.pf-mail-item.active{background:rgba(59,130,246,.07);border-left-color:#3b82f6!important}
+/* Avatar */
+.pf-item-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.3px;margin-top:1px}
+/* Body */
+.pf-item-body{flex:1;min-width:0}
+.pf-item-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:2px}
+.pf-item-absender{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.pf-item-datum{font-size:11px;color:var(--text-muted);flex-shrink:0;white-space:nowrap}
+.pf-item-betreff{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px}
+.pf-item-row3{display:flex;align-items:center;gap:5px;min-width:0}
+.pf-item-preview{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.pf-item-folder-badge{font-size:10px;color:var(--text-muted);background:var(--bg-raised);padding:1px 5px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0}
+.pf-item-att{font-size:12px;color:var(--text-muted);flex-shrink:0;line-height:1}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
+/* RIGHT PREVIEW */
 .pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
 .pf-prev-hdr{padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -889,10 +910,10 @@ def build_postfach():
 .pf-prev-datum{font-size:12px;color:var(--text-muted)}
 .pf-prev-acts{display:flex;gap:6px;flex-wrap:wrap}
 .pf-act-btn{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text);transition:.1s}
-.pf-act-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
-.pf-prev-anhaenge{padding:8px 20px;background:rgba(124,77,255,.05);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-.pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
-.pf-att-chip:hover{border-color:var(--accent);color:var(--accent)}
+.pf-act-btn:hover{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.pf-prev-anhaenge{padding:8px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+.pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
+.pf-att-chip:hover{border-color:#3b82f6;color:#3b82f6}
 .pf-prev-body{flex:1;overflow-y:auto;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
 .pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
 .pf-thread-cnt{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px}
@@ -901,6 +922,7 @@ def build_postfach():
 .pf-thread-msg-sender{font-weight:600;color:var(--text)}
 .pf-thread-msg-date{color:var(--text-muted)}
 .pf-thread-msg-body{color:var(--text-muted);white-space:pre-wrap;max-height:120px;overflow:hidden}
+/* COMPOSE */
 .pf-comp-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px;border-bottom:1px solid var(--border)}
 .pf-comp-hdr span{font-weight:700;font-size:15px}
 .pf-comp-fields{padding:12px 20px 0;border-bottom:1px solid var(--border)}
@@ -910,7 +932,7 @@ def build_postfach():
 .pf-comp-sel{flex:1;border:none;background:transparent;color:var(--text);font-size:13px;outline:none}
 .pf-comp-body{flex:1;border:none;resize:none;background:transparent;color:var(--text);font-size:13px;padding:14px 20px;outline:none;min-height:200px;font-family:inherit;line-height:1.6}
 .pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-@media(max-width:900px){.pf-left{width:52px}.pf-left-title,.pf-folder-konto,.pf-folder-item span:not(.pf-folder-badge){display:none}.pf-mid{width:240px}}
+@media(max-width:900px){.pf-left{width:52px}.pf-left-title,.pf-folder-konto,.pf-fav-section,.pf-fav-item span:not(.pf-fav-badge),.pf-folder-item span:not(.pf-folder-badge){display:none}.pf-mid{width:260px}}
 </style>
 
 <script>
@@ -972,11 +994,12 @@ function pfInit() {
     pfRenderFolders(data);
     document.getElementById('pf-folders-loading').style.display='none';
     pfLoadHealth(); // Ampeln laden
-    // Auto-select first INBOX
-    const first = data.konten?.[0];
-    if(first) {
-      const ib = first.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || first.ordner?.[0];
-      if(ib) pfSelectFolder(first.email, ib.name, ib.label||ib.name);
+    // Auto-select: Standardkonto bevorzugen, sonst erstes Konto
+    const stdEmail = data.standard_konto || '';
+    const autoKonto = (stdEmail && data.konten?.find(k=>k.email===stdEmail)) || data.konten?.[0];
+    if(autoKonto) {
+      const ib = autoKonto.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || autoKonto.ordner?.[0];
+      if(ib) pfSelectFolder(autoKonto.email, ib.name, ib.label||ib.name);
     }
     // Periodisches Refresh: Unread-Badge + Ampeln (Intervall aus Einstellungen)
     if(_pfRefreshTimer) clearInterval(_pfRefreshTimer);
@@ -1018,51 +1041,79 @@ function pfRefreshBadge() {
 // ── Folder Tree ──────────────────────────────────────────
 let _pfCollapsed = {};
 try { _pfCollapsed = JSON.parse(localStorage.getItem('pf_collapsed')||'{}'); } catch(e){}
+let _pfLastGroup = null;
+let _pfCurrentFolderLabel = '';
 
 function pfRenderFolders(data) {
   const tree = document.getElementById('pf-folder-tree');
-  // Fill from-select in compose
   const fromSel = document.getElementById('pf-comp-from');
   if(fromSel) fromSel.innerHTML='';
   tree.innerHTML = '';
   _pfTotalUnread = 0;
+
+  // ── Favoriten: Ungelesen-Shortcuts für Konten mit ungelesenen Inbox-Mails ──
+  const favItems = [];
   (data.konten||[]).forEach(konto=>{
-    const safe=konto.email.replace(/[@.]/g,'_');
-    const displayName = konto.display_name || (konto.label||konto.email).toUpperCase();
+    const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
+    (konto.ordner||[]).forEach(ord=>{
+      const isInbox = ord.name.toLowerCase().includes('inbox')||ord.name.toLowerCase().includes('posteingang');
+      if(isInbox) {
+        _pfTotalUnread += (ord.unread||0);
+        if(ord.unread > 0) favItems.push({konto, displayName, inbox: ord});
+      }
+    });
+  });
+  if(favItems.length > 0) {
+    const favHdr = document.createElement('div');
+    favHdr.className='pf-fav-section'; favHdr.textContent='Favoriten';
+    tree.appendChild(favHdr);
+    favItems.forEach(({konto, displayName, inbox})=>{
+      const fi = document.createElement('div');
+      fi.className = 'pf-fav-item';
+      fi.innerHTML = '<span style="font-size:14px;flex-shrink:0">&#x1F4E5;</span>'
+        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
+        +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
+      fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName);
+      tree.appendChild(fi);
+    });
+    const sep = document.createElement('div'); sep.className='pf-fav-sep'; tree.appendChild(sep);
+  }
+
+  // ── Konten mit Ordner-Baum ────────────────────────────────────────────────
+  (data.konten||[]).forEach(konto=>{
+    const safe = konto.email.replace(/[@.]/g,'_');
+    const displayName = konto.display_name || konto.label || konto.email.split('@')[0].toUpperCase();
     const isCollapsed = !!_pfCollapsed[konto.email];
 
     const lbl = document.createElement('div');
-    lbl.className='pf-folder-konto'+(isCollapsed?' collapsed':'');
-    lbl.id='pf-konto-hdr-'+safe;
-    lbl.innerHTML='<span class="pf-konto-arrow">&#x25BC;</span>'
-      +'<span>'+displayName+'</span>'
-      +`<span id="pf-ampel-${safe}" style="margin-left:6px;font-size:10px;color:#f0a000" title="Prüfe Verbindung…">&#x25CF;</span>`;
-    lbl.onclick=()=>pfToggleKonto(konto.email, safe);
+    lbl.className = 'pf-folder-konto'+(isCollapsed?' collapsed':'');
+    lbl.id = 'pf-konto-hdr-'+safe;
+    lbl.innerHTML = '<span class="pf-konto-arrow">&#x25BC;</span>'
+      +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+displayName+'</span>'
+      +'<span id="pf-ampel-'+safe+'" style="margin-left:6px;font-size:10px;color:#f0a000;flex-shrink:0" title="Prüfe Verbindung…">&#x25CF;</span>';
+    lbl.onclick = ()=>pfToggleKonto(konto.email, safe);
     tree.appendChild(lbl);
 
     if(fromSel) {
-      const opt=document.createElement('option');
-      opt.value=konto.email; opt.textContent=konto.email;
+      const opt = document.createElement('option');
+      opt.value = konto.email; opt.textContent = konto.email;
       fromSel.appendChild(opt);
     }
 
     const folderWrap = document.createElement('div');
-    folderWrap.className='pf-konto-folders'+(isCollapsed?' collapsed':'');
-    folderWrap.id='pf-konto-folders-'+safe;
+    folderWrap.className = 'pf-konto-folders'+(isCollapsed?' collapsed':'');
+    folderWrap.id = 'pf-konto-folders-'+safe;
     tree.appendChild(folderWrap);
 
     (konto.ordner||[]).forEach(ord=>{
-      const item=document.createElement('div');
-      item.className='pf-folder-item';
-      item.id='pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
-      item.innerHTML='<span>'+(ord.icon||'&#x1F4C2;')+'</span><span>'+(ord.label||ord.name)+'</span>'
-        + (ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
-      item.onclick=()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
+      const item = document.createElement('div');
+      item.className = 'pf-folder-item';
+      item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+      item.innerHTML = '<span style="font-size:14px;flex-shrink:0">'+(ord.icon||'&#x1F4C2;')+'</span>'
+        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
+        +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
+      item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
       folderWrap.appendChild(item);
-      // Unread-Summe für Sidebar-Badge (nur INBOX)
-      if(ord.name.toLowerCase().includes('inbox') || ord.name.toLowerCase().includes('posteingang')) {
-        _pfTotalUnread += (ord.unread||0);
-      }
     });
   });
   _pfUpdateSidebarBadge();
@@ -1080,6 +1131,7 @@ function pfToggleKonto(email, safe) {
 // ── Select Folder ────────────────────────────────────────
 window.pfSelectFolder = function(email, folder, label) {
   _pfCurrentKonto=email; _pfCurrentFolder=folder; _pfOffset=0; _pfSearch='';
+  _pfCurrentFolderLabel = label;
   document.getElementById('pf-mid-title').textContent=label;
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item').forEach(el=>el.classList.remove('active'));
@@ -1091,7 +1143,7 @@ window.pfSelectFolder = function(email, folder, label) {
 
 // ── Load Mail List ───────────────────────────────────────
 function pfLoadList(reset) {
-  if(reset) { _pfOffset=0; document.getElementById('pf-list').innerHTML=''; }
+  if(reset) { _pfOffset=0; document.getElementById('pf-list').innerHTML=''; _pfLastGroup=null; }
   if(!_pfCurrentKonto) return;
   let url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset='+_pfOffset+'&limit=50';
   if(_pfSearch) url+='&q='+encodeURIComponent(_pfSearch);
@@ -1111,26 +1163,82 @@ function pfLoadList(reset) {
   });
 }
 
+// ── Avatar / Datum Hilfsfunktionen ────────────────────────
+const _AVATAR_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#14b8a6','#f97316','#0ea5e9','#84cc16'];
+function pfGetInitials(name) {
+  const s=(name||'').trim();
+  if(!s) return '?';
+  if(s.includes('@')) return s[0].toUpperCase();
+  const parts=s.split(/\s+/);
+  if(parts.length>=2) return (parts[0][0]+(parts[1][0]||'')).toUpperCase();
+  return s.slice(0,2).toUpperCase();
+}
+function pfAvatarColor(name) {
+  let h=0; for(let i=0;i<name.length;i++) h=((h*31+name.charCodeAt(i))>>>0);
+  return _AVATAR_COLORS[h%_AVATAR_COLORS.length];
+}
+function pfDateGroup(datum) {
+  if(!datum) return 'Älter';
+  const d=new Date(datum.replace(' ','T'));
+  if(isNaN(d.getTime())) return 'Älter';
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const mdate=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const diff=Math.floor((today-mdate)/86400000);
+  if(diff<=0) return 'Heute';
+  if(diff===1) return 'Gestern';
+  if(diff<=7) return 'Diese Woche';
+  return 'Älter';
+}
+function pfFormatDatum(datum) {
+  if(!datum) return '';
+  const d=new Date(datum.replace(' ','T'));
+  if(isNaN(d.getTime())) return datum.slice(0,10);
+  const now=new Date();
+  const diffDays=Math.floor((now-d)/86400000);
+  if(diffDays<1) return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const days=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  if(diffDays<7) return days[d.getDay()]+', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+}
+
 function pfRenderMailItem(m, container) {
-  const el=document.createElement('div');
-  el.className='pf-mail-item'+(m.unread?' unread':'');
-  el.dataset.msgid=m.message_id;
-  el.dataset.threadid=m.thread_id||'';
-  const d=m.datum?m.datum.slice(0,10):'';
-  const absender=m.absender_short||m.absender||'';
-  const preview=(m.text_plain||'').replace(/\\s+/g,' ').slice(0,80);
-  let badges='';
-  if(m.hat_anhaenge) badges+='<span class="pf-item-badge att">&#x1F4CE;</span>';
-  if(m.hat_thread) badges+='<span class="pf-item-badge">&#x1F4AC; '+m.thread_count+'</span>';
-  el.innerHTML=
-    '<div class="pf-item-row1">'
-    +'<span class="pf-item-absender">'+esc(absender)+'</span>'
-    +'<span class="pf-item-datum">'+d+'</span>'
-    +'</div>'
-    +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
-    +'<div class="pf-item-preview">'+esc(preview)+'</div>'
-    +(badges?'<div class="pf-item-badges">'+badges+'</div>':'');
-  el.onclick=()=>pfOpenMail(m, el);
+  // Datums-Gruppe Header einfügen wenn nötig
+  const group = pfDateGroup(m.datum||'');
+  if(group !== _pfLastGroup) {
+    _pfLastGroup = group;
+    const gh = document.createElement('div');
+    gh.className = 'pf-date-group';
+    gh.textContent = group;
+    container.appendChild(gh);
+  }
+
+  const el = document.createElement('div');
+  el.className = 'pf-mail-item'+(m.unread?' unread':'');
+  el.dataset.msgid = m.message_id;
+  el.dataset.threadid = m.thread_id||'';
+
+  const absender = m.absender_short||m.absender||'?';
+  const initials = pfGetInitials(absender);
+  const color = pfAvatarColor(absender);
+  const datum = pfFormatDatum(m.datum||'');
+  const preview = (m.text_plain||'').replace(/\s+/g,' ').slice(0,60);
+
+  el.innerHTML =
+    '<div class="pf-item-avatar" style="background:'+color+'">'+esc(initials)+'</div>'
+    +'<div class="pf-item-body">'
+      +'<div class="pf-item-row1">'
+        +'<span class="pf-item-absender">'+esc(absender)+'</span>'
+        +'<span class="pf-item-datum">'+esc(datum)+'</span>'
+      +'</div>'
+      +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
+      +'<div class="pf-item-row3">'
+        +'<span class="pf-item-preview">'+esc(preview)+'</span>'
+        +(_pfCurrentFolderLabel?'<span class="pf-item-folder-badge">'+esc(_pfCurrentFolderLabel)+'</span>':'')
+        +(m.hat_anhaenge?'<span class="pf-item-att" title="Anhang">&#x1F4CE;</span>':'')
+      +'</div>'
+    +'</div>';
+  el.onclick = ()=>pfOpenMail(m, el);
   container.appendChild(el);
 }
 
@@ -3376,7 +3484,7 @@ function esShowProtoTab(id) {{
               ${{!isDeaktiv?`<input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">`:''}}
               <div class="es-mk-ico" style="${{isDeaktiv?'opacity:.4':''}}">&#x2709;</div>
               <div class="es-mk-body">
-                <div class="es-mk-email">${{k.email}} ${{k.email===std&&!isDeaktiv?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
+                <div class="es-mk-email">${{k.email}} ${{k.email===std&&!isDeaktiv?'<span style="font-size:10px;color:#3b82f6;margin-left:6px;font-weight:600">&#x2605; Standard</span>':''}}</div>
                 <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                   <input type="text" id="es-mk-dname-${{safe}}" value="${{k.display_name||''}}" placeholder="Anzeigename (z.B. INFO rauMKult)" style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;background:var(--bg-input,var(--bg-raised));color:var(--text);width:180px" title="Anzeigename im Postfach">
                   <button style="font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:5px;background:var(--bg-raised);color:var(--text);cursor:pointer" onclick="esMkSaveName('${{k.email}}','${{safe}}')">&#x2713;</button>
@@ -9377,9 +9485,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-            self._json({'konten': konten, 'monitor': {'aktiv': mon_aktiv, 'last_sync': mon_last, 'intervall': mon_intv}})
+            std_konto = ''
+            try:
+                _cfg2 = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                std_konto = _cfg2.get('mail_konten', {}).get('standard_konto', '')
+            except Exception:
+                pass
+            self._json({'konten': konten, 'standard_konto': std_konto, 'monitor': {'aktiv': mon_aktiv, 'last_sync': mon_last, 'intervall': mon_intv}})
         except Exception as e:
-            self._json({'konten': [], 'monitor': {}, 'error': str(e)})
+            self._json({'konten': [], 'standard_konto': '', 'monitor': {}, 'error': str(e)})
 
     def _api_mail_oauth_connect(self, body):
         """POST /api/mail/oauth/connect — Startet interaktive OAuth2-Anmeldung im Browser."""
@@ -9494,7 +9608,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-            result = {"konten": []}
+            std_konto = ''
+            try:
+                _cfg_k = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                std_konto = _cfg_k.get('mail_konten', {}).get('standard_konto', '')
+            except Exception:
+                pass
+
+            result = {"konten": [], "standard_konto": std_konto}
             for k in konten_raw:
                 email = k['email']
                 label = email.split('@')[0]
