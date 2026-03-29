@@ -917,10 +917,35 @@ let _pfActiveItem = null;
 let _pfThreadOpen = false;
 
 // ── Init ─────────────────────────────────────────────────
+// ── Konto-Ampel für Postfach ─────────────────────────────
+let _pfHealthCache = {};
+function pfLoadHealth() {
+  fetch('/api/mail/konto/health').then(r=>r.json()).then(d=>{
+    _pfHealthCache = d.health || {};
+    // Ampeln in Folder-Tree aktualisieren
+    Object.entries(_pfHealthCache).forEach(([email, h])=>{
+      const safe=email.replace(/[@.]/g,'_');
+      const dot=document.getElementById('pf-ampel-'+safe);
+      if(!dot) return;
+      if(h.status==='ok') { dot.style.color='#28c850'; dot.title='Verbunden'; }
+      else if(h.status==='auth_fehler') { dot.style.color='#c83c3c'; dot.title='Anmeldung fehlgeschlagen'; }
+      else { dot.style.color='#f0a000'; dot.title='Verbindungsproblem: '+(h.error||''); }
+    });
+    // Sidebar-Badge aktualisieren
+    const anyError = Object.values(_pfHealthCache).some(h=>h.status!=='ok');
+    const navBadge = document.getElementById('nav-postfach-badge');
+    if(navBadge) {
+      navBadge.textContent = anyError ? '⚠' : '';
+      navBadge.style.display = anyError ? '' : 'none';
+    }
+  }).catch(()=>{});
+}
+
 function pfInit() {
   fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
     pfRenderFolders(data);
     document.getElementById('pf-folders-loading').style.display='none';
+    pfLoadHealth(); // Ampeln laden
     // Auto-select first INBOX
     const first = data.konten?.[0];
     if(first) {
@@ -939,9 +964,11 @@ function pfRenderFolders(data) {
   const fromSel = document.getElementById('pf-comp-from');
   tree.innerHTML = '';
   (data.konten||[]).forEach(konto=>{
+    const safe=konto.email.replace(/[@.]/g,'_');
     const lbl = document.createElement('div');
     lbl.className='pf-folder-konto';
-    lbl.textContent=konto.label||konto.email;
+    lbl.innerHTML=(konto.label||konto.email)
+      +`<span id="pf-ampel-${safe}" style="margin-left:6px;font-size:10px;color:#f0a000" title="Prüfe Verbindung…">&#x25CF;</span>`;
     tree.appendChild(lbl);
     if(fromSel) {
       const opt=document.createElement('option');
@@ -2935,28 +2962,40 @@ function esShowProtoTab(id) {{
   .es-mk-ampel-gelb{{color:#f0a000}}
   .es-mk-ampel-rot{{color:#c83c3c}}
   /* ── Konto-Wizard ── */
-  .kira-wiz-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center}}
-  .kira-wiz-box{{background:var(--bg-card);border-radius:16px;width:560px;max-width:96vw;box-shadow:0 8px 48px rgba(0,0,0,.35);padding:0;overflow:hidden}}
-  .kira-wiz-step{{padding:48px 52px;text-align:center}}
-  .kira-wiz-dots{{display:flex;justify-content:center;gap:8px;margin-bottom:32px}}
-  .kira-wiz-dot{{width:10px;height:10px;border-radius:50%;background:var(--border)}}
+  .kira-wiz-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}}
+  .kira-wiz-box{{background:var(--bg-card);border-radius:20px;width:600px;max-width:96vw;box-shadow:0 20px 80px rgba(0,0,0,.45);overflow:hidden;border:1px solid var(--border)}}
+  .kira-wiz-step{{padding:52px 60px;text-align:center}}
+  .kira-wiz-dots{{display:flex;justify-content:center;gap:10px;margin-bottom:40px}}
+  .kira-wiz-dot{{width:9px;height:9px;border-radius:50%;background:var(--border);transition:background .3s}}
   .kira-wiz-dot.active{{background:var(--accent)}}
-  .kira-wiz-title{{font-size:24px;font-weight:700;color:var(--text);margin:0 0 10px}}
-  .kira-wiz-sub{{font-size:14px;color:var(--text-muted);margin:0 0 28px;line-height:1.5}}
-  .kira-wiz-fields{{text-align:left;margin-bottom:28px}}
-  .kira-wiz-field{{margin-bottom:16px}}
-  .kira-wiz-field label{{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}}
-  .kira-wiz-field input,.kira-wiz-field select{{width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px}}
-  .kira-wiz-field input:focus,.kira-wiz-field select:focus{{outline:none;border-color:var(--accent)}}
-  .kira-wiz-btns{{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}}
-  .kira-wiz-link{{font-size:13px;color:var(--accent);text-decoration:none}}
+  .kira-wiz-title{{font-size:28px;font-weight:700;color:var(--text);margin:0 0 12px;letter-spacing:-.3px}}
+  .kira-wiz-sub{{font-size:15px;color:var(--text-muted);margin:0 0 36px;line-height:1.6;max-width:400px;margin-left:auto;margin-right:auto}}
+  .kira-wiz-fields{{text-align:left;margin-bottom:32px;max-width:360px;margin-left:auto;margin-right:auto}}
+  .kira-wiz-field{{margin-bottom:20px}}
+  .kira-wiz-field label{{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.08em}}
+  .kira-wiz-field input,.kira-wiz-field select{{width:100%;box-sizing:border-box;padding:13px 16px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px;transition:border-color .2s}}
+  .kira-wiz-field input[readonly]{{opacity:.65;cursor:default}}
+  .kira-wiz-field input:focus,.kira-wiz-field select:focus{{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}}
+  .kira-wiz-btns{{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:24px;border-top:1px solid var(--border)}}
+  .kira-wiz-btns-right{{display:flex;gap:10px}}
+  .kira-wiz-link{{font-size:13px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:10px}}
   .kira-wiz-link:hover{{text-decoration:underline}}
-  .kira-wiz-found-box{{display:flex;align-items:center;gap:16px;background:var(--bg-raised);border-radius:12px;padding:16px 20px;margin:0 auto 4px;max-width:340px;text-align:left}}
-  .kira-wiz-found-ico{{font-size:28px}}
-  .kira-wiz-found-name{{font-size:15px;font-weight:700;color:var(--text)}}
-  .kira-wiz-found-detail{{font-size:12px;color:var(--text-muted);margin-top:3px}}
-  .kira-wiz-spinner{{width:52px;height:52px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:kira-spin .8s linear infinite;margin:20px auto}}
+  .kira-wiz-import-link{{font-size:13px;color:var(--accent);cursor:pointer;border:none;background:none;padding:0;margin-top:6px;text-align:center;width:100%}}
+  .kira-wiz-found-box{{display:flex;align-items:center;gap:18px;background:var(--bg-raised);border-radius:14px;padding:20px 24px;margin:0 auto 8px;max-width:380px;text-align:left;border:1px solid var(--border)}}
+  .kira-wiz-found-ico{{font-size:32px;flex-shrink:0}}
+  .kira-wiz-found-name{{font-size:16px;font-weight:700;color:var(--text)}}
+  .kira-wiz-found-detail{{font-size:13px;color:var(--text-muted);margin-top:4px}}
+  .kira-wiz-loading-area{{padding:20px 0 8px}}
+  .kira-wiz-spinner{{width:56px;height:56px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:kira-spin .85s linear infinite;margin:0 auto 20px}}
+  .kira-wiz-success-icon{{font-size:56px;margin-bottom:16px}}
   @keyframes kira-spin{{to{{transform:rotate(360deg)}}}}
+  .kira-wiz-btn-primary{{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s}}
+  .kira-wiz-btn-primary:hover{{opacity:.88}}
+  .kira-wiz-btn-sec{{background:transparent;color:var(--text-muted);border:1.5px solid var(--border);border-radius:9px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}}
+  .kira-wiz-btn-sec:hover{{border-color:var(--accent);color:var(--text)}}
+  .kira-wiz-import-card{{display:flex;align-items:center;gap:14px;background:var(--bg-raised);border:1.5px dashed var(--border);border-radius:12px;padding:16px 20px;margin-top:12px;cursor:pointer;transition:border-color .2s;text-align:left}}
+  .kira-wiz-import-card:hover{{border-color:var(--accent)}}
+  .kira-wiz-step-label{{font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:32px}}
   /* ── Gesamt-Header ── */
   .es-mk-total{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-card);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;gap:8px}}
   .es-mk-total-info{{font-size:13px;color:var(--text-muted)}}
@@ -3115,21 +3154,26 @@ function esShowProtoTab(id) {{
             </div>
             <div class="es-mk-actions">
               <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
-              <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Testen</button>
+              <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
               ${{needsReconnect
                 ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
-                : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">Token erneuern</button>`
+                : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Erneut verbinden</button>`
               }}
-              <button class="es-mk-btn sec" onclick="esMkTokenDel('${{k.email}}')">Token l&ouml;schen</button>
               <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">L&ouml;schen</button>
             </div>
             <div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div>
             <div id="es-kira-ord-${{safe}}" style="display:none"></div>
           </div>`;
         }}).join('');
-        // Stats lazy laden
+        // Stats lazy laden + Health Check auto-starten
         konten.forEach(k=>esMkLoadStats(k.email));
         esLoadTotalCount();
+        // Health-Check für alle Konten starten (async, ampel aktualisiert sich nach ~8s)
+        konten.forEach(k=>{{
+          fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:k.email}})}}).catch(()=>{{}});
+        }});
+        // Nach 8s Ampel neu rendern mit echten Ergebnissen
+        setTimeout(()=>esLoadMailKonten(), 8000);
       }}).catch(()=>{{
         // Fallback ohne Health
         list.innerHTML = konten.map(k=>{{
@@ -3278,20 +3322,32 @@ function esShowProtoTab(id) {{
     else if(_wiz.step===6) box.innerHTML=_wizStep6();
   }}
 
+  function _wizDots(active, total=4) {{
+    return `<div class="kira-wiz-dots">${{Array.from({{length:total}},(_,i)=>`<span class="kira-wiz-dot${{i<active?' active':''}}"></span>`).join('')}}</div>`;
+  }}
+  function _wizBtns(leftHtml, rightHtml) {{
+    return `<div class="kira-wiz-btns"><div>${{leftHtml||''}}</div><div class="kira-wiz-btns-right">${{rightHtml||''}}</div></div>`;
+  }}
+
   function _wizStep1() {{
-    const title=_wiz.isReconnect?'Verbindung wiederherstellen':'Konto hinzuf\u00fcgen';
-    const sub=_wiz.isReconnect?`Neuen Login f\u00fcr <strong>${{_wiz.email}}</strong> einrichten`:'Bitte Name und E\u2011Mail\u2011Adresse eingeben';
+    const isRec=_wiz.isReconnect;
     return `<div class="kira-wiz-step">
-      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span></div>
-      <h2 class="kira-wiz-title">${{title}}</h2>
-      <p class="kira-wiz-sub">${{sub}}</p>
+      ${{_wizDots(1)}}
+      <div class="kira-wiz-step-label">Schritt 1 von 4</div>
+      <h2 class="kira-wiz-title">${{isRec?'Verbindung wiederherstellen':'Konto hinzuf\u00fcgen'}}</h2>
+      <p class="kira-wiz-sub">${{isRec?`Neuen Login f\u00fcr <strong style="color:var(--text)">${{_wiz.email}}</strong> einrichten.`:'Geben Sie Name und E\u2011Mail\u2011Adresse ein.'}}</p>
       <div class="kira-wiz-fields">
-        ${{!_wiz.isReconnect?`<div class="kira-wiz-field"><label>Ihr Name</label><input id="wiz-name" type="text" placeholder="Max Mustermann" value="${{_wiz.name}}"></div>`:''}}<div class="kira-wiz-field"><label>E\u2011Mail\u2011Adresse</label><input id="wiz-email" type="email" placeholder="name@firma.de" value="${{_wiz.email}}" ${{_wiz.isReconnect?'readonly':''}}></div>
-        ${{!_wiz.isReconnect?`<div style="text-align:center;margin-top:8px"><a href="#" class="kira-wiz-link" onclick="return false">Konto aus einem anderen E\u2011Mail\u2011Client importieren</a></div>`:''}}</div>
-      <div class="kira-wiz-btns">
-        <button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button>
-        <button class="es-mk-btn" onclick="_wizStep1Next()">Weiter</button>
+        ${{!isRec?`<div class="kira-wiz-field"><label>Ihr Name</label><input id="wiz-name" type="text" placeholder="Max Mustermann" value="${{_wiz.name}}" autocomplete="name"></div>`:''}}
+        <div class="kira-wiz-field"><label>E\u2011Mail\u2011Adresse</label><input id="wiz-email" type="email" placeholder="name@firma.de" value="${{_wiz.email}}" ${{isRec?'readonly':''}} autocomplete="email"></div>
       </div>
+      ${{!isRec?`<div class="kira-wiz-import-card" onclick="showToast('Import-Assistent \u2014 kommt bald','info')">
+        <span style="font-size:24px">&#x1F4E5;</span>
+        <div><div style="font-size:14px;font-weight:600;color:var(--text)">Aus anderem E-Mail-Client importieren</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">Thunderbird, Outlook, Apple Mail \u2014 <span style="color:var(--accent)">In Vorbereitung</span></div></div>
+      </div>`:''}}
+      ${{_wizBtns(
+        `<button class="kira-wiz-btn-sec" onclick="_wizClose()">Abbrechen</button>`,
+        `<button class="kira-wiz-btn-primary" onclick="_wizStep1Next()">Weiter &rarr;</button>`
+      )}}
     </div>`;
   }}
   window._wizStep1Next = function() {{
@@ -3304,12 +3360,13 @@ function esShowProtoTab(id) {{
   }};
 
   function _wizStep2() {{
-    return `<div class="kira-wiz-step kira-wiz-loading">
-      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span></div>
+    return `<div class="kira-wiz-step">
+      ${{_wizDots(2)}}
+      <div class="kira-wiz-step-label">Schritt 2 von 4</div>
       <h2 class="kira-wiz-title">Einstellungen werden ermittelt\u2026</h2>
-      <p class="kira-wiz-sub">Bitte warten Sie, w\u00e4hrend wir den Anbieter erkennen.</p>
-      <div class="kira-wiz-spinner"></div>
-      <div class="kira-wiz-btns"><button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button></div>
+      <p class="kira-wiz-sub">Bitte warten Sie, w\u00e4hrend KIRA den passenden Anbieter und die Servereinstellungen erkennt.</p>
+      <div class="kira-wiz-loading-area"><div class="kira-wiz-spinner"></div></div>
+      ${{_wizBtns(`<button class="kira-wiz-btn-sec" onclick="_wizClose()">Abbrechen</button>`, '')}}
     </div>`;
   }}
   function _wizDetectProvider() {{
@@ -3322,26 +3379,32 @@ function esShowProtoTab(id) {{
   }}
 
   function _wizStep3() {{
-    const icons={{'microsoft':'&#x1F4E7;','google':'&#x1F4E7;','imap':'&#x1F4E8;'}};
-    const labels={{'microsoft':'Microsoft 365 / Outlook','google':'Google Mail','yahoo':'Yahoo Mail','aol':'AOL Mail','gmx':'GMX','web_de':'Web.de','t_online':'T-Online','imap':'Standard IMAP'}};
-    const ic=icons[_wiz.provider]||'&#x1F4E8;';
-    const lbl=labels[_wiz.provider]||_wiz.provider;
+    const providerLabels={{'microsoft':'Microsoft 365 / Outlook','google':'Google Mail','yahoo':'Yahoo Mail','aol':'AOL Mail','gmx':'GMX','web_de':'Web.de','t_online':'T-Online','imap':'Standard IMAP / Passwort'}};
+    const providerIcons={{'microsoft':'&#x1F4E7;','google':'&#x1F4E7;','yahoo':'&#x1F4EC;','aol':'&#x1F4EC;','imap':'&#x1F4E8;'}};
+    const lbl=providerLabels[_wiz.provider]||_wiz.provider;
+    const ic=providerIcons[_wiz.provider]||'&#x1F4E8;';
+    const srv=_wiz.settings.imap_server||'Wird automatisch ermittelt';
+    const isMicrosoft=_wiz.provider==='microsoft';
     return `<div class="kira-wiz-step">
-      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span></div>
-      <h2 class="kira-wiz-title">Einstellungen wurden gefunden</h2>
-      <p class="kira-wiz-sub">KIRA hat passende Einstellungen f\u00fcr <strong>${{_wiz.email}}</strong> erkannt.</p>
+      ${{_wizDots(3)}}
+      <div class="kira-wiz-step-label">Schritt 3 von 4</div>
+      <h2 class="kira-wiz-title">Einstellungen gefunden</h2>
+      <p class="kira-wiz-sub">KIRA hat passende Servereinstellungen f\u00fcr <strong style="color:var(--text)">${{_wiz.email}}</strong> erkannt.</p>
       <div class="kira-wiz-found-box">
         <div class="kira-wiz-found-ico">${{ic}}</div>
-        <div class="kira-wiz-found-info">
+        <div>
           <div class="kira-wiz-found-name">${{lbl}}</div>
-          <div class="kira-wiz-found-detail">${{_wiz.settings.imap_server||'Automatisch'}} &middot; Port ${{_wiz.settings.imap_port}}</div>
+          <div class="kira-wiz-found-detail">${{srv}}</div>
+          ${{isMicrosoft?`<div style="font-size:12px;color:var(--accent);margin-top:4px">&#x2713; Browser-Anmeldung \u2014 kein Passwort n\u00f6tig</div>`:`<div style="font-size:12px;color:var(--text-muted);margin-top:4px">IMAP-Verbindung mit Passwort</div>`}}
         </div>
       </div>
-      <div style="text-align:center;margin-top:12px"><a href="#" class="kira-wiz-link" onclick="_wiz.step=4;_wizRender();return false">Server-Einstellungen bearbeiten</a></div>
-      <div class="kira-wiz-btns">
-        <button class="es-mk-btn sec" onclick="_wiz.step=1;_wizRender()">Zur\u00fcck</button>
-        <button class="es-mk-btn" onclick="_wizStep3Next()">Weiter</button>
+      <div style="text-align:center;margin-top:16px">
+        <a href="#" class="kira-wiz-link" onclick="_wiz.step=4;_wizRender();return false">&#x2699; Server-Einstellungen bearbeiten</a>
       </div>
+      ${{_wizBtns(
+        `<button class="kira-wiz-btn-sec" onclick="_wiz.step=1;_wizRender()">Zur\u00fcck</button>`,
+        `<button class="kira-wiz-btn-primary" onclick="_wizStep3Next()">${{isMicrosoft?'Microsoft-Login starten &rarr;':'Verbinden &rarr;'}}</button>`
+      )}}
     </div>`;
   }}
   window._wizStep3Next = function() {{
@@ -3353,27 +3416,36 @@ function esShowProtoTab(id) {{
   function _wizStep4() {{
     const s=_wiz.settings;
     return `<div class="kira-wiz-step">
-      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span></div>
-      <h2 class="kira-wiz-title">Einstellungen bearbeiten</h2>
-      <p class="kira-wiz-sub">Expertenmodus &mdash; nur bei Bedarf anpassen.</p>
+      ${{_wizDots(4)}}
+      <div class="kira-wiz-step-label">Erweiterte Einstellungen</div>
+      <h2 class="kira-wiz-title">Server-Einstellungen</h2>
+      <p class="kira-wiz-sub">Nur bei Bedarf anpassen. F\u00fcr die meisten Konten sind die erkannten Werte korrekt.</p>
       <div class="kira-wiz-fields">
-        <div class="kira-wiz-field"><label>Authentifizierung</label><select id="wiz-auth">
+        <div class="kira-wiz-field"><label>Authentifizierung</label><select id="wiz-auth" onchange="_wizAuthChange()">
           <option value="oauth2_microsoft" ${{s.auth==='oauth2_microsoft'?'selected':''}}>Microsoft OAuth 2.0 (empfohlen)</option>
           <option value="oauth2_google" ${{s.auth==='oauth2_google'?'selected':''}}>Google OAuth 2.0</option>
-          <option value="imap_password" ${{s.auth==='imap_password'?'selected':''}}>Benutzername und Passwort</option>
+          <option value="imap_password" ${{s.auth==='imap_password'?'selected':''}}>Benutzername und Passwort (IMAP)</option>
         </select></div>
-        <div class="kira-wiz-field"><label>IMAP-Server</label><input id="wiz-server" type="text" value="${{s.imap_server}}"></div>
+        <div class="kira-wiz-field"><label>Protokoll</label><select id="wiz-proto">
+          <option value="imap" selected>IMAP</option>
+        </select></div>
+        <div class="kira-wiz-field"><label>IMAP-Server</label><input id="wiz-server" type="text" value="${{s.imap_server}}" placeholder="imap.provider.de"></div>
         <div class="kira-wiz-field"><label>Port</label><input id="wiz-port" type="number" value="${{s.imap_port}}"></div>
         <div id="wiz-pw-fields" style="${{s.auth==='imap_password'?'':'display:none'}}">
-          <div class="kira-wiz-field"><label>Passwort / App-Passwort</label><input id="wiz-pw" type="password" placeholder="App-Passwort"></div>
+          <div class="kira-wiz-field"><label>Passwort / App-Passwort</label><input id="wiz-pw" type="password" placeholder="App-Passwort aus den Kontoeinstellungen"></div>
         </div>
       </div>
-      <div class="kira-wiz-btns">
-        <button class="es-mk-btn sec" onclick="_wiz.step=3;_wizRender()">Zur\u00fcck</button>
-        <button class="es-mk-btn" onclick="_wizStep4Next()">Weiter</button>
-      </div>
+      ${{_wizBtns(
+        `<button class="kira-wiz-btn-sec" onclick="_wiz.step=3;_wizRender()">Zur\u00fcck</button>`,
+        `<button class="kira-wiz-btn-primary" onclick="_wizStep4Next()">Weiter &rarr;</button>`
+      )}}
     </div>`;
   }}
+  window._wizAuthChange = function() {{
+    const v=document.getElementById('wiz-auth')?.value;
+    const pw=document.getElementById('wiz-pw-fields');
+    if(pw) pw.style.display=v==='imap_password'?'':'none';
+  }};
   window._wizStep4Next = function() {{
     _wiz.settings.imap_server=document.getElementById('wiz-server').value;
     _wiz.settings.imap_port=parseInt(document.getElementById('wiz-port').value)||993;
@@ -3384,13 +3456,13 @@ function esShowProtoTab(id) {{
   }};
 
   function _wizStep5() {{
-    return `<div class="kira-wiz-step kira-wiz-loading">
-      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span></div>
-      <h2 class="kira-wiz-title">Microsoft-Login</h2>
-      <p class="kira-wiz-sub">Ein Browser-Fenster \u00f6ffnet sich. Bitte melden Sie sich mit <strong>${{_wiz.email}}</strong> an.</p>
-      <div class="kira-wiz-spinner"></div>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Warten auf Anmeldung\u2026</p>
-      <div class="kira-wiz-btns"><button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button></div>
+    return `<div class="kira-wiz-step">
+      ${{_wizDots(4)}}
+      <div class="kira-wiz-step-label">Microsoft-Anmeldung</div>
+      <h2 class="kira-wiz-title">Browser-Login wird ge\u00f6ffnet</h2>
+      <p class="kira-wiz-sub">Ein Browserfenster \u00f6ffnet sich. Melden Sie sich dort mit <strong style="color:var(--text)">${{_wiz.email}}</strong> an und kehren Sie dann hierher zur\u00fcck.</p>
+      <div class="kira-wiz-loading-area"><div class="kira-wiz-spinner"></div><p style="font-size:13px;color:var(--text-muted)">Warte auf Anmeldung\u2026</p></div>
+      ${{_wizBtns(`<button class="kira-wiz-btn-sec" onclick="_wizClose()">Abbrechen</button>`, '')}}
     </div>`;
   }}
   function _wizStartOAuth() {{
@@ -3439,13 +3511,15 @@ function esShowProtoTab(id) {{
   function _wizStep6() {{
     const ok=!_wiz._error;
     return `<div class="kira-wiz-step">
-      <h2 class="kira-wiz-title">${{ok?'&#x2713; Erfolgreich verbunden':'&#x26A0; Verbindung fehlgeschlagen'}}</h2>
+      <div class="kira-wiz-success-icon">${{ok?'&#x2705;':'&#x26A0;&#xFE0F;'}}</div>
+      <h2 class="kira-wiz-title">${{ok?'Erfolgreich verbunden':'Verbindung fehlgeschlagen'}}</h2>
       <p class="kira-wiz-sub">${{ok
-        ?`<strong>${{_wiz.email}}</strong> wurde erfolgreich eingerichtet.`
-        :`Fehler: ${{_wiz._error||'Unbekannt'}}`}}</p>
-      <div class="kira-wiz-btns">
-        ${{!ok?`<button class="es-mk-btn sec" onclick="_wiz.step=1;_wiz._error=null;_wizRender()">Nochmal versuchen</button>`:''}}<button class="es-mk-btn" onclick="_wizClose()">Schlie\u00dfen</button>
-      </div>
+        ?`<strong style="color:var(--text)">${{_wiz.email}}</strong> wurde erfolgreich eingerichtet und ist jetzt verbunden.`
+        :`Beim Verbinden ist ein Fehler aufgetreten:<br><span style="color:#c83c3c;font-size:13px">${{_wiz._error||'Unbekannter Fehler'}}</span>`}}</p>
+      ${{_wizBtns(
+        ok?'':`<button class="kira-wiz-btn-sec" onclick="_wiz.step=1;_wiz._error=null;_wizRender()">&#x21BA; Erneut versuchen</button>`,
+        `<button class="kira-wiz-btn-primary" onclick="_wizClose()">${{ok?'Fertig':'Schlie\u00dfen'}}</button>`
+      )}}
     </div>`;
   }}
   window.esMkArchivPruefen = function() {{
@@ -4130,7 +4204,7 @@ def generate_html() -> str:
         <span class="si-icon">&#x2709;</span><span class="si-label">Kommunikation</span>
       </div>
       <div class="sidebar-item" id="nav-postfach" onclick="showPanel('postfach')" data-label="Postfach">
-        <span class="si-icon">&#x1F4EC;</span><span class="si-label">Postfach</span>
+        <span class="si-icon">&#x1F4EC;</span><span class="si-label">Postfach</span><span id="nav-postfach-badge" class="si-badge" style="display:none;background:rgba(200,60,60,.12);color:#c83c3c;border-color:rgba(200,60,60,.25);font-size:11px"></span>
       </div>
       <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')" data-label="Organisation">
         <span class="si-icon">&#x1F4C5;</span><span class="si-label">Organisation</span>
