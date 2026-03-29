@@ -1337,16 +1337,18 @@ function pfRenderFolders(data) {
 
       (konto.ordner||[]).forEach(ord=>{
         const isStarred = _pfFavorites.some(f=>f.konto===konto.email && f.folder===ord.name);
-        const ke = konto.email.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        const fn = ord.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        const fl = (ord.label||ord.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         const item = document.createElement('div');
         item.className = 'pf-folder-item';
         item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
         item.innerHTML = pfFolderIconWrap(ord.name)
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
-          +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'')
-          +'<button class="pf-star-btn'+(isStarred?' starred':'')+'" title="'+(isStarred?'Aus Favoriten entfernen':'Zu Favoriten hinzuf\u00fcgen')+'" onclick="pfToggleFavorite(\''+ke+'\',\''+fn+'\',\''+fl+'\',this,event)">'+(isStarred?'&#x2605;':'&#x2606;')+'</button>';
+          +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
+        const starBtn = document.createElement('button');
+        starBtn.className = 'pf-star-btn'+(isStarred?' starred':'');
+        starBtn.title = isStarred ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzuf\u00fcgen';
+        starBtn.innerHTML = isStarred ? '&#x2605;' : '&#x2606;';
+        starBtn.onclick = e => pfToggleFavorite(konto.email, ord.name, ord.label||ord.name, starBtn, e);
+        item.appendChild(starBtn);
         item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
         folderWrap.appendChild(item);
       });
