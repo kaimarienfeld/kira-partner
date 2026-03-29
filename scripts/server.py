@@ -2629,6 +2629,37 @@ function esShowProtoTab(id) {{
     </div>
   </div>
 
+  <div class="es-grp">
+    <div class="es-grp-h">Meldungsdauer</div>
+    <div class="es-grp-sub">Wie lange werden Toast-Meldungen angezeigt (Sekunden). &Auml;nderungen gelten sofort &mdash; kein Speichern n&ouml;tig.</div>
+    <div class="es-row">
+      <div class="es-rl">OK-Meldungen <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a6e3c;vertical-align:middle;margin-left:4px"></span><div class="es-rd">Best&auml;tigungen (gr&uuml;n)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-toast-dauer-ok" min="1" max="30" value="4" style="width:64px" onchange="applyToastDauer('ok',this.value)">
+      <span style="color:var(--muted);font-size:12px;margin-left:4px">s</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Fehler-Meldungen <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#c0392b;vertical-align:middle;margin-left:4px"></span><div class="es-rd">Fehlermeldungen (rot)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-toast-dauer-fehler" min="1" max="60" value="10" style="width:64px" onchange="applyToastDauer('fehler',this.value)">
+      <span style="color:var(--muted);font-size:12px;margin-left:4px">s</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Warnungen <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#c87417;vertical-align:middle;margin-left:4px"></span><div class="es-rd">Warnmeldungen (orange)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-toast-dauer-warnung" min="1" max="60" value="7" style="width:64px" onchange="applyToastDauer('warnung',this.value)">
+      <span style="color:var(--muted);font-size:12px;margin-left:4px">s</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Info-Meldungen <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);vertical-align:middle;margin-left:4px"></span><div class="es-rd">Hinweise und Prozess-Meldungen (blau)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-toast-dauer-info" min="1" max="60" value="5" style="width:64px" onchange="applyToastDauer('info',this.value)">
+      <span style="color:var(--muted);font-size:12px;margin-left:4px">s</span>
+    </div>
+    <div style="margin-top:8px;padding:8px 10px;background:var(--bg-overlay);border-radius:6px;font-size:11px;color:var(--muted)">
+      Vorschau: <button onclick="showToast('OK-Meldung Beispiel','ok')" style="margin:0 4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);cursor:pointer;font-size:11px">&#x2713; OK</button>
+      <button onclick="showToast('Fehler: Verbindung getrennt','fehler')" style="margin:0 4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);cursor:pointer;font-size:11px">&#x2715; Fehler</button>
+      <button onclick="showToast('Warnung: Archiv-Pfad fehlt','warnung')" style="margin:0 4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);cursor:pointer;font-size:11px">&#x26a0; Warnung</button>
+      <button onclick="showToast('Info: Mail-Monitor gestartet','info')" style="margin:0 4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);cursor:pointer;font-size:11px">&#x2139; Info</button>
+    </div>
+  </div>
+
   <div class="es-save-bar">
     <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
   </div>
@@ -5137,6 +5168,10 @@ function applyToastPos(val) {{
   if(val) html.dataset.toastPos = val; else delete html.dataset.toastPos;
   localStorage.setItem('kira_toast_pos', val||'');
 }}
+function applyToastDauer(typ, val) {{
+  const sek = Math.max(1, Math.min(60, parseInt(val)||4));
+  localStorage.setItem('kira_toast_dauer_'+typ, sek);
+}}
 function applyTableZebra(checked) {{
   const html = document.documentElement;
   if(checked) html.dataset.tableZebra = 'true'; else delete html.dataset.tableZebra;
@@ -5212,6 +5247,11 @@ function restoreDesign() {{
   }}
   const tl = localStorage.getItem('kira_table_lines');
   if(tl) {{ applyTableLines(tl==='1'); const cb2=document.getElementById('cfg-table-lines'); if(cb2) cb2.checked=(tl==='1'); }}
+  // Toast-Dauern
+  ['ok','fehler','warnung','info'].forEach(typ => {{
+    const v = localStorage.getItem('kira_toast_dauer_'+typ);
+    if(v) {{ const inp=document.getElementById('cfg-toast-dauer-'+typ); if(inp) inp.value=v; }}
+  }});
 }}
 
 // KPI click -> jump to Kommunikation with filter
@@ -7334,16 +7374,18 @@ function loadKiraTasks(){{
 }}
 
 function escH(s){{return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}}
-function showToast(msg){{
+function showToast(msg, typ){{
   const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2400);
+  if(t._toastTimer)clearTimeout(t._toastTimer);
+  t.textContent=msg;
+  t.className='status-toast';
+  if(typ)t.classList.add(typ);
+  t.classList.add('show');
+  const defaults={{ok:4,fehler:10,warnung:7,info:5}};
+  const sek=parseInt(localStorage.getItem('kira_toast_dauer_'+(typ||'ok'))||defaults[typ||'ok']||4);
+  t._toastTimer=setTimeout(()=>{{t.classList.remove('show');t.className='status-toast';}},sek*1000);
 }}
-function showKiraToast(msg){{
-  const t=document.getElementById('toast');
-  t.textContent='Kira: '+msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),5000);
-}}
+function showKiraToast(msg){{showToast('Kira: '+msg,'info');}}
 // Später-Dialog
 function openSpaeterDialog(tid){{
   document.getElementById('sp-tid').value=tid;
@@ -8209,6 +8251,10 @@ a:hover{text-decoration:underline;}
   transform:translateY(50px);opacity:0;transition:all .28s;z-index:500;pointer-events:none;
   box-shadow:0 4px 20px rgba(0,0,0,.25);}
 .status-toast.show{transform:translateY(0);opacity:1;}
+.status-toast.ok{background:#1a6e3c;color:#fff;border-color:#1a6e3c;}
+.status-toast.fehler{background:#c0392b;color:#fff;border-color:#c0392b;}
+.status-toast.warnung{background:#c87417;color:#fff;border-color:#c87417;}
+.status-toast.info{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ═══ Kira FAB — Animierter Launcher ═══ */
 .kira-fab{position:fixed;bottom:20px;right:20px;z-index:200;
