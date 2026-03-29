@@ -1,5 +1,5 @@
 # Einstellungen – Vollständige Checkliste & Erweiterungsvorschläge
-_Stand: 2026-03-29 · session-y · Analyse-Basis: config.json, server.py (~9250 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
+_Stand: 2026-03-29 · session-bb · Analyse-Basis: config.json, server.py (~9250 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
 
 ---
 
@@ -195,22 +195,33 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 ---
 
 ## 7. MAIL & KONTEN
-_Komplett überarbeitet session-y (2026-03-29)_
+_Komplett überarbeitet session-y + session-bb (2026-03-29)_
 
 ### 7a. Konto-Übersicht & Verwaltung
 | Status | Element | Anmerkung |
 |--------|---------|-----------|
 | ✅ | Konto-Karten mit Index+Archiv-Stats | Echte Zahlen aus mail_index.db + Archiv-Ordner, session-y |
-| ✅ | Verbindungsstatus pro Konto | ✓ Verbunden / ⚠ Token abgelaufen / abgemeldet |
+| ✅ | Verbindungsampel pro Konto (grün/gelb/rot) | Echtzeit via `check_account_health()`, session-bb |
 | ✅ | Standard-Konto auswählen | Radio-Button pro Karte, session-y |
 | ✅ | Abrufen (pro Konto) | `POST /api/mail/konto/abrufen` — startet sofort, session-y |
 | ✅ | Alle abrufen | `POST /api/mail/konto/alle-abrufen`, session-y |
-| ✅ | IMAP-Verbindung testen | `POST /api/mail/konto/imap-test` — Ordneranzahl + ms, session-y |
-| ✅ | Token erneuern | Button → öffnet OAuth-Flow |
-| ✅ | Token löschen | `POST /api/mail/konto/token-loeschen`, session-y |
+| ✅ | Volltest (IMAP+SMTP+Roundtrip) | `POST /api/mail/konto/volltest` + Polling Status, session-bb |
+| ✅ | Verbindung wiederherstellen (Reconnect) | `POST /api/mail/konto/reconnect` — neue OAuth-Token für bestehendes Konto, session-bb |
 | 🔧 | Konto löschen | Button vorhanden, Backend `POST /api/mail/konto/hinzufuegen` implementiert — Löschen noch nur Toast |
-| ✅ | Konto hinzufügen | Dialog mit OAuth2/IMAP+PW/MS App-PW, `POST /api/mail/konto/hinzufuegen`, session-y |
+| ✅ | Konto hinzufügen (Mailbird-Wizard) | 6-Schritt-Assistent mit 3-stufiger Provider-Erkennung + OAuth-Browser, session-bb |
 | ✅ | IMAP-Ordner Accordion | Ordner laden via `GET /api/mail/konten/ordner`, session-y |
+
+### 7a-2. Konto-Assistent (Mailbird-Stil, session-bb)
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | Schritt 1: Name + E-Mail | Eingabe + Import-Karte (Zukunft) |
+| ✅ | Schritt 2: Provider-Erkennung | 3-stufig: Domain → DNS-MX+Autodiscover → MS OpenID-Probe |
+| ✅ | Schritt 3: Provider gefunden | Zeigt Anbieter-Logo/Name, Weiter-Button |
+| ✅ | Schritt 4: Expert-Mode | IMAP / Exchange/EWS / POP3 — EWS zeigt Server-Feld dynamisch |
+| ✅ | Schritt 5: OAuth-Browser | MSAL acquire_token_interactive() in eigenem Fenster |
+| ✅ | Schritt 6: Ergebnis | Erfolg/Fehler, Konto-Karte erscheint |
+| ❌ | Google OAuth | Noch nicht verdrahtet (geplant) |
+| ❌ | Provider nach OAuth persistieren | Nach Login: erkannter Provider in konto-config speichern |
 
 ### 7b. Mail-Monitor
 | Status | Element | ID / Schlüssel | Anmerkung |

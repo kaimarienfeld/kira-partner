@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "2026-03-28-session-y",
+  "_updated": "2026-03-29-session-bb",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -581,6 +581,45 @@
       "status": "planned",
       "last_updated": "2026-03-29",
       "description": "Kira soll bei jeder Abfrage/Angebot/Rechnung/Antwort Muster erkennen, Wissen aktualisieren, Preise anpassen wenn sich etwas ändert, Widersprüche erkennen und dokumentieren (vorher/nachher). Wissensregeln sollen von Kira aktiv erweitert und gepflegt werden, nicht nur starr bleiben."
+    },
+    {
+      "id": "mail-login-wizard",
+      "name": "Mail-Konto-Assistent (Mailbird-Stil)",
+      "icon": "🧙",
+      "leni_name": "E-Mail-Konten einfach einrichten",
+      "leni_desc": "Neues E-Mail-Konto hinzufuegen leicht gemacht: der Assistent erkennt automatisch den Anbieter (Microsoft, Google, IONOS...) und fuehrt Schritt fuer Schritt durch die Einrichtung.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py + mail_monitor.py",
+      "status": "done",
+      "last_updated": "2026-03-29",
+      "description": "6-Schritt-Wizard: Name/Mail → 3-stufige Provider-Erkennung → Anbieter gefunden → Expert-Mode (IMAP/Exchange/POP3) → OAuth-Browser → Ergebnis. CSS-Overlay, opaker Hintergrund, Reconnect-Funktion fuer bestehende Konten."
+    },
+    {
+      "id": "mail-verbindungsampel",
+      "name": "Verbindungsampel (gruen/gelb/rot)",
+      "icon": "🟢",
+      "leni_name": null,
+      "leni_desc": null,
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "server.py + mail_monitor.py",
+      "status": "done",
+      "last_updated": "2026-03-29",
+      "description": "Background-IMAP-Health (30min-Intervall), Volltest IMAP+SMTP XOAUTH2+30s Roundtrip. Ampel-Dots in Einstellungen-Konto-Karten, Postfach-Ordnerbaum, Sidebar-Badge. check_account_health() + run_full_connection_test() + get_all_health_status()."
+    },
+    {
+      "id": "mail-provider-detect",
+      "name": "3-stufige Provider-Erkennung",
+      "icon": "🔍",
+      "leni_name": null,
+      "leni_desc": null,
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "mail_monitor.py",
+      "status": "done",
+      "last_updated": "2026-03-29",
+      "description": "Stage1: Domain-Heuristik. Stage2: DNS-MX-Lookup+Autodiscover. Stage3: Microsoft OpenID-Config-Probe. detect_provider_advanced() orchestriert alle Stufen. Erkennt custom-domain Microsoft-Konten (z.B. info@raumkult.eu)."
     }
   ]
 }
