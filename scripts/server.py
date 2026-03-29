@@ -8271,7 +8271,7 @@ a:hover{text-decoration:underline;}
   border-radius:var(--radius-lg);padding:10px 18px;color:var(--accent);font-weight:700;font-size:var(--fs-base);
   transform:translateY(50px);opacity:0;transition:all .28s;z-index:500;pointer-events:none;
   box-shadow:0 4px 20px rgba(0,0,0,.25);}
-.status-toast.show{transform:translateY(0);opacity:1;}
+.status-toast.show{transform:translateY(0);opacity:1;pointer-events:auto;}
 .status-toast.ok{background:#1a6e3c;color:#fff;border-color:#1a6e3c;}
 .status-toast.fehler{background:#c0392b;color:#fff;border-color:#c0392b;}
 .status-toast.warnung{background:#c87417;color:#fff;border-color:#c87417;}
