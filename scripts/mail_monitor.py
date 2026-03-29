@@ -57,7 +57,10 @@ OAUTH_SCOPE_VERSION = "v4_office_com"
 # ── Zentrale KIRA Microsoft Entra App ───────────────────────────────────────
 KIRA_MS_CLIENT_ID    = "a0591b2d-86c3-4bc1-adf0-a10e197da07f"
 KIRA_MS_TENANT_ID    = "common"
-KIRA_MS_REDIRECT_URI = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+# Redirect-URI für System-Browser-Flow (loopback).
+# In Azure Portal unter App a0591b2d → Authentication → Mobile and desktop applications
+# muss http://localhost eingetragen sein (ohne Port — Microsoft akzeptiert dann alle Ports).
+KIRA_MS_REDIRECT_URI = "http://localhost"
 
 # ── Provider-Erkennung ───────────────────────────────────────────────────────
 _DOMAIN_PROVIDER = {
@@ -405,6 +408,7 @@ def start_oauth_browser_flow(email_addr: str, job_id: str):
             result = app.acquire_token_interactive(
                 scopes=OAUTH_SCOPES,
                 login_hint=email_addr,
+                redirect_uri=KIRA_MS_REDIRECT_URI,  # http://localhost — muss in Azure registriert sein
             )
             if "access_token" in result:
                 _save_token_cache(cache, cache_path)
