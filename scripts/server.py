@@ -46,6 +46,31 @@ try:
 except Exception:
     pass
 
+# ── Mail-Index Column Guard ───────────────────────────────────────────────────
+_MAIL_COLS_ENSURED = False
+
+def _ensure_mail_columns():
+    """Idempotent: fügt fehlende Spalten zu mail_index.db > mails hinzu."""
+    global _MAIL_COLS_ENSURED
+    if _MAIL_COLS_ENSURED:
+        return
+    _MAIL_COLS_ENSURED = True
+    try:
+        conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        for col, typedef in [
+            ('flagged',       'INTEGER DEFAULT 0'),
+            ('pinned',        'INTEGER DEFAULT 0'),
+            ('kira_verwendet','INTEGER DEFAULT 0'),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {typedef}")
+            except Exception:
+                pass  # column already exists
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
@@ -764,6 +789,13 @@ def build_postfach():
     <input class="pf-search" id="pf-search" placeholder="&#x2315; Suchen..." oninput="pfSearchDebounce()" autocomplete="off">
     <div class="pf-mid-meta" id="pf-mid-meta"></div>
   </div>
+  <div id="pf-bulk-bar">
+    <span class="pf-bulk-cnt" id="pf-bulk-cnt">0 ausgew&#228;hlt</span>
+    <button class="pf-bulk-btn" onclick="pfBulkMarkRead(true)">Als gelesen markieren</button>
+    <button class="pf-bulk-btn" onclick="pfBulkMarkRead(false)">Als ungelesen markieren</button>
+    <button class="pf-bulk-btn red" onclick="pfBulkDelete()">L&#246;schen</button>
+    <button class="pf-bulk-btn" onclick="pfClearSelection()">&#x2715; Abbrechen</button>
+  </div>
   <div id="pf-list-wrap">
     <div class="pf-list-empty" id="pf-list-empty" style="display:none">
       <div style="font-size:32px;margin-bottom:8px">&#x1F4EC;</div>
@@ -791,10 +823,18 @@ def build_postfach():
         <span class="pf-prev-absender" id="pf-prev-absender"></span>
         <span class="pf-prev-datum" id="pf-prev-datum"></span>
       </div>
-      <div class="pf-prev-acts">
-        <button class="pf-act-btn" onclick="pfReply()" title="Antworten">&#x21A9; Antworten</button>
-        <button class="pf-act-btn" onclick="pfForward()" title="Weiterleiten">&#x21AA; Weiterleiten</button>
-        <button class="pf-act-btn" onclick="pfKiraContext()" title="Kira fragen">&#x1F916; Kira</button>
+      <div class="pf-prev-toolbar" id="pf-prev-toolbar">
+        <button class="pf-tb-btn" id="pf-tb-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
+        <button class="pf-tb-btn" id="pf-tb-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
+        <button class="pf-tb-btn" id="pf-tb-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
+        <div class="pf-tb-sep"></div>
+        <button class="pf-tb-btn" id="pf-tb-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
+        <button class="pf-tb-btn" id="pf-tb-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
+        <button class="pf-tb-btn" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
+        <div class="pf-tb-sep"></div>
+        <button class="pf-tb-btn del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+        <div style="flex:1"></div>
+        <button class="pf-tb-btn" id="pf-tb-kira" title="Kira fragen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Kira</button>
       </div>
     </div>
     <div class="pf-prev-anhaenge" id="pf-prev-anhaenge" style="display:none"></div>
@@ -984,6 +1024,42 @@ def build_postfach():
 .pf-combined-sub-item .pf-fi-icon{width:16px;height:16px}
 .pf-combined-sub-item .pf-fi-icon svg{width:16px;height:16px}
 [data-theme="light"] .pf-combined-sub-item:hover{background:#f3f4f6}
+/* Hover-Aktionen auf Mail-Items */
+.pf-mail-item{position:relative}
+.pf-item-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;align-items:center;gap:2px;background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:2px 4px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.pf-mail-item:hover .pf-item-actions{display:flex}
+.pf-mail-item.selected .pf-item-actions{display:flex}
+.pf-item-act-btn{background:none;border:none;cursor:pointer;padding:4px 5px;border-radius:5px;color:var(--text-muted);display:flex;align-items:center;transition:background .1s,color .1s;flex-shrink:0}
+.pf-item-act-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-item-act-btn.active{color:#f59e0b}
+.pf-item-act-btn.pin-active{color:#3b82f6}
+.pf-item-act-btn.trash-btn:hover{background:rgba(200,60,60,.12);color:#c83c3c}
+.pf-item-act-btn svg{width:14px;height:14px;display:block;pointer-events:none}
+/* Checkbox — overlays the avatar area on hover */
+.pf-item-cbx-wrap{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s,background .12s;cursor:pointer;border-radius:50%;background:var(--bg-raised)}
+.pf-mail-item:hover .pf-item-cbx-wrap,.pf-mail-item.selected .pf-item-cbx-wrap{opacity:1}
+.pf-item-cbx{width:15px;height:15px;cursor:pointer;accent-color:#3b82f6;flex-shrink:0}
+.pf-mail-item.selected{background:rgba(59,130,246,.07)!important}
+/* Pinned + Flagged badges on item */
+.pf-item-flag-badge{color:#f59e0b;font-size:12px;flex-shrink:0;line-height:1}
+.pf-item-pin-badge{color:#3b82f6;font-size:11px;flex-shrink:0;line-height:1;margin-left:2px}
+.pf-item-kira-badge{background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid rgba(139,92,246,.3);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4}
+/* Bulk bar */
+#pf-bulk-bar{display:none;align-items:center;gap:8px;padding:7px 14px;background:rgba(59,130,246,.08);border-bottom:1px solid rgba(59,130,246,.2);font-size:12px;flex-shrink:0}
+#pf-bulk-bar.visible{display:flex}
+.pf-bulk-cnt{font-weight:600;color:#3b82f6;flex:1}
+.pf-bulk-btn{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text);transition:.1s}
+.pf-bulk-btn:hover{background:var(--bg-hover)}
+.pf-bulk-btn.red:hover{background:rgba(200,60,60,.12);color:#c83c3c;border-color:rgba(200,60,60,.3)}
+/* New preview toolbar */
+.pf-prev-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pf-tb-btn{background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:6px;color:var(--text-muted);display:flex;align-items:center;gap:5px;font-size:12px;transition:background .1s,color .1s}
+.pf-tb-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-tb-btn.active{color:#f59e0b}
+.pf-tb-btn.pin-active{color:#3b82f6}
+.pf-tb-btn.del-btn:hover{background:rgba(200,60,60,.12);color:#c83c3c}
+.pf-tb-btn svg{width:16px;height:16px;display:block;flex-shrink:0}
+.pf-tb-sep{width:1px;height:20px;background:var(--border);margin:0 3px;flex-shrink:0}
 </style>
 
 <script>
@@ -1041,6 +1117,8 @@ function pfLoadHealth() {
 
 let _pfRefreshTimer = null;
 function pfInit() {
+  pfInitResize(); // restore pane widths (DOM now exists)
+  _pfInitToolbar(); // bind preview toolbar buttons
   fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
     pfRenderFolders(data);
     document.getElementById('pf-folders-loading').style.display='none';
@@ -1057,7 +1135,7 @@ function pfInit() {
     fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{
       const mins=(cfg.mail_postfach?.refresh_intervall_min)||0;
       if(mins>0) _pfRefreshTimer=setInterval(pfRefreshBadge, mins*60000);
-      // else: kein automatisches Refresh → nur bei Abruf via pfRefreshBadge()
+      _pfMarkReadMode=cfg.mail_postfach?.lese_markierung||'sofort';
     }).catch(()=>{}); // Bei Fehler: kein Auto-Refresh
   }).catch(e=>{
     document.getElementById('pf-folders-loading').textContent='Konten konnten nicht geladen werden.';
@@ -1090,7 +1168,7 @@ function pfRefreshBadge() {
 }
 
 // ── Pane Resize ──────────────────────────────────────────
-(function pfInitResize() {
+function pfInitResize() {
   const saved = JSON.parse(localStorage.getItem('pf_pane_w')||'{}');
   const shell = document.querySelector('.pf-shell');
   if(!shell) return;
@@ -1100,6 +1178,8 @@ function pfRefreshBadge() {
   function makeHandle(handleId, paneId, varName, min, max, key) {
     const handle = document.getElementById(handleId);
     if(!handle) return;
+    if(handle._pfResizeInit) return; // avoid double-binding
+    handle._pfResizeInit = true;
     let startX, startW;
     handle.addEventListener('mousedown', function(e) {
       const pane = document.getElementById(paneId);
@@ -1121,7 +1201,7 @@ function pfRefreshBadge() {
   }
   makeHandle('pf-resize-1','pf-left','--pf-left-w',160,380,'left');
   makeHandle('pf-resize-2','pf-mid','--pf-mid-w',240,600,'mid');
-})();
+}
 
 // ── SVG Folder Icons ─────────────────────────────────────
 function pfFolderIconWrap(name) {
@@ -1218,6 +1298,161 @@ let _pfFavorites = [];          // saved favorites from /api/mail/favorites
 let _pfCombinedExpanded = true; // combined inbox sub-folders open
 let _pfCurrentFolderType = '';  // for combined sub-folder filter (inbox|sent|drafts|all)
 let _pfFolderData = null;       // cached last /api/mail/folders response for re-render
+let _pfSelected = new Set();    // selected message_ids for bulk actions
+let _pfCurrentMail = null;      // currently open mail object
+let _pfMarkReadMode = 'sofort'; // sofort|5s|30s|manuell
+let _pfMarkReadTimer = null;    // pending mark-read timeout
+
+// ── SVG Icons ────────────────────────────────────────────
+const _SVG_READ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg>';
+const _SVG_FLAG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>';
+const _SVG_PIN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>';
+const _SVG_TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+const _SVG_ENV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>';
+
+// ── Bulk Selection ────────────────────────────────────────
+function pfToggleSelect(msgId, checked) {
+  if(checked) _pfSelected.add(msgId); else _pfSelected.delete(msgId);
+  const el=document.querySelector('[data-msgid="'+msgId+'"]');
+  if(el) el.classList.toggle('selected',checked);
+  pfUpdateBulkBar();
+}
+function pfUpdateBulkBar() {
+  const bar=document.getElementById('pf-bulk-bar');
+  const cnt=document.getElementById('pf-bulk-cnt');
+  if(!bar) return;
+  const n=_pfSelected.size;
+  if(n>0){bar.classList.add('visible');if(cnt)cnt.textContent=n+' ausgew\u00e4hlt';}
+  else{bar.classList.remove('visible');}
+}
+function pfClearSelection() {
+  _pfSelected.forEach(id=>{const el=document.querySelector('[data-msgid="'+id+'"]');if(el)el.classList.remove('selected');});
+  _pfSelected.clear();
+  pfUpdateBulkBar();
+}
+function pfBulkMarkRead(gelesen) {
+  const ids=[..._pfSelected];
+  if(!ids.length) return;
+  fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids,gelesen})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){
+      ids.forEach(id=>{
+        const el=document.querySelector('[data-msgid="'+id+'"]');
+        if(el){if(gelesen)el.classList.remove('unread');else el.classList.add('unread');}
+      });
+      pfClearSelection();
+      _pfUpdateSidebarBadge();
+    }
+  }).catch(()=>{});
+}
+function pfBulkDelete() {
+  const ids=[..._pfSelected];
+  if(!ids.length) return;
+  showKritischModal('Mails l\u00f6schen','Sollen '+ids.length+' Mails endg\u00fcltig gel\u00f6scht werden?','LOESCHEN',()=>{
+    fetch('/api/mail/loeschen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        ids.forEach(id=>{const el=document.querySelector('[data-msgid="'+id+'"]');if(el)el.remove();});
+        pfClearSelection();
+      }
+    }).catch(()=>{});
+  },'Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.');
+}
+
+// ── Item-Level Actions ────────────────────────────────────
+function pfToggleRead(msgId, el) {
+  const isUnread=el.classList.contains('unread');
+  const gelesen=isUnread?1:0;
+  fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[msgId],gelesen:!!gelesen})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){
+      if(gelesen) el.classList.remove('unread'); else el.classList.add('unread');
+      _pfTotalUnread+=(gelesen?-1:1);
+      if(_pfTotalUnread<0)_pfTotalUnread=0;
+      _pfUpdateSidebarBadge();
+    }
+  }).catch(()=>{});
+}
+function pfToggleFlag(msgId, el) {
+  const isFlagged=el.dataset.flagged==='1';
+  fetch('/api/mail/flag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msgId,flagged:!isFlagged})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){
+      el.dataset.flagged=isFlagged?'0':'1';
+      const badge=el.querySelector('.pf-item-flag-badge');
+      if(badge) badge.style.display=isFlagged?'none':'';
+      const tbFlag=document.getElementById('pf-tb-flag');
+      if(_pfCurrentMail&&_pfCurrentMail.message_id===msgId&&tbFlag){
+        tbFlag.classList.toggle('active',!isFlagged);
+      }
+    }
+  }).catch(()=>{});
+}
+function pfTogglePin(msgId, el) {
+  const isPinned=el.dataset.pinned==='1';
+  fetch('/api/mail/pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msgId,pinned:!isPinned})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){
+      el.dataset.pinned=isPinned?'0':'1';
+      const badge=el.querySelector('.pf-item-pin-badge');
+      if(badge) badge.style.display=isPinned?'none':'';
+      const tbPin=document.getElementById('pf-tb-pin');
+      if(_pfCurrentMail&&_pfCurrentMail.message_id===msgId&&tbPin){
+        tbPin.classList.toggle('pin-active',!isPinned);
+      }
+    }
+  }).catch(()=>{});
+}
+function pfDeleteMail(msgId, el) {
+  showKritischModal('Mail l\u00f6schen','Soll diese Mail endg\u00fcltig gel\u00f6scht werden?','LOESCHEN',()=>{
+    fetch('/api/mail/loeschen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[msgId]})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        el.remove();
+        if(_pfCurrentMail&&_pfCurrentMail.message_id===msgId){
+          document.getElementById('pf-preview').style.display='none';
+          document.getElementById('pf-preview-empty').style.display='';
+          _pfCurrentMail=null;
+        }
+      }
+    }).catch(()=>{});
+  },'Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.');
+}
+
+// ── Preview Toolbar Binding ───────────────────────────────
+function _pfInitToolbar() {
+  const tb=document.getElementById('pf-prev-toolbar');
+  if(!tb||tb._pfBound) return;
+  tb._pfBound=true;
+  document.getElementById('pf-tb-reply')?.addEventListener('click',()=>pfReply());
+  document.getElementById('pf-tb-replyall')?.addEventListener('click',()=>pfReplyAll());
+  document.getElementById('pf-tb-forward')?.addEventListener('click',()=>pfForward());
+  document.getElementById('pf-tb-kira')?.addEventListener('click',()=>pfKiraContext());
+  document.getElementById('pf-tb-read')?.addEventListener('click',()=>{
+    if(!_pfCurrentMail) return;
+    const el=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+    if(el) pfToggleRead(_pfCurrentMail.message_id, el);
+  });
+  document.getElementById('pf-tb-flag')?.addEventListener('click',()=>{
+    if(!_pfCurrentMail) return;
+    const el=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+    if(el) pfToggleFlag(_pfCurrentMail.message_id, el);
+  });
+  document.getElementById('pf-tb-pin')?.addEventListener('click',()=>{
+    if(!_pfCurrentMail) return;
+    const el=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+    if(el) pfTogglePin(_pfCurrentMail.message_id, el);
+  });
+  document.getElementById('pf-tb-delete')?.addEventListener('click',()=>{
+    if(!_pfCurrentMail) return;
+    const el=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+    if(el) pfDeleteMail(_pfCurrentMail.message_id, el);
+  });
+}
+function pfReplyAll() {
+  if(!_pfCurrentMail) return;
+  pfReply(); // reuse pfReply — To: is the sender; CC from the mail can be added manually
+}
 
 function pfRenderFolders(data) {
   _pfFolderData = data; // cache for re-render after star toggle
@@ -1462,6 +1697,8 @@ function pfRenderMailItem(m, container) {
   el.className = 'pf-mail-item'+(m.unread?' unread':'');
   el.dataset.msgid = m.message_id;
   el.dataset.threadid = m.thread_id||'';
+  el.dataset.flagged = m.flagged?'1':'0';
+  el.dataset.pinned = m.pinned?'1':'0';
 
   const absender = m.absender_short||m.absender||'?';
   const initials = pfGetInitials(absender);
@@ -1469,21 +1706,85 @@ function pfRenderMailItem(m, container) {
   const datum = pfFormatDatum(m.datum||'');
   const preview = (m.text_plain||'').replace(/\s+/g,' ').slice(0,60);
 
-  el.innerHTML =
-    '<div class="pf-item-avatar" style="background:'+color+'">'+esc(initials)+'</div>'
-    +'<div class="pf-item-body">'
-      +'<div class="pf-item-row1">'
-        +'<span class="pf-item-absender">'+esc(absender)+'</span>'
-        +'<span class="pf-item-datum">'+esc(datum)+'</span>'
-      +'</div>'
-      +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
-      +'<div class="pf-item-row3">'
-        +'<span class="pf-item-preview">'+esc(preview)+'</span>'
-        +(_pfCurrentFolderLabel?'<span class="pf-item-folder-badge">'+esc(_pfCurrentFolderLabel)+'</span>':'')
-        +(m.hat_anhaenge?'<span class="pf-item-att" title="Anhang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>':'')
-      +'</div>'
+  // Checkbox wrap
+  const cbxWrap = document.createElement('div');
+  cbxWrap.className = 'pf-item-cbx-wrap';
+  const cbx = document.createElement('input');
+  cbx.type='checkbox'; cbx.className='pf-item-cbx';
+  cbx.checked = _pfSelected.has(m.message_id);
+  cbx.addEventListener('click', e=>{ e.stopPropagation(); pfToggleSelect(m.message_id, cbx.checked); });
+  cbxWrap.appendChild(cbx);
+  el.appendChild(cbxWrap);
+
+  // Avatar (same level as body, between cbxWrap and body)
+  const avatarEl = document.createElement('div');
+  avatarEl.className = 'pf-item-avatar';
+  avatarEl.style.background = color;
+  avatarEl.textContent = initials;
+  el.appendChild(avatarEl);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'pf-item-body';
+  body.innerHTML =
+    '<div class="pf-item-row1">'
+      +'<span class="pf-item-absender">'+esc(absender)+'</span>'
+      +(m.flagged?'<span class="pf-item-flag-badge" title="Gekennzeichnet">&#x2691;</span>':'<span class="pf-item-flag-badge" style="display:none" title="Gekennzeichnet">&#x2691;</span>')
+      +(m.pinned?'<span class="pf-item-pin-badge" title="Angeheftet">&#x1F4CD;</span>':'<span class="pf-item-pin-badge" style="display:none" title="Angeheftet">&#x1F4CD;</span>')
+      +(m.kira_verwendet?'<span class="pf-item-kira-badge" title="Von Kira verwendet">Kira</span>':'')
+      +'<span class="pf-item-datum">'+esc(datum)+'</span>'
+    +'</div>'
+    +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
+    +'<div class="pf-item-row3">'
+      +'<span class="pf-item-preview">'+esc(preview)+'</span>'
+      +(_pfCurrentFolderLabel?'<span class="pf-item-folder-badge">'+esc(_pfCurrentFolderLabel)+'</span>':'')
+      +(m.hat_anhaenge?'<span class="pf-item-att" title="Anhang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>':'')
     +'</div>';
-  el.onclick = ()=>pfOpenMail(m, el);
+  el.appendChild(body);
+
+  // Hover action buttons
+  const acts = document.createElement('div');
+  acts.className='pf-item-actions';
+
+  const btnRead=document.createElement('button');
+  btnRead.className='pf-item-act-btn'; btnRead.title='Gelesen/Ungelesen';
+  btnRead.innerHTML=_SVG_ENV;
+  btnRead.addEventListener('click',e=>{e.stopPropagation();pfToggleRead(m.message_id,el);});
+  acts.appendChild(btnRead);
+
+  const btnFlag=document.createElement('button');
+  btnFlag.className='pf-item-act-btn'+(m.flagged?' active':''); btnFlag.title='Kennzeichnen';
+  btnFlag.innerHTML=_SVG_FLAG;
+  btnFlag.addEventListener('click',e=>{
+    e.stopPropagation();
+    pfToggleFlag(m.message_id,el);
+    // optimistic UI — toggle will be confirmed/reverted by pfToggleFlag
+    setTimeout(()=>btnFlag.classList.toggle('active',el.dataset.flagged==='1'),50);
+  });
+  acts.appendChild(btnFlag);
+
+  const btnPin=document.createElement('button');
+  btnPin.className='pf-item-act-btn'+(m.pinned?' pin-active':''); btnPin.title='Anheften';
+  btnPin.innerHTML=_SVG_PIN;
+  btnPin.addEventListener('click',e=>{
+    e.stopPropagation();
+    pfTogglePin(m.message_id,el);
+    setTimeout(()=>btnPin.classList.toggle('pin-active',el.dataset.pinned==='1'),50);
+  });
+  acts.appendChild(btnPin);
+
+  const btnTrash=document.createElement('button');
+  btnTrash.className='pf-item-act-btn trash-btn'; btnTrash.title='L\u00f6schen';
+  btnTrash.innerHTML=_SVG_TRASH;
+  btnTrash.addEventListener('click',e=>{e.stopPropagation();pfDeleteMail(m.message_id,el);});
+  acts.appendChild(btnTrash);
+
+  el.appendChild(acts);
+
+  el.onclick = e=>{
+    if(e.target.closest('.pf-item-cbx-wrap,.pf-item-actions')) return;
+    pfOpenMail(m, el);
+  };
   container.appendChild(el);
 }
 
@@ -1493,6 +1794,7 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 window.pfOpenMail = function(m, el) {
   if(_pfActiveItem) _pfActiveItem.classList.remove('active');
   _pfActiveItem=el; el.classList.add('active');
+  _pfCurrentMail = m;
   document.getElementById('pf-preview-empty').style.display='none';
   document.getElementById('pf-preview').style.display='flex';
   document.getElementById('pf-preview').style.flexDirection='column';
@@ -1505,11 +1807,16 @@ window.pfOpenMail = function(m, el) {
   document.getElementById('pf-prev-anhaenge').style.display='none';
   document.getElementById('pf-thread-wrap').style.display='none';
 
+  // Toolbar state
+  const tbFlag=document.getElementById('pf-tb-flag');
+  const tbPin=document.getElementById('pf-tb-pin');
+  if(tbFlag) tbFlag.classList.toggle('active',!!(m.flagged));
+  if(tbPin) tbPin.classList.toggle('pin-active',!!(m.pinned));
+
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
     const body = document.getElementById('pf-prev-body');
     body.innerHTML = '';
     if(d.html) {
-      // HTML-Mail: in sandboxed iframe rendern (Scripts blockiert, CSS/Bilder erlaubt)
       body.style.padding = '0';
       body.style.overflow = 'hidden';
       const iframe = document.createElement('iframe');
@@ -1518,13 +1825,11 @@ window.pfOpenMail = function(m, el) {
       iframe.srcdoc = d.html;
       body.appendChild(iframe);
     } else {
-      // Plaintext
       body.style.padding = '20px';
       body.style.overflow = 'auto';
       body.style.whiteSpace = 'pre-wrap';
       body.textContent = d.text || '(kein Inhalt)';
     }
-    // Anhänge
     if(d.anhaenge&&d.anhaenge.length>0) {
       const wrap=document.getElementById('pf-prev-anhaenge');
       wrap.style.display='flex';
@@ -1532,11 +1837,10 @@ window.pfOpenMail = function(m, el) {
       wrap.innerHTML=d.anhaenge.map(a=>'<div class="pf-att-chip" data-pfad="'+encodeURIComponent(a.pfad)+'" onclick="pfOpenAtt(this.dataset.pfad)">'+attIcon+' '+esc(a.name)+' <small style="color:var(--text-muted)">'+a.typ+'</small></div>').join('');
     }
   });
-  // Als gelesen markieren
+
+  // Als gelesen markieren — abhängig von _pfMarkReadMode
   if(m.unread) {
-    fetch('/api/mail/mark-read?message_id='+encodeURIComponent(m.message_id));
-    const el=document.querySelector('[data-msgid="'+m.message_id+'"]');
-    if(el) el.classList.remove('unread');
+    pfDoMarkRead(m);
   }
 
   // Thread laden wenn thread_id vorhanden
@@ -1548,6 +1852,21 @@ window.pfOpenMail = function(m, el) {
     });
   }
 };
+
+function pfDoMarkRead(m) {
+  if(_pfMarkReadTimer) clearTimeout(_pfMarkReadTimer);
+  if(_pfMarkReadMode==='manuell') return;
+  const delay = _pfMarkReadMode==='5s'?5000:_pfMarkReadMode==='30s'?30000:0;
+  const doMark=()=>{
+    fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[m.message_id],gelesen:true})});
+    const itemEl=document.querySelector('[data-msgid="'+m.message_id+'"]');
+    if(itemEl) itemEl.classList.remove('unread');
+    _pfTotalUnread=Math.max(0,_pfTotalUnread-1);
+    _pfUpdateSidebarBadge();
+  };
+  if(delay===0) doMark();
+  else _pfMarkReadTimer=setTimeout(doMark, delay);
+}
 
 function pfRenderThread(mails, currentMsgId) {
   const wrap=document.getElementById('pf-thread-wrap');
@@ -3559,6 +3878,15 @@ function esShowProtoTab(id) {{
         <option value="30">alle 30 Minuten</option>
       </select>
     </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Als gelesen markieren</span><span class="es-row-hint">Wann eine ge&ouml;ffnete Mail automatisch als gelesen gilt</span></div>
+      <select id="cfg-lese-markierung" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text);cursor:pointer">
+        <option value="sofort">Sofort beim &Ouml;ffnen</option>
+        <option value="5s">Nach 5 Sekunden</option>
+        <option value="30s">Nach 30 Sekunden</option>
+        <option value="manuell">Nur manuell</option>
+      </select>
+    </div>
     <div class="es-row" style="border-bottom:none">
       <div class="es-row-label">
         <span>Letzter Abruf</span>
@@ -4257,6 +4585,10 @@ function esShowProtoTab(id) {{
         const opt=prSel.querySelector('option[value="'+pr+'"]');
         if(opt) opt.selected=true; else prSel.value='0';
       }}
+      // Lese-Markierung
+      const lm=d.mail_postfach?.lese_markierung||'sofort';
+      const lmSel=document.getElementById('cfg-lese-markierung');
+      if(lmSel) lmSel.value=lm;
     }}).catch(()=>{{}});
     // Archiv laden
     fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
@@ -6605,7 +6937,8 @@ function saveSettings() {{
       intervall_sekunden: (parseInt(document.getElementById('cfg-mail-intervall')?.value)||5)*60
     }},
     mail_postfach: {{
-      refresh_intervall_min: parseInt(document.getElementById('cfg-postfach-refresh')?.value)||0
+      refresh_intervall_min: parseInt(document.getElementById('cfg-postfach-refresh')?.value)||0,
+      lese_markierung: document.getElementById('cfg-lese-markierung')?.value||'sofort'
     }},
     mail_klassifizierung: {{
       classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
@@ -9940,6 +10273,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     # ── Postfach API ──────────────────────────────────────────────────────────
     def _api_mail_folders(self):
         """GET /api/mail/folders — Liefert Konten + Ordner mit Mailanzahlen."""
+        _ensure_mail_columns()
         try:
             archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
             konten_raw = []
@@ -10062,6 +10396,91 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_gelesen(self, body):
+        """POST /api/mail/gelesen — Lese-Status mehrerer Mails setzen. {ids:[...], gelesen:bool}"""
+        _ensure_mail_columns()
+        ids     = body.get('ids', [])
+        gelesen = 1 if body.get('gelesen', True) else 0
+        if not ids:
+            self._json({'ok': False, 'error': 'ids fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            placeholders = ','.join('?' * len(ids))
+            conn.execute(f"UPDATE mails SET gelesen={gelesen} WHERE message_id IN ({placeholders})", ids)
+            conn.commit()
+            conn.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_flag(self, body):
+        """POST /api/mail/flag — Kennzeichnen-Status setzen. {message_id, flagged:bool}"""
+        _ensure_mail_columns()
+        msg_id  = body.get('message_id', '')
+        flagged = 1 if body.get('flagged', False) else 0
+        if not msg_id:
+            self._json({'ok': False, 'error': 'message_id fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.execute("UPDATE mails SET flagged=? WHERE message_id=?", (flagged, msg_id))
+            conn.commit()
+            conn.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_pin(self, body):
+        """POST /api/mail/pin — Angeheftet-Status setzen. {message_id, pinned:bool}"""
+        _ensure_mail_columns()
+        msg_id = body.get('message_id', '')
+        pinned = 1 if body.get('pinned', False) else 0
+        if not msg_id:
+            self._json({'ok': False, 'error': 'message_id fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.execute("UPDATE mails SET pinned=? WHERE message_id=?", (pinned, msg_id))
+            conn.commit()
+            conn.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_loeschen(self, body):
+        """POST /api/mail/loeschen — Mails aus DB löschen. {ids:[...]}"""
+        ids = body.get('ids', [])
+        if not ids:
+            self._json({'ok': False, 'error': 'ids fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            placeholders = ','.join('?' * len(ids))
+            conn.execute(f"DELETE FROM mails WHERE message_id IN ({placeholders})", ids)
+            conn.commit()
+            conn.close()
+            self._json({'ok': True, 'deleted': len(ids)})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_kira_markieren(self, body):
+        """POST /api/mail/kira-markieren — Mail als von Kira verwendet markieren."""
+        _ensure_mail_columns()
+        msg_id = body.get('message_id', '')
+        wert   = 1 if body.get('verwendet', True) else 0
+        if not msg_id:
+            self._json({'ok': False, 'error': 'message_id fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.execute("UPDATE mails SET kira_verwendet=? WHERE message_id=?", (wert, msg_id))
+            conn.commit()
+            conn.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_combined(self):
         """GET /api/mail/combined?q=&offset=&limit=&folder_type= — Gemeinsames Postfach aus mehreren Konten."""
         import re as _re
@@ -10100,9 +10519,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
                 like = f"%{q}%"
                 params += [like, like, like]
+            _ensure_mail_columns()
             total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
             rows  = conn.execute(
-                f"SELECT id,konto,betreff,absender,datum,message_id,hat_anhaenge,anhaenge,thread_id,text_plain,gelesen "
+                f"SELECT id,konto,betreff,absender,datum,message_id,hat_anhaenge,anhaenge,thread_id,text_plain,gelesen,"
+                f"COALESCE(flagged,0) as flagged,COALESCE(pinned,0) as pinned,"
+                f"COALESCE(kira_verwendet,0) as kira_verwendet "
                 f"FROM mails WHERE {where} ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -10124,6 +10546,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'text_plain':     (r['text_plain'] or '')[:120],
                     'unread':         (r['gelesen'] == 0) if r['gelesen'] is not None else False,
                     'konto':          r['konto'] or '',
+                    'flagged':        bool(r['flagged']),
+                    'pinned':         bool(r['pinned']),
+                    'kira_verwendet': bool(r['kira_verwendet']),
                 })
             conn.close()
             self._json({'total': total, 'mails': mails})
@@ -10150,10 +10575,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 like = f"%{q}%"
                 params += [like, like, like]
 
+            _ensure_mail_columns()
             total = conn.execute(f"SELECT COUNT(*) FROM mails WHERE {where}", params).fetchone()[0]
             rows  = conn.execute(
                 f"SELECT id,konto,konto_label,betreff,absender,an,datum,message_id,"
-                f"hat_anhaenge,anhaenge,thread_id,text_plain,gelesen FROM mails WHERE {where} "
+                f"hat_anhaenge,anhaenge,thread_id,text_plain,gelesen,"
+                f"COALESCE(flagged,0) as flagged,COALESCE(pinned,0) as pinned,"
+                f"COALESCE(kira_verwendet,0) as kira_verwendet FROM mails WHERE {where} "
                 f"ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -10186,6 +10614,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'thread_count':  tc,
                     'text_plain':    (r['text_plain'] or '')[:120],
                     'unread':        (r['gelesen'] == 0) if r['gelesen'] is not None else False,
+                    'flagged':       bool(r['flagged']),
+                    'pinned':        bool(r['pinned']),
+                    'kira_verwendet': bool(r['kira_verwendet']),
                 })
 
             conn.close()
@@ -10601,7 +11032,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'phone_number_id': secrets.get('whatsapp_phone_number_id', ''),
                 },
                 'mail_klassifizierung': cfg.get('mail_klassifizierung', {}),
-                'mail_postfach': cfg.get('mail_postfach', {'refresh_intervall_min': 0}),
+                'mail_postfach': {**{'refresh_intervall_min': 0, 'lese_markierung': 'sofort'}, **cfg.get('mail_postfach', {})},
             })
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
@@ -10879,6 +11310,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/favorites':
             self._api_mail_favorites_set(body)
+            return
+
+        if self.path == '/api/mail/gelesen':
+            self._api_mail_gelesen(body)
+            return
+
+        if self.path == '/api/mail/flag':
+            self._api_mail_flag(body)
+            return
+
+        if self.path == '/api/mail/pin':
+            self._api_mail_pin(body)
+            return
+
+        if self.path == '/api/mail/loeschen':
+            self._api_mail_loeschen(body)
+            return
+
+        if self.path == '/api/mail/kira-markieren':
+            self._api_mail_kira_markieren(body)
             return
 
         if self.path == '/api/mail/combined/konten':
