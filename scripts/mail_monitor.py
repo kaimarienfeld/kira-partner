@@ -54,6 +54,52 @@ IMAP_TIMEOUT  = 60
 OAUTH_SCOPES  = ["https://outlook.office.com/IMAP.AccessAsUser.All"]
 OAUTH_SCOPE_VERSION = "v4_office_com"
 
+# ── Zentrale KIRA Microsoft Entra App ───────────────────────────────────────
+KIRA_MS_CLIENT_ID    = "a0591b2d-86c3-4bc1-adf0-a10e197da07f"
+KIRA_MS_TENANT_ID    = "common"
+KIRA_MS_REDIRECT_URI = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+
+# ── Provider-Erkennung ───────────────────────────────────────────────────────
+_DOMAIN_PROVIDER = {
+    "outlook.com": "microsoft", "hotmail.com": "microsoft",
+    "live.com": "microsoft", "live.de": "microsoft",
+    "outlook.de": "microsoft", "msn.com": "microsoft",
+    "gmail.com": "google", "googlemail.com": "google",
+    "yahoo.com": "yahoo", "yahoo.de": "yahoo",
+    "ymail.com": "yahoo",
+    "aol.com": "aol",
+    "gmx.de": "gmx", "gmx.net": "gmx", "gmx.com": "gmx",
+    "web.de": "web_de",
+    "t-online.de": "t_online",
+    "icloud.com": "imap", "me.com": "imap",
+}
+_PROVIDER_SETTINGS = {
+    "microsoft": {"imap_server": "outlook.office365.com", "imap_port": 993, "imap_ssl": True, "auth": "oauth2_microsoft"},
+    "google":    {"imap_server": "imap.gmail.com",         "imap_port": 993, "imap_ssl": True, "auth": "oauth2_google"},
+    "yahoo":     {"imap_server": "imap.mail.yahoo.com",    "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+    "aol":       {"imap_server": "imap.aol.com",           "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+    "gmx":       {"imap_server": "imap.gmx.net",           "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+    "web_de":    {"imap_server": "imap.web.de",            "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+    "t_online":  {"imap_server": "secureimap.t-online.de", "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+    "imap":      {"imap_server": "",                       "imap_port": 993, "imap_ssl": True, "auth": "imap_password"},
+}
+
+def detect_provider(email_addr: str) -> dict:
+    """Erkennt Anbieter aus E-Mail-Domain und gibt Einstellungen zurück."""
+    domain = email_addr.split("@")[-1].lower() if "@" in email_addr else ""
+    if domain.endswith(".onmicrosoft.com"):
+        provider = "microsoft"
+    else:
+        provider = _DOMAIN_PROVIDER.get(domain, "imap")
+    settings = dict(_PROVIDER_SETTINGS.get(provider, _PROVIDER_SETTINGS["imap"]))
+    settings["provider"] = provider
+    settings["domain"] = domain
+    return settings
+
+# ── Account Health Status (in-memory) ───────────────────────────────────────
+_account_health: dict = {}  # email → {status, last_check, error, inbox_count}
+_health_lock = threading.Lock()
+
 ORDNER_AUSSCHLIESSEN = [
     "spam", "junk", "trash", "papierkorb", "gelöschte", "deleted",
     "geloeschte", "outbox", "entwürfe", "entwurfe", "drafts",
@@ -132,15 +178,36 @@ def _msal_app(konto):
     return app, cache, cache_path
 
 
+def _msal_app_kira(email_addr: str):
+    """MSAL App mit der zentralen KIRA Entra App (kein per-Konto client_id nötig)."""
+    if not MSAL_OK:
+        raise RuntimeError("msal nicht installiert: pip install msal")
+    cache = msal.SerializableTokenCache()
+    cache_path = _token_cache_path(email_addr)
+    if cache_path.exists():
+        cache.deserialize(cache_path.read_text(encoding="utf-8"))
+    app = msal.PublicClientApplication(
+        KIRA_MS_CLIENT_ID,
+        authority=f"https://login.microsoftonline.com/{KIRA_MS_TENANT_ID}",
+        token_cache=cache,
+    )
+    return app, cache, cache_path
+
+
 def _save_token_cache(cache, path):
     if cache.has_state_changed:
         path.write_text(cache.serialize(), encoding="utf-8")
 
 
 def get_oauth2_token(konto):
-    """Holt OAuth2 Access Token (aus Cache oder Device-Flow)."""
-    app, cache, cache_path = _msal_app(konto)
+    """Holt OAuth2 Access Token (aus Cache oder Device-Flow / Browser-Flow)."""
     email_addr = konto["email"]
+    # Zentrale KIRA-App bevorzugen wenn kein per-Konto client_id gesetzt
+    use_kira_app = not konto.get("oauth2_client_id", "").strip()
+    if use_kira_app:
+        app, cache, cache_path = _msal_app_kira(email_addr)
+    else:
+        app, cache, cache_path = _msal_app(konto)
 
     # Scope-Version prüfen
     version_path = cache_path.parent / (cache_path.stem + "_version.txt")
@@ -186,6 +253,118 @@ def get_oauth2_token(konto):
     version_path.write_text(OAUTH_SCOPE_VERSION)
     log.info(f"OAuth2 OK für {email_addr}")
     return result["access_token"]
+
+
+# ── OAuth2 Jobs (für Browser-Flow aus UI) ───────────────────────────────────
+_oauth_jobs: dict = {}  # job_id → {status, email, error, token}
+_oauth_jobs_lock = threading.Lock()
+
+
+def start_oauth_browser_flow(email_addr: str, job_id: str):
+    """Startet Browser-OAuth in Thread. Status via get_oauth_job_status()."""
+    def _run():
+        try:
+            app, cache, cache_path = _msal_app_kira(email_addr)
+            # Silent zuerst
+            accounts = app.get_accounts(username=email_addr)
+            if accounts:
+                result = app.acquire_token_silent(OAUTH_SCOPES, account=accounts[0])
+                if result and "access_token" in result:
+                    _save_token_cache(cache, cache_path)
+                    with _oauth_jobs_lock:
+                        _oauth_jobs[job_id] = {"status": "done", "email": email_addr, "error": None}
+                    log.info(f"OAuth silent OK für {email_addr}")
+                    return
+            # Interaktiver Browser-Flow
+            log.info(f"Browser-OAuth gestartet für {email_addr}")
+            result = app.acquire_token_interactive(
+                scopes=OAUTH_SCOPES,
+                login_hint=email_addr,
+            )
+            if "access_token" in result:
+                _save_token_cache(cache, cache_path)
+                with _oauth_jobs_lock:
+                    _oauth_jobs[job_id] = {"status": "done", "email": email_addr, "error": None}
+                log.info(f"Browser-OAuth OK für {email_addr}")
+            else:
+                err = result.get("error_description") or result.get("error") or "Unbekannter Fehler"
+                with _oauth_jobs_lock:
+                    _oauth_jobs[job_id] = {"status": "error", "email": email_addr, "error": err}
+                log.error(f"Browser-OAuth Fehler für {email_addr}: {err}")
+        except Exception as e:
+            with _oauth_jobs_lock:
+                _oauth_jobs[job_id] = {"status": "error", "email": email_addr, "error": str(e)}
+            log.error(f"Browser-OAuth Exception für {email_addr}: {e}")
+
+    with _oauth_jobs_lock:
+        _oauth_jobs[job_id] = {"status": "pending", "email": email_addr, "error": None}
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+
+def get_oauth_job_status(job_id: str) -> dict:
+    with _oauth_jobs_lock:
+        return dict(_oauth_jobs.get(job_id, {"status": "unbekannt"}))
+
+
+def test_microsoft_app() -> dict:
+    """Testet ob die zentrale KIRA Entra App erreichbar und gültig ist."""
+    if not MSAL_OK:
+        return {"ok": False, "error": "msal nicht installiert"}
+    try:
+        import urllib.request as _ur
+        # Einfacher Discovery-Request gegen den OIDC-Endpoint der App
+        url = f"https://login.microsoftonline.com/{KIRA_MS_TENANT_ID}/v2.0/.well-known/openid-configuration"
+        with _ur.urlopen(url, timeout=8) as r:
+            data = json.loads(r.read())
+        # MSAL App instanziieren (kein Token-Request — nur Erreichbarkeit)
+        app = msal.PublicClientApplication(
+            KIRA_MS_CLIENT_ID,
+            authority=f"https://login.microsoftonline.com/{KIRA_MS_TENANT_ID}",
+        )
+        return {
+            "ok": True,
+            "client_id": KIRA_MS_CLIENT_ID,
+            "tenant": KIRA_MS_TENANT_ID,
+            "issuer": data.get("issuer", ""),
+            "token_endpoint": data.get("token_endpoint", "")[:60],
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
+# ── Account Health Check ─────────────────────────────────────────────────────
+def check_account_health(email_addr: str) -> dict:
+    """Echte IMAP-Verbindungsprüfung für ein Konto."""
+    konten = _load_accounts()
+    konto = next((k for k in konten if k["email"] == email_addr), None)
+    if not konto:
+        result = {"status": "unbekannt", "error": "Konto nicht gefunden", "inbox_count": 0}
+    else:
+        try:
+            imap = imap_connect(konto)
+            typ, data = imap.select("INBOX", readonly=True)
+            inbox_count = int(data[0]) if data and data[0] and data[0].isdigit() else 0
+            imap.logout()
+            result = {"status": "ok", "error": None, "inbox_count": inbox_count}
+        except Exception as e:
+            err = str(e)
+            if "authentication" in err.lower() or "login" in err.lower() or "token" in err.lower():
+                status = "auth_fehler"
+            else:
+                status = "fehler"
+            result = {"status": status, "error": err[:200], "inbox_count": 0}
+    result["email"] = email_addr
+    result["last_check"] = datetime.utcnow().isoformat()
+    with _health_lock:
+        _account_health[email_addr] = result
+    return result
+
+
+def get_all_health_status() -> dict:
+    """Gibt gecachten Health-Status aller Konten zurück."""
+    with _health_lock:
+        return dict(_account_health)
 
 
 def imap_connect(konto):

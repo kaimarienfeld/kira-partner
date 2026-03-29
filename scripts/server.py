@@ -2927,7 +2927,36 @@ function esShowProtoTab(id) {{
   .es-mk-btn:hover{{opacity:.85}}
   .es-mk-btn.sec{{background:var(--bg-card);color:var(--text);border:1px solid var(--border)}}
   .es-mk-btn.danger{{background:rgba(200,60,60,.15);color:#c84444;border:1px solid rgba(200,60,60,.3)}}
+  .es-mk-btn.warn{{background:rgba(255,140,0,.15);color:#e07800;border:1px solid rgba(255,140,0,.35)}}
   .es-mk-btn:disabled{{opacity:.5;cursor:default}}
+  /* ── Ampel ── */
+  .es-mk-ampel{{font-size:18px;flex-shrink:0;cursor:help}}
+  .es-mk-ampel-gruen{{color:#28c850}}
+  .es-mk-ampel-gelb{{color:#f0a000}}
+  .es-mk-ampel-rot{{color:#c83c3c}}
+  /* ── Konto-Wizard ── */
+  .kira-wiz-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center}}
+  .kira-wiz-box{{background:var(--bg-card);border-radius:16px;width:560px;max-width:96vw;box-shadow:0 8px 48px rgba(0,0,0,.35);padding:0;overflow:hidden}}
+  .kira-wiz-step{{padding:48px 52px;text-align:center}}
+  .kira-wiz-dots{{display:flex;justify-content:center;gap:8px;margin-bottom:32px}}
+  .kira-wiz-dot{{width:10px;height:10px;border-radius:50%;background:var(--border)}}
+  .kira-wiz-dot.active{{background:var(--accent)}}
+  .kira-wiz-title{{font-size:24px;font-weight:700;color:var(--text);margin:0 0 10px}}
+  .kira-wiz-sub{{font-size:14px;color:var(--text-muted);margin:0 0 28px;line-height:1.5}}
+  .kira-wiz-fields{{text-align:left;margin-bottom:28px}}
+  .kira-wiz-field{{margin-bottom:16px}}
+  .kira-wiz-field label{{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}}
+  .kira-wiz-field input,.kira-wiz-field select{{width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px}}
+  .kira-wiz-field input:focus,.kira-wiz-field select:focus{{outline:none;border-color:var(--accent)}}
+  .kira-wiz-btns{{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}}
+  .kira-wiz-link{{font-size:13px;color:var(--accent);text-decoration:none}}
+  .kira-wiz-link:hover{{text-decoration:underline}}
+  .kira-wiz-found-box{{display:flex;align-items:center;gap:16px;background:var(--bg-raised);border-radius:12px;padding:16px 20px;margin:0 auto 4px;max-width:340px;text-align:left}}
+  .kira-wiz-found-ico{{font-size:28px}}
+  .kira-wiz-found-name{{font-size:15px;font-weight:700;color:var(--text)}}
+  .kira-wiz-found-detail{{font-size:12px;color:var(--text-muted);margin-top:3px}}
+  .kira-wiz-spinner{{width:52px;height:52px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:kira-spin .8s linear infinite;margin:20px auto}}
+  @keyframes kira-spin{{to{{transform:rotate(360deg)}}}}
   /* ── Gesamt-Header ── */
   .es-mk-total{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-card);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;gap:8px}}
   .es-mk-total-info{{font-size:13px;color:var(--text-muted)}}
@@ -2958,7 +2987,7 @@ function esShowProtoTab(id) {{
 
   <!-- Konto-Liste -->
   <div id="es-mail-konten-list"><div style="padding:12px;color:var(--text-muted);font-size:13px">Lade Konten...</div></div>
-  <button class="es-mk-btn" style="margin-top:8px" onclick="esMkAddDialog()">+ Konto hinzuf&uuml;gen</button>
+  <button class="es-mk-btn" style="margin-top:8px" onclick="esMkWizardOpen()">+ Konto hinzuf&uuml;gen</button>
 
   <!-- Mail-Monitor -->
   <div class="es-grp" style="margin-top:24px">
@@ -3050,41 +3079,72 @@ function esShowProtoTab(id) {{
       const std = data.standard_konto || '';
       const konten = data.konten || [];
       if(!konten.length) {{ list.innerHTML='<div style="padding:12px;color:var(--text-muted);font-size:13px">Keine Konten konfiguriert.</div>'; return; }}
-      list.innerHTML = konten.map(k=>{{
-        const safe = k.email.replace(/[@.]/g,'_');
-        let sbadge='';
-        if(k.token_status==='ok') sbadge='<span class="es-mk-status es-mk-ok">&#x2713; Verbunden</span>';
-        else if(k.token_status==='expired') sbadge='<span class="es-mk-status es-mk-expired">&#x26A0; Token abgelaufen</span>';
-        else sbadge='<span class="es-mk-status es-mk-missing">Nicht verbunden</span>';
-        return `<div class="es-mk-card" id="es-mk-card-${{safe}}">
-          <div class="es-mk-card-head">
-            <input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">
-            <div class="es-mk-ico">&#x2709;</div>
-            <div class="es-mk-body">
-              <div class="es-mk-email">${{k.email}} ${{k.email===std?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
-              <div class="es-mk-desc">${{k.beschreibung||''}}</div>
+      // Health-Status laden und Karten rendern
+      fetch('/api/mail/konto/health').then(r=>r.json()).then(healthData=>{{
+        const health = healthData.health || {{}};
+        list.innerHTML = konten.map(k=>{{
+          const safe = k.email.replace(/[@.]/g,'_');
+          const h = health[k.email] || {{}};
+          // Ampel-Badge: bevorzuge echten Health-Status, Fallback auf Token-Status
+          let ampel='', ampelClass='', ampelTip='';
+          if(h.status==='ok') {{
+            ampel='&#x25CF;'; ampelClass='es-mk-ampel-gruen'; ampelTip='Verbindung aktiv ('+new Date(h.last_check||0).toLocaleTimeString()+')';
+          }} else if(h.status==='auth_fehler') {{
+            ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Authentifizierung fehlgeschlagen: '+(h.error||'');
+          }} else if(h.status==='fehler') {{
+            ampel='&#x25CF;'; ampelClass='es-mk-ampel-gelb'; ampelTip='Verbindungsfehler: '+(h.error||'');
+          }} else if(k.token_status==='ok') {{
+            ampel='&#x25CF;'; ampelClass='es-mk-ampel-gelb'; ampelTip='Token vorhanden — noch nicht geprüft';
+          }} else {{
+            ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Nicht verbunden';
+          }}
+          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler' || k.token_status!=='ok';
+          return `<div class="es-mk-card" id="es-mk-card-${{safe}}">
+            <div class="es-mk-card-head">
+              <input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">
+              <div class="es-mk-ico">&#x2709;</div>
+              <div class="es-mk-body">
+                <div class="es-mk-email">${{k.email}} ${{k.email===std?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
+                <div class="es-mk-desc">${{k.beschreibung||''}}</div>
+              </div>
+              <span class="es-mk-ampel ${{ampelClass}}" title="${{ampelTip}}">${{ampel}}</span>
             </div>
-            ${{sbadge}}
-          </div>
-          <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
-            <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
-            <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-arc-${{safe}}">–</div><div class="es-mk-stat-lbl">Archiviert</div></div>
-          </div>
-          <div class="es-mk-actions">
-            <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
-            <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Testen</button>
-            <button class="es-mk-btn sec" id="esbtn-${{safe}}" onclick="esMkConnect('${{k.email}}')">${{k.token_status==='ok'?'Token erneuern':'Verbinden'}}</button>
-            <button class="es-mk-btn sec" onclick="esMkTokenDel('${{k.email}}')">Token l&ouml;schen</button>
-            <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">L&ouml;schen</button>
-          </div>
-          <div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div>
-          <div id="es-kira-ord-${{safe}}" style="display:none"></div>
-        </div>`;
-      }}).join('');
-      // Stats lazy laden
-      konten.forEach(k=>esMkLoadStats(k.email));
-      // Gesamt
-      esLoadTotalCount();
+            <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
+              <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
+              <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-arc-${{safe}}">–</div><div class="es-mk-stat-lbl">Archiviert</div></div>
+            </div>
+            <div class="es-mk-actions">
+              <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
+              <button class="es-mk-btn sec" onclick="esMkTest('${{k.email}}',this)">&#x26A1; Testen</button>
+              ${{needsReconnect
+                ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
+                : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">Token erneuern</button>`
+              }}
+              <button class="es-mk-btn sec" onclick="esMkTokenDel('${{k.email}}')">Token l&ouml;schen</button>
+              <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">L&ouml;schen</button>
+            </div>
+            <div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div>
+            <div id="es-kira-ord-${{safe}}" style="display:none"></div>
+          </div>`;
+        }}).join('');
+        // Stats lazy laden
+        konten.forEach(k=>esMkLoadStats(k.email));
+        esLoadTotalCount();
+      }}).catch(()=>{{
+        // Fallback ohne Health
+        list.innerHTML = konten.map(k=>{{
+          const safe=k.email.replace(/[@.]/g,'_');
+          return `<div class="es-mk-card" id="es-mk-card-${{safe}}">
+            <div class="es-mk-card-head"><div class="es-mk-ico">&#x2709;</div>
+            <div class="es-mk-body"><div class="es-mk-email">${{k.email}}</div><div class="es-mk-desc">${{k.beschreibung||''}}</div></div></div>
+            <div class="es-mk-actions">
+              <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
+              <button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbinden</button>
+            </div></div>`;
+        }}).join('');
+        konten.forEach(k=>esMkLoadStats(k.email));
+        esLoadTotalCount();
+      }});
     }}).catch(()=>{{
       const list=document.getElementById('es-mail-konten-list');
       if(list) list.innerHTML='<div style="padding:12px;color:#c84444;font-size:13px">Fehler beim Laden.</div>';
@@ -3185,61 +3245,209 @@ function esShowProtoTab(id) {{
     el.classList.toggle('active');
     // TODO: POST /api/mail/konto/ordner-kira
   }};
-  window.esMkAddDialog = function() {{
-    const html=`<div class="es-mk-dialog-overlay" id="es-mk-add-dialog" onclick="if(event.target===this)this.remove()">
-      <div class="es-mk-dialog">
-        <h3>Konto hinzuf&uuml;gen</h3>
-        <div class="es-mk-dialog-row"><label>Konto-Typ</label><select id="dlg-typ" onchange="esMkDlgTyp()">
-          <option value="oauth2">Microsoft 365 / Exchange (OAuth2)</option>
-          <option value="imap">Standard IMAP + Passwort</option>
-          <option value="ms_app">Microsoft + App-Passwort (IMAP)</option>
-        </select></div>
-        <div class="es-mk-dialog-row"><label>E-Mail-Adresse</label><input type="email" id="dlg-email" placeholder="name@domain.de"></div>
-        <div class="es-mk-dialog-row"><label>Beschreibung</label><input type="text" id="dlg-desc" placeholder="z.B. Firmen-Info-Konto"></div>
-        <div id="dlg-oauth2-fields">
-          <div class="es-mk-dialog-row"><label>IMAP-Server</label><input type="text" id="dlg-imap-server" value="outlook.office365.com"></div>
-          <div class="es-mk-dialog-row"><label>Port</label><input type="number" id="dlg-imap-port" value="993"></div>
-          <div style="font-size:12px;color:var(--text-muted);padding:8px 0">OAuth2-Client-ID und Tenant-ID werden aus der bestehenden App-Konfiguration übernommen.</div>
-        </div>
-        <div id="dlg-imap-fields" style="display:none">
-          <div class="es-mk-dialog-row"><label>IMAP-Server</label><input type="text" id="dlg-imap-server2" placeholder="imap.gmail.com"></div>
-          <div class="es-mk-dialog-row"><label>Port</label><input type="number" id="dlg-imap-port2" value="993"></div>
-          <div class="es-mk-dialog-row"><label>Benutzername</label><input type="text" id="dlg-login" placeholder="email@gmail.com"></div>
-          <div class="es-mk-dialog-row"><label>Passwort / App-Passwort</label><input type="password" id="dlg-passwort" placeholder="App-Passwort aus Kontoeinstellungen"></div>
-        </div>
-        <div class="es-mk-dialog-btns">
-          <button class="es-mk-btn sec" onclick="document.getElementById('es-mk-add-dialog').remove()">Abbrechen</button>
-          <button class="es-mk-btn" onclick="esMkSaveNew()">Speichern</button>
-        </div>
+  // ── Konto-Wizard ────────────────────────────────────────────────────────────
+  let _wiz = {{step:0, email:'', name:'', provider:'', settings:{{}}, jobId:null, isReconnect:false}};
+
+  window.esMkWizardOpen = function(reconnectEmail) {{
+    _wiz = {{step:1, email:reconnectEmail||'', name:'', provider:'', settings:{{}}, jobId:null, isReconnect:!!reconnectEmail}};
+    const overlay = document.createElement('div');
+    overlay.id = 'kira-wiz-overlay';
+    overlay.className = 'kira-wiz-overlay';
+    overlay.innerHTML = `<div class="kira-wiz-box" id="kira-wiz-box"></div>`;
+    document.body.appendChild(overlay);
+    _wizRender();
+  }};
+  window.esMkReconnect = function(email, btn) {{
+    esMkWizardOpen(email);
+  }};
+
+  function _wizClose() {{
+    const o=document.getElementById('kira-wiz-overlay');
+    if(o) o.remove();
+    esLoadMailKonten();
+  }}
+
+  function _wizRender() {{
+    const box=document.getElementById('kira-wiz-box');
+    if(!box) return;
+    if(_wiz.step===1) box.innerHTML=_wizStep1();
+    else if(_wiz.step===2) {{ box.innerHTML=_wizStep2(); _wizDetectProvider(); }}
+    else if(_wiz.step===3) box.innerHTML=_wizStep3();
+    else if(_wiz.step===4) box.innerHTML=_wizStep4();
+    else if(_wiz.step===5) {{ box.innerHTML=_wizStep5(); _wizStartOAuth(); }}
+    else if(_wiz.step===6) box.innerHTML=_wizStep6();
+  }}
+
+  function _wizStep1() {{
+    const title=_wiz.isReconnect?'Verbindung wiederherstellen':'Konto hinzuf\u00fcgen';
+    const sub=_wiz.isReconnect?`Neuen Login f\u00fcr <strong>${{_wiz.email}}</strong> einrichten`:'Bitte Name und E\u2011Mail\u2011Adresse eingeben';
+    return `<div class="kira-wiz-step">
+      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span></div>
+      <h2 class="kira-wiz-title">${{title}}</h2>
+      <p class="kira-wiz-sub">${{sub}}</p>
+      <div class="kira-wiz-fields">
+        ${{!_wiz.isReconnect?`<div class="kira-wiz-field"><label>Ihr Name</label><input id="wiz-name" type="text" placeholder="Max Mustermann" value="${{_wiz.name}}"></div>`:''}}<div class="kira-wiz-field"><label>E\u2011Mail\u2011Adresse</label><input id="wiz-email" type="email" placeholder="name@firma.de" value="${{_wiz.email}}" ${{_wiz.isReconnect?'readonly':''}}></div>
+        ${{!_wiz.isReconnect?`<div style="text-align:center;margin-top:8px"><a href="#" class="kira-wiz-link" onclick="return false">Konto aus einem anderen E\u2011Mail\u2011Client importieren</a></div>`:''}}</div>
+      <div class="kira-wiz-btns">
+        <button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button>
+        <button class="es-mk-btn" onclick="_wizStep1Next()">Weiter</button>
       </div>
     </div>`;
-    document.body.insertAdjacentHTML('beforeend',html);
+  }}
+  window._wizStep1Next = function() {{
+    const e=document.getElementById('wiz-email');
+    const n=document.getElementById('wiz-name');
+    if(!e||!e.value.trim()){{showToast('E-Mail-Adresse eingeben','warnung');return;}}
+    _wiz.email=e.value.trim();
+    _wiz.name=n?n.value.trim():'';
+    _wiz.step=2; _wizRender();
   }};
-  window.esMkDlgTyp = function() {{
-    const typ=document.getElementById('dlg-typ').value;
-    document.getElementById('dlg-oauth2-fields').style.display=typ==='oauth2'?'':'none';
-    document.getElementById('dlg-imap-fields').style.display=typ==='imap'||typ==='ms_app'?'':'none';
-  }};
-  window.esMkSaveNew = function() {{
-    const typ=document.getElementById('dlg-typ').value;
-    const email=document.getElementById('dlg-email').value.trim();
-    if(!email){{showToast('E-Mail-Adresse fehlt','warnung');return;}}
-    const body={{
-      email,
-      beschreibung:document.getElementById('dlg-desc').value,
-      auth_methode:typ==='oauth2'?'oauth2':'imap_password',
-      imap_server:typ==='oauth2'?(document.getElementById('dlg-imap-server').value||'outlook.office365.com'):(document.getElementById('dlg-imap-server2')?.value||''),
-      imap_port:parseInt(typ==='oauth2'?(document.getElementById('dlg-imap-port').value||993):(document.getElementById('dlg-imap-port2')?.value||993)),
-      imap_ssl:true,
-      login:document.getElementById('dlg-login')?.value||email,
-      passwort:document.getElementById('dlg-passwort')?.value||''
-    }};
-    fetch('/api/mail/konto/hinzufuegen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+
+  function _wizStep2() {{
+    return `<div class="kira-wiz-step kira-wiz-loading">
+      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span><span class="kira-wiz-dot"></span></div>
+      <h2 class="kira-wiz-title">Einstellungen werden ermittelt\u2026</h2>
+      <p class="kira-wiz-sub">Bitte warten Sie, w\u00e4hrend wir den Anbieter erkennen.</p>
+      <div class="kira-wiz-spinner"></div>
+      <div class="kira-wiz-btns"><button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button></div>
+    </div>`;
+  }}
+  function _wizDetectProvider() {{
+    fetch('/api/mail/provider-detect?email='+encodeURIComponent(_wiz.email))
     .then(r=>r.json()).then(d=>{{
-      if(d.ok){{showToast('Konto hinzugefügt','ok');document.getElementById('es-mk-add-dialog').remove();esLoadMailKonten();}}
+      _wiz.provider=d.provider||'imap';
+      _wiz.settings={{imap_server:d.imap_server||'',imap_port:d.imap_port||993,imap_ssl:true,auth:d.auth||'imap_password'}};
+      _wiz.step=3; _wizRender();
+    }}).catch(()=>{{_wiz.provider='imap';_wiz.step=3;_wizRender();}});
+  }}
+
+  function _wizStep3() {{
+    const icons={{'microsoft':'&#x1F4E7;','google':'&#x1F4E7;','imap':'&#x1F4E8;'}};
+    const labels={{'microsoft':'Microsoft 365 / Outlook','google':'Google Mail','yahoo':'Yahoo Mail','aol':'AOL Mail','gmx':'GMX','web_de':'Web.de','t_online':'T-Online','imap':'Standard IMAP'}};
+    const ic=icons[_wiz.provider]||'&#x1F4E8;';
+    const lbl=labels[_wiz.provider]||_wiz.provider;
+    return `<div class="kira-wiz-step">
+      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot"></span></div>
+      <h2 class="kira-wiz-title">Einstellungen wurden gefunden</h2>
+      <p class="kira-wiz-sub">KIRA hat passende Einstellungen f\u00fcr <strong>${{_wiz.email}}</strong> erkannt.</p>
+      <div class="kira-wiz-found-box">
+        <div class="kira-wiz-found-ico">${{ic}}</div>
+        <div class="kira-wiz-found-info">
+          <div class="kira-wiz-found-name">${{lbl}}</div>
+          <div class="kira-wiz-found-detail">${{_wiz.settings.imap_server||'Automatisch'}} &middot; Port ${{_wiz.settings.imap_port}}</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px"><a href="#" class="kira-wiz-link" onclick="_wiz.step=4;_wizRender();return false">Server-Einstellungen bearbeiten</a></div>
+      <div class="kira-wiz-btns">
+        <button class="es-mk-btn sec" onclick="_wiz.step=1;_wizRender()">Zur\u00fcck</button>
+        <button class="es-mk-btn" onclick="_wizStep3Next()">Weiter</button>
+      </div>
+    </div>`;
+  }}
+  window._wizStep3Next = function() {{
+    if(_wiz.provider==='microsoft') {{ _wiz.step=5; _wizRender(); }}
+    else if(_wiz.settings.auth==='imap_password') {{ _wiz.step=4; _wizRender(); }}
+    else {{ _wiz.step=5; _wizRender(); }}
+  }};
+
+  function _wizStep4() {{
+    const s=_wiz.settings;
+    return `<div class="kira-wiz-step">
+      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span></div>
+      <h2 class="kira-wiz-title">Einstellungen bearbeiten</h2>
+      <p class="kira-wiz-sub">Expertenmodus &mdash; nur bei Bedarf anpassen.</p>
+      <div class="kira-wiz-fields">
+        <div class="kira-wiz-field"><label>Authentifizierung</label><select id="wiz-auth">
+          <option value="oauth2_microsoft" ${{s.auth==='oauth2_microsoft'?'selected':''}}>Microsoft OAuth 2.0 (empfohlen)</option>
+          <option value="oauth2_google" ${{s.auth==='oauth2_google'?'selected':''}}>Google OAuth 2.0</option>
+          <option value="imap_password" ${{s.auth==='imap_password'?'selected':''}}>Benutzername und Passwort</option>
+        </select></div>
+        <div class="kira-wiz-field"><label>IMAP-Server</label><input id="wiz-server" type="text" value="${{s.imap_server}}"></div>
+        <div class="kira-wiz-field"><label>Port</label><input id="wiz-port" type="number" value="${{s.imap_port}}"></div>
+        <div id="wiz-pw-fields" style="${{s.auth==='imap_password'?'':'display:none'}}">
+          <div class="kira-wiz-field"><label>Passwort / App-Passwort</label><input id="wiz-pw" type="password" placeholder="App-Passwort"></div>
+        </div>
+      </div>
+      <div class="kira-wiz-btns">
+        <button class="es-mk-btn sec" onclick="_wiz.step=3;_wizRender()">Zur\u00fcck</button>
+        <button class="es-mk-btn" onclick="_wizStep4Next()">Weiter</button>
+      </div>
+    </div>`;
+  }}
+  window._wizStep4Next = function() {{
+    _wiz.settings.imap_server=document.getElementById('wiz-server').value;
+    _wiz.settings.imap_port=parseInt(document.getElementById('wiz-port').value)||993;
+    _wiz.settings.auth=document.getElementById('wiz-auth').value;
+    _wiz.settings.passwort=document.getElementById('wiz-pw')?.value||'';
+    if(_wiz.settings.auth==='imap_password') _wizSaveImap();
+    else {{ _wiz.step=5; _wizRender(); }}
+  }};
+
+  function _wizStep5() {{
+    return `<div class="kira-wiz-step kira-wiz-loading">
+      <div class="kira-wiz-dots"><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span><span class="kira-wiz-dot active"></span></div>
+      <h2 class="kira-wiz-title">Microsoft-Login</h2>
+      <p class="kira-wiz-sub">Ein Browser-Fenster \u00f6ffnet sich. Bitte melden Sie sich mit <strong>${{_wiz.email}}</strong> an.</p>
+      <div class="kira-wiz-spinner"></div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Warten auf Anmeldung\u2026</p>
+      <div class="kira-wiz-btns"><button class="es-mk-btn sec" onclick="_wizClose()">Abbrechen</button></div>
+    </div>`;
+  }}
+  function _wizStartOAuth() {{
+    // Zuerst Konto anlegen falls neu
+    const savePromise = _wiz.isReconnect
+      ? Promise.resolve({{ok:true}})
+      : fetch('/api/mail/konto/hinzufuegen',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+          body:JSON.stringify({{email:_wiz.email,beschreibung:_wiz.name||_wiz.email.split('@')[0],
+            auth_methode:'oauth2',imap_server:_wiz.settings.imap_server||'outlook.office365.com',
+            imap_port:_wiz.settings.imap_port||993,imap_ssl:true}})}}).then(r=>r.json());
+    savePromise.then(saved=>{{
+      if(!saved.ok && !_wiz.isReconnect){{showToast('Fehler: '+(saved.error||'?'),'fehler');return;}}
+      const endpoint = _wiz.isReconnect ? '/api/mail/konto/reconnect' : '/api/mail/konto/oauth-start';
+      return fetch(endpoint,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}})
+        .then(r=>r.json()).then(d=>{{
+          if(!d.ok){{showToast('OAuth-Fehler: '+(d.error||'?'),'fehler');_wizClose();return;}}
+          _wiz.jobId=d.job_id;
+          _wizPollOAuth();
+        }});
+    }}).catch(e=>{{showToast('Fehler: '+e,'fehler');_wizClose();}});
+  }}
+  function _wizPollOAuth() {{
+    let polls=0;
+    const timer=setInterval(()=>{{
+      polls++;
+      fetch('/api/mail/konto/oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
+        if(s.status==='done'){{clearInterval(timer);_wiz.step=6;_wizRender();}}
+        else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error;_wizRender();}}
+        else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
+      }}).catch(()=>{{}});
+    }},2000);
+  }}
+
+  function _wizSaveImap() {{
+    const s=_wiz.settings;
+    fetch('/api/mail/konto/hinzufuegen',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{email:_wiz.email,beschreibung:_wiz.name||_wiz.email.split('@')[0],
+        auth_methode:'imap_password',imap_server:s.imap_server,imap_port:s.imap_port,
+        imap_ssl:true,login:_wiz.email,passwort:s.passwort||''}})}}
+    ).then(r=>r.json()).then(d=>{{
+      if(d.ok){{_wiz.step=6;_wizRender();}}
       else showToast('Fehler: '+(d.error||'?'),'fehler');
     }}).catch(()=>showToast('Fehler','fehler'));
-  }};
+  }}
+
+  function _wizStep6() {{
+    const ok=!_wiz._error;
+    return `<div class="kira-wiz-step">
+      <h2 class="kira-wiz-title">${{ok?'&#x2713; Erfolgreich verbunden':'&#x26A0; Verbindung fehlgeschlagen'}}</h2>
+      <p class="kira-wiz-sub">${{ok
+        ?`<strong>${{_wiz.email}}</strong> wurde erfolgreich eingerichtet.`
+        :`Fehler: ${{_wiz._error||'Unbekannt'}}`}}</p>
+      <div class="kira-wiz-btns">
+        ${{!ok?`<button class="es-mk-btn sec" onclick="_wiz.step=1;_wiz._error=null;_wizRender()">Nochmal versuchen</button>`:''}}<button class="es-mk-btn" onclick="_wizClose()">Schlie\u00dfen</button>
+      </div>
+    </div>`;
+  }}
   window.esMkArchivPruefen = function() {{
     const pfad=document.getElementById('cfg-archiv-pfad').value;
     if(!pfad){{showToast('Bitte Pfad eingeben','warnung');return;}}
@@ -3307,6 +3515,27 @@ function esShowProtoTab(id) {{
 <div class="es-sec-panel" id="es-sec-integrationen">
   <div class="es-sec-h">Integrationen</div>
   <div class="es-sec-sub">Externe Dienste verbinden.</div>
+
+  <!-- Microsoft Entra App -->
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F511; Microsoft KIRA Entra App</div>
+    <div class="es-grp-sub">Zentrale Microsoft-App f&uuml;r den OAuth-Login aller Microsof-Konten. Kein per-Konto Setup n&ouml;tig.</div>
+    <div class="es-row">
+      <div class="es-row-label"><span>App-ID (Client)</span></div>
+      <code style="font-size:12px;background:var(--bg-raised);padding:4px 8px;border-radius:5px;color:var(--text-muted)">a0591b2d-86c3-4bc1-adf0-a10e197da07f</code>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Mandant</span></div>
+      <code style="font-size:12px;background:var(--bg-raised);padding:4px 8px;border-radius:5px;color:var(--text-muted)">common (Mehrere Organisationen)</code>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Status</span></div>
+      <span id="ms-app-status" style="font-size:13px;color:var(--text-muted)">Noch nicht gepr&uuml;ft</span>
+    </div>
+    <div style="margin-top:8px">
+      <button class="es-mk-btn sec" onclick="esMsAppTest(this)">&#x26A1; App-Verbindung testen</button>
+    </div>
+  </div>
 
   <!-- WhatsApp Business API -->
   <div class="es-grp">
@@ -3376,6 +3605,24 @@ function esShowProtoTab(id) {{
       if(t==='KIRATEST') showToast('Webhook-Verifizierung erfolgreich ✓','ok');
       else showToast('Webhook antwortet falsch: '+t,'warnung');
     }}).catch(()=>showToast('Fehler beim Test','fehler'));
+  }};
+  window.esMsAppTest = function(btn) {{
+    if(btn){{btn.disabled=true;btn.textContent='Teste\u2026';}}
+    fetch('/api/mail/microsoft-app/test',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{
+      const el=document.getElementById('ms-app-status');
+      if(d.ok) {{
+        if(el) el.innerHTML='<span style="color:#28c850;font-weight:600">&#x2713; Erreichbar</span> &middot; Issuer: '+d.issuer.replace('https://','').substring(0,40);
+        showToast('Microsoft KIRA App erreichbar \u2713','ok');
+      }} else {{
+        if(el) el.innerHTML='<span style="color:#c83c3c;font-weight:600">&#x26A0; Fehler</span>: '+d.error;
+        showToast('App-Test fehlgeschlagen: '+(d.error||'?'),'fehler');
+      }}
+      if(btn){{btn.disabled=false;btn.textContent='\u26A1 App-Verbindung testen';}}
+    }}).catch(()=>{{
+      if(btn){{btn.disabled=false;btn.textContent='\u26A1 App-Verbindung testen';}}
+      showToast('Fehler beim Test','fehler');
+    }});
   }};
   </script>
 </div>
@@ -8276,6 +8523,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/archiv/pruefen'):
             self._api_mail_archiv_pruefen()
 
+        elif self.path.startswith('/api/mail/provider-detect'):
+            self._api_mail_provider_detect()
+
+        elif self.path.startswith('/api/mail/konto/oauth-status'):
+            self._api_mail_konto_oauth_status()
+
+        elif self.path.startswith('/api/mail/konto/health'):
+            self._api_mail_konto_health()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
 
@@ -9204,6 +9460,110 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_provider_detect(self):
+        """GET /api/mail/provider-detect?email= — Anbieter aus E-Mail-Domain erkennen."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            email = qs.get('email', [''])[0]
+            result = _mm.detect_provider(email)
+            self._json({'ok': True, **result})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_oauth_start(self, body):
+        """POST /api/mail/konto/oauth-start — Browser-OAuth starten, gibt job_id zurück."""
+        import uuid, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        job_id = str(uuid.uuid4())[:8]
+        _mm.start_oauth_browser_flow(email, job_id)
+        self._json({'ok': True, 'job_id': job_id, 'email': email})
+
+    def _api_mail_konto_oauth_status(self):
+        """GET /api/mail/konto/oauth-status?job_id= — OAuth-Job-Status abfragen."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            job_id = qs.get('job_id', [''])[0]
+            status = _mm.get_oauth_job_status(job_id)
+            self._json({'ok': True, **status})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_reconnect(self, body):
+        """POST /api/mail/konto/reconnect — Bestehendes Konto mit Browser-OAuth neu verbinden."""
+        import uuid, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        # Token-Cache löschen damit frischer Login erzwungen wird
+        try:
+            cache_p = _mm._token_cache_path(email)
+            if cache_p.exists():
+                cache_p.unlink()
+        except Exception:
+            pass
+        # Neuen OAuth-Job starten
+        job_id = str(uuid.uuid4())[:8]
+        _mm.start_oauth_browser_flow(email, job_id)
+        self._json({'ok': True, 'job_id': job_id, 'email': email, 'aktion': 'reconnect'})
+
+    def _api_mail_konto_health(self):
+        """GET /api/mail/konto/health — Health-Status aller Konten (gecacht)."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            health = _mm.get_all_health_status()
+            self._json({'ok': True, 'health': health})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_health_check(self, body):
+        """POST /api/mail/konto/health-check — Sofortige echte Verbindungsprüfung."""
+        import threading as _t, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        # In Thread starten (kann 5-10s dauern)
+        def _do():
+            _mm.check_account_health(email)
+        _t.Thread(target=_do, daemon=True).start()
+        self._json({'ok': True, 'status': 'gestartet', 'email': email})
+
+    def _api_mail_microsoft_app_test(self):
+        """POST /api/mail/microsoft-app/test — Zentrale KIRA Entra App auf Erreichbarkeit testen."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            result = _mm.test_microsoft_app()
+            self._json({'ok': result['ok'], **result})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_whatsapp_secrets_speichern(self, body):
         """POST /api/whatsapp/secrets-speichern — WhatsApp-Credentials in secrets.json speichern."""
         try:
@@ -9292,6 +9652,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/hinzufuegen':
             self._api_mail_konto_hinzufuegen(body)
+            return
+
+        if self.path == '/api/mail/konto/oauth-start':
+            self._api_mail_konto_oauth_start(body)
+            return
+
+        if self.path == '/api/mail/konto/reconnect':
+            self._api_mail_konto_reconnect(body)
+            return
+
+        if self.path == '/api/mail/konto/health-check':
+            self._api_mail_konto_health_check(body)
+            return
+
+        if self.path == '/api/mail/microsoft-app/test':
+            self._api_mail_microsoft_app_test()
             return
 
         if self.path == '/api/whatsapp/secrets-speichern':
