@@ -25,7 +25,8 @@
 
 ### Session-Start: Größerer Auftrag kommt rein
 1. **Sofort** in `user_briefs.md` festhalten — Original-Wortlaut oder treue Rekonstruktion
-2. Dann mit der Arbeit beginnen
+2. **Plan-Agent nutzen** (PFLICHT bei größeren Aufträgen): Vor der Implementierung immer `Plan`-Agenten starten, um die beste Umsetzung zu strukturieren — Schritte, betroffene Dateien, Reihenfolge. Direkt danach implementieren. Verhindert vergessene Arbeitsanweisungen und Fehler durch fehlende Planung.
+3. Dann mit der Arbeit beginnen
 
 ### Session-Ende / Nach jeder Änderung
 1. **Git Commit** erstellen (immer nach jeder abgeschlossenen Änderung)

@@ -76,3 +76,22 @@
 
 ## 2026-03-29 — Session-Ende (session-bb)
 **Status:** erledigt
+
+---
+
+## 2026-03-29 — Session-Start (session-cc)
+
+**Auftrag:** (1) AGENT.md: Neue Regel — bei großen Aufträgen Plan-Agent nutzen für beste Umsetzungsstruktur. (2) Toast-Kopierbutton funktioniert nicht + zu klein beheben. (3) Archiv-Mails "weg" — nach Update nicht mehr zugänglich. (4) Doppelte Archiv-Ordner klären (anfrage vs anfrage_raumkult_eu). (5) Offene Punkte für nächste Session festhalten: Google OAuth, SMTP-Passwort-Auth, Provider-Persistierung, Mail-Archiv-Plan.
+**Status:** erledigt
+
+**Erledigt:**
+- AGENT.md: Neue Regel in "Session-Start: Größerer Auftrag" — Plan-Agent Pflicht vor Implementierung
+- config.json Bug: mail_archiv.pfad war leer ("") → wiederhergestellt auf korrekten Archiv-Pfad. Ursache: war in Arbeitskopie gelöscht, nie committed.
+- mail_monitor.py Bug: _save_to_archive() erhielt label=`anfrage` statt email_addr=`anfrage@raumkult.eu` → Ordner `anfrage/` statt `anfrage_raumkult_eu/` → Fix: email_addr übergeben. Die 12.507 Mails im alten Archiv (anfrage_raumkult_eu etc.) sind vollständig erhalten und intakt.
+- Erklärung Doppelordner: Neue Ordner (anfrage/ info/ invoice/ kaimrf/ shop/) entstanden durch falsches Label im mail_monitor — können gelöscht werden.
+- Toast-Kopierbutton: größer (16px, Rahmen, Padding), JS-Fallback via execCommand wenn clipboard API nicht verfügbar
+- session_handoff.json aktualisiert mit offenen Punkten
+**Offen geblieben:** Neue (falsch benannte) Ordner `anfrage/`, `info/`, `invoice/`, `kaimrf/`, `shop/` können vom User manuell gelöscht werden.
+
+## 2026-03-29 — Session-Ende (session-cc)
+**Status:** erledigt
