@@ -3222,7 +3222,7 @@ function esShowProtoTab(id) {{
           }} else {{
             ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Nicht verbunden';
           }}
-          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler' || k.token_status!=='ok';
+          const needsReconnect = h.status==='auth_fehler' || h.status==='fehler';
           const isDeaktiv = k.aktiv === false;
           return `<div class="es-mk-card${{isDeaktiv?' es-mk-card-deaktiv':''}}" id="es-mk-card-${{safe}}">
             ${{isDeaktiv?'<div class="es-mk-deaktiv-banner">&#x23F8; Deaktiviert &mdash; kein Abruf/Senden &bull; <span style="color:var(--success,#2e9e5b)">&#x2713; Archiv-Zugang aktiv</span></div>':''}}
@@ -3246,7 +3246,7 @@ function esShowProtoTab(id) {{
                    <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
                    ${{needsReconnect
                      ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
-                     : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Erneut verbinden</button>`
+                     : ''
                    }}
                    <button class="es-mk-btn warn" onclick="esMkToggleAktiv('${{k.email}}',false,this)" title="Konto deaktivieren — Archiv bleibt erhalten">&#x23F8; Deaktivieren</button>`
               }}

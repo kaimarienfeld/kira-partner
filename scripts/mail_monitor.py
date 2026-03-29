@@ -328,16 +328,13 @@ def _save_token_cache(cache, path):
 
 
 def get_oauth2_token(konto):
-    """Holt OAuth2 Access Token (aus Cache oder Device-Flow / Browser-Flow)."""
+    """Holt OAuth2 Access Token aus dem KIRA-App-Cache (silent)."""
     email_addr = konto["email"]
-    # Zentrale KIRA-App bevorzugen wenn kein per-Konto client_id gesetzt
-    use_kira_app = not konto.get("oauth2_client_id", "").strip()
-    if use_kira_app:
-        app, cache, cache_path = _msal_app_kira(email_addr)
-    else:
-        app, cache, cache_path = _msal_app(konto)
+    # Immer zentrale KIRA-App nutzen — per-konto oauth2_client_id ist veraltet.
+    # start_oauth_browser_flow() speichert immer unter KIRA-App-Client-ID.
+    app, cache, cache_path = _msal_app_kira(email_addr)
 
-    # Scope-Version prüfen
+    # Scope-Version prüfen — bei Änderung Cache leeren und neu mit KIRA-App aufbauen
     version_path = cache_path.parent / (cache_path.stem + "_version.txt")
     if version_path.exists() and version_path.read_text().strip() != OAUTH_SCOPE_VERSION:
         log.info(f"Scope geändert, Token-Reset für {email_addr}")
@@ -345,9 +342,9 @@ def get_oauth2_token(konto):
             cache_path.unlink()
         if version_path.exists():
             version_path.unlink()
-        app, cache, cache_path = _msal_app(konto)
+        app, cache, cache_path = _msal_app_kira(email_addr)  # neu initialisieren
 
-    # 1. Silent (aus Cache)
+    # Silent aus Cache
     accounts = app.get_accounts(username=email_addr)
     if accounts:
         result = app.acquire_token_silent(OAUTH_SCOPES, account=accounts[0])
@@ -356,10 +353,8 @@ def get_oauth2_token(konto):
             version_path.write_text(OAUTH_SCOPE_VERSION)
             return result["access_token"]
 
-    # 2. Kein Token im Cache → Neu-Authentifizierung über UI-Wizard erforderlich.
-    # Device-Code-Flow wird NICHT verwendet (kein Hintergrund-Blocking, kein Browser-Popup).
-    # Stattdessen: Exception → Konto bekommt status=auth_fehler → Reconnect-Button in UI.
-    log.warning(f"OAuth2 Token abgelaufen/fehlt für {email_addr} — Reconnect über Einstellungen nötig")
+    # Kein Token → Reconnect über UI-Wizard erforderlich (kein Device-Flow)
+    log.warning(f"OAuth2 Token fehlt für {email_addr} — Reconnect über Einstellungen nötig")
     raise RuntimeError(f"TOKEN_ABGELAUFEN:{email_addr}")
 
 
@@ -617,15 +612,17 @@ def imap_connect(konto):
     except:
         pass
 
-    if auth_methode == "imap_password":
-        # Passwort-Auth: LOGIN mit Benutzername + Passwort
+    # Passwort-Auth wenn auth_methode imap/imap_password/password enthält
+    use_password = auth_methode in ("imap_password", "imap", "password") or \
+                   "password" in auth_methode or auth_methode == ""
+    if use_password:
         passwort = konto.get("passwort", "") or konto.get("password", "")
         login = konto.get("login", email_addr)
         if not passwort:
             raise RuntimeError(f"Kein Passwort für {email_addr} hinterlegt")
         imap.login(login, passwort)
     else:
-        # OAuth2 (Microsoft XOAUTH2 / Google)
+        # OAuth2 (Microsoft XOAUTH2 / Google) — auth_methode: oauth2, oauth2_microsoft, oauth2_google
         token = get_oauth2_token(konto)
         auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01".encode("utf-8")
         imap.authenticate("XOAUTH2", lambda x: auth_string)
