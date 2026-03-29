@@ -10,8 +10,8 @@
 1. Diese Datei lesen (Regeln)
 2. `session_handoff.json` lesen (letzter Arbeitsstand, offene Punkte, nächster Schritt)
 3. `feature_registry.json` lesen (Feature-Status aller Module)
-4. **`knowledge/session_log.md` lesen** — prüfen ob offene Punkte aus vorheriger Session (Crash-Recovery!)
-5. **Kai's Arbeitsanweisung/Prompt sofort in `knowledge/session_log.md` eintragen** mit Datum+Uhrzeit-Stempel (Pflicht, auch bei kleinen Aufträgen — Crash-Backup)
+4. **`knowledge/session_log.md` lesen** — letzten Eintrag prüfen (Crash-Recovery). Bei Status "offen" oder "crash": session_log.md + App-Zustand prüfen → was war fertig, was offen → direkt weiterführen (kein Nachfragen nötig, Kai fragt selbst wenn er Kontext braucht)
+5. **Kai's Arbeitsanweisung/Prompt sofort in `knowledge/session_log.md` eintragen** mit Datum+Uhrzeit-Stempel (Pflicht, auch bei kleinen Aufträgen — Crash-Backup). Während der Session: neue Teilaufgaben ebenfalls nach Schema der Datei eintragen.
 6. **Feature-Listen scannen und abgleichen** (PFLICHT, auch bei kleinen Änderungen):
    - `_archiv/feature_list.md` lesen
    - `_archiv/only_kais checkliste.md` lesen
@@ -38,14 +38,14 @@
    - `_archiv/only_kais checkliste.md` aktualisieren
    - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
    → Alle drei mit `feature_registry.json` abgleichen
-10. **Partner-View generieren** (PFLICHT nach Änderungen an feature_registry.json):
+10. **Partner-View generieren** (PFLICHT — automatisch, kein Nachfragen):
     ```
     python scripts/generate_partner_view.py
     ```
-    → prüft ob HTML aktuell ist, aktualisiert falls nötig
+    → läuft automatisch am Session-Ende, prüft ob HTML aktuell ist, aktualisiert falls nötig
     → Push zu GitHub NUR nach expliziter Freigabe durch Kai: `--push` Flag
-    → Kai sieht diff und sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
-    → **Mail an Leni + BCC Kai**: Wenn Versand fehlschlägt → sofort explizite Fehlermeldung im Chat ausgeben: "⚠️ Mail an Leni konnte nicht gesendet werden: [Fehlerdetail]. Bitte manuell prüfen."
+    → Kai sagt "ja, push" → dann: `python scripts/generate_partner_view.py --push`
+    → **Mail an Leni + BCC Kai**: Wenn Versand fehlschlägt → sofort im Chat: "⚠️ Mail an Leni konnte nicht gesendet werden: [Fehlerdetail]. Bitte manuell prüfen."
 
 ### Nach Leni-Feedback (Workflow)
 1. Kai gibt Leni-Feedback mit "Alles für Claude kopieren" (Admin-Panel) → fügt in Chat ein
@@ -67,22 +67,32 @@
 
 **Datei:** `knowledge/session_log.md` (append-only, niemals überschreiben)
 
+**WICHTIG: Alle Einträge IMMER mit Datum UND Uhrzeit** — gilt auch für alle anderen Tracking-Dateien (session_handoff.json, known_issues.json, AGENT.md Protokoll, etc.)
+
 **Format für jeden Eintrag:**
 ```
-## [DATUM] [UHRZEIT] — Session-Start
+## 2026-MM-DD HH:MM — Session-Start
 **Auftrag:** [Kai's vollständiger Prompt / Arbeitsanweisung — Original-Wortlaut]
 **Status:** offen
 
+### 2026-MM-DD HH:MM — Neue Teilaufgabe
+**Auftrag:** [Neue Anweisung von Kai mid-session]
+**Status:** offen / erledigt
+
 ---
-[Session-Ende-Nachtrag:]
-**Erledigt:** [Was wurde fertig]
-**Offen geblieben:** [Was nicht fertig wurde oder beim nächsten Start weitergehen muss]
+## 2026-MM-DD HH:MM — Session-Ende
+**Erledigt:** [Was wurde fertig — mit Datum+Uhrzeit]
+**Offen geblieben:** [Was nicht fertig wurde]
 **Status:** erledigt / teilweise / crash
 ```
 
-**Zweck:** Wenn Claude oder der Server crasht und der Kontext verloren geht, kann die nächste Session anhand dieser Datei sofort weitermachen — ohne dass Kai alles neu erklären muss.
+**Wann eintragen:**
+- Session-Start: Kai's erster Prompt → sofort als Eintrag
+- Mid-Session: Jede neue Teilaufgabe von Kai → Eintrag nach Schema
+- Session-Ende: Abschluss-Eintrag mit Status
 
-**Regel beim Start:** Letzten Eintrag prüfen — wenn Status = "offen" oder "crash" → Kai sofort informieren: "Ich sehe eine offene Aufgabe vom [Datum]: [Auftrag]. Weiterführen?"
+**Crash-Recovery (kein Nachfragen):**
+Bei Status "offen" oder "crash": session_log.md + App/Git-Zustand prüfen → selbst rekonstruieren was fertig war und was offen → direkt weiterführen. Kai fragt aktiv wenn er Kontext braucht ("Was war die letzte Aufgabe?") — dann: Datei lesen, App prüfen, Bericht + sofort weiterführen.
 
 ---
 

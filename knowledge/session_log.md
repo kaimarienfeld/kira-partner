@@ -28,3 +28,12 @@
 
 **Auftrag:** AGENT.md Regeln erweitern: 5 neue Regeln (session_log Crash-Backup, Feature-Listen-Sync, Partner View Ende-Pflicht mit Mail-Fehler-Meldung, Todo_checkliste Pflicht).
 **Status:** offen
+
+### 2026-03-29 22:40 — Neue Teilaufgabe
+**Auftrag:** Korrekturen an den 5 Regeln: (1) Alle Dateien immer mit Datum+Uhrzeit. (2) session_log.md auch mid-session befüllen nach Schema. (3) Crash-Recovery ohne Nachfragen — selbst rekonstruieren. (4) Partner-View Regel 3 automatisch (kein Nachfragen).
+**Status:** erledigt
+
+## 2026-03-29 22:42 — Session-Ende (session-z)
+**Erledigt:** AGENT.md vollständig aktualisiert mit 5 neuen Regeln + 4 Korrekturen. session_log.md Datei erstellt. MEMORY.md aktualisiert. Alle committed.
+**Offen geblieben:** —
+**Status:** erledigt
