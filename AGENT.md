@@ -172,6 +172,21 @@ Hat sich feature_registry.json geändert UND
 → NEIN: python scripts/generate_partner_view.py  (nur lokal)
 ```
 
+### Einrichtung (2026-03-29 — einmalig erledigt, NICHT nochmal ausführen)
+
+| Was | Wert |
+|-----|------|
+| Lokales Repo-Verzeichnis | `C:/Users/kaimr/kira-partner/` |
+| Geklont von | `https://github.com/kaimarienfeld/kira-partner` |
+| config.json Key | `partner_github_repo_dir` = `C:/Users/kaimr/kira-partner` (Top-Level!) |
+| git user (im Repo) | `Kai Marienfeld` / `kaimrf@rauMKultSichtbeton.onmicrosoft.com` |
+| PAT | in `scripts/secrets.json` → `github_pat` |
+| Leni-URL | **https://kaimarienfeld.github.io/kira-partner/** |
+
+> Wenn das Repo-Verzeichnis fehlt oder beschädigt ist:
+> `git clone https://[PAT]@github.com/kaimarienfeld/kira-partner.git C:/Users/kaimr/kira-partner`
+> dann `git config user.email` + `user.name` im Repo setzen.
+
 ---
 
 ## 2. Git-Regeln
