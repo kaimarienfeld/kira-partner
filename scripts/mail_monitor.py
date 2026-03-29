@@ -356,31 +356,11 @@ def get_oauth2_token(konto):
             version_path.write_text(OAUTH_SCOPE_VERSION)
             return result["access_token"]
 
-    # 2. Device-Code-Flow
-    log.info(f"OAuth2 Login erforderlich für {email_addr}")
-    flow = app.initiate_device_flow(scopes=OAUTH_SCOPES)
-    if "user_code" not in flow:
-        raise RuntimeError(f"Device-Flow fehlgeschlagen: {flow.get('error_description', '?')}")
-
-    url = flow["verification_uri"]
-    code = flow["user_code"]
-    log.warning(f"OAUTH2 LOGIN: {email_addr} → {url} Code: {code}")
-
-    # Browser öffnen
-    try:
-        webbrowser.open(url)
-    except:
-        pass
-
-    # Warten (bis 5 Min)
-    result = app.acquire_token_by_device_flow(flow)
-    if "access_token" not in result:
-        raise RuntimeError(f"OAuth2 fehlgeschlagen: {result.get('error_description', '?')}")
-
-    _save_token_cache(cache, cache_path)
-    version_path.write_text(OAUTH_SCOPE_VERSION)
-    log.info(f"OAuth2 OK für {email_addr}")
-    return result["access_token"]
+    # 2. Kein Token im Cache → Neu-Authentifizierung über UI-Wizard erforderlich.
+    # Device-Code-Flow wird NICHT verwendet (kein Hintergrund-Blocking, kein Browser-Popup).
+    # Stattdessen: Exception → Konto bekommt status=auth_fehler → Reconnect-Button in UI.
+    log.warning(f"OAuth2 Token abgelaufen/fehlt für {email_addr} — Reconnect über Einstellungen nötig")
+    raise RuntimeError(f"TOKEN_ABGELAUFEN:{email_addr}")
 
 
 # ── OAuth2 Jobs (für Browser-Flow aus UI) ───────────────────────────────────
@@ -616,14 +596,12 @@ def get_volltest_status(job_id: str) -> dict:
 
 
 def imap_connect(konto):
-    """IMAP-Verbindung via OAuth2."""
+    """IMAP-Verbindung via OAuth2 (Microsoft/Google) oder IMAP-Passwort."""
     server = konto.get("imap_server", "outlook.office365.com")
     port = int(konto.get("imap_port", 993))
     use_ssl = konto.get("imap_ssl", True)
     email_addr = konto["email"]
-
-    token = get_oauth2_token(konto)
-    auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01".encode("utf-8")
+    auth_methode = konto.get("auth_methode", "oauth2_microsoft")
 
     if use_ssl:
         imap = imaplib.IMAP4_SSL(server, port)
@@ -639,7 +617,19 @@ def imap_connect(konto):
     except:
         pass
 
-    imap.authenticate("XOAUTH2", lambda x: auth_string)
+    if auth_methode == "imap_password":
+        # Passwort-Auth: LOGIN mit Benutzername + Passwort
+        passwort = konto.get("passwort", "") or konto.get("password", "")
+        login = konto.get("login", email_addr)
+        if not passwort:
+            raise RuntimeError(f"Kein Passwort für {email_addr} hinterlegt")
+        imap.login(login, passwort)
+    else:
+        # OAuth2 (Microsoft XOAUTH2 / Google)
+        token = get_oauth2_token(konto)
+        auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01".encode("utf-8")
+        imap.authenticate("XOAUTH2", lambda x: auth_string)
+
     return imap
 
 
