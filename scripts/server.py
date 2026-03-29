@@ -2987,6 +2987,8 @@ function esShowProtoTab(id) {{
   .es-mk-btn.danger{{background:rgba(200,60,60,.15);color:#c84444;border:1px solid rgba(200,60,60,.3)}}
   .es-mk-btn.warn{{background:rgba(255,140,0,.15);color:#e07800;border:1px solid rgba(255,140,0,.35)}}
   .es-mk-btn:disabled{{opacity:.5;cursor:default}}
+  .es-mk-card-deaktiv{{opacity:.75;border-color:var(--border);border-style:dashed}}
+  .es-mk-deaktiv-banner{{background:rgba(150,150,150,.12);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--text-muted);margin-bottom:10px}}
   /* ── Ampel ── */
   .es-mk-ampel{{font-size:18px;flex-shrink:0;cursor:help}}
   .es-mk-ampel-gruen{{color:#28c850}}
@@ -3221,31 +3223,36 @@ function esShowProtoTab(id) {{
             ampel='&#x25CF;'; ampelClass='es-mk-ampel-rot'; ampelTip='Nicht verbunden';
           }}
           const needsReconnect = h.status==='auth_fehler' || h.status==='fehler' || k.token_status!=='ok';
-          return `<div class="es-mk-card" id="es-mk-card-${{safe}}">
+          const isDeaktiv = k.aktiv === false;
+          return `<div class="es-mk-card${{isDeaktiv?' es-mk-card-deaktiv':''}}" id="es-mk-card-${{safe}}">
+            ${{isDeaktiv?'<div class="es-mk-deaktiv-banner">&#x23F8; Deaktiviert &mdash; kein Abruf/Senden &bull; <span style="color:var(--success,#2e9e5b)">&#x2713; Archiv-Zugang aktiv</span></div>':''}}
             <div class="es-mk-card-head">
-              <input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">
-              <div class="es-mk-ico">&#x2709;</div>
+              ${{!isDeaktiv?`<input type="radio" name="mk-standard" class="es-mk-radio" value="${{k.email}}" ${{k.email===std?'checked':''}} onchange="esMkSetStandard('${{k.email}}')">`:''}}
+              <div class="es-mk-ico" style="${{isDeaktiv?'opacity:.4':''}}">&#x2709;</div>
               <div class="es-mk-body">
-                <div class="es-mk-email">${{k.email}} ${{k.email===std?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
+                <div class="es-mk-email">${{k.email}} ${{k.email===std&&!isDeaktiv?'<span style="font-size:10px;color:var(--accent);margin-left:6px">&#x2605; Standard</span>':''}}</div>
                 <div class="es-mk-desc">${{k.beschreibung||''}}</div>
               </div>
-              <span class="es-mk-ampel ${{ampelClass}}" id="es-ampel-${{safe}}" title="${{ampelTip}}">${{ampel}}</span>
+              ${{!isDeaktiv?`<span class="es-mk-ampel ${{ampelClass}}" id="es-ampel-${{safe}}" title="${{ampelTip}}">${{ampel}}</span>`:''}}
             </div>
             <div class="es-mk-stats" id="es-mk-stats-${{safe}}">
               <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-idx-${{safe}}">–</div><div class="es-mk-stat-lbl">Im Index</div></div>
               <div class="es-mk-stat"><div class="es-mk-stat-val" id="es-mk-arc-${{safe}}">–</div><div class="es-mk-stat-lbl">Archiviert</div></div>
             </div>
             <div class="es-mk-actions">
-              <button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
-              <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
-              ${{needsReconnect
-                ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
-                : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Erneut verbinden</button>`
+              ${{isDeaktiv
+                ? `<button class="es-mk-btn sec" onclick="esMkToggleAktiv('${{k.email}}',true,this)">&#x25B6; Aktivieren</button>`
+                : `<button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
+                   <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
+                   ${{needsReconnect
+                     ? `<button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button>`
+                     : `<button class="es-mk-btn sec" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Erneut verbinden</button>`
+                   }}
+                   <button class="es-mk-btn warn" onclick="esMkToggleAktiv('${{k.email}}',false,this)" title="Konto deaktivieren — Archiv bleibt erhalten">&#x23F8; Deaktivieren</button>`
               }}
-              <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">L&ouml;schen</button>
+              <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">&#x1F5D1; L&ouml;schen</button>
             </div>
-            <div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div>
-            <div id="es-kira-ord-${{safe}}" style="display:none"></div>
+            ${{!isDeaktiv?`<div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div><div id="es-kira-ord-${{safe}}" style="display:none"></div>`:''}}
           </div>`;
         }}).join('');
         // Stats lazy laden + Health Check auto-starten
@@ -3335,9 +3342,22 @@ function esShowProtoTab(id) {{
     fetch('/api/mail/konto/token-loeschen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
     .then(r=>r.json()).then(d=>{{ showToast(d.ok?'Token gelöscht':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler'); esLoadMailKonten(); }}).catch(()=>{{}});
   }};
+  window.esMkToggleAktiv = function(email, aktiv, btn) {{
+    if(btn){{btn.disabled=true;btn.textContent=aktiv?'Aktivieren...':'Deaktivieren...';}}
+    fetch('/api/mail/konto/toggle-aktiv',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email,aktiv}})}})
+      .then(r=>r.json()).then(d=>{{
+        if(d.ok){{showToast(aktiv?email+' aktiviert':email+' deaktiviert \u2014 Archiv-Zugang bleibt bestehen',aktiv?'ok':'warnung');esLoadMailKonten();}}
+        else showToast('Fehler: '+(d.error||'?'),'fehler');
+      }}).catch(()=>showToast('Fehler','fehler'));
+  }};
   window.esMkDeleteConfirm = function(email) {{
-    if(!confirm(email+' wirklich löschen? Konfiguration wird entfernt.')) return;
-    showToast('Löschen noch nicht implementiert — bitte manuell in raumkult_config.json','warnung');
+    showKritischModal(
+      'Konto l\u00f6schen \u2014 '+email,
+      '<strong>Empfehlung: Konto deaktivieren statt l\u00f6schen.</strong><br><br>Deaktivierte Konten sind f\u00fcr KIRA und im Archiv weiterhin zug\u00e4nglich \u2014 nur Abruf und Senden ist gestoppt.<br><br>L\u00f6schen entfernt nur den Konfigurations-Eintrag. Archiv-Dateien auf der Festplatte bleiben erhalten.',
+      'L\u00d6SCHEN',
+      ()=>showToast('Konto-L\u00f6schen: Admin-Feature \u2014 bitte manuell in raumkult_config.json','warnung'),
+      'Tipp: \u23f8 Deaktivieren \u2014 Archiv bleibt vollst\u00e4ndig zug\u00e4nglich'
+    );
   }};
   window.esMkConnect = function(email) {{
     const safe=email.replace(/[@.]/g,'_');
@@ -4927,7 +4947,7 @@ def generate_html() -> str:
   </div>
 </div>
 
-<div class="status-toast" id="toast"></div>
+<div class="status-toast" id="toast"><span id="toast-msg"></span><button id="toast-copy-btn" title="Inhalt kopieren" onclick="navigator.clipboard.writeText(document.getElementById('toast-msg').textContent).then(()=>{{const b=this;b.textContent='✓';setTimeout(()=>b.textContent='⧉',900);}})">&#x29C9;</button></div>
 <footer>Kira Assistenz &middot; <a href="javascript:location.reload()">Aktualisieren</a></footer>
 </div><!-- /main-area -->
 </div><!-- /app-shell -->
@@ -7376,8 +7396,9 @@ function loadKiraTasks(){{
 function escH(s){{return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}}
 function showToast(msg, typ){{
   const t=document.getElementById('toast');
+  const msgEl=document.getElementById('toast-msg');
   if(t._toastTimer)clearTimeout(t._toastTimer);
-  t.textContent=msg;
+  if(msgEl)msgEl.textContent=msg; else t.firstChild&&(t.firstChild.textContent=msg);
   t.className='status-toast';
   if(typ)t.classList.add(typ);
   t.classList.add('show');
@@ -8255,6 +8276,8 @@ a:hover{text-decoration:underline;}
 .status-toast.fehler{background:#c0392b;color:#fff;border-color:#c0392b;}
 .status-toast.warnung{background:#c87417;color:#fff;border-color:#c87417;}
 .status-toast.info{background:var(--accent);color:#fff;border-color:var(--accent);}
+#toast-copy-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:0 0 0 10px;opacity:.6;vertical-align:middle;color:inherit;line-height:1;}
+#toast-copy-btn:hover{opacity:1;}
 
 /* ═══ Kira FAB — Animierter Launcher ═══ */
 .kira-fab{position:fixed;bottom:20px;right:20px;z-index:200;
@@ -9617,6 +9640,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """POST /api/mail/konto/alle-abrufen — Alle Konten pollen."""
         self._api_mail_konto_abrufen(body)
 
+    def _api_mail_konto_toggle_aktiv(self, body):
+        """POST /api/mail/konto/toggle-aktiv — Konto aktivieren/deaktivieren (Archiv bleibt erhalten)."""
+        email  = body.get('email', '')
+        aktiv  = bool(body.get('aktiv', True))
+        archiver_cfg_path = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+        try:
+            cfg = json.loads(archiver_cfg_path.read_text('utf-8'))
+            found = False
+            for k in cfg.get('konten', []):
+                if k.get('email') == email:
+                    k['aktiv'] = aktiv
+                    found = True
+                    break
+            if not found:
+                self._json({'ok': False, 'error': 'Konto nicht gefunden'})
+                return
+            archiver_cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            self._elog(f"Konto {'aktiviert' if aktiv else 'deaktiviert'}: {email}")
+            self._json({'ok': True, 'email': email, 'aktiv': aktiv})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_konto_token_loeschen(self, body):
         """POST /api/mail/konto/token-loeschen — OAuth2-Token löschen."""
         email = body.get('email', '')
@@ -9912,6 +9957,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/token-loeschen':
             self._api_mail_konto_token_loeschen(body)
+            return
+
+        if self.path == '/api/mail/konto/toggle-aktiv':
+            self._api_mail_konto_toggle_aktiv(body)
             return
 
         if self.path == '/api/mail/konto/standard':
