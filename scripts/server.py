@@ -824,7 +824,105 @@ def build_kommunikation(tasks):
 # ── POSTFACH Panel ────────────────────────────────────────────────────────────
 def build_postfach():
     """Outlook-Style 3-Pane Mail-Modul. Daten werden via AJAX geladen."""
-    return """<div class="pf-shell">
+    return """<!-- ── RIBBON ─────────────────────────────────────────────── -->
+<div class="pf-ribbon-wrap" id="pf-ribbon-wrap">
+  <div class="pf-ribbon" id="pf-ribbon">
+    <button class="pf-rbn-edge pf-rbn-prev" id="pf-rbn-prev" onclick="pfRibbonScroll(-1)" title="Zurück" style="display:none">&#x2039;</button>
+    <div class="pf-rbn-viewport" id="pf-rbn-viewport">
+      <div class="pf-rbn-inner" id="pf-rbn-inner">
+        <div class="pf-rbn-group">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool" id="pf-rb-compose" onclick="pfOpenCompose()" title="Neue Mail verfassen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              <span>Neue Mail</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">Erstellen</div>
+        </div>
+        <div class="pf-rbn-sep"></div>
+        <div class="pf-rbn-group">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-reply" onclick="pfReply()" title="Antworten">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+              <span>Antworten</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-replyall" onclick="pfReplyAll()" title="Allen antworten">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>
+              <span>Allen</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-forward" onclick="pfForward()" title="Weiterleiten">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+              <span>Weiterleiten</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">Antworten</div>
+        </div>
+        <div class="pf-rbn-sep"></div>
+        <div class="pf-rbn-group">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-read" onclick="pfRibbonToggleRead()" title="Gelesen/Ungelesen umschalten">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg>
+              <span>Gelesen</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-flag" onclick="pfRibbonToggleFlag()" title="Kennzeichnen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+              <span>Kennzeichnen</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-pin" onclick="pfRibbonTogglePin()" title="Anheften">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>
+              <span>Anheften</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-delete" onclick="pfRibbonDelete()" title="Löschen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              <span>Löschen</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-move" onclick="pfOpenVerschiebenMenu(this)" title="Verschieben">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              <span>Verschieben</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-mail-dep pf-rbn-prep" id="pf-rb-archive" onclick="pfToastVorbereitung('Archivieren')" title="Archivieren (in Vorbereitung)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              <span>Archivieren</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-prep" id="pf-rb-rules" onclick="pfToastVorbereitung('Regeln/Sweep')" title="Regeln/Sweep (in Vorbereitung)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              <span>Regeln</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">Aktionen</div>
+        </div>
+        <div class="pf-rbn-sep"></div>
+        <div class="pf-rbn-group">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-snooze" onclick="pfOpenSnoozeMenu(this)" title="Erneut erinnern / Snooze">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>Erinnern</span>
+            </button>
+            <button class="pf-rbn-tool pf-rbn-prep" id="pf-rb-print" onclick="pfToastVorbereitung('Drucken')" title="Drucken (in Vorbereitung)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <span>Drucken</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">Erinnern &amp; Mehr</div>
+        </div>
+        <div class="pf-rbn-sep"></div>
+        <div class="pf-rbn-group">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool pf-rbn-kira pf-rbn-mail-dep" id="pf-rb-kira" onclick="pfKiraMailContext()" title="Mit Kira besprechen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>
+              <span>Kira fragen</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">KI &amp; Kira</div>
+        </div>
+      </div>
+    </div>
+    <button class="pf-rbn-edge pf-rbn-next" id="pf-rbn-next" onclick="pfRibbonScroll(1)" title="Weiter" style="display:none">&#x203A;</button>
+    <button class="pf-rbn-toggle" id="pf-rbn-toggle" onclick="pfRibbonCompact()" title="Kompakt/Vollmodus">&#x25BE;</button>
+  </div>
+</div>
+
+<div class="pf-shell">
 
 <!-- LEFT: Konten + Ordner -->
 <div class="pf-left" id="pf-left">
@@ -887,39 +985,85 @@ def build_postfach():
     <div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">Zu lesendes Element auswählen</div>
     <div style="font-size:13px;color:var(--text-muted)">Es wurde keine Auswahl vorgenommen.</div>
   </div>
-  <div id="pf-preview" style="display:none">
-    <div class="pf-prev-hdr">
-      <div class="pf-prev-betreff" id="pf-prev-betreff"></div>
-      <div class="pf-prev-meta">
-        <span class="pf-prev-absender" id="pf-prev-absender"></span>
-        <span class="pf-prev-datum" id="pf-prev-datum"></span>
+  <div id="pf-preview" class="pf-detail-frame" style="display:none">
+
+    <!-- ── 1. Mail-Kopf ──────────────────────────────────────── -->
+    <div class="pf-mail-head" id="pf-mail-head">
+      <div class="pf-subject-bar">
+        <div class="pf-subject-text" id="pf-prev-betreff"></div>
+        <div class="pf-date-stack" id="pf-prev-datum"></div>
       </div>
-      <div class="pf-prev-toolbar" id="pf-prev-toolbar">
-        <button class="pf-tb-btn" id="pf-tb-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
-        <button class="pf-tb-btn" id="pf-tb-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
-        <button class="pf-tb-btn" id="pf-tb-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
-        <div class="pf-tb-sep"></div>
-        <button class="pf-tb-btn" id="pf-tb-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
-        <button class="pf-tb-btn" id="pf-tb-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
-        <button class="pf-tb-btn" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
-        <div class="pf-tb-sep"></div>
-        <button class="pf-tb-btn del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+      <div class="pf-header-meta">
+        <div class="pf-sender-col">
+          <div class="pf-avatar" id="pf-avatar">?</div>
+          <div class="pf-identity">
+            <div class="pf-from-line" id="pf-prev-absender"></div>
+            <div class="pf-to-line" id="pf-prev-to"></div>
+          </div>
+        </div>
+        <div class="pf-head-actions" id="pf-prev-toolbar">
+          <button class="pf-ha-btn" id="pf-tb-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
+          <button class="pf-ha-btn" id="pf-tb-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
+          <button class="pf-ha-btn" id="pf-tb-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
+          <div class="pf-ha-sep"></div>
+          <button class="pf-ha-icon" id="pf-tb-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
+          <button class="pf-ha-icon" id="pf-tb-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
+          <button class="pf-ha-icon" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
+          <button class="pf-ha-icon del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+          <button class="pf-ha-icon" id="pf-tb-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+          <div class="pf-ha-sep"></div>
+          <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2. Thread-/Status-Hinweise ────────────────────────── -->
+    <div class="pf-hint-section" id="pf-hint-section" style="display:none"></div>
+
+    <!-- ── 3. Anh\u00e4nge (einklappbar) ─────────────────────────── -->
+    <div class="pf-attachment-section" id="pf-attachment-section" style="display:none">
+      <div class="pf-att-collapsed" id="pf-att-collapsed">
+        <svg class="pf-att-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <span id="pf-att-summary" class="pf-att-summary-text"></span>
+        <button class="pf-att-open-btn" onclick="pfToggleAttBar()">Öffnen ›</button>
         <div style="flex:1"></div>
-        <button class="pf-tb-btn" id="pf-tb-move" title="In anderen Ordner verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Verschieben</button>
-        <div class="pf-tb-sep"></div>
-        <button class="pf-tb-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen \u2014 l\u00e4dt kompletten Kontext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
+        <button class="pf-att-save-sm" onclick="pfSaveAllAtts()">Alle speichern</button>
+      </div>
+      <div class="pf-att-expanded" id="pf-att-expanded" style="display:none">
+        <div class="pf-att-bar-head">
+          <span class="pf-att-title">Anh\u00e4nge</span>
+          <span class="pf-att-count" id="pf-att-count"></span>
+          <div style="flex:1"></div>
+          <button class="pf-att-save-sm" onclick="pfSaveAllAtts()">Alle speichern</button>
+          <button class="pf-att-close-btn" onclick="pfToggleAttBar()">\u2715 Schlie\u00dfen</button>
+        </div>
+        <div class="pf-attachment-list" id="pf-attachment-list"></div>
       </div>
     </div>
-    <div class="pf-prev-anhaenge" id="pf-prev-anhaenge" style="display:none"></div>
-    <div class="pf-prev-body" id="pf-prev-body"></div>
-    <!-- Thread -->
-    <div id="pf-thread-wrap" style="display:none">
-      <div class="pf-thread-hdr" onclick="pfToggleThread()">
-        <span>&#x1F4AC; Thread-Verlauf</span><span id="pf-thread-cnt"></span>
-        <span id="pf-thread-toggle">&#x25BC;</span>
+
+    <!-- ── 4. Viewer ──────────────────────────────────────────── -->
+    <div class="pf-content-section">
+      <div class="pf-viewer-toolbar" id="pf-viewer-toolbar" style="display:none">
+        <div class="pf-state-row" id="pf-state-row">
+          <span class="pf-state-chip pf-chip-html" id="pf-chip-html" style="display:none">HTML</span>
+          <span class="pf-state-chip pf-chip-text" id="pf-chip-text" style="display:none">Nur Text</span>
+          <span class="pf-state-chip pf-chip-blocked" id="pf-chip-blocked" style="display:none">Externe Bilder blockiert</span>
+        </div>
       </div>
-      <div id="pf-thread-list"></div>
+      <div class="pf-trust-banner" id="pf-trust-banner" style="display:none">
+        <span>Externe Inhalte wurden blockiert, um Ihre Privatsph\u00e4re zu sch\u00fctzen.</span>
+        <button class="pf-trust-btn" onclick="pfTrustSender()">Absender vertrauen</button>
+      </div>
+      <div class="pf-prev-body" id="pf-prev-body"></div>
+      <div id="pf-thread-wrap" style="display:none">
+        <div class="pf-thread-hdr" onclick="pfToggleThread()">
+          <span>&#x1F4AC; Thread-Verlauf</span><span id="pf-thread-cnt"></span>
+          <span id="pf-thread-toggle">&#x25BC;</span>
+        </div>
+        <div id="pf-thread-list"></div>
+      </div>
     </div>
+
   </div>
   <!-- Compose -->
   <div id="pf-compose" style="display:none">
@@ -956,9 +1100,29 @@ def build_postfach():
 
 </div>
 
+<!-- ── BILD-GALERIE MODAL ──────────────────────────────────── -->
+<div class="pf-gallery-modal" id="pf-gallery-modal" style="display:none" onclick="if(event.target===this)pfCloseGallery()">
+  <div class="pf-gallery-wrap">
+    <div class="pf-gallery-topbar">
+      <span class="pf-gallery-title" id="pf-gallery-title"></span>
+      <div style="flex:1"></div>
+      <span class="pf-gallery-counter" id="pf-gallery-counter"></span>
+      <button class="pf-gallery-close" onclick="pfCloseGallery()">&#x2715;</button>
+    </div>
+    <div class="pf-gallery-main">
+      <button class="pf-gallery-nav pf-gallery-prev" id="pf-gallery-prev" onclick="pfGalleryNav(-1)">&#x2039;</button>
+      <div class="pf-gallery-imgwrap">
+        <img class="pf-gallery-img" id="pf-gallery-img" src="" alt="">
+      </div>
+      <button class="pf-gallery-nav pf-gallery-next" id="pf-gallery-next" onclick="pfGalleryNav(1)">&#x203A;</button>
+    </div>
+    <div class="pf-gallery-thumbs" id="pf-gallery-thumbs"></div>
+  </div>
+</div>
+
 <style>
 /* ── Postfach Shell ─────────────────────────────────────── */
-.pf-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
+.pf-shell{display:flex;height:calc(100vh - 56px - var(--pf-ribbon-h,48px));overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
 /* LEFT SIDEBAR */
 .pf-left{width:var(--pf-left-w);min-width:160px;max-width:380px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
 .pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -1167,6 +1331,143 @@ def build_postfach():
 .pf-kira-btn svg{color:#fff!important;opacity:.9;width:15px!important;height:15px!important}
 .pf-kira-btn.loading{opacity:.7;pointer-events:none;cursor:wait}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RIBBON ─────────────────────────────────────────────── */
+:root{--pf-ribbon-h:48px}
+.pf-ribbon-wrap{background:var(--bg-raised);border-bottom:1px solid var(--border);height:var(--pf-ribbon-h);flex-shrink:0;overflow:hidden}
+.pf-ribbon{display:flex;align-items:stretch;height:100%;user-select:none}
+.pf-rbn-viewport{flex:1;overflow:hidden;position:relative}
+.pf-rbn-inner{display:flex;align-items:stretch;height:100%;transition:transform .22s ease;will-change:transform}
+.pf-rbn-group{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0}
+.pf-rbn-actions{display:flex;align-items:center;gap:1px;flex:1;padding-top:4px}
+.pf-rbn-label{font-size:9.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:2px 0 3px;white-space:nowrap}
+.pf-rbn-sep{width:1px;background:var(--border);height:70%;align-self:center;flex-shrink:0;margin:0 4px}
+.pf-rbn-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px 7px;border-radius:6px;color:var(--text-muted);font-size:10.5px;min-width:44px;transition:background .1s,color .1s;flex-shrink:0}
+.pf-rbn-tool svg{width:18px;height:18px;display:block;flex-shrink:0}
+.pf-rbn-tool span{line-height:1;white-space:nowrap}
+.pf-rbn-tool:hover{background:var(--bg-hover);color:var(--text)}
+.pf-rbn-tool.disabled{opacity:.38;cursor:default;pointer-events:none}
+.pf-rbn-tool.pf-rbn-prep{opacity:.55}
+.pf-rbn-tool.pf-rbn-prep:hover{opacity:1}
+.pf-rbn-kira{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(109,40,217,.08))!important;color:#7c3aed!important;border-radius:7px!important}
+.pf-rbn-kira:hover{background:linear-gradient(135deg,rgba(124,58,237,.22),rgba(109,40,217,.18))!important;color:#6d28d9!important}
+.pf-rbn-edge{background:none;border:none;cursor:pointer;padding:0 8px;color:var(--text-muted);font-size:20px;display:flex;align-items:center;transition:color .1s;flex-shrink:0}
+.pf-rbn-edge:hover{color:var(--text)}
+.pf-rbn-toggle{background:none;border:none;cursor:pointer;padding:0 10px;color:var(--text-muted);font-size:12px;display:flex;align-items:center;border-left:1px solid var(--border);flex-shrink:0;transition:color .1s}
+.pf-rbn-toggle:hover{color:var(--text)}
+/* Compact mode: icon-only, no labels, smaller */
+.pf-ribbon.compact{--pf-ribbon-h:38px}
+.pf-ribbon.compact .pf-rbn-label{display:none}
+.pf-ribbon.compact .pf-rbn-tool{padding:4px 5px;min-width:34px;gap:0}
+.pf-ribbon.compact .pf-rbn-tool svg{width:16px;height:16px}
+.pf-ribbon.compact .pf-rbn-tool span{display:none}
+.pf-ribbon.compact .pf-rbn-actions{padding-top:0}
+/* Responsive: compact auto on narrow screens */
+@media(max-width:900px){.pf-ribbon:not(.compact){--pf-ribbon-h:38px}.pf-ribbon:not(.compact) .pf-rbn-label{display:none}.pf-ribbon:not(.compact) .pf-rbn-tool{padding:4px 5px;min-width:34px}.pf-ribbon:not(.compact) .pf-rbn-tool svg{width:16px;height:16px}.pf-ribbon:not(.compact) .pf-rbn-tool span{display:none}.pf-ribbon:not(.compact) .pf-rbn-actions{padding-top:0}}
+[data-theme="light"] .pf-ribbon-wrap{background:#f8f9fa}
+
+/* ── DETAIL FRAME (Mail-Lesefläche) ──────────────────────── */
+.pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden}
+
+/* ── MAIL-KOPF ───────────────────────────────────────────── */
+.pf-mail-head{padding:14px 20px 10px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0}
+.pf-subject-bar{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.pf-subject-text{font-size:16px;font-weight:700;color:var(--text);flex:1;min-width:0;line-height:1.3;word-break:break-word}
+.pf-date-stack{font-size:12px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;padding-top:2px}
+.pf-header-meta{display:flex;flex-direction:column;gap:6px}
+.pf-sender-col{display:flex;align-items:center;gap:12px;min-width:0}
+.pf-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;background:#3b82f6}
+.pf-identity{min-width:0;flex:1}
+.pf-from-line{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-to-line{font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.pf-head-actions{display:flex;align-items:center;gap:3px;flex-wrap:wrap;flex-shrink:0}
+.pf-ha-btn{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:5px;white-space:nowrap;transition:.12s}
+.pf-ha-btn:hover{background:var(--bg-hover);border-color:var(--border)}
+.pf-ha-btn svg{width:14px;height:14px;flex-shrink:0}
+.pf-ha-icon{background:none;border:none;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--text-muted);display:flex;align-items:center;transition:.12s}
+.pf-ha-icon:hover{background:var(--bg-hover);color:var(--text)}
+.pf-ha-icon.del-btn:hover{background:rgba(200,60,60,.12);color:#c83c3c}
+.pf-ha-icon.active{color:#f59e0b}
+.pf-ha-icon.pin-active{color:#3b82f6}
+.pf-ha-icon svg{width:16px;height:16px;display:block}
+.pf-ha-sep{width:1px;height:20px;background:var(--border);margin:0 3px;flex-shrink:0}
+[data-theme="light"] .pf-mail-head{background:#fff}
+
+/* ── HINT-SECTION ────────────────────────────────────────── */
+.pf-hint-section{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
+.pf-hint{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.pf-hint-reply{background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.25)}
+.pf-hint-forwarded{background:rgba(100,116,139,.1);color:var(--text-muted);border:1px solid var(--border)}
+.pf-hint-done{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)}
+.pf-hint-followup{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.pf-hint-kira{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.25)}
+.pf-hint-unread{background:rgba(14,165,233,.1);color:#0ea5e9;border:1px solid rgba(14,165,233,.25)}
+[data-theme="light"] .pf-hint-section{background:#f8f9fa}
+
+/* ── ANHANG-SECTION ──────────────────────────────────────── */
+.pf-attachment-section{border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0}
+.pf-att-collapsed{display:flex;align-items:center;gap:8px;padding:7px 20px;cursor:pointer}
+.pf-att-icon-svg{width:14px;height:14px;flex-shrink:0;color:var(--text-muted)}
+.pf-att-summary-text{font-size:12.5px;color:var(--text-muted);flex-shrink:0}
+.pf-att-open-btn{background:none;border:none;cursor:pointer;font-size:12px;color:#3b82f6;padding:0 4px;white-space:nowrap}
+.pf-att-open-btn:hover{text-decoration:underline}
+.pf-att-save-sm{background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:11px;color:var(--text-muted);padding:3px 8px;white-space:nowrap;transition:.1s}
+.pf-att-save-sm:hover{border-color:#3b82f6;color:#3b82f6}
+.pf-att-expanded{background:var(--bg-raised)}
+.pf-att-bar-head{display:flex;align-items:center;gap:8px;padding:8px 20px 6px;border-top:1px solid var(--border)}
+.pf-att-title{font-size:12px;font-weight:600;color:var(--text)}
+.pf-att-count{font-size:11px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:1px 6px}
+.pf-att-close-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);padding:3px 6px;border-radius:5px;transition:.1s}
+.pf-att-close-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-attachment-list{padding:4px 20px 10px;display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto}
+.pf-attachment-row{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;background:var(--bg);border:1px solid var(--border);transition:.1s}
+.pf-attachment-row:hover{border-color:rgba(59,130,246,.4)}
+.pf-att-preview-box{width:48px;height:48px;border-radius:5px;background:var(--bg-hover);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text-muted);overflow:hidden;flex-shrink:0}
+.pf-att-preview-box.pdf{background:rgba(239,68,68,.12);color:#ef4444}
+.pf-att-preview-box.doc{background:rgba(59,130,246,.12);color:#3b82f6}
+.pf-att-preview-box.zip{background:rgba(245,158,11,.12);color:#f59e0b}
+.pf-att-preview-box.img{background:#000}
+.pf-att-file-info{min-width:0}
+.pf-att-file-name{font-size:12.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-att-file-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.pf-att-row-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.pf-att-act-btn{background:none;border:none;cursor:pointer;padding:5px 6px;border-radius:5px;font-size:13px;color:var(--text-muted);transition:.1s}
+.pf-att-act-btn:hover{background:var(--bg-hover);color:var(--text)}
+[data-theme="light"] .pf-attachment-section{background:#f8f9fa}
+[data-theme="light"] .pf-att-expanded{background:#f8f9fa}
+[data-theme="light"] .pf-attachment-row{background:#fff}
+
+/* ── VIEWER / CONTENT-SECTION ─────────────────────────────── */
+.pf-content-section{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pf-viewer-toolbar{display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
+.pf-state-chip{font-size:11px;padding:2px 8px;border-radius:9px;font-weight:500;white-space:nowrap}
+.pf-chip-html{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)}
+.pf-chip-text{background:rgba(100,116,139,.1);color:var(--text-muted);border:1px solid var(--border)}
+.pf-chip-blocked{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.pf-trust-banner{display:flex;align-items:center;gap:10px;padding:6px 20px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);font-size:12.5px;color:#b45309;flex-shrink:0}
+.pf-trust-btn{background:#f59e0b;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11.5px;cursor:pointer}
+.pf-trust-btn:hover{background:#d97706}
+[data-theme="light"] .pf-viewer-toolbar{background:#f8f9fa}
+
+/* ── GALLERY MODAL ────────────────────────────────────────── */
+.pf-gallery-modal{position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center}
+.pf-gallery-wrap{display:flex;flex-direction:column;width:min(92vw,1100px);height:min(90vh,800px);background:#1a1a1a;border-radius:12px;overflow:hidden}
+.pf-gallery-topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(255,255,255,.06);flex-shrink:0}
+.pf-gallery-title{font-size:13px;color:rgba(255,255,255,.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.pf-gallery-counter{font-size:12px;color:rgba(255,255,255,.5);flex-shrink:0}
+.pf-gallery-close{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.6);font-size:18px;padding:2px 6px;border-radius:5px;transition:.1s}
+.pf-gallery-close:hover{color:#fff;background:rgba(255,255,255,.1)}
+.pf-gallery-main{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;position:relative;gap:0}
+.pf-gallery-imgwrap{flex:1;display:flex;align-items:center;justify-content:center;height:100%;padding:10px;min-width:0}
+.pf-gallery-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;display:block}
+.pf-gallery-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);border:none;cursor:pointer;color:rgba(255,255,255,.8);font-size:32px;width:44px;height:60px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.15s;z-index:2}
+.pf-gallery-prev{left:8px}
+.pf-gallery-next{right:8px}
+.pf-gallery-nav:hover{background:rgba(255,255,255,.2);color:#fff}
+.pf-gallery-thumbs{display:flex;gap:6px;padding:8px 16px;background:rgba(0,0,0,.4);overflow-x:auto;flex-shrink:0}
+.pf-gallery-thumb{width:56px;height:56px;object-fit:cover;border-radius:4px;cursor:pointer;opacity:.55;border:2px solid transparent;transition:.15s;flex-shrink:0}
+.pf-gallery-thumb:hover{opacity:.85}
+.pf-gallery-thumb.active{opacity:1;border-color:#fff}
 </style>
 
 <script>
@@ -1225,6 +1526,7 @@ function pfLoadHealth() {
 let _pfRefreshTimer = null;
 function pfInit() {
   pfInitResize(); // restore pane widths (DOM now exists)
+  pfRibbonInit(); // init fixed ribbon
   _pfInitToolbar(); // bind preview toolbar buttons
   fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
     pfRenderFolders(data);
@@ -1465,6 +1767,7 @@ function pfBarDeleteCurrent() {
         const el=document.querySelector('[data-msgid="'+id+'"]');
         if(el) el.remove();
         _pfCurrentMail=null;
+        pfRibbonUpdateState(false);
         document.getElementById('pf-preview').style.display='none';
         document.getElementById('pf-preview-empty').style.display='flex';
         pfUpdateBulkBar();
@@ -1561,6 +1864,7 @@ window.pfSnoozeUntil = function(isoDatetime, menuEl) {
         if(_pfCurrentFolder && /inbox|posteingang/i.test(_pfCurrentFolder)) {
           if(itemEl) itemEl.remove();
           _pfCurrentMail=null;
+          pfRibbonUpdateState(false);
           document.getElementById('pf-preview').style.display='none';
           document.getElementById('pf-preview-empty').style.display='flex';
           pfUpdateBulkBar();
@@ -1694,6 +1998,7 @@ function pfDeleteMail(msgId, el) {
           document.getElementById('pf-preview').style.display='none';
           document.getElementById('pf-preview-empty').style.display='';
           _pfCurrentMail=null;
+          pfRibbonUpdateState(false);
         }
       }
     }).catch(()=>{});
@@ -2096,77 +2401,322 @@ function pfRenderMailItem(m, container) {
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+// ── RFC-2047 Header Decode ────────────────────────────────
+function pfDecodeHeader(str) {
+  if (!str) return str;
+  return str.replace(/=\\?([^?]+)\\?([BbQq])\\?([^?]*)\\?=/g, function(_, charset, enc, data) {
+    try {
+      const cs = charset.toLowerCase().replace('windows-','cp');
+      if (enc.toUpperCase() === 'B') {
+        const bin = atob(data.replace(/-/g,'+').replace(/_/g,'/'));
+        return new TextDecoder(cs).decode(new Uint8Array([...bin].map(c=>c.charCodeAt(0))));
+      } else {
+        const q = data.replace(/_/g,' ').replace(/=([0-9A-Fa-f]{2})/g,(_,h)=>String.fromCharCode(parseInt(h,16)));
+        return new TextDecoder(cs).decode(new Uint8Array([...q].map(c=>c.charCodeAt(0))));
+      }
+    } catch(e) { return data; }
+  }).trim();
+}
+
+// ── Ribbon ────────────────────────────────────────────────
+let _pfRibbonOffset = 0;
+let _pfRibbonIsCompact = false;
+
+function pfRibbonInit() {
+  _pfRibbonIsCompact = localStorage.getItem('pf_ribbon_compact') === '1';
+  const ribbon = document.getElementById('pf-ribbon');
+  if (!ribbon) return;
+  if (_pfRibbonIsCompact) {
+    ribbon.classList.add('compact');
+    const tog = document.getElementById('pf-rbn-toggle');
+    if (tog) tog.innerHTML = '&#x25B4;';
+  }
+  pfRibbonCheckEdges();
+  pfRibbonUpdateState(false);
+  const vp = document.getElementById('pf-rbn-viewport');
+  if (vp && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => pfRibbonCheckEdges()).observe(vp);
+  }
+}
+
+window.pfRibbonCompact = function() {
+  _pfRibbonIsCompact = !_pfRibbonIsCompact;
+  const ribbon = document.getElementById('pf-ribbon');
+  if (ribbon) ribbon.classList.toggle('compact', _pfRibbonIsCompact);
+  const tog = document.getElementById('pf-rbn-toggle');
+  if (tog) tog.innerHTML = _pfRibbonIsCompact ? '&#x25B4;' : '&#x25BE;';
+  localStorage.setItem('pf_ribbon_compact', _pfRibbonIsCompact ? '1' : '0');
+  setTimeout(pfRibbonCheckEdges, 60);
+};
+
+window.pfRibbonScroll = function(dir) {
+  const inner = document.getElementById('pf-rbn-inner');
+  const vp = document.getElementById('pf-rbn-viewport');
+  if (!inner || !vp) return;
+  const step = vp.offsetWidth * 0.65;
+  _pfRibbonOffset = Math.max(0, Math.min(inner.scrollWidth - vp.offsetWidth + 2, _pfRibbonOffset + dir * step));
+  inner.style.transform = 'translateX(-' + _pfRibbonOffset + 'px)';
+  pfRibbonCheckEdges();
+};
+
+function pfRibbonCheckEdges() {
+  const inner = document.getElementById('pf-rbn-inner');
+  const vp = document.getElementById('pf-rbn-viewport');
+  const prev = document.getElementById('pf-rbn-prev');
+  const next = document.getElementById('pf-rbn-next');
+  if (!inner || !vp || !prev || !next) return;
+  const overflow = inner.scrollWidth > vp.offsetWidth + 4;
+  prev.style.display = (overflow && _pfRibbonOffset > 2) ? '' : 'none';
+  next.style.display = (overflow && _pfRibbonOffset < inner.scrollWidth - vp.offsetWidth - 2) ? '' : 'none';
+}
+
+window.pfRibbonUpdateState = function(mailSelected) {
+  document.querySelectorAll('.pf-rbn-mail-dep').forEach(btn => {
+    btn.classList.toggle('disabled', !mailSelected);
+  });
+};
+
+window.pfToastVorbereitung = function(name) {
+  showToast((name || 'Diese Funktion') + ' — in Vorbereitung', 'info');
+};
+
+// Ribbon delegates to existing action handlers
+window.pfRibbonToggleRead = function() {
+  if (!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if (el) pfToggleRead(_pfCurrentMail.message_id, el);
+};
+window.pfRibbonToggleFlag = function() {
+  if (!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if (el) pfToggleFlag(_pfCurrentMail.message_id, el);
+};
+window.pfRibbonTogglePin = function() {
+  if (!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if (el) pfTogglePin(_pfCurrentMail.message_id, el);
+};
+window.pfRibbonDelete = function() {
+  if (!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if (el) pfDeleteMail(_pfCurrentMail.message_id, el);
+};
+
+// ── Viewer state chips ────────────────────────────────────
+function pfUpdateViewerState(type) {
+  const ids = ['pf-chip-html','pf-chip-text','pf-chip-blocked'];
+  ids.forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  const toolbar = document.getElementById('pf-viewer-toolbar');
+  if (!type) { if(toolbar) toolbar.style.display='none'; return; }
+  const map = {html:'pf-chip-html', text:'pf-chip-text', blocked:'pf-chip-blocked'};
+  if (map[type]) { const el=document.getElementById(map[type]); if(el) el.style.display=''; }
+  if (toolbar) toolbar.style.display='';
+}
+
+window.pfTrustSender = function() {
+  const banner = document.getElementById('pf-trust-banner');
+  if (banner) banner.style.display = 'none';
+  showToast('Absender als vertrauenswürdig markiert', 'ok');
+};
+
+// ── Hints section ─────────────────────────────────────────
+function pfRenderHints(m, d) {
+  const sec = document.getElementById('pf-hint-section');
+  if (!sec) return;
+  const hints = [];
+  if (m.replied) hints.push({cls:'reply', text:'Geantwortet'+(m.replied_at?' · '+m.replied_at:'')});
+  if (m.forwarded) hints.push({cls:'forwarded', text:'Weitergeleitet'+(m.forwarded_at?' · '+m.forwarded_at:'')});
+  if (m.snoozed) hints.push({cls:'followup', text:'Wiedervorlage: '+(m.snooze_until||'geplant')});
+  if (m.pinned) hints.push({cls:'reply', text:'Angeheftet'});
+  if (d && d.kira_context) hints.push({cls:'kira', text:'Mit Kira besprochen'});
+  if (!hints.length) { sec.style.display='none'; sec.innerHTML=''; return; }
+  sec.style.display='';
+  sec.innerHTML = hints.map(h=>'<span class="pf-hint pf-hint-'+h.cls+'">'+esc(h.text)+'</span>').join('');
+}
+
+// ── Attachments collapsible bar ───────────────────────────
+let _pfAttBarOpen = false;
+let _pfGalleryImages = [];
+
+function pfRenderAttachments(anhaenge) {
+  const sec = document.getElementById('pf-attachment-section');
+  if (!sec) return;
+  if (!anhaenge || !anhaenge.length) { sec.style.display='none'; return; }
+  sec.style.display = '';
+  _pfAttBarOpen = false;
+  document.getElementById('pf-att-collapsed').style.display = 'flex';
+  document.getElementById('pf-att-expanded').style.display = 'none';
+  // Summary
+  const totalBytes = anhaenge.reduce((s,a)=>s+(a.groesse||0), 0);
+  const sizeStr = totalBytes > 1048576 ? (totalBytes/1048576).toFixed(1)+' MB'
+    : totalBytes > 1024 ? Math.round(totalBytes/1024)+' KB' : '';
+  const summary = anhaenge.length+(anhaenge.length===1?' Anhang':' Anhänge')+(sizeStr?' · '+sizeStr:'');
+  document.getElementById('pf-att-summary').textContent = summary;
+  document.getElementById('pf-att-count').textContent = summary;
+  // Build expanded list
+  const images = anhaenge.filter(a=>/^image\\//i.test(a.typ||''));
+  _pfGalleryImages = images.map(a=>({name:a.name||'Bild', src:'/api/file?path='+encodeURIComponent(a.pfad)}));
+  const list = document.getElementById('pf-attachment-list');
+  list.innerHTML = anhaenge.map((a, idx) => {
+    const isImg = /^image\\//i.test(a.typ||'');
+    const isPdf = /pdf/i.test(a.typ+a.name);
+    const isDoc = /word|excel|powerpoint|docx|xlsx|pptx/i.test(a.typ+(a.name||''));
+    const isZip = /zip|rar|7z/i.test(a.typ+(a.name||''));
+    const pcls = isImg?'img':isPdf?'pdf':isDoc?'doc':isZip?'zip':'';
+    const pContent = isImg
+      ? '<img src="/api/file?path='+encodeURIComponent(a.pfad)+'" style="width:100%;height:100%;object-fit:cover;border-radius:4px">'
+      : '<span>'+esc((a.name||'').split('.').pop().toUpperCase().slice(0,4)||'?')+'</span>';
+    const imgIdx = isImg ? images.findIndex(im=>im.name===a.name) : -1;
+    return '<div class="pf-attachment-row">'
+      +'<div class="pf-att-preview-box '+pcls+'">'+pContent+'</div>'
+      +'<div class="pf-att-file-info">'
+      +'<div class="pf-att-file-name">'+esc(a.name||'Anhang')+'</div>'
+      +'<div class="pf-att-file-sub">'+esc((a.groesse?(a.groesse>1048576?(a.groesse/1048576).toFixed(1)+' MB':Math.round(a.groesse/1024)+' KB')+' · ':'')+(a.typ||''))+'</div>'
+      +'</div>'
+      +'<div class="pf-att-row-actions">'
+      +(isImg&&imgIdx>=0?'<button class="pf-att-act-btn" onclick="pfGalleryJump('+imgIdx+')" title="Galerie öffnen">&#x1F4F7;</button>':'')
+      +'<button class="pf-att-act-btn" onclick="pfOpenAtt(encodeURIComponent(this.dataset.path))" data-path="'+esc(a.pfad)+'" title="Öffnen">&#x1F441;</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+window.pfToggleAttBar = function() {
+  _pfAttBarOpen = !_pfAttBarOpen;
+  document.getElementById('pf-att-collapsed').style.display = _pfAttBarOpen ? 'none' : 'flex';
+  document.getElementById('pf-att-expanded').style.display = _pfAttBarOpen ? '' : 'none';
+};
+
+window.pfSaveAllAtts = function() { pfToastVorbereitung('Alle Anhänge speichern'); };
+
+// ── Gallery modal ─────────────────────────────────────────
+let _pfGalleryIdx = 0;
+
+window.pfGalleryJump = function(idx) {
+  _pfGalleryIdx = idx;
+  document.getElementById('pf-gallery-modal').style.display = 'flex';
+  pfGalleryRender();
+};
+
+window.pfGalleryNav = function(dir) {
+  if (!_pfGalleryImages.length) return;
+  _pfGalleryIdx = (_pfGalleryIdx + dir + _pfGalleryImages.length) % _pfGalleryImages.length;
+  pfGalleryRender();
+};
+
+window.pfCloseGallery = function() {
+  document.getElementById('pf-gallery-modal').style.display = 'none';
+};
+
+function pfGalleryRender() {
+  const im = _pfGalleryImages[_pfGalleryIdx];
+  if (!im) return;
+  document.getElementById('pf-gallery-img').src = im.src;
+  document.getElementById('pf-gallery-title').textContent = im.name;
+  document.getElementById('pf-gallery-counter').textContent = (_pfGalleryIdx+1)+' / '+_pfGalleryImages.length;
+  const thumbs = document.getElementById('pf-gallery-thumbs');
+  thumbs.innerHTML = _pfGalleryImages.map((g,i)=>
+    '<img class="pf-gallery-thumb'+(i===_pfGalleryIdx?' active':'')+'" src="'+g.src
+    +'" onclick="pfGalleryJump('+i+')" title="'+esc(g.name)+'">'
+  ).join('');
+  document.getElementById('pf-gallery-prev').style.display = _pfGalleryImages.length>1?'':'none';
+  document.getElementById('pf-gallery-next').style.display = _pfGalleryImages.length>1?'':'none';
+}
+
+document.addEventListener('keydown', function(e) {
+  const modal = document.getElementById('pf-gallery-modal');
+  if (!modal || modal.style.display==='none') return;
+  if (e.key==='ArrowLeft') pfGalleryNav(-1);
+  else if (e.key==='ArrowRight') pfGalleryNav(1);
+  else if (e.key==='Escape') pfCloseGallery();
+});
+
 // ── Open Mail ────────────────────────────────────────────
 window.pfOpenMail = function(m, el) {
   if(_pfActiveItem) _pfActiveItem.classList.remove('active');
-  _pfActiveItem=el; el.classList.add('active');
+  _pfActiveItem = el; if(el) el.classList.add('active');
   _pfCurrentMail = m;
-  _pfCurrentMsgId = m.message_id || null;  // für Verschieben-Funktion
-  pfUpdateBulkBar();  // Aktionsleiste für Single-Auswahl anzeigen
-  document.getElementById('pf-preview-empty').style.display='none';
-  document.getElementById('pf-preview').style.display='flex';
-  document.getElementById('pf-preview').style.flexDirection='column';
-  document.getElementById('pf-compose').style.display='none';
+  _pfCurrentMsgId = m.message_id || null;
+  pfUpdateBulkBar();
+  pfRibbonUpdateState(true);
+  document.getElementById('pf-preview-empty').style.display = 'none';
+  document.getElementById('pf-preview').style.display = 'grid';
+  document.getElementById('pf-compose').style.display = 'none';
 
-  document.getElementById('pf-prev-betreff').textContent=m.betreff||'(kein Betreff)';
-  document.getElementById('pf-prev-absender').textContent='Von: '+(m.absender||'');
-  document.getElementById('pf-prev-datum').textContent=m.datum||'';
-  document.getElementById('pf-prev-body').textContent='Lade...';
-  document.getElementById('pf-prev-anhaenge').style.display='none';
-  document.getElementById('pf-thread-wrap').style.display='none';
+  // ── Decode + render header ─────────────────────────────
+  const betreff = pfDecodeHeader(m.betreff) || '(kein Betreff)';
+  const absenderRaw = pfDecodeHeader(m.absender) || '';
+  const emailMatch = absenderRaw.match(/<([^>]+@[^>]+)>/);
+  const emailAddr = emailMatch ? emailMatch[1] : absenderRaw;
+  const displayName = absenderRaw.replace(/<[^>]+>/, '').trim() || emailAddr.split('@')[0];
+  const initials = displayName.split(/\\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
 
-  // Toolbar state
-  const tbFlag=document.getElementById('pf-tb-flag');
-  const tbPin=document.getElementById('pf-tb-pin');
-  if(tbFlag) tbFlag.classList.toggle('active',!!(m.flagged));
-  if(tbPin) tbPin.classList.toggle('pin-active',!!(m.pinned));
+  const subjectEl = document.getElementById('pf-prev-betreff');
+  if (subjectEl) subjectEl.textContent = betreff;
+  const datumEl = document.getElementById('pf-prev-datum');
+  if (datumEl) datumEl.textContent = m.datum || '';
+  const avatarEl = document.getElementById('pf-avatar');
+  if (avatarEl) { avatarEl.textContent = initials; avatarEl.style.background = pfAvatarColor(displayName); }
+  const fromEl = document.getElementById('pf-prev-absender');
+  if (fromEl) fromEl.textContent = absenderRaw || emailAddr;
+  const toEl = document.getElementById('pf-prev-to');
+  if (toEl) toEl.textContent = m.empfaenger ? 'An: '+pfDecodeHeader(m.empfaenger) : '';
 
+  // Toolbar icon states
+  const tbFlag = document.getElementById('pf-tb-flag');
+  const tbPin = document.getElementById('pf-tb-pin');
+  if (tbFlag) tbFlag.classList.toggle('active', !!(m.flagged));
+  if (tbPin) tbPin.classList.toggle('pin-active', !!(m.pinned));
+
+  // ── Reset sections ─────────────────────────────────────
+  pfRenderHints(m, null);
+  pfRenderAttachments([]);
+  pfUpdateViewerState(null);
+  document.getElementById('pf-thread-wrap').style.display = 'none';
+  const body = document.getElementById('pf-prev-body');
+  body.className = 'pf-prev-body';
+  body.innerHTML = '';
+  body.textContent = 'Lade...';
+
+  // ── Load mail content ──────────────────────────────────
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
     const body = document.getElementById('pf-prev-body');
     body.innerHTML = '';
     const rawText = d.text || '';
-    // HTML-Mail via iframe (füllt kompletten Bereich)
     const hasHtml = !!d.html;
     const textLooksLikeHtml = !hasHtml && /^\\s*(<html|<!doctype)/i.test(rawText);
-    if(hasHtml || textLooksLikeHtml) {
+    if (hasHtml || textLooksLikeHtml) {
+      pfUpdateViewerState('html');
       body.classList.add('iframe-mode');
-      body.style.padding = '';
-      body.style.overflow = '';
-      body.style.whiteSpace = '';
+      body.style.cssText = '';
       const iframe = document.createElement('iframe');
       iframe.setAttribute('sandbox', 'allow-same-origin allow-popups-to-escape-sandbox');
-      iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;display:block;min-height:0';
+      iframe.style.cssText = 'flex:1;width:100%;height:100%;border:none;background:#fff;display:block;min-height:0';
       iframe.srcdoc = hasHtml ? d.html : rawText;
       body.appendChild(iframe);
     } else {
+      pfUpdateViewerState('text');
       body.classList.remove('iframe-mode');
       body.style.padding = '20px';
       body.style.overflow = 'auto';
       body.style.whiteSpace = 'pre-wrap';
-      // HTML-Entities dekodieren (z.B. &amp; → &, &lt; → <)
       const tmp = document.createElement('div');
       tmp.innerHTML = rawText;
       body.textContent = tmp.textContent || '(kein Inhalt)';
     }
-    if(d.anhaenge&&d.anhaenge.length>0) {
-      const wrap=document.getElementById('pf-prev-anhaenge');
-      wrap.style.display='flex';
-      const attIcon='<svg style="width:14px;height:14px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
-      wrap.innerHTML=d.anhaenge.map(a=>'<div class="pf-att-chip" data-pfad="'+encodeURIComponent(a.pfad)+'" onclick="pfOpenAtt(this.dataset.pfad)">'+attIcon+' '+esc(a.name)+' <small style="color:var(--text-muted)">'+a.typ+'</small></div>').join('');
-    }
+    if (d.anhaenge && d.anhaenge.length > 0) pfRenderAttachments(d.anhaenge);
+    pfRenderHints(m, d);
+  }).catch(() => {
+    const body = document.getElementById('pf-prev-body');
+    body.textContent = 'Fehler beim Laden.';
+    pfUpdateViewerState(null);
   });
 
-  // Als gelesen markieren — abhängig von _pfMarkReadMode
-  if(m.unread) {
-    pfDoMarkRead(m);
-  }
+  if (m.unread) pfDoMarkRead(m);
 
-  // Thread laden wenn thread_id vorhanden
-  if(m.thread_id&&m.thread_id!==m.message_id) {
+  if (m.thread_id && m.thread_id !== m.message_id) {
     fetch('/api/mail/thread?thread_id='+encodeURIComponent(m.thread_id)).then(r=>r.json()).then(d=>{
-      if(d.mails&&d.mails.length>1) {
-        pfRenderThread(d.mails, m.message_id);
-      }
+      if (d.mails && d.mails.length > 1) pfRenderThread(d.mails, m.message_id);
     });
   }
 };
