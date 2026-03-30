@@ -980,8 +980,7 @@ const CFG = {
   "ntfy_server": "https://ntfy.sh",
   "gh_owner": "kaimarienfeld",
   "gh_repo": "kira-partner",
-  "feedback_token": "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",
-  "gh_token": "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"
+  "feedback_token": "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"
 };
 
 /* ── FEATURE-DATEN ── generiert durch generate_partner_view.py ─ */
@@ -1390,13 +1389,11 @@ function loadAdminSettings() {
     pw_kai:'',pw_leni:'',ntfy_kai:CFG.ntfy_kai,ntfy_kai_mode:'immediate',
     ntfy_leni:CFG.ntfy_leni,ntfy_leni_auto:'1',
     ntfy_leni_msg:'Neue Funktionen bei KIRA Partner! Schau mal rein 🌟',
-    gh_token:CFG.gh_token||'',last_push:'',last_push_ok:false,
+    gh_token:'',last_push:'',last_push_ok:false,
     leni_email:'',leni_notif_method:'ntfy',leni_notif_freq:'sofort'
   };
   const stored=JSON.parse(localStorage.getItem('kira_pv_admin')||'{}');
   const result=Object.assign(defaults, stored);
-  // CFG-Token als Fallback wenn localStorage leer gespeichert hat
-  if (!result.gh_token) result.gh_token=CFG.gh_token||'';
   if (!result.ntfy_kai) result.ntfy_kai=CFG.ntfy_kai||'';
   return result;
 }
@@ -1410,7 +1407,7 @@ function saveAdminSettings() {
     ntfy_leni:     document.getElementById('cfg-ntfy-leni').value.trim(),
     ntfy_leni_auto:document.getElementById('cfg-ntfy-leni-auto').value,
     ntfy_leni_msg: document.getElementById('cfg-ntfy-leni-msg').value.trim(),
-    gh_token:           document.getElementById('cfg-gh-token').value.trim()||CFG.gh_token||'',
+    gh_token:           document.getElementById('cfg-gh-token').value.trim()||s.gh_token||'',
     leni_email:         document.getElementById('cfg-leni-email').value.trim(),
     leni_notif_method:  document.getElementById('cfg-leni-notif-method').value,
     leni_notif_freq:    document.getElementById('cfg-leni-notif-freq').value,
@@ -1612,7 +1609,7 @@ async function pushToGitHub() {
     syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})`, 'ok');
     const currentHtml=b64decode(getData.content);
     syncLog('Aktualisiere Einstellungen...','info');
-    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token,gh_token:ghToken};
+    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token};
     let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
     syncLog('OK Einstellungen aktualisiert','ok');
     syncLog(`Pushe zu GitHub (branch: ${branch})...`,'info');
