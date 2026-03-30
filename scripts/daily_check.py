@@ -982,6 +982,16 @@ def main():
           duration_ms=int((__import__('time').monotonic()-_t0_job)*1000),
           result=f"mails={stats.get('gesamt',0)} tasks={stats.get('tasks_erstellt',0)} offen={total_open}")
 
+    # 6. Archiv-Bereinigung (Gelöschte-Ordner nach einstellbarer Frist)
+    try:
+        import archiv_cleanup as _ac
+        _cs = _ac.run_cleanup()
+        if _cs.get("bereinigt", 0) > 0:
+            print(f"  Archiv-Bereinigung: {_cs['bereinigt']} Mails bereinigt, "
+                  f"{_cs['protokoll']} protokolliert, {_cs['fehler']} Fehler")
+    except Exception as _ace:
+        print(f"  [WARN] Archiv-Bereinigung übersprungen: {_ace}")
+
 
 if __name__ == "__main__":
     import argparse

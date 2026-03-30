@@ -1,5 +1,5 @@
 {
-  "last_session": "session-ff",
+  "last_session": "session-hh",
   "date": "2026-03-30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
@@ -25,7 +25,9 @@
     "session-cc (2026-03-29): Bugfixes + AGENT.md Plan-Regel. (1) AGENT.md: Neue Pflicht-Regel — Plan-Agent bei großen Aufträgen vor Implementierung nutzen. (2) KRITISCHER BUG: mail_archiv.pfad war in config.json leer → KIRA konnte keine archivierten Mails lesen. Wiederhergestellt auf korrekten Pfad. (3) mail_monitor.py: _save_to_archive() Ordner-Bug — erhielt label=anfrage statt email_addr=anfrage@raumkult.eu → falsche Ordnernamen. Fix: email_addr übergeben. (4) Toast-Kopierbutton: größer + JS-Fallback via execCommand.",
     "session-dd (2026-03-29): Postfach UI — Favoriten-Sterne + Kombiniertes Postfach Ordnerstruktur + folder_type-Filter + JS-Regex-SyntaxError-Fix. Commits fe30af0 + 2ab44da.",
     "session-ee (2026-03-29): Postfach Outlook-Style Komplett-Upgrade (8 Phasen). (1) DB: _ensure_mail_columns() fügt flagged/pinned/kira_verwendet zu mail_index.db. (2) pfInitResize() von IIFE auf reguläre Funktion (DOM-Timing-Fix). (3) 5 neue POST-Endpunkte: /api/mail/gelesen + /flag + /pin + /loeschen + /kira-markieren. (4) Hover-Aktionen auf Mail-Items: Checkbox + 4 SVG-Icons (Gelesen/Flag/Pin/Trash). (5) Bulk-Bar: Mehrfachauswahl → gelesen/ungelesen/löschen (3-Schritt showKritischModal). (6) SVG Preview-Toolbar: Antworten/Allen/Weiterleiten | Gelesen/Flag/Pin | Löschen | Kira. (7) Lese-Markierung Einstellung: sofort/5s/30s/manuell → cfg-lese-markierung → mail_postfach.lese_markierung. (8) kira_verwendet Badge: lila Chip auf Items. Commit 2aadedc. Alle Tests via Playwright: 0 JS-Fehler, Hover-Aktionen ✓, Bulk-Bar ✓, Toolbar ✓.",
-    "session-ff (2026-03-30): Mail-Nachklassifizierung. Diagnose: 83+ Business-Mails in mail_index.db ohne Tasks (Angebotsrückmeldungen, Anfragen, Rechnungen ab Feb 27). Root-Cause: daily_check.py's scan_new_mails() überspringt alle Mails älter als letzter_lauf → historische Mails werden NIE nachgeholt. Fix: (1) daily_check.py: MAIL_INDEX_DB-Konstante, _recheck_progress Dict, get_recheck_progress(), recheck_mails(seit, bis, dry_run) Funktion — queries mail_index.db direkt, verwendet gleiche Klassifizierungs- und Dedup-Logik wie process_new_mails(). CLI: --seit/--bis/--trocken. (2) server.py: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status Endpoints, esMailNachklassifizieren() JS, Button in Einstellungen > Mail-Klassifizierung mit Datums-Input + Progress-Anzeige. (3) Nachklassifizierung ausgeführt für 2026-01-28 bis heute: 511 Mails geprüft, 5 Tasks erstellt (A-SB260093 Angebotsrückmeldung Kaufmann, Betonkosmetik Horsting, Amir Sad Lead, Calumex Lead, Maurer/Handwerker Lead)."
+    "session-ff (2026-03-30): Mail-Nachklassifizierung. Diagnose: 83+ Business-Mails in mail_index.db ohne Tasks (Angebotsrückmeldungen, Anfragen, Rechnungen ab Feb 27). Root-Cause: daily_check.py's scan_new_mails() überspringt alle Mails älter als letzter_lauf → historische Mails werden NIE nachgeholt. Fix: (1) daily_check.py: MAIL_INDEX_DB-Konstante, _recheck_progress Dict, get_recheck_progress(), recheck_mails(seit, bis, dry_run) Funktion — queries mail_index.db direkt, verwendet gleiche Klassifizierungs- und Dedup-Logik wie process_new_mails(). CLI: --seit/--bis/--trocken. (2) server.py: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status Endpoints, esMailNachklassifizieren() JS, Button in Einstellungen > Mail-Klassifizierung mit Datums-Input + Progress-Anzeige. (3) Nachklassifizierung ausgeführt für 2026-01-28 bis heute: 511 Mails geprüft, 5 Tasks erstellt (A-SB260093 Angebotsrückmeldung Kaufmann, Betonkosmetik Horsting, Amir Sad Lead, Calumex Lead, Maurer/Handwerker Lead).",
+    "session-gg (2026-03-29): Dashboard-Fixes. build_dashboard(): _TYP_LABELS dict mappt raw DB-Werte auf deutsche Labels (sonstiger_vorgang→Vorgang, zahlungserinnerung→Zahlungserinnerung etc.). Farbprüfung nutzt raw_typ (nicht mapped). Badge überfällig wenn diff<0 statt immer heute. Commit 1e4ca49.",
+    "session-hh (2026-03-30): IMAP-Postfach + Ordner-System Komplett-Umbau. (1) Phase 0: _ensure_geloeschte_protokoll_table() + geloeschte_protokoll Tabelle in tasks.db. (2) Phase 1: mail_monitor.py — _get_sync_ordner(), _ordner_erlaubt() config-basiert (kein hardcoded ORDNER_EINSCHLIESSEN mehr), Entwürfe+Gelöschte jetzt verdrahtet. (3) Phase 2: /api/mail/konto/postfach-ordner (POST), /api/mail/verschieben (POST), /api/mail/protokoll (GET). (4) Phase 3: /api/mail/folders komplett neu — Live-IMAP mit _decode_imap_utf7() (RFC 3501 Modified UTF-7), 60s Cache, DB-Fallback, Kira-/Zusatz-Ordner-Split. (5) Phase 4: JS-Frontend — zwei Panels (Screenshot 1: Zusätzliche Postfach-Ordner, Screenshot 2: Sync-Ordner), _pfCurrentMsgId, pfOpenVerschiebenMenu()/pfVerschiebenNach(), showKritischModal() bei Deaktivieren. (6) Phase 5: archiv_cleanup.py — tägl. Bereinigung von Gelöschte-Ordnern (EML+Attachments löschen, mail.json bleibt), geloeschte_protokoll Eintrag (300 Zeichen), tägl. Background-Thread in run_server() + daily_check.py Integration. (7) Phase 6: kira_llm.py _build_data_context() — GELÖSCHTE MAILS PROTOKOLL Sektion (letzte 20, mit Kurzinhalt). (8) Phase 7: Tests — UTF-7 Fix, postfach-ordner add/remove, protokoll-Endpoint, dry-run cleanup. 3 Bugs gefunden+gefixt: UTF-7-Decoding fehlte, ordner-als-Liste-Handling, _ensure_geloeschte_protokoll_table nur on-demand."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -76,18 +78,28 @@
     "postfach-hover-aktionen-bulk-svg-toolbar",
     "postfach-lese-markierung-einstellung",
     "postfach-flag-pin-kira-verwendet-db",
-    "mail-nachklassifizierung-recheck"
+    "mail-nachklassifizierung-recheck",
+    "imap-folder-live-listing-utf7",
+    "postfach-zusatz-ordner-screenshot1",
+    "sync-ordner-config-basiert-mail-monitor",
+    "mail-verschieben-imap",
+    "geloeschte-protokoll-archiv-bereinigung",
+    "archiv-cleanup-daily-background",
+    "geloeschte-protokoll-llm-kontext",
+    "dashboard-typ-labels-fix"
   ],
   "open_tasks": [
+    "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ können vom User manuell gelöscht werden (aus session-cc)",
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
-    "ISS-003: SyntaxWarnings (pre-existing, niedrige Prio) — JS-Regex in Python-Strings, raw-strings wenn berührt",
-    "UX-Gap: 'Mit Kira bearbeiten' (Dashboard) öffnet generellen Aufgaben-Tab — openKiraWorkspace('aufgabe', taskId) wäre besser",
-    "Einstellungen > Konfiguration: Config exportieren/importieren noch Platzhalter (showToast only)",
-    "In-App Benachrichtigungen: toggles gespeichert, Backend-Auslösung (showToast via SSE) noch nicht verdrahtet",
-    "Urlaubsmodus Auto-Aktivierung: urlaub_von/bis werden gespeichert, aber Backend-Check (ist aktuelle Zeit im Urlaubsfenster?) fehlt noch",
-    "Config-Export/Import: Buttons vorhanden, Funktion noch showToast-Platzhalter"
+    "ISS-003: SyntaxWarnings (pre-existing, niedrige Prio)",
+    "Google OAuth noch nicht verdrahtet",
+    "Provider-Persistierung nach OAuth-Login fehlt",
+    "SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2)",
+    "geloeschte_protokoll-Anzeige in Einstellungen-UI fehlt noch",
+    "Zu Kira hinzufügen-Button aus Postfach (Ordner direkt zu sync_ordner hinzufügen)",
+    "bereinigung_frist_tage / geloeschte_bereinigung_aktiv noch nicht in Einstellungen-UI"
   ],
-  "next_step": "Offene Punkte: (1) Rechnungen/Mahnungen von eigener invoice@-Adresse werden NICHT als Tasks erstellt (k_email=None wegen EIGENE_DOMAINS) — separate Behandlung für invoice-routing-Mails nötig. (2) kira_llm.py: kira_verwendet setzen wenn Mail in _build_data_context() genutzt wird + Badge in Postfach aktualisieren. (3) Mail-Archiv-Plan: Archiv→KIRA-LLM-Kontext. (4) Google OAuth verdrahten. (5) Postfach: Gesendete-Zählung im Badge.",
+  "next_step": "Offene Punkte: (1) Einstellungen-UI: bereinigung_frist_tage + geloeschte_bereinigung_aktiv anzeigen+speichern. (2) Gelöschte Archiv-Ordner werden erst sichtbar wenn mail_monitor sie archiviert hat. (3) Postfach: Verschieben testen mit echten Mails. (4) geloeschte_protokoll-Anzeige im Einstellungen > Mail-Konten Panel. (5) Google OAuth.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
@@ -108,7 +120,10 @@
     "Einstellungen-Sektions-IDs sind 'es-sec-{name}' (z.B. es-sec-nachfass) — esShowSec() benötigt den vollen ID-String.",
     "Logo-Upload: max 512KB client-seitig. handleLogoUpload() schreibt base64 data URL in cfg-logo Input + localStorage. Kein Backend-Upload — alles lokal.",
     "ntfy.urlaub_von/urlaub_bis: datetime-local Format (YYYY-MM-DDTHH:MM). Auto-Aktivierung noch nicht implementiert — nur manuelle Toggle.",
-    "active_budget_model: Python-Variable in build_einstellungen(), iteriert über providers bis erster aktiver mit status='ok' gefunden. _BUDGET_DISPLAY dict maps provider typ → model string."
+    "active_budget_model: Python-Variable in build_einstellungen(), iteriert über providers bis erster aktiver mit status='ok' gefunden. _BUDGET_DISPLAY dict maps provider typ → model string.",
+    "IMAP-Ordnernamen kommen von Exchange/Office365 in Modified UTF-7 (RFC 3501): Entw&APw-rfe statt Entwürfe. _decode_imap_utf7() in server.py decodiert das. Ohne Decoding schlagen Vergleiche mit config.json-Ordnernamen fehl.",
+    "_ensure_geloeschte_protokoll_table() muss am Anfang jedes Endpunkts aufgerufen werden der die Tabelle braucht (ist nur on-demand, NICHT beim Server-Start). Aktuell in _api_mail_folders() + _api_mail_protokoll().",
+    "_api_mail_konto_postfach_ordner(): ordner muss String sein (nicht Array). Der Handler normalisiert jetzt Listen aber sendet als Single-String. JS sendet Ordnernamen einzeln (aktiv=true/false statt komplette Liste)."
   ],
   "tracking_files": {
     "user_briefs": "user_briefs.md — Original-Aufträge (session-g bis j eingetragen)",

@@ -52,7 +52,7 @@
   },
   "mail_monitor": {
     "aktiv": true,
-    "intervall_sekunden": 300,
+    "intervall_sekunden": 1800,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
   "mail_archiv": {
@@ -65,23 +65,37 @@
     "sync_ordner": {
       "kaimrf@rauMKultSichtbeton.onmicrosoft.com": [
         "INBOX",
-        "Gesendete Elemente"
+        "Gesendete Elemente",
+        "Entwürfe",
+        "Gelöschte Elemente"
       ],
       "info@raumkult.eu": [
         "INBOX",
-        "Gesendete Elemente"
+        "Gesendete Elemente",
+        "Entwürfe",
+        "Gelöschte Elemente"
       ],
       "anfrage@raumkult.eu": [
         "INBOX",
-        "Gesendete Elemente"
+        "Gesendete Elemente",
+        "Entwürfe",
+        "Gelöschte Elemente"
       ],
       "shop@sichtbeton-cire.de": [
         "INBOX",
-        "Gesendete Elemente"
+        "Gesendete Elemente",
+        "Entwürfe",
+        "Gelöschte Elemente"
       ],
       "invoice@sichtbeton-cire.de": [
         "INBOX",
-        "Gesendete Elemente"
+        "Gesendete Elemente",
+        "Entwürfe",
+        "Gelöschte Elemente"
+      ],
+      "info@sichtbeton-cire.de": [
+        "Entwürfe",
+        "Gelöschte Elemente"
       ]
     }
   },
@@ -147,6 +161,33 @@
   "partner_github_branch": "main",
   "partner_github_repo_url": "https://github.com/kaimarienfeld/kira-partner",
   "mail_konten": {
-    "standard_konto": "kaimrf@rauMKultSichtbeton.onmicrosoft.com"
+    "standard_konto": "info@raumkult.eu",
+    "postfach_zusatz_ordner": {
+      "info@raumkult.eu": []
+    }
+  },
+  "mail_klassifizierung": {
+    "classify": true,
+    "auto_tasks": true,
+    "ignore_newsletter": true
+  },
+  "mail_postfach": {
+    "refresh_intervall_min": 0
+  },
+  "mail_konto_labels": {
+    "kaimrf@rauMKultSichtbeton.onmicrosoft.com": "rauMKult Microsoft",
+    "shop@sichtbeton-cire.de": "Shop Sichtbeton Cire",
+    "anfrage@raumkult.eu": "Anfrage rauMKult",
+    "info@raumkult.eu": "INFO rauMKult",
+    "invoice@sichtbeton-cire.de": "Rechnungen sichbeton-cire"
+  },
+  "combined_postfach": {
+    "konten": [
+      "kaimrf@rauMKultSichtbeton.onmicrosoft.com",
+      "info@raumkult.eu",
+      "anfrage@raumkult.eu",
+      "shop@sichtbeton-cire.de",
+      "invoice@sichtbeton-cire.de"
+    ]
   }
 }

@@ -120,3 +120,35 @@
 
 ## 2026-03-29 — Session-Ende (session-gg)
 **Status:** erledigt
+
+---
+
+## 2026-03-30 07:00 — Session-Start (session-hh)
+
+**Auftrag:** Vollwertiges IMAP-Postfach + Ordner-System Komplett-Umbau.
+(1) Screenshot 1 Chips "IMAP-Ordner / KIRA-Zugang" → umbenennen in "Zusätzliche Postfach-Ordner". Chips funktional machen: speichern, zeigt nur Ordner die NICHT in Screenshot 2 (Kira-Kernordner) gecheckt sind. Markierung = nur Postfach-Anzeige, kein Kira-Archiv.
+(2) Screenshot 2 (Sync-Ordner & KIRA-Zugang): Nur gecheckte Ordner = Kira-Kernordner. Kein Auto-Spam. Erweiterbar aus Postfach. Deaktivieren nur mit Admin + Dreifach-Absicherung. Jeder gecheckte Ordner bekommt Archiv-Unterordner.
+(3) mail_monitor.py: ORDNER_EINSCHLIESSEN/AUSSCHLIESSEN hardcoded → config-basiert aus sync_ordner. Entwürfe + Gelöschte wirklich verdrahten.
+(4) /api/mail/folders → IMAP-live (nicht nur mail_index.db). Postfach zeigt alle sichtbaren Ordner.
+(5) Mail verschieben per IMAP (POST /api/mail/verschieben).
+(6) Gelöschte-Protokoll-System: Archiv-Ordner "Gelöschte" nach einstellbarer Zeit auto-bereinigen. Anhänge/grosse Dateien löschen, Kurzprotokoll (Datum/Absender/Betreff/200 Zeichen) bleibt für immer. Kira LLM kann Protokoll lesen.
+(7) Tatsächlich testen mit echten Mails.
+**Status:** erledigt
+
+---
+**Erledigt:**
+- Phase 0: `_ensure_geloeschte_protokoll_table()` + `geloeschte_protokoll`-Tabelle in tasks.db (mit Indizes)
+- Phase 1: `mail_monitor.py` — `_get_sync_ordner()` + `_ordner_erlaubt()` config-basiert. `ORDNER_EINSCHLIESSEN`/`AUSSCHLIESSEN` hardcoded durch config-Logik ersetzt. Entwürfe+Gelöschte Elemente verdrahtet.
+- Phase 2: 3 neue API-Endpunkte: POST `/api/mail/konto/postfach-ordner`, POST `/api/mail/verschieben`, GET `/api/mail/protokoll`
+- Phase 3: `/api/mail/folders` komplett neu — Live-IMAP mit `_decode_imap_utf7()` (RFC 3501 Modified UTF-7), 60s Cache, DB-Fallback, Kira-/Zusatz-Ordner-Split pro Konto
+- Phase 4: JS-Frontend — zwei Panels, `_pfCurrentMsgId`, `pfOpenVerschiebenMenu()`/`pfVerschiebenNach()`, `showKritischModal()` bei Kira-Ordner deaktivieren
+- Phase 5: `archiv_cleanup.py` neu, tägl. Background-Thread in `run_server()`, Integration in `daily_check.py`
+- Phase 6: `kira_llm.py _build_data_context()` — GELÖSCHTE MAILS PROTOKOLL Sektion (letzte 20)
+- Phase 7: Tests — UTF-7-Decoding-Bug gefunden+gefixt, ordner-als-Liste-Handling, `_ensure_geloeschte_protokoll_table()` on-demand in Protokoll-Endpoint
+- Bugs: (1) IMAP Modified UTF-7 nicht decodiert → Entwürfe/Gelöschte nicht erkannt. (2) ordner als Array statt String im Handler. (3) Protokoll-Tabelle nur on-demand erstellt.
+**Offen geblieben:** Einstellungen-UI für `bereinigung_frist_tage`. Mail-Verschieben mit echten Mails testen.
+
+## 2026-03-30 — Session-Ende (session-hh)
+**Status:** erledigt
+
+---

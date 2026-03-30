@@ -481,6 +481,26 @@ def _build_data_context(config):
     except Exception:
         pass
 
+    # Gelöschte-Protokoll: Kira kann auf bereinigten Mail-Kontext zugreifen
+    try:
+        gp_rows = db.execute("""
+            SELECT konto, datum_mail, absender, betreff, kurzinhalt, datum_geloescht
+            FROM geloeschte_protokoll
+            ORDER BY datum_geloescht DESC LIMIT 20
+        """).fetchall()
+        if gp_rows:
+            ctx += f"\n=== GELÖSCHTE MAILS PROTOKOLL (letzte {len(gp_rows)}) ===\n"
+            ctx += "(Aus Archiv bereinigt — Anhänge entfernt, Kurzinhalt bleibt erhalten)\n"
+            for r in gp_rows:
+                dm = (r['datum_mail'] or '')[:10]
+                dg = (r['datum_geloescht'] or '')[:10]
+                ctx += (f"  {dm} | {r['absender'] or '?'} | "
+                        f"{(r['betreff'] or '')[:60]} | bereinigt: {dg}\n")
+                if r['kurzinhalt']:
+                    ctx += f"    → {r['kurzinhalt'][:150]}\n"
+    except Exception:
+        pass
+
     db.close()
     return ctx
 

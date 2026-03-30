@@ -49,8 +49,14 @@ except Exception:
 # ── Mail-Index Column Guard ───────────────────────────────────────────────────
 _MAIL_COLS_ENSURED = False
 
+# ── IMAP-Folder-Cache (60s TTL) ────────────────────────────────────────────
+import threading as _threading
+_folder_cache: dict = {}        # email -> {'ts': float, 'ordner': list}
+_folder_cache_lock = _threading.Lock()
+_FOLDER_CACHE_TTL = 60          # Sekunden
+
 def _ensure_mail_columns():
-    """Idempotent: fügt fehlende Spalten zu mail_index.db > mails hinzu."""
+    """Idempotent: fügt fehlende Spalten zu mail_index.db > mails hinzu + erstellt geloeschte_protokoll."""
     global _MAIL_COLS_ENSURED
     if _MAIL_COLS_ENSURED:
         return
@@ -68,6 +74,34 @@ def _ensure_mail_columns():
                 pass  # column already exists
         conn.commit()
         conn.close()
+    except Exception:
+        pass
+    # Gelöschte-Protokoll-Tabelle in tasks.db sicherstellen
+    _ensure_geloeschte_protokoll_table()
+
+def _ensure_geloeschte_protokoll_table():
+    """Erstellt geloeschte_protokoll-Tabelle in tasks.db (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS geloeschte_protokoll (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                konto             TEXT NOT NULL,
+                folder            TEXT NOT NULL,
+                datum_mail        TEXT,
+                absender          TEXT,
+                empfaenger        TEXT,
+                betreff           TEXT,
+                kurzinhalt        TEXT,
+                datum_geloescht   TEXT NOT NULL,
+                anhaenge_entfernt INTEGER DEFAULT 0,
+                message_id        TEXT
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_gp_konto ON geloeschte_protokoll(konto)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_gp_datum ON geloeschte_protokoll(datum_geloescht)")
+        db.commit()
+        db.close()
     except Exception:
         pass
 
@@ -853,6 +887,7 @@ def build_postfach():
         <div class="pf-tb-sep"></div>
         <button class="pf-tb-btn del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         <div style="flex:1"></div>
+        <button class="pf-tb-btn" id="pf-tb-move" title="In anderen Ordner verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Verschieben</button>
         <button class="pf-tb-btn" id="pf-tb-kira" title="Kira fragen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Kira</button>
       </div>
     </div>
@@ -1814,6 +1849,7 @@ window.pfOpenMail = function(m, el) {
   if(_pfActiveItem) _pfActiveItem.classList.remove('active');
   _pfActiveItem=el; el.classList.add('active');
   _pfCurrentMail = m;
+  _pfCurrentMsgId = m.message_id || null;  // für Verschieben-Funktion
   document.getElementById('pf-preview-empty').style.display='none';
   document.getElementById('pf-preview').style.display='flex';
   document.getElementById('pf-preview').style.flexDirection='column';
@@ -1986,6 +2022,55 @@ window.pfKiraContext=function(){
   },300);
 };
 window.pfOpenAtt=function(p){window.open('/api/file?path='+p,'_blank');};
+
+// Verschieben-Menü
+let _pfCurrentMsgId = null;
+window.pfOpenVerschiebenMenu = function(btn) {
+  // Altes Menü entfernen
+  document.querySelectorAll('.pf-verschieben-menu').forEach(m=>m.remove());
+  if(!_pfCurrentMsgId || !_pfCurrentKonto) { showToast('Keine Mail ausgewählt','fehler'); return; }
+  if(!_pfFolderData) { showToast('Ordnerliste nicht geladen','fehler'); return; }
+  const kdata = (_pfFolderData.konten||[]).find(k=>k.email===_pfCurrentKonto);
+  const ordner = kdata ? kdata.ordner : [];
+  if(!ordner.length) { showToast('Keine Zielordner verfügbar','fehler'); return; }
+  const menu = document.createElement('div');
+  menu.className = 'pf-verschieben-menu';
+  menu.style.cssText = 'position:absolute;z-index:9999;background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:200px;max-height:300px;overflow-y:auto;padding:4px 0';
+  ordner.forEach(o => {
+    if(o.name === _pfCurrentFolder) return; // Aktueller Ordner nicht anzeigen
+    const item = document.createElement('div');
+    item.textContent = o.label || o.name;
+    item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px';
+    item.onmouseenter = () => item.style.background='var(--bg-hover,rgba(0,0,0,.07))';
+    item.onmouseleave = () => item.style.background='';
+    item.onclick = () => {
+      menu.remove();
+      pfVerschiebenNach(o.name);
+    };
+    menu.appendChild(item);
+  });
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom+4+window.scrollY)+'px';
+  menu.style.left = (rect.left+window.scrollX)+'px';
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',function close(){menu.remove();document.removeEventListener('click',close);},{once:true}),50);
+};
+window.pfVerschiebenNach = function(zielOrdner) {
+  if(!_pfCurrentMsgId||!_pfCurrentKonto) return;
+  fetch('/api/mail/verschieben',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({konto:_pfCurrentKonto, message_id:_pfCurrentMsgId, ziel_ordner:zielOrdner})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      showToast('Mail verschoben nach '+zielOrdner,'ok');
+      pfLoadList(true); // Liste neu laden
+      document.getElementById('pf-preview').style.display='none';
+      document.getElementById('pf-preview-empty').style.display='flex';
+    } else {
+      showToast('Fehler: '+(d.error||'?'),'fehler');
+    }
+  }).catch(()=>showToast('Verbindungsfehler','fehler'));
+};
 
 // Suche
 window.pfSearchDebounce=function(){
@@ -4130,7 +4215,7 @@ function esShowProtoTab(id) {{
               }}
               <button class="es-mk-btn danger" onclick="esMkDeleteConfirm('${{k.email}}')">&#x1F5D1; L&ouml;schen</button>
             </div>
-            ${{!isDeaktiv?`<div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; IMAP-Ordner / KIRA-Zugang</div><div id="es-kira-ord-${{safe}}" style="display:none"></div>`:''}}
+            ${{!isDeaktiv?`<div class="es-kira-ord-toggle" onclick="esMkToggleOrdner('${{safe}}','${{k.email}}')">&#x25B6; Zus&auml;tzliche Postfach-Ordner</div><div id="es-kira-ord-${{safe}}" style="display:none"></div>`:''}}
           </div>`;
         }}).join('');
         // Stats lazy laden + Health Check auto-starten
@@ -4272,20 +4357,55 @@ function esShowProtoTab(id) {{
     if(!el) return;
     if(el.style.display==='none') {{
       el.style.display='block';
-      if(!el.dataset.loaded) {{
-        el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Lade Ordner...</div>';
-        el.dataset.loaded='1';
-        fetch('/api/mail/konten/ordner?email='+encodeURIComponent(email)).then(r=>r.json()).then(d=>{{
-          if(!d.ok||!d.ordner.length) {{el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Keine Ordner gefunden.</div>';return;}}
-          // sync_ordner aus config lesen (vereinfacht)
-          el.innerHTML='<div class="es-kira-ord-list">'+d.ordner.map(o=>`<div class="es-kira-ord-chip" onclick="esMkOrdnerToggle(this,'${{email}}','${{o}}')">${{o}}</div>`).join('')+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Angeklickte Ordner: KIRA LLM-Zugang aktiv</div>';
-        }}).catch(()=>{{el.innerHTML='<div style="color:#c84444;font-size:12px">Fehler beim Laden</div>';}});
-      }}
+      // Immer neu laden (Ordner können sich ändern)
+      el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Lade IMAP-Ordner...</div>';
+      // Holt alle IMAP-Ordner + aktuelle Kira- und Postfach-Ordner via /api/mail/folders
+      fetch('/api/mail/folders').then(r=>r.json()).then(data=>{{
+        const kdata = (data.konten||[]).find(k=>k.email===email);
+        if(!kdata||!kdata.alle_imap_ordner||!kdata.alle_imap_ordner.length) {{
+          el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Keine IMAP-Ordner gefunden.</div>';
+          return;
+        }}
+        const kiraOrdner = (kdata.kira_ordner||[]).map(o=>o.toLowerCase());
+        const zusatzOrdner = (kdata.zusatz_ordner||[]).map(o=>o.toLowerCase());
+        // Nur Ordner zeigen die NICHT in Kira-Kern-Ordnern (Screenshot 2) sind
+        const freieOrdner = kdata.alle_imap_ordner.filter(o=>{{
+          const ol=o.toLowerCase();
+          return !kiraOrdner.some(k=>k===ol||k.includes(ol)||ol.includes(k));
+        }});
+        if(!freieOrdner.length) {{
+          el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Alle Ordner sind bereits als Kira-Kernordner konfiguriert.</div>';
+          return;
+        }}
+        const chips = freieOrdner.map(o=>{{
+          const isAktiv = zusatzOrdner.some(z=>z===o.toLowerCase()||z.includes(o.toLowerCase())||o.toLowerCase().includes(z));
+          return `<div class="es-kira-ord-chip${{isAktiv?' active':''}}" onclick="esMkOrdnerToggle(this,'${{email}}','${{o}}')" title="${{isAktiv?'Im Postfach sichtbar — klicken zum Entfernen':'Klicken um im Postfach anzuzeigen'}}">${{o}}</div>`;
+        }}).join('');
+        el.innerHTML='<div class="es-kira-ord-list">'+chips+'</div>'
+          +'<div style="font-size:11px;color:var(--text-muted);margin-top:6px">&#9432; Markierte Ordner erscheinen im Postfach (kein Kira-Archiv). Kira-Kernordner werden hier nicht angezeigt.</div>';
+      }}).catch(()=>{{el.innerHTML='<div style="color:#c84444;font-size:12px">Fehler beim Laden der Ordner</div>';}});
     }} else el.style.display='none';
   }};
   window.esMkOrdnerToggle = function(el,email,ordner) {{
+    const wirdAktiv = !el.classList.contains('active');
     el.classList.toggle('active');
-    // TODO: POST /api/mail/konto/ordner-kira
+    el.title = wirdAktiv ? 'Im Postfach sichtbar — klicken zum Entfernen' : 'Klicken um im Postfach anzuzeigen';
+    fetch('/api/mail/konto/postfach-ordner',{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{email,ordner,aktiv:wirdAktiv}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{
+        el.classList.toggle('active'); // Rückgängig
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+      }} else {{
+        showToast(wirdAktiv?'Ordner "'+ordner+'" im Postfach hinzugefügt':'Ordner "'+ordner+'" aus Postfach entfernt','ok');
+        // Postfach-Sidebar neu laden
+        if(typeof pfRenderFolders==='function') {{
+          fetch('/api/mail/folders').then(r=>r.json()).then(data=>pfRenderFolders(data)).catch(()=>{{}});
+        }}
+      }}
+    }}).catch(()=>{{el.classList.toggle('active');showToast('Verbindungsfehler','fehler');}});
   }};
   // ── Konto-Wizard ────────────────────────────────────────────────────────────
   let _wiz = {{step:0, email:'', name:'', provider:'', settings:{{}}, jobId:null, isReconnect:false}};
@@ -4705,9 +4825,34 @@ function esShowProtoTab(id) {{
       }}).catch(()=>{{}});
     }}).catch(()=>{{}});
   }}
-  window.esSyncOrdnerChange = function(konto,ordner,aktiv) {{
+  function _doSyncOrdnerChange(konto,ordner,aktiv) {{
     fetch('/api/mail/archiv/sync-ordner',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{konto,ordner,aktiv}})}})
-    .then(r=>r.json()).then(d=>{{ if(!d.ok) showToast('Fehler beim Speichern','fehler'); }}).catch(()=>{{}});
+    .then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{ showToast('Fehler beim Speichern: '+(d.error||'?'),'fehler'); return; }}
+      showToast(aktiv?'Ordner "'+ordner+'" zu Kira hinzugefügt':'Ordner "'+ordner+'" aus Kira entfernt', aktiv?'ok':'warn');
+      // Konto-Karten und Postfach-Sidebar neu laden
+      esLoadMailKonten();
+      if(typeof pfRenderFolders==='function') {{
+        fetch('/api/mail/folders').then(r=>r.json()).then(data=>pfRenderFolders(data)).catch(()=>{{}});
+      }}
+    }}).catch(()=>{{}});
+  }}
+  window.esSyncOrdnerChange = function(konto,ordner,aktiv) {{
+    if(!aktiv) {{
+      // Deaktivieren nur mit Dreifach-Bestätigung
+      showKritischModal(
+        'Kira-Archiv-Ordner deaktivieren',
+        'Ordner <strong>'+ordner+'</strong> f&uuml;r <em>'+konto+'</em> wird nicht mehr von Kira überwacht und archiviert.<br><br>'
+        +'Bestehende Archiv-Daten bleiben erhalten — aber neue Mails in diesem Ordner werden nicht mehr von Kira verarbeitet und sind nicht mehr im LLM-Kontext.',
+        ordner,
+        function() {{ _doSyncOrdnerChange(konto,ordner,false); }},
+        'Gib den Ordnernamen ein um zu bestätigen: '+ordner
+      );
+      // Checkbox zurücksetzen (wird durch showKritischModal erst nach Bestätigung deaktiviert)
+      // Kein direktes Checkbox-Toggle hier — Reload nach Bestätigung
+    }} else {{
+      _doSyncOrdnerChange(konto,ordner,true);
+    }}
   }};
   window.esArchivOrdnerWaehlen = function(btn) {{
     if(btn) {{ btn.disabled=true; btn.textContent='…'; }}
@@ -9808,6 +9953,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
+        elif self.path.startswith('/api/mail/protokoll'):
+            self._api_mail_protokoll()
+
         elif self.path.startswith('/api/browse/result'):
             self._api_browse_result()
 
@@ -10357,72 +10505,207 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     # ── Postfach API ──────────────────────────────────────────────────────────
     def _api_mail_folders(self):
-        """GET /api/mail/folders — Liefert Konten + Ordner mit Mailanzahlen."""
+        """GET /api/mail/folders — Liefert Konten + Ordner (Live-IMAP + Cache + DB-Fallback)."""
+        import time as _time
+        import imaplib as _imaplib
         _ensure_mail_columns()
+
+        _FOLDER_ICONS = {
+            'inbox': '&#x1F4EC;', 'posteingang': '&#x1F4EC;', 'eingang': '&#x1F4EC;',
+            'gesendete': '&#x1F4E4;', 'gesendet': '&#x1F4E4;', 'sent': '&#x1F4E4;',
+            'entwurf': '&#x1F4DD;', 'draft': '&#x1F4DD;',
+            'gel': '&#x1F5D1;', 'deleted': '&#x1F5D1;', 'trash': '&#x1F5D1;', 'papierkorb': '&#x1F5D1;',
+            'spam': '&#x26D4;', 'junk': '&#x26D4;',
+            'archiv': '&#x1F4C1;', 'archive': '&#x1F4C1;',
+        }
+        _FOLDER_LABELS = {
+            'gesendete elemente': 'Gesendet', 'gesendete objekte': 'Gesendet',
+            'gesendete': 'Gesendet', 'sent items': 'Gesendet', 'sent': 'Gesendet',
+            'inbox': 'Posteingang', 'posteingang': 'Posteingang',
+            'entwürfe': 'Entwürfe', 'drafts': 'Entwürfe',
+            'gelöschte elemente': 'Gelöscht', 'deleted messages': 'Gelöscht',
+            'deleted items': 'Gelöscht', 'trash': 'Papierkorb', 'papierkorb': 'Papierkorb',
+            'junk-e-mail': 'Spam', 'junk': 'Spam', 'spam': 'Spam',
+            'archiv': 'Archiv', 'archive': 'Archiv',
+        }
+
+        def _fn_icon(fn):
+            fl = fn.lower()
+            return next((v for k, v in _FOLDER_ICONS.items() if k in fl), '&#x1F4C2;')
+
+        def _fn_label(fn):
+            fl = fn.lower()
+            return next((v for k, v in _FOLDER_LABELS.items() if k == fl or k in fl), fn)
+
+        def _decode_imap_utf7(name):
+            """Dekodiert IMAP Modified UTF-7 (RFC 3501) → Unicode-String."""
+            import base64 as _b64
+            res = []
+            i = 0
+            while i < len(name):
+                if name[i] == '&':
+                    end = name.find('-', i + 1)
+                    if end == -1:
+                        res.append(name[i:]); break
+                    b64 = name[i + 1:end]
+                    if b64:
+                        pad = (4 - len(b64) % 4) % 4
+                        try:
+                            chars = _b64.b64decode(b64 + '=' * pad).decode('utf-16-be')
+                            res.append(chars)
+                        except Exception:
+                            res.append(name[i:end + 1])
+                    else:
+                        res.append('&')
+                    i = end + 1
+                else:
+                    res.append(name[i]); i += 1
+            return ''.join(res)
+
+        def _imap_list_ordner(konto_dict):
+            """Holt IMAP-Ordnerliste via Live-Verbindung. Gibt [] bei Fehler."""
+            try:
+                from mail_monitor import imap_connect as _imap_connect
+                imap = _imap_connect(konto_dict)
+                try:
+                    imap.sock.settimeout(12)
+                except Exception: pass
+                status, folder_list = imap.list()
+                ordner = []
+                if status == 'OK':
+                    for entry in (folder_list or []):
+                        if isinstance(entry, bytes):
+                            raw = entry.decode(errors='replace')
+                            # Format: (\HasNoChildren) "/" "INBOX"
+                            parts = raw.split('"/"')
+                            if len(parts) >= 2:
+                                name = parts[-1].strip().strip('"')
+                            else:
+                                parts2 = raw.rsplit(' ', 1)
+                                name = parts2[-1].strip().strip('"') if parts2 else ''
+                            if name:
+                                ordner.append(_decode_imap_utf7(name))
+                try: imap.logout()
+                except: pass
+                return ordner
+            except Exception:
+                return []
+
         try:
+            # Alle aktiven Konten laden
             archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
             konten_raw = []
             if archiver_cfg.exists():
-                cfg = json.loads(archiver_cfg.read_text('utf-8'))
-                konten_raw = [k for k in cfg.get('konten', []) if k.get('aktiv', True) and k.get('auth_methode') == 'oauth2']
+                cfg_arc = json.loads(archiver_cfg.read_text('utf-8'))
+                konten_raw = [k for k in cfg_arc.get('konten', []) if k.get('aktiv', True)]
+
+            kira_cfg = {}
+            try:
+                kira_cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+            except Exception:
+                pass
+
+            konto_labels_map = kira_cfg.get('mail_konto_labels', {})
+            std_konto = kira_cfg.get('mail_konten', {}).get('standard_konto', '')
+            sync_ordner_cfg  = kira_cfg.get('mail_archiv', {}).get('sync_ordner', {})
+            zusatz_cfg       = kira_cfg.get('mail_konten', {}).get('postfach_zusatz_ordner', {})
 
             conn = sqlite3.connect(str(MAIL_INDEX_DB))
             conn.row_factory = sqlite3.Row
 
-            folder_icons = {
-                'inbox': '&#x1F4EC;', 'posteingang': '&#x1F4EC;', 'eingang': '&#x1F4EC;',
-                'gesendete': '&#x1F4E4;', 'gesendet': '&#x1F4E4;', 'sent': '&#x1F4E4;',
-                'entwürfe': '&#x1F4DD;', 'drafts': '&#x1F4DD;',
-                'archiv': '&#x1F4C1;', 'archive': '&#x1F4C1;',
-            }
-            folder_labels = {
-                'gesendete elemente': 'Gesendet', 'gesendete': 'Gesendet', 'sent': 'Gesendet',
-                'inbox': 'Posteingang', 'posteingang': 'Posteingang',
-                'entwürfe': 'Entwürfe', 'drafts': 'Entwürfe',
-                'archiv': 'Archiv', 'archive': 'Archiv',
-            }
-
-            # Custom-Labels aus config.json laden
-            konto_labels = {}
-            try:
-                from pathlib import Path as _P
-                _cfg_path = _P(__file__).parent / 'config.json'
-                if _cfg_path.exists():
-                    import json as _json
-                    _cfg = _json.loads(_cfg_path.read_text('utf-8'))
-                    konto_labels = _cfg.get('mail_konto_labels', {})
-            except Exception:
-                pass
-
-            std_konto = ''
-            try:
-                _cfg_k = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
-                std_konto = _cfg_k.get('mail_konten', {}).get('standard_konto', '')
-            except Exception:
-                pass
-
             result = {"konten": [], "standard_konto": std_konto}
-            for k in konten_raw:
-                email = k['email']
-                label = email.split('@')[0]
-                rows = conn.execute(
-                    "SELECT folder, COUNT(*) as cnt FROM mails WHERE konto=? GROUP BY folder ORDER BY cnt DESC",
+
+            for konto_dict in konten_raw:
+                email = konto_dict.get('email', '')
+                if not email:
+                    continue
+
+                # ── IMAP-Ordner via Cache oder Live ──
+                now_ts = _time.time()
+                with _folder_cache_lock:
+                    cached = _folder_cache.get(email)
+                    cache_valid = cached and (now_ts - cached['ts']) < _FOLDER_CACHE_TTL
+
+                if cache_valid:
+                    alle_imap_ordner = cached['ordner']
+                else:
+                    alle_imap_ordner = _imap_list_ordner(konto_dict)
+                    if alle_imap_ordner:
+                        with _folder_cache_lock:
+                            _folder_cache[email] = {'ts': now_ts, 'ordner': alle_imap_ordner}
+
+                # Kira-Kern-Ordner (Screenshot 2) + Postfach-Zusatz-Ordner (Screenshot 1)
+                kira_ordner_namen = [o.lower() for o in sync_ordner_cfg.get(email, [])]
+                zusatz_ordner_namen = [o.lower() for o in zusatz_cfg.get(email, [])]
+
+                # Sichtbare Ordner = Kira-Kern + Postfach-Zusatz
+                # Alle IMAP-Ordner filtern: zeige nur die in einer der beiden Listen
+                def _soll_zeigen(fn):
+                    fl = fn.lower()
+                    for k in kira_ordner_namen:
+                        if k in fl or fl in k:
+                            return True
+                    for z in zusatz_ordner_namen:
+                        if z in fl or fl in z:
+                            return True
+                    return False
+
+                # Wenn noch keine Konfiguration → Fallback: alle zeigen die im DB sind
+                if not kira_ordner_namen and not zusatz_ordner_namen:
+                    sichtbare_ordner = alle_imap_ordner or []
+                else:
+                    sichtbare_ordner = [fn for fn in alle_imap_ordner if _soll_zeigen(fn)] if alle_imap_ordner else []
+
+                # Unread-Counts + Mailanzahlen aus mail_index.db
+                db_rows = conn.execute(
+                    "SELECT folder, COUNT(*) as cnt FROM mails WHERE konto=? GROUP BY folder",
                     (email,)
                 ).fetchall()
-                ordner = []
-                for r in rows:
-                    fn = r['folder'] or ''
-                    fn_low = fn.lower()
-                    icon = next((v for key, v in folder_icons.items() if key in fn_low), '&#x1F4C2;')
-                    lbl = next((v for key, v in folder_labels.items() if key in fn_low), fn)
-                    unread_cnt = conn.execute(
-                        "SELECT COUNT(*) FROM mails WHERE konto=? AND folder=? AND gelesen=0",
-                        (email, fn)
-                    ).fetchone()[0]
-                    ordner.append({'name': fn, 'label': lbl, 'icon': icon, 'count': r['cnt'], 'unread': unread_cnt})
-                if ordner:
-                    display_name = konto_labels.get(email, '')
-                    result['konten'].append({'email': email, 'label': label, 'display_name': display_name, 'ordner': ordner})
+                db_cnt  = {r['folder']: r['cnt'] for r in db_rows}
+                db_unread_rows = conn.execute(
+                    "SELECT folder, COUNT(*) as cnt FROM mails WHERE konto=? AND gelesen=0 GROUP BY folder",
+                    (email,)
+                ).fetchall()
+                db_unread = {r['folder']: r['cnt'] for r in db_unread_rows}
+
+                # Fallback: wenn keine IMAP-Ordner → aus DB-Ordner nehmen
+                if not sichtbare_ordner:
+                    sichtbare_ordner = list(db_cnt.keys())
+
+                ordner_list = []
+                for fn in sichtbare_ordner:
+                    fl = fn.lower()
+                    is_kira = any(k in fl or fl in k for k in kira_ordner_namen)
+                    ordner_list.append({
+                        'name':   fn,
+                        'label':  _fn_label(fn),
+                        'icon':   _fn_icon(fn),
+                        'count':  db_cnt.get(fn, 0),
+                        'unread': db_unread.get(fn, 0),
+                        'typ':    'kira' if is_kira else 'postfach',
+                    })
+
+                # Sortierung: Kira-Ordner zuerst (INBOX top), dann Postfach-Zusatz
+                _SORT_ORDER = ['inbox','posteingang','gesendete','sent','entwurf','draft',
+                               'gel','deleted','trash','papierkorb','spam','junk']
+                def _sort_key(o):
+                    fl = o['name'].lower()
+                    prio = next((i for i, k in enumerate(_SORT_ORDER) if k in fl), 99)
+                    return (0 if o['typ']=='kira' else 1, prio, o['name'].lower())
+
+                ordner_list.sort(key=_sort_key)
+
+                display_name = konto_labels_map.get(email, '')
+                result['konten'].append({
+                    'email': email,
+                    'label': email.split('@')[0],
+                    'display_name': display_name,
+                    'ordner': ordner_list,
+                    'alle_imap_ordner': alle_imap_ordner,  # für Screenshot 1 Chip-Auswahl
+                    'kira_ordner': sync_ordner_cfg.get(email, []),
+                    'zusatz_ordner': zusatz_cfg.get(email, []),
+                })
+
             conn.close()
             self._json(result)
         except Exception as e:
@@ -10890,6 +11173,143 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 ordner_list.remove(ordner)
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
             self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_konto_postfach_ordner(self, body):
+        """POST /api/mail/konto/postfach-ordner — Speichert Postfach-Zusatz-Ordner (Screenshot 1 Chips)."""
+        try:
+            email  = (body.get('email') or '').strip()
+            ordner = body.get('ordner', '')   # einzelner Ordnername (oder Liste)
+            if isinstance(ordner, list):
+                ordner = ordner[0] if ordner else ''
+            aktiv  = bool(body.get('aktiv', True))
+            if not email or not ordner:
+                self._json({'ok': False, 'error': 'email und ordner erforderlich'})
+                return
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            cfg = json.loads(cfg_path.read_text('utf-8'))
+            mk = cfg.setdefault('mail_konten', {})
+            pz = mk.setdefault('postfach_zusatz_ordner', {})
+            lst = pz.setdefault(email, [])
+            if aktiv and ordner not in lst:
+                lst.append(ordner)
+            elif not aktiv and ordner in lst:
+                lst.remove(ordner)
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            # Folder-Cache invalidieren
+            with _folder_cache_lock:
+                _folder_cache.pop(email, None)
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_verschieben(self, body):
+        """POST /api/mail/verschieben — Verschiebt Mail zwischen IMAP-Ordnern + DB-Update."""
+        try:
+            konto      = (body.get('konto') or '').strip()
+            message_id = (body.get('message_id') or '').strip()
+            ziel       = (body.get('ziel_ordner') or '').strip()
+            if not konto or not message_id or not ziel:
+                self._json({'ok': False, 'error': 'konto, message_id und ziel_ordner erforderlich'})
+                return
+
+            # Quellordner aus mail_index.db ermitteln
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT folder, uid FROM mails WHERE konto=? AND message_id=? LIMIT 1",
+                (konto, message_id)
+            ).fetchone()
+            conn.close()
+            if not row:
+                self._json({'ok': False, 'error': 'Mail nicht im Index gefunden'})
+                return
+            quell_ordner = row['folder']
+
+            # IMAP-Zugangsdaten laden
+            from mail_monitor import _imap_connect_konto
+            imap = _imap_connect_konto(konto)
+            if not imap:
+                self._json({'ok': False, 'error': 'IMAP-Verbindung fehlgeschlagen'})
+                return
+
+            try:
+                # Quellordner öffnen
+                s, _ = imap.select(f'"{quell_ordner}"')
+                if s != 'OK':
+                    self._json({'ok': False, 'error': f'Ordner {quell_ordner} nicht zugänglich'})
+                    return
+
+                # UID anhand Message-ID suchen
+                clean_mid = message_id.strip('<>').strip()
+                sr, ud = imap.uid('SEARCH', 'HEADER', 'Message-ID', clean_mid)
+                if sr != 'OK' or not ud or not ud[0]:
+                    # Fallback: Message-ID mit spitzen Klammern
+                    mid_fb = f'<{clean_mid}>'
+                    sr, ud = imap.uid('SEARCH', 'HEADER', 'Message-ID', mid_fb)
+                if sr != 'OK' or not ud or not ud[0]:
+                    self._json({'ok': False, 'error': 'UID nicht gefunden'})
+                    return
+                uid = ud[0].split()[0]
+
+                # COPY in Zielordner
+                cr, _ = imap.uid('COPY', uid, f'"{ziel}"')
+                if cr != 'OK':
+                    self._json({'ok': False, 'error': f'COPY nach {ziel} fehlgeschlagen'})
+                    return
+
+                # Original als gelöscht markieren + expunge
+                imap.uid('STORE', uid, '+FLAGS', '(\\Deleted)')
+                imap.expunge()
+            finally:
+                try: imap.logout()
+                except: pass
+
+            # DB aktualisieren
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.execute(
+                "UPDATE mails SET folder=? WHERE konto=? AND message_id=?",
+                (ziel, konto, message_id)
+            )
+            conn.commit()
+            conn.close()
+
+            # Folder-Cache invalidieren
+            with _folder_cache_lock:
+                _folder_cache.pop(konto, None)
+
+            self._json({'ok': True, 'quell_ordner': quell_ordner, 'neuer_ordner': ziel})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_protokoll(self):
+        """GET /api/mail/protokoll?konto=&limit=50&offset=0 — Gelöschte-Protokoll abrufen."""
+        _ensure_geloeschte_protokoll_table()
+        try:
+            qs     = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            konto  = qs.get('konto', [''])[0]
+            limit  = int(qs.get('limit', ['50'])[0])
+            offset = int(qs.get('offset', ['0'])[0])
+            db = get_db()
+            if konto:
+                rows = db.execute(
+                    "SELECT * FROM geloeschte_protokoll WHERE konto=? ORDER BY datum_geloescht DESC LIMIT ? OFFSET ?",
+                    (konto, limit, offset)
+                ).fetchall()
+                total = db.execute("SELECT COUNT(*) FROM geloeschte_protokoll WHERE konto=?", (konto,)).fetchone()[0]
+            else:
+                rows = db.execute(
+                    "SELECT * FROM geloeschte_protokoll ORDER BY datum_geloescht DESC LIMIT ? OFFSET ?",
+                    (limit, offset)
+                ).fetchall()
+                total = db.execute("SELECT COUNT(*) FROM geloeschte_protokoll").fetchone()[0]
+            db.close()
+            self._json({
+                'ok': True,
+                'total': total,
+                'eintraege': [dict(r) for r in rows]
+            })
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
@@ -11412,6 +11832,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/archiv/sync-ordner':
             self._api_mail_archiv_sync_ordner(body)
+            return
+
+        if self.path == '/api/mail/konto/postfach-ordner':
+            self._api_mail_konto_postfach_ordner(body)
+            return
+
+        if self.path == '/api/mail/verschieben':
+            self._api_mail_verschieben(body)
             return
 
         if self.path == '/api/mail/send':
@@ -12640,6 +13068,28 @@ def run_server(open_browser=True):
             print("[Mail-Monitor] Gestartet (IMAP-Polling)")
         else:
             print("[Mail-Monitor] Nicht verfügbar (msal fehlt oder keine Config)")
+
+    # Archiv-Bereinigung: täglich einmal im Hintergrund (03:00 Uhr oder 24h nach Start)
+    def _archiv_cleanup_loop():
+        import time as _time
+        import importlib
+        _time.sleep(10)  # kurze Verzögerung nach Server-Start
+        while True:
+            try:
+                ac = importlib.import_module("archiv_cleanup")
+                cs = ac.run_cleanup()
+                if cs.get("bereinigt", 0) > 0:
+                    rlog('system', 'archiv_cleanup',
+                         f"Archiv-Bereinigung: {cs['bereinigt']} Mails bereinigt, "
+                         f"{cs['protokoll']} protokolliert",
+                         source='server', modul='archiv_cleanup',
+                         actor_type='system', status='ok')
+            except Exception as _e:
+                pass
+            _time.sleep(86400)  # 24h bis zur nächsten Bereinigung
+
+    _cleanup_t = threading.Thread(target=_archiv_cleanup_loop, daemon=True, name="ArchivCleanup")
+    _cleanup_t.start()
 
     try:
         httpd.serve_forever()

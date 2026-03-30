@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "2026-03-29-session-bb",
+  "_updated": "2026-03-30-session-hh",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -632,6 +632,84 @@
       "status": "done",
       "last_updated": "2026-03-30",
       "description": "recheck_mails(seit, bis, dry_run): Scannt mail_index.db auf Mails ohne Tasks, klassifiziert via LLM, erstellt fehlende Tasks. CLI: --seit/--bis/--trocken. API: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status. UI: Button + Datums-Input in Einstellungen > Mail-Klassifizierung mit Live-Fortschrittsanzeige. Erstlauf 2026-03-30: 511 geprüft, 5 Tasks erstellt (Kaufmann A-SB260093, Horsting, Amir Sad, Calumex, Handwerker)."
+    },
+    {
+      "id": "imap-folder-live-listing",
+      "name": "Live-IMAP Ordnerliste",
+      "icon": "📂",
+      "leni_name": "Ordner direkt aus dem Postfach",
+      "leni_desc": "Kira liest die Ordner direkt aus deinem E-Mail-Postfach aus — genau wie Outlook. Du siehst immer alle aktuellen Ordner, nicht nur die die Kira kennt.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/server.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "GET /api/mail/folders — Live-IMAP LIST mit 60s Cache + UTF-7 Decoding + DB-Fallback. Kira-/Zusatz-Ordner-Split."
+    },
+    {
+      "id": "postfach-zusatz-ordner",
+      "name": "Zusätzliche Postfach-Ordner (Screenshot 1)",
+      "icon": "📁",
+      "leni_name": "Eigene Ordner im Postfach anzeigen",
+      "leni_desc": "Du kannst weitere Ordner aus deinem E-Mail-Konto direkt im Postfach anzeigen lassen — ohne dass Kira sie überwacht oder archiviert. Ideal für spezielle Ordner die du im Blick haben willst.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/server.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "Einstellungen > Mail & Konten: Chips für Zusatz-Ordner. POST /api/mail/konto/postfach-ordner. Nur Anzeige, kein Archiv."
+    },
+    {
+      "id": "sync-ordner-config-basiert",
+      "name": "Config-basierte Sync-Ordner für mail_monitor",
+      "icon": "🔄",
+      "leni_name": "Kontrolle welche Ordner Kira überwacht",
+      "leni_desc": "Du kannst genau festlegen welche Ordner Kira überwacht und archiviert — INBOX, Gesendete, Entwürfe, Gelöschte und mehr. Deaktivieren ist nur mit Dreifach-Bestätigung möglich.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/mail_monitor.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "_get_sync_ordner() + _ordner_erlaubt() config-basiert. Entwürfe+Gelöschte Elemente jetzt vollständig verdrahtet."
+    },
+    {
+      "id": "mail-verschieben-imap",
+      "name": "Mail per IMAP verschieben",
+      "icon": "↪️",
+      "leni_name": "Mails in andere Ordner verschieben",
+      "leni_desc": "Du kannst Mails direkt aus dem Postfach in einen anderen Ordner verschieben — wie in Outlook. Die Mail wird im Postfach sofort aktualisiert.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/server.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "POST /api/mail/verschieben — IMAP COPY + STORE \\Deleted + EXPUNGE + DB UPDATE mails SET folder."
+    },
+    {
+      "id": "geloeschte-protokoll",
+      "name": "Gelöschte-Protokoll (Archiv-Bereinigung)",
+      "icon": "🗑️",
+      "leni_name": "Automatische Aufräumung + Protokoll",
+      "leni_desc": "Gelöschte Mails im Archiv werden nach einstellbarer Frist automatisch bereinigt — große Anhänge und EML-Dateien verschwinden. Aber Kira merkt sich für immer wer die Mail war (Betreff, Absender, Datum, kurzen Inhalt). Kein vollständiger Datenverlust.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "scripts/archiv_cleanup.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "archiv_cleanup.py: tägliche Bereinigung von Gelöschte-Ordnern, geloeschte_protokoll in tasks.db, Kurzinhalt 300 Zeichen bleibt. Background-Thread in run_server(). CLI: --dry-run --frist N."
+    },
+    {
+      "id": "geloeschte-protokoll-llm-kontext",
+      "name": "LLM-Kontext: Gelöschte-Protokoll",
+      "icon": "🧠",
+      "leni_name": "Kira erinnert sich an gelöschte Mails",
+      "leni_desc": "Auch wenn eine Mail längst aus dem Archiv bereinigt wurde — Kira kann trotzdem noch sagen \"diese Mail war da\". Das hilft bei Fragen wie: Hat jemand mal geantwortet? Wann kam die letzte Nachricht?",
+      "leni_visible": false,
+      "leni_note": "Interne Kira-Funktion",
+      "module": "scripts/kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-03-30",
+      "description": "_build_data_context() liest geloeschte_protokoll (letzte 20) und fügt GELÖSCHTE MAILS PROTOKOLL Sektion ein."
     }
   ]
 }

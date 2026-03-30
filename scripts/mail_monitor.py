@@ -231,15 +231,33 @@ def detect_provider_advanced(email_addr: str) -> dict:
 _account_health: dict = {}  # email → {status, last_check, error, inbox_count}
 _health_lock = threading.Lock()
 
+# Fallback-Listen wenn kein config.json-Eintrag vorhanden
 ORDNER_AUSSCHLIESSEN = [
-    "spam", "junk", "trash", "papierkorb", "gelöschte", "deleted",
-    "geloeschte", "outbox", "entwürfe", "entwurfe", "drafts",
-    "archive", "archiv", "sent items", "unerwünscht", "unerwuenscht",
+    "spam", "junk", "trash", "papierkorb", "outbox",
+    "archive", "archiv", "unerwünscht", "unerwuenscht",
+    "kalender", "kontakte", "notizen", "aufgaben", "journal",
+    "snoozed", "postausgang", "verlauf",
 ]
 ORDNER_EINSCHLIESSEN = [
     "inbox", "posteingang", "eingang",
     "sent", "gesendete", "gesendet",
+    "entwürfe", "entwurfe", "drafts",
+    "gelöschte", "geloeschte", "deleted", "papierkorb", "trash",
 ]
+
+
+def _get_sync_ordner(email_addr: str) -> list:
+    """Liefert konfigurierte Sync-Ordner für ein Konto aus config.json.
+    Gibt eine Liste von Ordnernamen zurück (case-insensitive Substring-Match).
+    Fallback: ORDNER_EINSCHLIESSEN wenn keine Config vorhanden."""
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        sync = cfg.get('mail_archiv', {}).get('sync_ordner', {})
+        if email_addr in sync and sync[email_addr]:
+            return [o.lower().strip() for o in sync[email_addr]]
+    except Exception:
+        pass
+    return ORDNER_EINSCHLIESSEN
 
 log = logging.getLogger("mail_monitor")
 
@@ -641,8 +659,35 @@ def imap_connect(konto):
     return imap
 
 
-def _ordner_erlaubt(name):
+def _imap_connect_konto(email_addr: str):
+    """Lädt Konto-Config und baut IMAP-Verbindung auf. Gibt IMAP-Objekt oder None zurück."""
+    try:
+        archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+        konten = []
+        if archiver_cfg.exists():
+            cfg = json.loads(archiver_cfg.read_text('utf-8'))
+            konten = cfg.get('konten', [])
+        # Zusätzlich aus Kira config.json
+        kira_cfg_path = CONFIG_FILE
+        if kira_cfg_path.exists():
+            kira_cfg = json.loads(kira_cfg_path.read_text('utf-8'))
+            konten += kira_cfg.get('mail_konten', {}).get('konten', [])
+        konto = next((k for k in konten if k.get('email') == email_addr), None)
+        if not konto:
+            return None
+        return imap_connect(konto)
+    except Exception:
+        return None
+
+
+def _ordner_erlaubt(name, sync_ordner_liste=None):
+    """Prüft ob ein IMAP-Ordner vom mail_monitor verarbeitet werden soll.
+    sync_ordner_liste: config-basierte Liste (aus _get_sync_ordner()), None = Fallback-Heuristik."""
     n = name.lower().strip()
+    if sync_ordner_liste is not None:
+        # Config-basiert: Ordner erlaubt wenn einer der konfigurierten Namen enthalten ist
+        return any(s in n or n in s for s in sync_ordner_liste)
+    # Fallback: Hardcoded-Heuristik
     for a in ORDNER_AUSSCHLIESSEN:
         if a in n:
             return False
@@ -1287,10 +1332,14 @@ def poll_all_accounts():
                     if parts:
                         folders.append(parts[-1].strip().strip('"'))
 
+            # Config-basierte Ordner-Whitelist laden (einmal pro Konto)
+            sync_liste = _get_sync_ordner(email_addr)
+            log.info(f"  {label}: Sync-Ordner aus config: {sync_liste}")
+
             for folder_name in folders:
                 if _stop_event.is_set():
                     break
-                if not _ordner_erlaubt(folder_name):
+                if not _ordner_erlaubt(folder_name, sync_ordner_liste=sync_liste):
                     continue
 
                 folder_key = f"{email_addr}:{folder_name}"
