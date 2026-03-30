@@ -706,7 +706,17 @@ body{
     </div>
 
     <div class="atab-content active" id="atab-feedback">
-      <div id="admin-feedback-list"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <span style="font-weight:600;font-size:14px">📬 Lenis Feedbacks (GitHub Issues)</span>
+        <button class="btn-export" style="margin-top:0" onclick="loadGitHubFeedback()">🔄 Aktualisieren</button>
+      </div>
+      <div id="gh-issues-list" style="margin-bottom:16px">
+        <div style="color:var(--text-muted);font-size:13px">Lade Feedbacks…</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-dim)">Lokal gespeichert (Lenis Browser)</div>
+        <div id="admin-feedback-list"></div>
+      </div>
       <button class="btn-export" onclick="exportForClaude()">📋 Alles für Claude kopieren</button>
     </div>
 
@@ -1699,7 +1709,7 @@ function startApp() {
     document.getElementById('welcome-h').textContent='Willkommen zurück, Kai.';
     document.getElementById('welcome-p').textContent='Admin-Ansicht: Features, Lenis Feedback, Einstellungen und GitHub-Sync.';
     document.getElementById('admin-panel').style.display='block';
-    renderAdminPanel();fillAdminForm();
+    renderAdminPanel();fillAdminForm();loadGitHubFeedback();
   }
 
   const lastVisit=localStorage.getItem('kira_pv_last')||CFG.app_start;
@@ -1883,6 +1893,28 @@ function showAdminTab(tab,btn) {
   if (btn) btn.classList.add('active');
   else document.querySelector(`.atab-btn[onclick*="'${tab}'"]`)?.classList.add('active');
   document.getElementById('atab-'+tab)?.classList.add('active');
+  if (tab==='feedback') loadGitHubFeedback();
+}
+async function loadGitHubFeedback() {
+  const el=document.getElementById('gh-issues-list');
+  if(!el) return;
+  el.innerHTML='<div style="color:var(--text-muted);font-size:13px">Lade…</div>';
+  try {
+    const r=await fetch('http://localhost:8765/api/partner/feedback-issues');
+    const data=await r.json();
+    if(data.error){el.innerHTML=`<div style="color:var(--text-muted);font-size:12px">Kira-App offline — Issues auf <a href="https://github.com/kaimarienfeld/kira-partner/issues?q=label%3Aleni-feedback" target="_blank" style="color:var(--accent)">GitHub</a> ansehen.</div>`;return;}
+    if(!data.length){el.innerHTML='<div style="color:var(--text-muted);font-size:13px">Noch keine Feedbacks als Issues vorhanden.</div>';return;}
+    el.innerHTML=data.map(i=>`
+      <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <a href="${i.url}" target="_blank" style="color:var(--accent);font-weight:600;font-size:13px;text-decoration:none">#${i.number} ${escHtml(i.title)}</a>
+          <span style="color:var(--text-muted);font-size:11px;white-space:nowrap">${i.created}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px;white-space:pre-wrap">${escHtml(i.body.slice(0,300))}${i.body.length>300?'…':''}</div>
+      </div>`).join('');
+  } catch(_){
+    el.innerHTML='<div style="color:var(--text-muted);font-size:12px">Kira-App offline — Issues auf <a href="https://github.com/kaimarienfeld/kira-partner/issues?q=label%3Aleni-feedback" target="_blank" style="color:var(--accent)">GitHub</a> ansehen.</div>';
+  }
 }
 function renderAdminPanel() {
   const feedbacks=JSON.parse(localStorage.getItem('kira_pv_fb')||'{}');

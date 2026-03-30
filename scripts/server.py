@@ -13102,9 +13102,69 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 )
                 with _urllib.urlopen(req, timeout=10) as resp:
                     result = json.loads(resp.read())
-                self._json({'ok': True, 'issue_url': result.get('html_url', '')})
+                issue_url = result.get('html_url', '')
+                issue_nr  = result.get('number', '')
+                # E-Mail an Kai senden
+                try:
+                    import smtplib, ssl as _ssl2
+                    from email.mime.text import MIMEText as _MIMEText
+                    mail_cfg2  = CFG.get('email_notification', {})
+                    smtp_srv   = mail_cfg2.get('smtp_server', '')
+                    smtp_prt   = int(mail_cfg2.get('smtp_port', 587))
+                    kai_addr   = mail_cfg2.get('absender_email', '')
+                    kai_pw     = mail_cfg2.get('absender_passwort', '')
+                    if smtp_srv and kai_addr:
+                        issues_url = f'https://github.com/{gh_owner}/{gh_repo}/issues'
+                        mail_text = (
+                            f"Leni hat Feedback gegeben!\n\n"
+                            f"Funktion:  {feature}\n"
+                            f"Reaktion:  {react or '(keine)'}\n"
+                            f"Feedback:  {text or '(kein Text)'}\n"
+                            f"Datum:     {date}\n\n"
+                            f"Direkt zum Issue #{issue_nr}:\n{issue_url}\n\n"
+                            f"Alle Feedbacks:\n{issues_url}?q=label%3Aleni-feedback\n"
+                        )
+                        m2 = _MIMEText(mail_text, 'plain', 'utf-8')
+                        m2['From']    = kai_addr
+                        m2['To']      = kai_addr
+                        m2['Subject'] = f'📬 Leni: {feature}' + (f' — {react}' if react else '')
+                        ctx2 = _ssl2.create_default_context()
+                        with smtplib.SMTP(smtp_srv, smtp_prt, timeout=15) as sv:
+                            sv.ehlo(); sv.starttls(context=ctx2); sv.login(kai_addr, kai_pw)
+                            sv.sendmail(kai_addr, kai_addr, m2.as_string())
+                except Exception:
+                    pass  # Mail-Fehler darf Issue-Erfolg nicht blockieren
+                self._json({'ok': True, 'issue_url': issue_url})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Partner-View: GitHub Issues abrufen (Proxy, kein Token im Browser nötig)
+        if self.path == '/api/partner/feedback-issues':
+            try:
+                import urllib.request as _urllib2
+                secrets_path2 = SCRIPTS_DIR / 'secrets.json'
+                try:
+                    sec2 = json.loads(secrets_path2.read_text('utf-8'))
+                except Exception:
+                    sec2 = {}
+                tok2 = sec2.get('partner_feedback_token', '')
+                gh_o = 'kaimarienfeld'; gh_r = 'kira-partner'
+                url2 = f'https://api.github.com/repos/{gh_o}/{gh_r}/issues?labels=leni-feedback&state=open&per_page=50'
+                req2 = _urllib2.Request(url2, headers={
+                    'Authorization': f'Bearer {tok2}',
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                })
+                with _urllib2.urlopen(req2, timeout=10) as r2:
+                    issues = json.loads(r2.read())
+                self._json([{
+                    'number': i['number'], 'title': i['title'],
+                    'url': i['html_url'], 'created': i['created_at'][:10],
+                    'body': (i.get('body') or '')[:400]
+                } for i in issues])
+            except Exception as e:
+                self._json({'error': str(e)})
             return
 
         # Partner-View: Mail an Leni senden (Willkommen oder Passwort)
