@@ -1581,39 +1581,46 @@ async function pushToGitHub() {
   btn.disabled=true;btn.textContent='⏳ Verbinde...';
   document.getElementById('sync-log').innerHTML='';
   syncLog(`Verbinde: ${owner}/${repo}`,'info');
+  const b64decode = b64 => {
+    const bin=atob(b64.replace(/\s/g,''));
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  };
+  const b64encode = str => {
+    const bytes=new TextEncoder().encode(str);
+    let bin='';
+    for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  };
   try {
+    // Repo-Info: default branch ermitteln
+    syncLog('Prüfe Repository...','info');
+    const repoResp=await fetch(`https://api.github.com/repos/${owner}/${repo}`,
+      {headers:{'Authorization':`token ${ghToken}`,'Accept':'application/vnd.github+json'}});
+    if (!repoResp.ok){const e=await repoResp.json();throw new Error(e.message||`Repo HTTP ${repoResp.status}`);}
+    const repoData=await repoResp.json();
+    const branch=repoData.default_branch||'main';
+    syncLog(`OK Branch: ${branch}`,'ok');
     syncLog('Hole aktuelle Version...','info');
-    const getResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
-      {headers:{'Authorization':`token ${ghToken}`,'Accept':'application/vnd.github.v3+json'}});
-    if (!getResp.ok){const e=await getResp.json();throw new Error(e.message||`HTTP ${getResp.status}`);}
+    const getResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
+      {headers:{'Authorization':`token ${ghToken}`,'Accept':'application/vnd.github+json'}});
+    if (!getResp.ok){const e=await getResp.json();throw new Error(e.message||`GET HTTP ${getResp.status}`);}
     const getData=await getResp.json();
     const sha=getData.sha;
-    if (!sha){throw new Error('Kein SHA vom Server — Datei nicht gefunden?');}
+    if (!sha){throw new Error('Kein SHA — ist index.html im Repo?');}
     syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})`, 'ok');
-    // Robust UTF-8 → base64 decode
-    const b64decode = b64 => {
-      const bin = atob(b64.replace(/\s/g,''));
-      const bytes = new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-      return new TextDecoder('utf-8').decode(bytes);
-    };
-    const b64encode = str => {
-      const bytes = new TextEncoder().encode(str);
-      let bin='';
-      for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
-      return btoa(bin);
-    };
     const currentHtml=b64decode(getData.content);
     syncLog('Aktualisiere Einstellungen...','info');
     const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token,gh_token:ghToken};
     let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
     syncLog('OK Einstellungen aktualisiert','ok');
-    syncLog('Pushe zu GitHub...','info');
+    syncLog(`Pushe zu GitHub (branch: ${branch})...`,'info');
     const content=b64encode(newHtml);
-    const putBody={message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha};
+    const putBody={message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha,branch};
     const putResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
       method:'PUT',
-      headers:{'Authorization':`token ${ghToken}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      headers:{'Authorization':`token ${ghToken}`,'Content-Type':'application/json','Accept':'application/vnd.github+json'},
       body:JSON.stringify(putBody)
     });
     if (!putResp.ok){
