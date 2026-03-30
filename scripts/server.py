@@ -3912,6 +3912,19 @@ function esShowProtoTab(id) {{
       <div class="es-row-label"><span>Newsletter ignorieren</span><span class="es-row-hint">Newsletter-Mails werden nicht als Aufgaben eingetragen</span></div>
       <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-mail-ignore-newsletter"><div class="es-toggle-vis"></div></label>
     </div>
+    <div class="es-row" style="border-bottom:none">
+      <div class="es-row-label">
+        <span>&#x21BA; Mails nachklassifizieren</span>
+        <span class="es-row-hint">Nicht klassifizierte Mails aus dem Index r&uuml;ckwirkend verarbeiten und Tasks anlegen</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="es-recheck-seit"
+               style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
+        <button class="es-mk-btn sec" id="btn-mail-recheck"
+                onclick="esMailNachklassifizieren(this)">&#x21BA; Nachklassifizieren</button>
+      </div>
+    </div>
+    <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
   </div>
 
   <!-- Archiv-Ordner -->
@@ -4567,6 +4580,50 @@ function esShowProtoTab(id) {{
       }},1500);
     }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}}}});
   }};
+
+  window.esMailNachklassifizieren = function(btn) {{
+    const seitEl = document.getElementById('es-recheck-seit');
+    const seit = seitEl ? seitEl.value : '';
+    if(!seit) {{ showToast('Bitte Startdatum w\u00e4hlen','warnung'); return; }}
+    if(btn) {{ btn.disabled=true; btn.textContent='L\u00e4uft\u2026'; }}
+    const prog = document.getElementById('es-recheck-progress');
+    if(prog) prog.textContent = 'Starte\u2026';
+    fetch('/api/mail/nachklassifizieren', {{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{seit: seit, bis: null, trocken: false}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+        if(btn){{ btn.disabled=false; btn.textContent='\u21BA Nachklassifizieren'; }}
+        return;
+      }}
+      showToast('Nachklassifizierung gestartet ab '+seit+'\u2026','ok');
+      let polls=0;
+      const timer=setInterval(()=>{{
+        polls++;
+        fetch('/api/mail/nachklassifizieren/status').then(r=>r.json()).then(p=>{{
+          const pct=p.gesamt>0?Math.round(100*p.geprueft/p.gesamt):0;
+          if(prog){{
+            if(p.finished){{
+              prog.textContent='Fertig: '+p.gesamt+' gepr\u00fcft \u00b7 '+(p.tasks_erstellt||0)+' Tasks erstellt \u00b7 '+(p.ignoriert||0)+' ignoriert'+(p.fehler?' \u00b7 '+p.fehler+' Fehler':'');
+            }} else {{
+              prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) \u00b7 Tasks: '+(p.tasks_erstellt||0)+' \u00b7 '+((p.aktuell||'').slice(0,60));
+            }}
+          }}
+          if(p.finished||polls>600){{
+            clearInterval(timer);
+            if(btn){{ btn.disabled=false; btn.textContent='\u21BA Nachklassifizieren'; }}
+            if(p.tasks_erstellt>0) showToast(p.tasks_erstellt+' neue Tasks erstellt','ok');
+          }}
+        }}).catch(()=>clearInterval(timer));
+      }},2000);
+    }}).catch(()=>{{
+      if(btn){{ btn.disabled=false; btn.textContent='\u21BA Nachklassifizieren'; }}
+      if(prog) prog.textContent='Verbindungsfehler';
+    }});
+  }};
+
   // Sync-Ordner laden (bestehende Funktion)
   function esLoadMailArchiv() {{
     // Mail-Klassifizierung + Postfach-Refresh laden
@@ -4578,6 +4635,12 @@ function esShowProtoTab(id) {{
       if(c1) c1.checked=!!mk.classify;
       if(c2) c2.checked=!!mk.auto_tasks;
       if(c3) c3.checked=!!mk.ignore_newsletter;
+      // Standard-Datum für Nachklassifizierung (90 Tage zurück)
+      const recheckSeit=document.getElementById('es-recheck-seit');
+      if(recheckSeit&&!recheckSeit.value){{
+        const d90=new Date(); d90.setDate(d90.getDate()-90);
+        recheckSeit.value=d90.toISOString().slice(0,10);
+      }}
       // Postfach-Refresh-Intervall
       const pr=d.mail_postfach?.refresh_intervall_min??0;
       const prSel=document.getElementById('cfg-postfach-refresh');
@@ -9720,6 +9783,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/konto/volltest-status'):
             self._api_mail_konto_volltest_status()
 
+        elif self.path.startswith('/api/mail/nachklassifizieren/status'):
+            self._api_mail_nachklassifizieren_status()
+
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
@@ -11210,6 +11276,51 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_nachklassifizieren(self, body):
+        """POST /api/mail/nachklassifizieren — Mail-Nachklassifizierung starten."""
+        import threading as _threading, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        seit  = (body.get('seit') or '').strip()
+        bis   = body.get('bis') or None
+        trocken = bool(body.get('trocken', False))
+        if not seit:
+            self._json({'ok': False, 'error': 'seit-Datum fehlt (Format: YYYY-MM-DD)'})
+            return
+        try:
+            datetime.strptime(seit, '%Y-%m-%d')
+        except ValueError:
+            self._json({'ok': False, 'error': f'Ungültiges Datum: {seit}'})
+            return
+        # Laufenden Job abweisen
+        try:
+            from daily_check import get_recheck_progress as _grp
+            if _grp().get('running', False):
+                self._json({'ok': False, 'error': 'Nachklassifizierung läuft bereits'})
+                return
+        except Exception:
+            pass
+        def _run():
+            try:
+                from daily_check import recheck_mails
+                recheck_mails(seit, bis, trocken)
+            except Exception as ex:
+                import logging
+                logging.getLogger('server').error(f'Nachklassifizierung-Fehler: {ex}')
+        _threading.Thread(target=_run, daemon=True).start()
+        self._json({'ok': True, 'status': 'gestartet', 'seit': seit, 'bis': bis, 'trocken': trocken})
+
+    def _api_mail_nachklassifizieren_status(self):
+        """GET /api/mail/nachklassifizieren/status — Fortschritt abfragen."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            from daily_check import get_recheck_progress
+            self._json(get_recheck_progress())
+        except Exception as e:
+            self._json({'running': False, 'finished': True, 'error': str(e)})
+
     def _api_mail_microsoft_app_test(self):
         """POST /api/mail/microsoft-app/test — Zentrale KIRA Entra App auf Erreichbarkeit testen."""
         try:
@@ -11362,6 +11473,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/volltest':
             self._api_mail_konto_volltest_start(body)
+            return
+
+        if self.path == '/api/mail/nachklassifizieren':
+            self._api_mail_nachklassifizieren(body)
             return
 
         if self.path == '/api/mail/microsoft-app/test':

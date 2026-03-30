@@ -47,9 +47,20 @@ _GENERIC_SENT_DOMAINS = {
     "live.com","posteo.de","protonmail.com","mailbox.org","aol.com",
 }
 
-TASKS_DB  = KNOWLEDGE_DIR / "tasks.db"
-KUNDEN_DB = KNOWLEDGE_DIR / "kunden.db"
-SENT_DB   = KNOWLEDGE_DIR / "sent_mails.db"
+TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
+KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+SENT_DB       = KNOWLEDGE_DIR / "sent_mails.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
+
+# ── Fortschritt für Nachklassifizierung (thread-safe dict) ───────────────────
+_recheck_progress: dict = {
+    "running": False, "finished": True,
+    "gesamt": 0, "geprueft": 0, "tasks_erstellt": 0,
+    "ignoriert": 0, "aktuell": "", "fehler": 0,
+}
+
+def get_recheck_progress() -> dict:
+    return dict(_recheck_progress)
 
 
 # ── HTML Helper ───────────────────────────────────────────────────────────────
@@ -140,6 +151,287 @@ def scan_new_mails(since_dt):
                     "folder":fn,'mail_folder_pfad':str(mail_dir),'mailbox':mbx,
                 })
     return sorted(new_mails, key=lambda x: x['datum'])
+
+
+# ── Mail-Nachklassifizierung aus mail_index.db ───────────────────────────────
+def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False) -> dict:
+    """
+    Klassifiziert Mails aus mail_index.db, die noch keinen Task haben.
+
+    seit_datum : "YYYY-MM-DD" (inklusiv)
+    bis_datum  : "YYYY-MM-DD" oder None (default: heute)
+    dry_run    : wenn True, nur zählen — keine Tasks schreiben
+    Gibt Stats-Dict zurück: {gesamt, geprueft, tasks_erstellt, ignoriert, fehler}
+    """
+    global _recheck_progress
+    _recheck_progress.update({
+        "running": True, "finished": False,
+        "gesamt": 0, "geprueft": 0, "tasks_erstellt": 0,
+        "ignoriert": 0, "aktuell": "Initialisiere…", "fehler": 0,
+    })
+
+    if not bis_datum:
+        bis_datum = datetime.now().strftime("%Y-%m-%d")
+    seit_ts = seit_datum + " 00:00:00"
+    bis_ts  = bis_datum  + " 23:59:59"
+
+    if not MAIL_INDEX_DB.exists():
+        _recheck_progress.update({"running": False, "finished": True,
+                                   "aktuell": "FEHLER: mail_index.db nicht gefunden"})
+        return {"fehler": 1}
+
+    # ── 1. Kandidaten aus mail_index.db laden ─────────────────────────────────
+    mail_db  = sqlite3.connect(str(MAIL_INDEX_DB))
+    mail_db.row_factory = sqlite3.Row
+    tasks_db = sqlite3.connect(str(TASKS_DB))
+    tasks_db.row_factory = sqlite3.Row
+    kunden_db = sqlite3.connect(str(KUNDEN_DB))
+    sent_db   = sqlite3.connect(str(SENT_DB))
+
+    kandidaten = mail_db.execute("""
+        SELECT id, konto, konto_label, betreff, absender, an, datum,
+               message_id, folder, hat_anhaenge, anhaenge,
+               anhaenge_pfad, mail_folder_pfad, text_plain
+        FROM mails
+        WHERE folder NOT LIKE '%Gesendete%'
+          AND folder NOT LIKE '%Sent%'
+          AND datum >= ?
+          AND datum <= ?
+        ORDER BY datum ASC
+    """, (seit_ts, bis_ts)).fetchall()
+    mail_db.close()
+
+    _recheck_progress["gesamt"] = len(kandidaten)
+    if not kandidaten:
+        _recheck_progress.update({"running": False, "finished": True,
+                                   "aktuell": "Keine Mails im Zeitraum gefunden"})
+        return {"gesamt": 0, "geprueft": 0, "tasks_erstellt": 0, "ignoriert": 0, "fehler": 0}
+
+    # ── 2. Bereits vorhandene Tasks (message_id dedup) ────────────────────────
+    existing_ids = {
+        r[0] for r in tasks_db.execute(
+            "SELECT message_id FROM tasks WHERE message_id IS NOT NULL AND message_id != ''"
+        ).fetchall()
+    }
+    deleted_msgids: set = set()
+    try:
+        deleted_msgids = {
+            r[0] for r in tasks_db.execute(
+                "SELECT message_id FROM loeschhistorie "
+                "WHERE message_id IS NOT NULL AND message_id != ''"
+            ).fetchall()
+        }
+    except Exception:
+        pass
+
+    # ── 3. Gesendete-Index (für "schon beantwortet?" Check) ──────────────────
+    sent_index: dict  = {}
+    sent_domains: dict = {}
+    try:
+        sent_db.row_factory = sqlite3.Row
+        for r in sent_db.execute(
+            "SELECT kunden_email, datum FROM gesendete_mails ORDER BY datum"
+        ).fetchall():
+            em = (r["kunden_email"] or "").lower().strip()
+            if not em: continue
+            sent_index.setdefault(em, []).append(r["datum"])
+            dom = em.split('@')[-1] if '@' in em else ''
+            if dom and dom not in _GENERIC_SENT_DOMAINS:
+                sent_domains.setdefault(dom, []).append(r["datum"])
+    except Exception:
+        pass
+
+    stats = {"gesamt": len(kandidaten), "geprueft": 0,
+             "tasks_erstellt": 0, "ignoriert": 0, "fehler": 0}
+
+    # ── 4. Jede Mail prüfen und ggf. klassifizieren ───────────────────────────
+    for idx, m in enumerate(kandidaten):
+        folder = m["folder"] or ""
+        absnd  = m["absender"] or ""
+        betr   = m["betreff"] or ""
+        datum  = m["datum"] or ""
+        msgid  = m["message_id"] or ""
+        konto  = m["konto_label"] or m["konto"] or ""
+        an     = m["an"] or ""
+
+        # Fortschritt-Update (nicht bei jedem Schritt für Performance)
+        if idx % 5 == 0:
+            _recheck_progress.update({
+                "geprueft": stats["geprueft"],
+                "tasks_erstellt": stats["tasks_erstellt"],
+                "ignoriert": stats["ignoriert"],
+                "aktuell": f"{betr[:55]} ({datum[:10]})",
+            })
+
+        # Schon vorhandener Task → überspringen
+        if msgid and (msgid in existing_ids or msgid in deleted_msgids):
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        # Kunden-E-Mail auflösen
+        k_email = get_kunden_email(absnd, an, folder)
+        if not k_email:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+        k_email = resolve_alias(k_email)
+
+        # Eigene Domain überspringen
+        dom = k_email.split('@')[-1] if '@' in k_email else ''
+        if dom in EIGENE_DOMAINS:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        # Text laden: text_plain aus DB oder aus mail.json auf Disk
+        text = m["text_plain"] or ""
+        if not text and m["mail_folder_pfad"]:
+            try:
+                mj_path = Path(m["mail_folder_pfad"]) / "mail.json"
+                if mj_path.exists():
+                    mdata = json.loads(mj_path.read_text('utf-8', errors='replace'))
+                    text = h2t(mdata.get("text", "") or "")[:3000]
+            except Exception:
+                pass
+
+        # DATEV-Weiterleitungs-Duplikat-Filter
+        absnd_dom = absnd.split('@')[-1].lower() if '@' in absnd else ''
+        if absnd_dom in EIGENE_DOMAINS:
+            anhaenge_pfad = m["anhaenge_pfad"] or ""
+            dup = _check_datev_duplicate(betr, text, anhaenge_pfad, konto, tasks_db)
+            if dup['action'] == 'skip':
+                stats["ignoriert"] += 1
+                stats["geprueft"] += 1
+                continue
+
+        # Anhaenge-Liste aus JSON-String
+        anhaenge_list: list = []
+        try:
+            raw = m["anhaenge"] or ""
+            if raw:
+                anhaenge_list = json.loads(raw)
+        except Exception:
+            pass
+
+        # Klassifizieren
+        try:
+            cl = classify_mail(
+                konto=konto, absender=absnd, betreff=betr, text=text,
+                anhaenge=anhaenge_list, folder=folder, is_sent=False,
+                mail_datum=datum, kanal="email",
+            )
+        except Exception as e:
+            stats["fehler"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        kat = cl["kategorie"]
+
+        # Ignorierbare Kategorien → kein Task
+        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen", "Zur Kenntnis"):
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+        if kat in ("Shop / System", "Rechnung / Beleg") and not cl["antwort_noetig"]:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        # Schon beantwortet?
+        k_email_l = k_email.lower()
+        if any(d > datum for d in sent_index.get(k_email_l, [])):
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+        k_domain = k_email_l.split('@')[-1] if '@' in k_email_l else ''
+        if k_domain and k_domain not in _GENERIC_SENT_DOMAINS:
+            if any(d > datum for d in sent_domains.get(k_domain, [])):
+                stats["ignoriert"] += 1
+                stats["geprueft"] += 1
+                continue
+
+        # Erneuter Duplikat-Check (falls msgid leer war, nach oben-Filter)
+        if msgid and msgid in existing_ids:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        if not dry_run:
+            # Entwurf generieren
+            entwurf = ""
+            claude_prompt = ""
+            benoetigt_entwurf = (cl["antwort_noetig"]
+                                  or kat in ("Angebotsrueckmeldung", "Antwort erforderlich"))
+            if benoetigt_entwurf and k_email:
+                try:
+                    hint = "Angebotsrueckmeldung" if kat == "Angebotsrueckmeldung" else ""
+                    draft = generate_draft(betr, absnd, text, k_email, hint=hint)
+                    entwurf = draft.get("entwurf", "")
+                    claude_prompt = draft.get("claude_prompt", "")
+                except Exception:
+                    pass
+
+            # Thread-ID
+            thread_id = None
+            try:
+                cutoff30 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+                ex_t = tasks_db.execute(
+                    "SELECT id, thread_id FROM tasks "
+                    "WHERE kunden_email=? AND erstellt_am >= ? ORDER BY id ASC LIMIT 1",
+                    (k_email, cutoff30)
+                ).fetchone()
+                if ex_t:
+                    thread_id = ex_t["thread_id"] or f"T{ex_t['id']}"
+            except Exception:
+                pass
+
+            task_typ = kategorie_to_task_typ(kat)
+            try:
+                tasks_db.execute("""INSERT INTO tasks
+                    (typ, kategorie, titel, zusammenfassung, beschreibung,
+                     kunden_email, kunden_name, absender_rolle, empfohlene_aktion,
+                     kategorie_grund, message_id, mail_folder_pfad, anhaenge_pfad,
+                     antwort_entwurf, claude_prompt, betreff, konto, datum_mail,
+                     prioritaet, antwort_noetig, thread_id, konfidenz)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (task_typ, kat, betr[:120] or f"Mail von {k_email}",
+                     cl["zusammenfassung"], text[:1000],
+                     k_email, "", cl["absender_rolle"],
+                     cl["empfohlene_aktion"], cl["kategorie_grund"],
+                     msgid, m["mail_folder_pfad"] or "", m["anhaenge_pfad"] or "",
+                     entwurf[:4000], claude_prompt[:2000],
+                     betr[:120], konto, datum,
+                     cl["prioritaet"], 1 if cl["antwort_noetig"] else 0,
+                     thread_id, cl.get("konfidenz", "mittel")))
+                new_id = tasks_db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                if not thread_id:
+                    tasks_db.execute("UPDATE tasks SET thread_id=? WHERE id=?",
+                                     (f"T{new_id}", new_id))
+                stats["tasks_erstellt"] += 1
+                if msgid:
+                    existing_ids.add(msgid)
+                if kat == "Angebotsrueckmeldung":
+                    _try_update_angebot_from_mail(k_email, text, tasks_db)
+            except Exception as e:
+                stats["fehler"] += 1
+                print(f"  [recheck] Task-Fehler: {e}")
+
+        stats["geprueft"] += 1
+
+    if not dry_run:
+        tasks_db.commit()
+        kunden_db.commit()
+    tasks_db.close()
+    kunden_db.close()
+    sent_db.close()
+
+    _recheck_progress.update({
+        "running": False, "finished": True,
+        "aktuell": "Fertig",
+        **{k: stats[k] for k in ("gesamt", "geprueft", "tasks_erstellt", "ignoriert", "fehler")},
+    })
+    return stats
 
 
 # ── Angebot-Status Auto-Update ───────────────────────────────────────────────
@@ -692,4 +984,22 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    _p = argparse.ArgumentParser(description="rauMKult Daily Check / Mail-Nachklassifizierung")
+    _p.add_argument("--seit", metavar="YYYY-MM-DD",
+                    help="Mails ab diesem Datum nachklassifizieren (recheck_mails)")
+    _p.add_argument("--bis",  metavar="YYYY-MM-DD", default=None,
+                    help="Mails bis zu diesem Datum (optional, default: heute)")
+    _p.add_argument("--trocken", action="store_true",
+                    help="Dry-run: klassifizieren aber keine Tasks schreiben")
+    _args = _p.parse_args()
+    if _args.seit:
+        print(f"[recheck] Nachklassifizierung: {_args.seit} -> {_args.bis or 'heute'}"
+              + (" (DRY-RUN)" if _args.trocken else ""))
+        _stats = recheck_mails(_args.seit, _args.bis, _args.trocken)
+        print(f"[recheck] Ergebnis: {_stats['geprueft']}/{_stats['gesamt']} geprüft"
+              f" · {_stats['tasks_erstellt']} Tasks erstellt"
+              f" · {_stats['ignoriert']} ignoriert"
+              f" · {_stats['fehler']} Fehler")
+    else:
+        main()

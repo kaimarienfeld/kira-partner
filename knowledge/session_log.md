@@ -95,3 +95,15 @@
 
 ## 2026-03-29 — Session-Ende (session-cc)
 **Status:** erledigt
+
+---
+
+## 2026-03-29 21:00 — Session-Start (session-ff)
+
+**Auftrag:** Kira indexiert hereingekommene E-Mails nicht mehr. Angebote, Eingangs- und Ausgangsrechnungen werden nicht mehr zugeordnet. Die Kacheln (Geschäft, Nächste Termine, Geschäft aktuell) sind seit mehreren Tagen unverändert. Im Aktivitätsprotokoll nach 16:10 Uhr nichts mehr über Klassifizierung. Die migrierten Archiv-Mails wurden nicht in die Klassifizierung genommen. Bitte Problem identifizieren, beheben, alle Mails der letzten 3-4 Tage nachklassifizieren und eine "Nachklassifizieren ab Datum"-Funktion einbauen.
+
+**Diagnose:** Mail-Monitor läuft korrekt (Speedify 17:48, Ecwid 17:38 in Aktivitätslog). Root-Cause: daily_check.py's scan_new_mails() überspringt Mails älter als letzter_lauf. 511 Kandidaten in mail_index.db ohne Task, davon 5 echte Business-Mails (übrige: Newsletter, System, bereits beantwortet).
+
+**Umsetzung:** (1) daily_check.py: recheck_mails(seit, bis, dry_run) + get_recheck_progress() + --seit/--bis/--trocken CLI. (2) server.py: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status + UI-Button in Einstellungen > Mail-Klassifizierung. (3) Nachklassifizierung durchgeführt: 5 neue Tasks (Angebotsrückmeldung Kaufmann A-SB260093, Betonkosmetik Horsting, Amir Sad Lead, Calumex Lead, Handwerker).
+
+**Status:** erledigt

@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ee",
-  "date": "2026-03-29",
+  "last_session": "session-ff",
+  "date": "2026-03-30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -24,7 +24,8 @@
     "session-bb (2026-03-29): Mail-Login-Komplett-Umbau + AGENT.md Rule. (1) AGENT.md: change_log.jsonl-Prüfung als Session-Start Step 7 + Kapitel 1e. (2) Microsoft OAuth mit zentraler KIRA Entra App (a0591b2d): _msal_app_kira(), start_oauth_browser_flow(), MSAL acquire_token_interactive(). (3) 3-stufige Provider-Erkennung: Stage1 Domain-Heuristik, Stage2 DNS-MX+Autodiscover (info@raumkult.eu korrekt erkannt!), Stage3 MS OpenID-Config-Probe. detect_provider_advanced() orchestriert alle Stufen. (4) Mailbird-Stil 6-Schritt-Wizard: kira-wiz-overlay CSS, opaker Hintergrund (kein transparent), Wizard-Steps, Anbietererkennung mit Stufen-Text, Expert-Mode mit IMAP/Exchange/EWS/POP3, _wizProtoChange() für EWS-Felder. (5) Echte Verbindungsampel: Einstellungen+Postfach+Sidebar, Background-IMAP-Health (30min-Intervall), Volltest mit SMTP XOAUTH2+30s Roundtrip. (6) Token/Client-ID aus UI entfernt. (7) 9 neue API-Endpunkte. (8) Commits: 750253d (AGENT.md) + weitere.",
     "session-cc (2026-03-29): Bugfixes + AGENT.md Plan-Regel. (1) AGENT.md: Neue Pflicht-Regel — Plan-Agent bei großen Aufträgen vor Implementierung nutzen. (2) KRITISCHER BUG: mail_archiv.pfad war in config.json leer → KIRA konnte keine archivierten Mails lesen. Wiederhergestellt auf korrekten Pfad. (3) mail_monitor.py: _save_to_archive() Ordner-Bug — erhielt label=anfrage statt email_addr=anfrage@raumkult.eu → falsche Ordnernamen. Fix: email_addr übergeben. (4) Toast-Kopierbutton: größer + JS-Fallback via execCommand.",
     "session-dd (2026-03-29): Postfach UI — Favoriten-Sterne + Kombiniertes Postfach Ordnerstruktur + folder_type-Filter + JS-Regex-SyntaxError-Fix. Commits fe30af0 + 2ab44da.",
-    "session-ee (2026-03-29): Postfach Outlook-Style Komplett-Upgrade (8 Phasen). (1) DB: _ensure_mail_columns() fügt flagged/pinned/kira_verwendet zu mail_index.db. (2) pfInitResize() von IIFE auf reguläre Funktion (DOM-Timing-Fix). (3) 5 neue POST-Endpunkte: /api/mail/gelesen + /flag + /pin + /loeschen + /kira-markieren. (4) Hover-Aktionen auf Mail-Items: Checkbox + 4 SVG-Icons (Gelesen/Flag/Pin/Trash). (5) Bulk-Bar: Mehrfachauswahl → gelesen/ungelesen/löschen (3-Schritt showKritischModal). (6) SVG Preview-Toolbar: Antworten/Allen/Weiterleiten | Gelesen/Flag/Pin | Löschen | Kira. (7) Lese-Markierung Einstellung: sofort/5s/30s/manuell → cfg-lese-markierung → mail_postfach.lese_markierung. (8) kira_verwendet Badge: lila Chip auf Items. Commit 2aadedc. Alle Tests via Playwright: 0 JS-Fehler, Hover-Aktionen ✓, Bulk-Bar ✓, Toolbar ✓."
+    "session-ee (2026-03-29): Postfach Outlook-Style Komplett-Upgrade (8 Phasen). (1) DB: _ensure_mail_columns() fügt flagged/pinned/kira_verwendet zu mail_index.db. (2) pfInitResize() von IIFE auf reguläre Funktion (DOM-Timing-Fix). (3) 5 neue POST-Endpunkte: /api/mail/gelesen + /flag + /pin + /loeschen + /kira-markieren. (4) Hover-Aktionen auf Mail-Items: Checkbox + 4 SVG-Icons (Gelesen/Flag/Pin/Trash). (5) Bulk-Bar: Mehrfachauswahl → gelesen/ungelesen/löschen (3-Schritt showKritischModal). (6) SVG Preview-Toolbar: Antworten/Allen/Weiterleiten | Gelesen/Flag/Pin | Löschen | Kira. (7) Lese-Markierung Einstellung: sofort/5s/30s/manuell → cfg-lese-markierung → mail_postfach.lese_markierung. (8) kira_verwendet Badge: lila Chip auf Items. Commit 2aadedc. Alle Tests via Playwright: 0 JS-Fehler, Hover-Aktionen ✓, Bulk-Bar ✓, Toolbar ✓.",
+    "session-ff (2026-03-30): Mail-Nachklassifizierung. Diagnose: 83+ Business-Mails in mail_index.db ohne Tasks (Angebotsrückmeldungen, Anfragen, Rechnungen ab Feb 27). Root-Cause: daily_check.py's scan_new_mails() überspringt alle Mails älter als letzter_lauf → historische Mails werden NIE nachgeholt. Fix: (1) daily_check.py: MAIL_INDEX_DB-Konstante, _recheck_progress Dict, get_recheck_progress(), recheck_mails(seit, bis, dry_run) Funktion — queries mail_index.db direkt, verwendet gleiche Klassifizierungs- und Dedup-Logik wie process_new_mails(). CLI: --seit/--bis/--trocken. (2) server.py: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status Endpoints, esMailNachklassifizieren() JS, Button in Einstellungen > Mail-Klassifizierung mit Datums-Input + Progress-Anzeige. (3) Nachklassifizierung ausgeführt für 2026-01-28 bis heute: 511 Mails geprüft, 5 Tasks erstellt (A-SB260093 Angebotsrückmeldung Kaufmann, Betonkosmetik Horsting, Amir Sad Lead, Calumex Lead, Maurer/Handwerker Lead)."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -74,7 +75,8 @@
     "postfach-favoriten-sterne-combined-subfolder",
     "postfach-hover-aktionen-bulk-svg-toolbar",
     "postfach-lese-markierung-einstellung",
-    "postfach-flag-pin-kira-verwendet-db"
+    "postfach-flag-pin-kira-verwendet-db",
+    "mail-nachklassifizierung-recheck"
   ],
   "open_tasks": [
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
@@ -85,7 +87,7 @@
     "Urlaubsmodus Auto-Aktivierung: urlaub_von/bis werden gespeichert, aber Backend-Check (ist aktuelle Zeit im Urlaubsfenster?) fehlt noch",
     "Config-Export/Import: Buttons vorhanden, Funktion noch showToast-Platzhalter"
   ],
-  "next_step": "Offene Punkte: (1) kira_llm.py: kira_verwendet setzen wenn Mail in _build_data_context() genutzt wird + Badge in Postfach aktualisieren. (2) Mail-Archiv-Plan (snuggly-kindling-boot.md): Archiv→KIRA-LLM-Kontext, mail_archiv_reindex.py, Einstellungen-Ordnerauswahl. (3) Google OAuth verdrahten. (4) Postfach: Gesendete-Zählung im Badge (momentan nur Ungelesen-Inbox).",
+  "next_step": "Offene Punkte: (1) Rechnungen/Mahnungen von eigener invoice@-Adresse werden NICHT als Tasks erstellt (k_email=None wegen EIGENE_DOMAINS) — separate Behandlung für invoice-routing-Mails nötig. (2) kira_llm.py: kira_verwendet setzen wenn Mail in _build_data_context() genutzt wird + Badge in Postfach aktualisieren. (3) Mail-Archiv-Plan: Archiv→KIRA-LLM-Kontext. (4) Google OAuth verdrahten. (5) Postfach: Gesendete-Zählung im Badge.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
