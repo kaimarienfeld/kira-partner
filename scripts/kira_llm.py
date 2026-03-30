@@ -47,7 +47,7 @@ PROVIDER_TYPES = {
         "models": [
             ("gpt-4o", "GPT-4o"),
             ("gpt-4o-mini", "GPT-4o Mini"),
-            ("gpt-4.1-2025-04-14", "GPT-4.1"),
+            ("gpt-4.1", "GPT-4.1"),
             ("o3-mini", "o3-mini"),
         ],
         "default_model": "gpt-4o",
@@ -255,7 +255,7 @@ _MODEL_FALLBACK_RANKING = {
         "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
     ],
     "openai":     [
-        "gpt-4o", "gpt-4o-mini", "gpt-4.1-2025-04-14", "o3-mini",
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "o3-mini",
     ],
     "openrouter": [
         "anthropic/claude-sonnet-4", "openai/gpt-4o",
@@ -454,6 +454,44 @@ def _auto_update_model(provider) -> dict:
     return {"changed": True, "old_model": old_model, "new_model": new_model}
 
 
+def _normalize_model(provider) -> dict:
+    """Ersetzt dated Snapshots durch saubere Basis-IDs aus dem Fallback-Ranking.
+
+    Beispiel: 'claude-sonnet-4-6-20250514' → 'claude-sonnet-4-6'
+    Wird aufgerufen wenn Modell noch gültig ist, aber eine datierte Version nutzt.
+    Returns: {"changed": bool, "old_model": str, "new_model": str}
+    """
+    model = provider.get("model", "")
+    typ = provider.get("typ", "")
+    pid = provider.get("id", "")
+
+    # Nur wenn Modell ein dated Snapshot ist (enthält -YYYYMMDD oder -YYYY-MM-DD)
+    import re
+    if not re.search(r'-20\d{6}(-|$)|-20\d\d-\d\d-\d\d', model):
+        return {"changed": False, "old_model": model, "new_model": model}
+
+    for candidate in _MODEL_FALLBACK_RANKING.get(typ, []):
+        # candidate ist Basis-ID von model wenn model mit candidate+"-20" beginnt
+        if model.startswith(candidate + "-20"):
+            try:
+                c = json.loads(CONFIG_FILE.read_text('utf-8'))
+                for p in c.get("llm", {}).get("providers", []):
+                    if p.get("id") == pid:
+                        p["model"] = candidate
+                        break
+                CONFIG_FILE.write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+                _elog("llm", "model_normalize",
+                      f"Provider {pid}: {model} → {candidate} (Snapshot → Basis-ID)",
+                      source="kira_llm", modul="kira", submodul="model_validation",
+                      status="ok", provider=pid,
+                      entity_snapshot={"old_model": model, "new_model": candidate})
+            except Exception:
+                return {"changed": False, "old_model": model, "new_model": model}
+            return {"changed": True, "old_model": model, "new_model": candidate}
+
+    return {"changed": False, "old_model": model, "new_model": model}
+
+
 def validate_all_providers() -> dict:
     """Validiert alle aktiven Provider, korrigiert veraltete Modelle automatisch.
 
@@ -473,8 +511,14 @@ def validate_all_providers() -> dict:
 
         vr = _validate_model(provider)
         if not vr.get("valid") and not vr.get("skipped"):
+            # Modell nicht mehr verfügbar → bestes verfügbares wählen
             update = _auto_update_model(provider)
             vr["auto_update"] = update
+        elif vr.get("valid") and not vr.get("skipped"):
+            # Modell noch gültig aber evtl. dated Snapshot → auf Basis-ID normalisieren
+            norm = _normalize_model(provider)
+            if norm.get("changed"):
+                vr["normalized"] = norm
 
         results[pid] = vr
 
