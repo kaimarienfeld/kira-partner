@@ -420,6 +420,19 @@ def _build_data_context(config):
             """).fetchall()
             mdb.close()
             if mail_rows:
+                # kira_verwendet setzen für alle in den Kontext aufgenommenen Mails
+                used_ids = [m['message_id'] for m in mail_rows if m['message_id']]
+                if used_ids:
+                    try:
+                        mdb2 = sqlite3.connect(str(MAIL_INDEX_DB))
+                        mdb2.executemany(
+                            "UPDATE mails SET kira_verwendet=1 WHERE message_id=?",
+                            [(mid,) for mid in used_ids]
+                        )
+                        mdb2.commit()
+                        mdb2.close()
+                    except Exception:
+                        pass
                 ctx += f"\n=== LETZTE EINGANGSMAILS ({len(mail_rows)}) ===\n"
                 ctx += "(Für vollständigen Mailinhalt: mail_lesen(message_id) aufrufen)\n"
                 for m in mail_rows:
@@ -564,6 +577,15 @@ def mail_vollinhalt_lesen(message_id: str) -> dict:
                     result["anhaenge_dateien"] = [f.name for f in Path(anhaenge_pfad).iterdir() if f.is_file()]
         except Exception:
             pass
+
+    # kira_verwendet setzen — Kira hat diese Mail explizit gelesen
+    try:
+        mdb3 = sqlite3.connect(str(MAIL_INDEX_DB))
+        mdb3.execute("UPDATE mails SET kira_verwendet=1 WHERE message_id=?", (message_id,))
+        mdb3.commit()
+        mdb3.close()
+    except Exception:
+        pass
 
     return result
 

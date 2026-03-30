@@ -1,4 +1,57 @@
-??? löschen einzeln und Multi funktioniert nicht. kira fragt zwar nach dem grund, aber sie tut nach bestätigen nichts, das eingabefenster schließt sich, kira arbeitet nicht und einträge werden auch nicht gelööscht.
+## KIRA App — Offene Todos & Entwicklungs-Backlog
+*Stand: 2026-03-30 | Letzte Aktualisierung: session-hh/ii*
+
+---
+
+### 🔴 BUGS (bekannt, offen)
+
+- **Löschen einzeln + Multi**: Kira fragt nach dem Grund, aber nach Bestätigung passiert nichts — Eingabefenster schließt sich, kein Löschvorgang, Einträge bleiben. Betrifft Tasks.
+
+---
+
+### 🟡 GEPLANT / VORGEMERKT
+
+**Postfach:**
+- **Mails verschieben** (IMAP) testen mit echten Mails — POST /api/mail/verschieben implementiert, noch nicht live getestet
+- **"Zu Kira hinzufügen"-Button** im Postfach: Ordner direkt aus dem Postfach zu sync_ordner (Kira-Kernordner) hinzufügen
+- **Gesendete-Zählung** im Sidebar-Badge (zeigt aktuell nur Posteingang-Unread)
+- **Direkte E-Mail-Antwort** aus dem Postfach heraus — geplant, noch nicht gebaut
+
+**Mail-Konten:**
+- **Google OAuth** verdrahten (Microsoft fertig, Google fehlt noch)
+- **SMTP-Passwort-Auth im Volltest** (Volltest nutzt aktuell nur XOAUTH2)
+- **Provider-Persistierung** nach OAuth-Login (Typ/Provider wird nicht in config gespeichert)
+- **Einstellungen-UI**: bereinigung_frist_tage + geloeschte_bereinigung_aktiv ✅ (session-hh erledigt)
+
+**Kira LLM:**
+- **kira_verwendet Auto-Markierung** ✅ (session-ii erledigt): Kira markiert Mails die sie für Kontext/Auswertung nutzt automatisch mit lila Badge im Postfach
+- **Wissen-Datenbank automatisch pflegen**: Kira soll Preise, Erkenntnisse, Muster aus Mails/Angeboten/Rechnungen automatisch erkennen und in wissen_regeln eintragen. Timestamps für alle Einträge (wann erstellt, wann geändert). Duplikate prüfen + anpassen statt neu anlegen.
+- **Eingangsrechnungen Auto-Scan**: Mails mit Rechnungsmerkmalen erkennen, Rechnungsdaten extrahieren, Offene-Posten-DB anlegen, Kira pflegt Status bis bezahlt/erledigt
+
+**Dashboard:**
+- **Stats-Zeile klickbar mit Filter**: Klick auf "N Leads" → Kommunikation-Tab öffnet sich direkt mit "Neue Lead-Anfrage" Filter
+- **Tagesstart-Briefing**: Backend vorhanden (generate_daily_briefing()), Morgen-Anzeige im Dashboard fehlt noch
+
+**Sonstiges:**
+- **Kunden-360-Ansicht** — geplant, noch nicht gebaut
+- **Falsch benannte Archiv-Ordner löschen**: anfrage/, info/, invoice/, kaimrf/, shop/ im Mail-Archiv (entstanden durch Bug in session-cc, können manuell gelöscht werden)
+- **Neue Archiv-Ordner**: Gelöschte Elemente/Entwürfe entstehen erst nach nächstem mail_monitor-Lauf (automatisch)
+
+---
+
+### ✅ ZULETZT ERLEDIGT
+
+- **session-hh (2026-03-30)**: IMAP-Postfach + Ordner-System: Live-IMAP Ordnerliste (UTF-7 Fix), config-basierte Sync-Ordner, Mail verschieben, Gelöschte-Protokoll-System, archiv_cleanup.py, Kira LLM sieht bereinigte Mails
+- **session-hh Nachtrag**: Einstellungen-UI Archiv-Bereinigung (Frist + Toggle)
+- **session-ii (2026-03-30)**: Lese-Markierung Standard auf "manuell" + mehr Zeitoptionen (1s–5min), kira_verwendet Auto-Markierung in _build_data_context() + mail_vollinhalt_lesen()
+- **session-gg**: Dashboard Typ-Labels fix (sonstiger_vorgang→Vorgang), überfällig-Badge
+- **session-ff**: Mail-Nachklassifizierung recheck_mails() + UI-Button
+- **session-ee**: Postfach Hover-Aktionen, Bulk-Bar, SVG-Toolbar, kira_verwendet Badge
+- **session-dd**: Postfach Favoriten-Sterne, Kombiniertes Postfach, folder_type-Filter
+
+---
+
+
 
 
 
@@ -217,7 +270,8 @@ Wie wird der Nachfass gemeldet -  ist Aufgabe erstellen.. KIRA LLM tatsächlich 
 
 
 
-###  sichtbar in der App Dashboard( kurz)- kommunikation (detailiert) eigene kachel, heute gesendete mails an.. von warum, llm-von user x , fehlgeschlagen, erfolg, datum uhrzeit, bei fehler zu konto oder erneut senden und weiters sinnvolle
+### sichtbar in der App Dashboard( kurz)- kommunikation (detailiert) eigene kachel, heute gesendete mails an.. von warum, llm-von user x , fehlgeschlagen, erfolg, datum uhrzeit, bei fehler zu konto oder erneut senden und weiters sinnvolle
+
 
 
 
@@ -235,14 +289,168 @@ Wie wird der Nachfass gemeldet -  ist Aufgabe erstellen.. KIRA LLM tatsächlich 
 
 
 \-- mail duplikatserkennung erforderlich durch kira aktive ki bei Import mail. Szene habe 14 gleiche Nachrichten erhalten, wo nur der anhang anders war erkennen, evtl gruppieren und nachfrage (vorhanden?)
- Richte in diesem zug das senden an leni marlenabraham@gmail.com über das konto info@raumkult ein. Gib dir beim erstellen der Mail etwas mehr mühe ;) in html formatiert und etwas schicker, passend zum kira brand. (für beide mails, erste einladung , dann zweite passwort , und dritte als dauerhafte vorlage für benachrichtigungen. 
+Richte in diesem zug das senden an leni marlenabraham@gmail.com über das konto info@raumkult ein. Gib dir beim erstellen der Mail etwas mehr mühe ;) in html formatiert und etwas schicker, passend zum kira brand. (für beide mails, erste einladung , dann zweite passwort , und dritte als dauerhafte vorlage für benachrichtigungen.
 
 
 
-### Tagesbriefing immer mit Zeitangabe von wann das Briefing ist --- hinzufügen
 
 
-### Wenn hinter kira Launcher ein element zum klicken ist, dann soll das programm das erkennen und der launcher rutscht beiseite wenn die maus dort hingeht und versucht an das element zu kommen.. wenn möglich, dass schlau lösen
+
+
+###### **Tagesbriefing** immer mit Zeitangabe von wann das Briefing ist --- hinzufügen
+
+Wenn hinter kira Launcher ein element zum klicken ist, dann soll das programm das erkennen und der launcher rutscht beiseite wenn die maus dort hingeht und versucht an das element zu kommen.. wenn möglich, dass schlau lösen
+
+
+
+**Mail-Monitor Polling-Intervall (Sekunden)** - auf stunden/minuten umstellen - bessere eingabe machen
+
+
+
+###### **Entwickler-/Admin-Bereich** oder  separates internes Diagnose-Dashboard für Kira App
+
+Belegablage für eingescannte oder hochgeladene oder per mail im bestimmten Format kommende - Briefe aller art, mit der auch KIRA zusammenarbeitet und automatisch diese ablage nach neuen inhalten durchsucht Und bearbeitet je nach Bearbeitungsstand Wobei der verarbeitet erinnert Komma wieder erinnert Komma und wieder erinnert Und auch erkennt Bezahlung oder Mahnungen Zahlungsänderungen oder sonstigen Aufforderungen aus dem Briefen Weitere Schritte einleitet die wichtig sind Punkt vollautomatisch über das Llm.
+
+
+
+
+
+
+
+###### **Bei partner view...** 
+
+Wenn Leni in der aktuellen html version ein feedback gibt, dann kommt zwar die speichern seite- erfolg, wird aber nur temporär in der html gespeichert. Das was sie eingegebn hat, wird nicht commitet. wie kann das geändert werden? bei jeder feadback eingabe durch speicher btn auto commit oder beim speichern dann sagen wenn du mit allen fertig bist , dann musst du auf dem hauptbildschirm dort.. oder dort noch deine gesammelten einträge abschicken... --- dann wäre es auch gut, wenn oben bei den karten - wo man die karten filtern kann, noch ein filter hat, meine feadbacks, oder so.. ###
+Wie ist  der ablauf wenn Leni auf der html seite kommentiert? wie werde ich benachrichtigt? was war der plan und wie wird es aktuell umgesetzt? welche listen werden automatisch aktualisiert?
+
+
+
+
+
+ bitte schau dich im projekt um und bring dich auf den neuesten stand. führe dann die nächste aufgabe immer mit den regeln aus der agent.md aus:
+
+
+
+###### **Kira und KIRA LLM**
+
+\-Komplette Struktur und Architektur verbessern
+
+
+
+
+
+&#x20;### Die Anzahl der Ungelesene Nachrichten im Batch Symbol Der Haupt Sidebar Vom Postfach Stimmt nicht. bitte Alle Posteingänge Von allen Postfächern Einbeziehen "D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-30 050052.png"
+
+
+
+&#x20;- Dann Frage Komma das Verschieben der vertikalen Fenster Komma ist das Nach Neustart dann so gespeichert Wenn nicht bitte nachholen
+
+&#x20;
+
+\### Wenn möglich In der Checkliste aufnehmen Zur abarbeiten für diese App Aufnehmen das vielleicht markiert ist welche E Mail Tatsächlich Kira markiert Hat Das sie benutzt für den Kontext oder für Auswertungen oder sonstiges Dass man das im Vorfeld schon sieht diese Funktion entweder direkt einbauen oder Vormerken, zusammengefasst Kira soll die E-Mails Direkt markieren Die sie verwendet Und Durchgerast rastert hat Um diese vielleicht auch später Noch benutzen zu können oder müssen.
+"D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-29 185040.png"
+"D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-29 184328.png"
+"D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-29 184216.png"
+
+Ach so Noch eine wichtige Sache, Bei Der Funktion Von ungelesen zu gelesen Das bitte einstellbar machen im Menü Bei Konten, entweder nach Zeit Zeit einstellbar Wann es ungelesen sein soll Komma oder auch die Option Bis ich es Als gelesen markiere. diese Funktion brauche ich dringend
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+❯ welche Konten werden von kira gescannt? Die klassifizierung oder das was kira machen sollte, stimmt nicht. z.b im invoice ordner sind benachrichtigung vom system das
+
+&#x20; ausstehende Rechnungen von Kunde x bezahlt sind, dann z.b. ein shema das wichtig ist wenn solche mails in der art kommen Mitteilung zur Verlängerung für Ihren
+
+&#x20; Ecwid-Shop, dass das systematisch von llm prüfen und schauen wo kann ich es ablegen und kai informieren.. kira llm sollte so mitdenken, also die aktive llm, dass sie
+
+&#x20; wenn sie so etwas sieht und keine datenbank findet, dass sie kai benachrichtigt, später dann den admin (nur Admin) und sagt, ich habe das gefunden und denke es könnte wichtig sein, habe
+
+&#x20; das ganze system gecheckt datenbanken und so weiter und weiss nicht wo ich das einordnen soll, ich habe eine idee dazu das du in dein system integrieren solltest. Kiro sollte dabei zugriff auf die Plan dateien vom Sytem checklisten was ist geplanzt , was wurde erstellt bekommen, sodass sie dann auch weiss was sie mir vorschlagen kann. Damit meine ich aber nicht nur die mails, sondern alle informationen egal von welchen kanal eine nachricht reinkommt. Kira LLM sollte auch eine übersicht erhalten und zugriff haben von den bestehenden Datenbanken oder bereichen wo sie ablegen kann die ständig aktuell gehalten wird, damit sie überhaupt suchen und einordnen kann. Ich möchte das die llm also das model mit dem programm aktiv im hintergrund aktiv arbeitet. Ich habe das gefühl kira arbeitet nur nach den angelegten festen regeln und kann das das nicht richtig tun, da es dann nicht richtig programiert ist. 
+
+
+
+Weitere beispiele: 
+
+
+
+* Nächste termine und fristen bereich ist nie aktuell, das steht seit anfang märz so, es gibt unzählige elemente die termine und fristen enthalten in den kanälen, tauchen aber nicht auf
+
+&#x20;
+
+
+
+* Geschäft aktuell
+
+Letzte Bewegungen  wird überhaupt nicht aktualisiert, das hat sie einmal gemacht und dann nie wieder
+
+
+
+
+
+* Wenn man jetzt mal im Bereich Der Kommunikation Schaut Siehe Screenshots, Dann kann man deutlich sehen Paß Sie nur Einen Kommentar an jeder E-Mail Anheftet, aber diese nicht wirklich bearbeitet oder weiterverarbeitet. Die Struktur passt überhaupt nicht. z.b. Rechnung RE20260006 von Marcus Hantke -- zur Kentniss??? bitte was? wiso wird das nicht zugeordent und bei eingangsrechnungen abgelegt ---- Ihre Kreditkarte wurde abgelehnt. - zur kenntniss?? Das ist eine so wichtige Information, Kira LMM soll dem ja hier in einem Fenster sofort mitteilen dass ich hier mal nachschauen soll ob alles ok ist um mir Vorschläge machen --- Rechnung für Microsoft 365 Business Standard einsehen  -  Diese Nachricht Kam 2 mal, Kira Hat Sie zweimal unterschiedlich eingestuft Komma weil sie mit den Regeln nicht klar kam, deshalb aktiv LLM - Solche Nachrichten Das sind aber Hat die Zukunft trotzdem wichtig dass man sie irgendwo schon vorbereitend hinlegt für die Buchhaltung Komma dass man Belege sammelt Und schon vorbereitet zum Bitte versenden einen lexoffice oder schaut, Ob es dann bei Anbindung Der Lex Office Totschan Einträge gibt Komma oder ob es Nachrichten gibt die schon an lexoffice oder invoicefetcher gesendet wurden, aber ohne sich nur auf die beiden zu beschränken.  --- 
+
+
+
+* Aw: AW: Aw: AW: Neue Betonkosmetik Anfrage (Landing) – Anna Berres kein Handlungsbedarf??? bedanken für die Information an frau Berres könnte man hier vorschlagen, gleich mit einem text, Und einer benachrichtigung, Hallo Kai Komma oder , der gerade angemeldet ist , hier ist eine Antwort von dein Angebot oder Der preisaufstellung von.. (hier halt auch wieder die verknüfung zur kompletten korospontens) von Anna Berres, 
+* Nachfass 1/3: A-SB260092 — Elwira und David Wendel
+
+&#x09;Angebot A-SB260092 ist 41 Tage offen (5,965.71 EUR). Nachfass 1 ist fällig.
+
+&#x09;➜ Höfliche Nachfass-Mail senden (Vorlage nutzen)   ----- der auftrag ist bereits fertig und bezahlt.. das macht hier kein sinn.. wieder nur stumpf diese mail betrachtet, keinen bezug zu anderen hergestellt, es gibt unzählige weitere Nachrichten und verläufe.. 
+
+
+
+* Nachfass 1/3: A-SB260093 — etna GmbH
+
+Angebot A-SB260093 ist 41 Tage offen (36,928.31 EUR). Nachfass 1 ist fällig.
+
+➜ Höfliche Nachfass-Mail senden (Vorlage nutzen)   ---- hier steht z.b. im text dass sie das Angebot gelesen haben und erstmal bis sommer zurückstellen, aufgrund der höhe, hier sinnvolle sachen machen, Termin erstellen, und automatisch dem user im sommer sagen, frag doch noch einmal nach, jetzt wäre ein guter Zeitpunkt, gleich mit erstellten vorschlag zum senden --- und wenn diese Nachricht kommt, dann auch gleich antwort vorschlagen, hier user, das Kam gerade rein Komma ist aber noch nicht vom Tisch Leo bedanken uns erst mal hier hast du gleich eine Vorlage Und ich erinnere dich dann im Sondern noch einmal daran Punkt den Termin habe ich Mehr gemerkt und Werde dich aktiv erinnern
+
+
+
+
+
+\#####  Kira und kira llm Schaut nicht Aktiv bei Eingang einer Nachricht in allen anderen Nachrichten Ob es da Verbindungen gibt, es wird stumpf nur Die eine Nachricht genommen Und dann einfach Kommentare hingeschrieben und nix weiter gemacht, das ist nicht mein ziel.. ich finde so habe ich viel mehr arbeit als hätte ich nur mein Postfach bei Outlook. Kira sollte ja meine Assistenz sein, Ach so habe ich tatsächlich viel mehr Arbeit als vorher Das ist nicht der Sinn dahinter
+
+
+
+
+
+Ich hoffe Dass meine Beispiele dir zeigen , was ich meine, Es gibt natürlich noch unheimlich viele weitere Beispiele aber die können ja schon mal verdreuchten wie ich das gerne hätte und was sie jetzt nicht tut.
+
+
+
+Cool wäre es Wenn es tatsächlich wieso ein aktiv Fenster gibt, Dass das Modell Wenn das im hintergrund arbeitet Und ich vor dem PC sitze( gibt ja heute sensoren in den PCs oder man kann einen anbinden) das das merkt, Und dann direkt mit mir kommuniziert, trotzdem die Übersichten bedient und alles einschreibt wo es hin muss Und alles ausfüllt und alles vorbereitet und die Diagnosen erstellt Komma soll alles weitere Hintergrund geschehen, Aber Schön wäre es Wenn das einmal aktiv Fenster Gibt Wo sie dann Ja schreibt Ja schau mal Das das oder das ist eingetroffen was wollen wir machen damit. dann schon vorschläge..  Ja habe ich das schaut ihr das mal an hab schon vorbereitet …. Und wenn man dann Aktiv mit ihr arbeitet und Punkte Bearbeitet, werden die dann aktiv im Hintergrund In die Datenbanken geschrieben oder irgendwo zu dokumentiert Dass man immer wieder damit Arbeiten kann Wie das hier auch vorgesehen ist. Wenn es irgendetwas gibt Was man Bei mir einbauen kann Unter Umsätzen Komma ich bin für Vorschläge offen.
+
+
+
+Ansonsten Erst mal zur Ersten Aufgabe oben, Bräuchte ich ein Konzept Auf mein System angepasst das ist ja schon gibt Was das wirklich verbessert Die Agentenstruktur Aufbereitet. Bitte recherchiere dafür wie man das In meinem Fall umsetzen kann. sei es Mehrere Agentur gleichzeitig einsetzen Oder Strukturen entsetzen oder Verknüpfungen setzen Komma ich habe keine Ahnung du bist da Experte Bitte helf mir die richtige Lösung zu finden das Das Unternehmen wirklich Aktiv unterstützt wird. 
+
+
+
+
+
+
 
 
 

@@ -97,7 +97,9 @@
         "Entwürfe",
         "Gelöschte Elemente"
       ]
-    }
+    },
+    "geloeschte_bereinigung_aktiv": true,
+    "bereinigung_frist_tage": 90
   },
   "llm": {
     "_kommentar": "Kira KI-Assistent Einstellungen. API Key wird separat in secrets.json gespeichert.",
@@ -163,7 +165,11 @@
   "mail_konten": {
     "standard_konto": "info@raumkult.eu",
     "postfach_zusatz_ordner": {
-      "info@raumkult.eu": []
+      "info@raumkult.eu": [
+        "Archiv",
+        "Aufgaben",
+        "Erneut erinnern aktiviert"
+      ]
     }
   },
   "mail_klassifizierung": {
@@ -172,7 +178,8 @@
     "ignore_newsletter": true
   },
   "mail_postfach": {
-    "refresh_intervall_min": 0
+    "refresh_intervall_min": 0,
+    "lese_markierung": "manuell"
   },
   "mail_konto_labels": {
     "kaimrf@rauMKultSichtbeton.onmicrosoft.com": "rauMKult Microsoft",

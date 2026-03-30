@@ -1911,7 +1911,13 @@ window.pfOpenMail = function(m, el) {
 function pfDoMarkRead(m) {
   if(_pfMarkReadTimer) clearTimeout(_pfMarkReadTimer);
   if(_pfMarkReadMode==='manuell') return;
-  const delay = _pfMarkReadMode==='5s'?5000:_pfMarkReadMode==='30s'?30000:0;
+  let delay = 0;
+  if(_pfMarkReadMode !== 'sofort') {
+    const minM = _pfMarkReadMode.match(/^(\d+)min$/);
+    const secM = _pfMarkReadMode.match(/^(\d+)s$/);
+    if(minM) delay = parseInt(minM[1]) * 60000;
+    else if(secM) delay = parseInt(secM[1]) * 1000;
+  }
   const doMark=()=>{
     fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[m.message_id],gelesen:true})});
     const itemEl=document.querySelector('[data-msgid="'+m.message_id+'"]');
@@ -3988,9 +3994,15 @@ function esShowProtoTab(id) {{
       <div class="es-row-label"><span>Als gelesen markieren</span><span class="es-row-hint">Wann eine ge&ouml;ffnete Mail automatisch als gelesen gilt</span></div>
       <select id="cfg-lese-markierung" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text);cursor:pointer">
         <option value="sofort">Sofort beim &Ouml;ffnen</option>
+        <option value="1s">Nach 1 Sekunde</option>
+        <option value="3s">Nach 3 Sekunden</option>
         <option value="5s">Nach 5 Sekunden</option>
+        <option value="10s">Nach 10 Sekunden</option>
         <option value="30s">Nach 30 Sekunden</option>
-        <option value="manuell">Nur manuell</option>
+        <option value="60s">Nach 1 Minute</option>
+        <option value="2min">Nach 2 Minuten</option>
+        <option value="5min">Nach 5 Minuten</option>
+        <option value="manuell">Nur manuell (nur per Klick)</option>
       </select>
     </div>
     <div class="es-row" style="border-bottom:none">
