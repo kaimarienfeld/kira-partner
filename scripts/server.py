@@ -833,7 +833,7 @@ def build_postfach():
         <div class="pf-rbn-group">
           <div class="pf-rbn-actions">
             <button class="pf-rbn-tool" id="pf-rb-compose" onclick="pfOpenCompose()" title="Neue Mail verfassen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 11.2603V7.608L12.348 12.6644C12.13 12.7785 11.87 12.7785 11.652 12.6644L2 7.608V15.75L2.00514 15.9344C2.10075 17.6435 3.51697 19 5.25 19H11.717C11.9006 18.5781 12.1624 18.1927 12.4903 17.8648L18.3927 11.9624C19.3679 10.9871 20.8037 10.7531 22 11.2603ZM18.75 3H5.25L5.06409 3.00523C3.46432 3.09545 2.17386 4.34271 2.01619 5.92355L12 11.1533L21.9838 5.92355C21.8201 4.28191 20.4347 3 18.75 3ZM19.0999 12.6695L13.1974 18.5719C12.8533 18.916 12.6092 19.3472 12.4911 19.8194L12.0334 21.6501C11.8344 22.4462 12.5556 23.1674 13.3517 22.9683L15.1824 22.5106C15.6545 22.3926 16.0857 22.1485 16.4299 21.8043L22.3323 15.9019C23.2249 15.0093 23.2249 13.5621 22.3323 12.6695C21.4397 11.7768 19.9925 11.7768 19.0999 12.6695Z"/></svg>
               <span>Neue Mail</span>
             </button>
           </div>
@@ -843,15 +843,15 @@ def build_postfach():
         <div class="pf-rbn-group">
           <div class="pf-rbn-actions">
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-reply" onclick="pfReply()" title="Antworten">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.707 6.707a1 1 0 1 0-1.414-1.414l-5 5a1 1 0 0 0 0 1.414l5 5a1 1 0 0 0 1.414-1.414L6.414 12H13a5 5 0 0 1 5 5 1 1 0 1 0 2 0 7 7 0 0 0-7-7H6.414l3.293-3.293Z"/></svg>
               <span>Antworten</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-replyall" onclick="pfReplyAll()" title="Allen antworten">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.707 5.293a1 1 0 0 1 0 1.414L5.414 11H13a7 7 0 0 1 7 7 1 1 0 1 1-2 0 5 5 0 0 0-5-5H5.414l4.293 4.293a1 1 0 0 1-1.414 1.414l-6-6a1 1 0 0 1 0-1.414l6-6a1 1 0 0 1 1.414 0Zm5 0a1 1 0 0 1 0 1.414L11.414 10H13a7 7 0 0 1 7 7 1 1 0 1 1-2 0 5 5 0 0 0-5-5h-1.586l3.293 3.293a1 1 0 0 1-1.414 1.414l-5-5a1 1 0 0 1 0-1.414l5-5a1 1 0 0 1 1.414 0Z"/></svg>
               <span>Allen</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-forward" onclick="pfForward()" title="Weiterleiten">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14.293 6.707a1 1 0 0 1 1.414-1.414l5 5a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414-1.414L17.586 12H11a5 5 0 0 0-5 5 1 1 0 1 1-2 0 7 7 0 0 1 7-7h6.586l-3.293-3.293Z"/></svg>
               <span>Weiterleiten</span>
             </button>
           </div>
@@ -861,31 +861,31 @@ def build_postfach():
         <div class="pf-rbn-group">
           <div class="pf-rbn-actions">
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-read" onclick="pfRibbonToggleRead()" title="Gelesen/Ungelesen umschalten">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.809 2.34a2 2 0 0 1 2.382 0L21.04 7.67c.06.045.118.093.171.144L12 12.15 2.79 7.814A2 2 0 0 1 2.963 7.67L10.81 2.34ZM2.049 8.615A2.01 2.01 0 0 0 2 9.082V16.75A3.25 3.25 0 0 0 5.25 20h13.5A3.25 3.25 0 0 0 22 16.75V9.082c0-.16-.017-.317-.05-.472L12.35 13.66a1 1 0 0 1-.7 0L2.05 8.615Z"/></svg>
               <span>Gelesen</span>
             </button>
-            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-flag" onclick="pfRibbonToggleFlag()" title="Kennzeichnen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            <button class="pf-rbn-tool pf-rbn-mail-dep pf-rbn-accent-orange" id="pf-rb-flag" onclick="pfRibbonToggleFlag()" title="Kennzeichnen">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3.748a.75.75 0 0 1 .75-.75H20.25a.625.625 0 0 1 .459 1.05l-4.164 5.5 4.164 5.5a.625.625 0 0 1-.459 1.05H4.5v5.25a.75.75 0 0 1-1.5 0V3.748Z"/></svg>
               <span>Kennzeichnen</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-pin" onclick="pfRibbonTogglePin()" title="Anheften">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.068 7.758 16.242 2.932c-1.327-1.327-3.565-.964-4.404 1.714L9.403 8.517a1 1 0 0 1-.427.474L4.81 10.33a1 1 0 0 0-.476 1.065l3.105 3.106L3 19.939 3 21h1.061l4.44-4.44 3.104 3.105a1 1 0 0 0 1.065-.476l2.44-4.166a1 1 0 0 1 .474-.427l4.87-2.363c2.678-.84 3.041-3.078 1.714-4.405Z"/></svg>
               <span>Anheften</span>
             </button>
-            <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-delete" onclick="pfRibbonDelete()" title="Löschen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <button class="pf-rbn-tool pf-rbn-mail-dep pf-rbn-accent-red" id="pf-rb-delete" onclick="pfRibbonDelete()" title="Löschen">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 5h4a2 2 0 1 0-4 0ZM8.5 5a3.5 3.5 0 1 1 7 0h5.25a.75.75 0 0 1 0 1.5h-1.32l-1.17 12.111A3.75 3.75 0 0 1 14.515 22H9.485a3.75 3.75 0 0 1-3.744-3.389L4.57 6.5H3.25a.75.75 0 0 1 0-1.5H8.5Zm1.25 4.75a.75.75 0 0 0-1.5 0v7.5a.75.75 0 0 0 1.5 0v-7.5Zm4.5 0a.75.75 0 0 0-1.5 0v7.5a.75.75 0 0 0 1.5 0v-7.5Z"/></svg>
               <span>Löschen</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-move" onclick="pfOpenVerschiebenMenu(this)" title="Verschieben">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 8V6.25A3.25 3.25 0 0 1 5.25 3h2.879a2 2 0 0 1 1.414.586L10.836 5H2Zm0 1.5v8.25A3.25 3.25 0 0 0 5.25 21h6.772A5.5 5.5 0 0 1 11 17.5c0-3.59 2.91-6.5 6.5-6.5 1.246 0 2.41.35 3.4.956V8.75A3.25 3.25 0 0 0 17.65 5.5h-4.898L11.25 9.5H2ZM23 17.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Zm-9 0c0 .276.224.5.5.5h5.293l-1.647 1.646a.5.5 0 0 0 .708.708l2.5-2.5a.5.5 0 0 0 0-.708l-2.5-2.5a.5.5 0 0 0-.708.708L19.793 17H14.5a.5.5 0 0 0-.5.5Z"/></svg>
               <span>Verschieben</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-mail-dep pf-rbn-prep" id="pf-rb-archive" onclick="pfToastVorbereitung('Archivieren')" title="Archivieren (in Vorbereitung)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h15A1.5 1.5 0 0 1 21 4.5V6a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 6V4.5ZM4 9h16v8.25A3.75 3.75 0 0 1 16.25 21H7.75A3.75 3.75 0 0 1 4 17.25V9Zm5.5 2.75a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5h-5Z"/></svg>
               <span>Archivieren</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-prep" id="pf-rb-rules" onclick="pfToastVorbereitung('Regeln/Sweep')" title="Regeln/Sweep (in Vorbereitung)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 17a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2h-4ZM8 12a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8ZM5 7a1 1 0 0 0 0 2h14a1 1 0 1 0 0-2H5Z"/></svg>
               <span>Regeln</span>
             </button>
           </div>
@@ -895,11 +895,11 @@ def build_postfach():
         <div class="pf-rbn-group">
           <div class="pf-rbn-actions">
             <button class="pf-rbn-tool pf-rbn-mail-dep" id="pf-rb-snooze" onclick="pfOpenSnoozeMenu(this)" title="Erneut erinnern / Snooze">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2Zm0 1.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17ZM12 6a.75.75 0 0 1 .75.75V12h3a.75.75 0 0 1 0 1.5h-3.75a.75.75 0 0 1-.75-.75v-6A.75.75 0 0 1 12 6Z"/></svg>
               <span>Erinnern</span>
             </button>
             <button class="pf-rbn-tool pf-rbn-prep" id="pf-rb-print" onclick="pfToastVorbereitung('Drucken')" title="Drucken (in Vorbereitung)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 17.5v1.25A2.25 2.25 0 0 1 15.75 21H8.25A2.25 2.25 0 0 1 6 18.75V17.5H4.25A2.25 2.25 0 0 1 2 15.25V9.254a3.25 3.25 0 0 1 3.25-3.25H6V5.25A2.25 2.25 0 0 1 8.25 3h7.5A2.25 2.25 0 0 1 18 5.25V6h.75A3.25 3.25 0 0 1 22 9.254v5.996A2.25 2.25 0 0 1 19.75 17.5H18Zm-10.5-4v5.25c0 .414.336.75.75.75h7.5a.75.75 0 0 0 .75-.75V13.5h-9Zm9-8.25a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75V6h9V5.25Z"/></svg>
               <span>Drucken</span>
             </button>
           </div>
@@ -909,7 +909,7 @@ def build_postfach():
         <div class="pf-rbn-group">
           <div class="pf-rbn-actions">
             <button class="pf-rbn-tool pf-rbn-kira pf-rbn-mail-dep" id="pf-rb-kira" onclick="pfKiraMailContext()" title="Mit Kira besprechen">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2Zm0 2a8 8 0 1 0 0 16A8 8 0 0 0 12 4Zm0 9.5c1.74 0 3.41.81 4.5 2.18a.75.75 0 1 1-1.16.94A4.48 4.48 0 0 0 12 15a4.48 4.48 0 0 0-3.34 1.62.75.75 0 1 1-1.16-.94A5.98 5.98 0 0 1 12 13.5ZM9.5 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm5 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></svg>
               <span>Kira fragen</span>
             </button>
           </div>
@@ -1122,7 +1122,7 @@ def build_postfach():
 
 <style>
 /* ── Postfach Shell ─────────────────────────────────────── */
-.pf-shell{display:flex;height:calc(100vh - 56px - var(--pf-ribbon-h,48px));overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
+.pf-shell{display:flex;height:calc(100vh - 56px - var(--pf-ribbon-h,80px));overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
 /* LEFT SIDEBAR */
 .pf-left{width:var(--pf-left-w);min-width:160px;max-width:380px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
 .pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -1133,7 +1133,7 @@ def build_postfach():
 .pf-fav-section{padding:10px 14px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
 .pf-fav-item{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;cursor:pointer;font-size:12px;color:var(--text);transition:background .12s;border-left:3px solid transparent}
 .pf-fav-item:hover{background:var(--bg-hover)}
-.pf-fav-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
+.pf-fav-item.active{background:rgba(59,130,246,.15);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
 .pf-fav-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700}
 .pf-fav-sep{height:1px;background:var(--border);margin:6px 0}
 /* Account headers */
@@ -1146,7 +1146,7 @@ def build_postfach():
 /* Folder items */
 .pf-folder-item{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;cursor:pointer;font-size:13px;color:var(--text);border-left:3px solid transparent;transition:background .12s}
 .pf-folder-item:hover{background:var(--bg-hover)}
-.pf-folder-item.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
+.pf-folder-item.active{background:rgba(59,130,246,.15);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
 .pf-folder-badge{margin-left:auto;color:#0ea5e9;font-size:11px;font-weight:700;min-width:16px;text-align:right}
 /* MIDDLE LIST */
 .pf-mid{width:var(--pf-mid-w);min-width:240px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
@@ -1225,7 +1225,7 @@ def build_postfach():
 /* Combined Inbox button */
 .pf-combined-btn{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text);font-weight:600;border-bottom:1px solid var(--border);transition:background .12s;border-left:3px solid transparent}
 .pf-combined-btn:hover{background:var(--bg-hover)}
-.pf-combined-btn.active{background:rgba(59,130,246,.09);border-left-color:#3b82f6;color:#3b82f6}
+.pf-combined-btn.active{background:rgba(59,130,246,.15);border-left-color:#3b82f6;color:#3b82f6;font-weight:600}
 .pf-combined-cfg{padding:8px 14px;border-bottom:1px solid var(--border);display:none;background:var(--bg-raised)}
 .pf-combined-cfg label{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer}
 /* Light mode — white backgrounds */
@@ -1241,8 +1241,13 @@ def build_postfach():
 [data-theme="light"] .pf-prev-body{background:#ffffff}
 [data-theme="light"] .pf-preview-empty{background:#ffffff}
 [data-theme="light"] .pf-folder-item:hover{background:#f3f4f6}
+[data-theme="light"] .pf-folder-item.active{background:#dbeafe;border-left-color:#2563eb;color:#1d4ed8}
+[data-theme="light"] .pf-folder-item.active .pf-fi-icon{color:#2563eb}
 [data-theme="light"] .pf-fav-item:hover{background:#f3f4f6}
+[data-theme="light"] .pf-fav-item.active{background:#dbeafe;border-left-color:#2563eb;color:#1d4ed8}
+[data-theme="light"] .pf-fav-item.active .pf-fi-icon{color:#2563eb}
 [data-theme="light"] .pf-combined-btn:hover{background:#f3f4f6}
+[data-theme="light"] .pf-combined-btn.active{background:#dbeafe;border-left-color:#2563eb;color:#1d4ed8}
 [data-theme="light"] .pf-combined-cfg{background:#f8f9fa}
 [data-theme="light"] .pf-item-folder-badge{background:#f3f4f6;border-color:rgba(0,0,0,.09)}
 /* Star/Favourite toggle on folder items */
@@ -1333,38 +1338,52 @@ def build_postfach():
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── RIBBON ─────────────────────────────────────────────── */
-:root{--pf-ribbon-h:48px}
+:root{--pf-ribbon-h:80px}
 .pf-ribbon-wrap{background:var(--bg-raised);border-bottom:1px solid var(--border);height:var(--pf-ribbon-h);flex-shrink:0;overflow:hidden}
-.pf-ribbon{display:flex;align-items:stretch;height:100%;user-select:none}
+.pf-ribbon{display:flex;align-items:stretch;height:100%;user-select:none;padding-left:6px}
 .pf-rbn-viewport{flex:1;overflow:hidden;position:relative}
 .pf-rbn-inner{display:flex;align-items:stretch;height:100%;transition:transform .22s ease;will-change:transform}
-.pf-rbn-group{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0}
-.pf-rbn-actions{display:flex;align-items:center;gap:1px;flex:1;padding-top:4px}
-.pf-rbn-label{font-size:9.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:2px 0 3px;white-space:nowrap}
-.pf-rbn-sep{width:1px;background:var(--border);height:70%;align-self:center;flex-shrink:0;margin:0 4px}
-.pf-rbn-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px 7px;border-radius:6px;color:var(--text-muted);font-size:10.5px;min-width:44px;transition:background .1s,color .1s;flex-shrink:0}
-.pf-rbn-tool svg{width:18px;height:18px;display:block;flex-shrink:0}
+.pf-rbn-group{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 12px;flex-shrink:0}
+.pf-rbn-actions{display:flex;align-items:center;gap:2px;flex:1;padding-top:4px}
+.pf-rbn-label{font-size:11px;color:var(--text-muted);letter-spacing:.02px;padding:4px 0 6px;white-space:nowrap;font-weight:400}
+.pf-rbn-sep{width:1px;background:var(--border);height:58%;align-self:center;flex-shrink:0;margin:0 12px}
+.pf-rbn-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:none;cursor:pointer;padding:7px 11px;border-radius:6px;color:var(--text-muted);font-size:11px;min-width:56px;transition:background .15s,color .15s;flex-shrink:0;font-weight:400;letter-spacing:.01em}
+.pf-rbn-tool svg{width:24px;height:24px;display:block;flex-shrink:0;transition:color .15s;fill:currentColor}
 .pf-rbn-tool span{line-height:1;white-space:nowrap}
-.pf-rbn-tool:hover{background:var(--bg-hover);color:var(--text)}
+.pf-rbn-tool:hover{background:rgba(0,120,212,.08);color:#0078d4}
 .pf-rbn-tool.disabled{opacity:.38;cursor:default;pointer-events:none}
-.pf-rbn-tool.pf-rbn-prep{opacity:.55}
+.pf-rbn-tool.pf-rbn-prep{opacity:.5}
 .pf-rbn-tool.pf-rbn-prep:hover{opacity:1}
-.pf-rbn-kira{background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(109,40,217,.08))!important;color:#7c3aed!important;border-radius:7px!important}
-.pf-rbn-kira:hover{background:linear-gradient(135deg,rgba(124,58,237,.22),rgba(109,40,217,.18))!important;color:#6d28d9!important}
+/* Accent colors for specific actions */
+.pf-rbn-tool.pf-rbn-accent-orange:not(:hover){color:#ca5010}
+.pf-rbn-tool.pf-rbn-accent-red:not(:hover){color:#c4314b}
+.pf-rbn-kira{background:linear-gradient(135deg,#7c3aed,#4f46e5)!important;color:#fff!important;border-radius:22px!important;box-shadow:0 2px 12px rgba(79,70,229,.38)!important;padding:8px 20px!important;min-width:auto!important;gap:8px!important;letter-spacing:.02em!important;font-weight:600!important;font-size:12px!important}
+.pf-rbn-kira:hover{background:linear-gradient(135deg,#8b5cf6,#7c3aed)!important;color:#fff!important;box-shadow:0 5px 20px rgba(79,70,229,.6)!important;transform:translateY(-1px)!important}
+.pf-rbn-kira svg{width:20px!important;height:20px!important;color:#fff!important;fill:#fff!important;opacity:1!important}
 .pf-rbn-edge{background:none;border:none;cursor:pointer;padding:0 8px;color:var(--text-muted);font-size:20px;display:flex;align-items:center;transition:color .1s;flex-shrink:0}
 .pf-rbn-edge:hover{color:var(--text)}
 .pf-rbn-toggle{background:none;border:none;cursor:pointer;padding:0 10px;color:var(--text-muted);font-size:12px;display:flex;align-items:center;border-left:1px solid var(--border);flex-shrink:0;transition:color .1s}
 .pf-rbn-toggle:hover{color:var(--text)}
 /* Compact mode: icon-only, no labels, smaller */
-.pf-ribbon.compact{--pf-ribbon-h:38px}
+.pf-ribbon.compact{--pf-ribbon-h:44px}
 .pf-ribbon.compact .pf-rbn-label{display:none}
-.pf-ribbon.compact .pf-rbn-tool{padding:4px 5px;min-width:34px;gap:0}
-.pf-ribbon.compact .pf-rbn-tool svg{width:16px;height:16px}
+.pf-ribbon.compact .pf-rbn-tool{padding:5px 7px;min-width:38px;gap:0}
+.pf-ribbon.compact .pf-rbn-tool svg{width:20px;height:20px}
 .pf-ribbon.compact .pf-rbn-tool span{display:none}
 .pf-ribbon.compact .pf-rbn-actions{padding-top:0}
+.pf-ribbon.compact .pf-rbn-group{padding:0 6px}
 /* Responsive: compact auto on narrow screens */
-@media(max-width:900px){.pf-ribbon:not(.compact){--pf-ribbon-h:38px}.pf-ribbon:not(.compact) .pf-rbn-label{display:none}.pf-ribbon:not(.compact) .pf-rbn-tool{padding:4px 5px;min-width:34px}.pf-ribbon:not(.compact) .pf-rbn-tool svg{width:16px;height:16px}.pf-ribbon:not(.compact) .pf-rbn-tool span{display:none}.pf-ribbon:not(.compact) .pf-rbn-actions{padding-top:0}}
-[data-theme="light"] .pf-ribbon-wrap{background:#f8f9fa}
+@media(max-width:900px){.pf-ribbon:not(.compact){--pf-ribbon-h:44px}.pf-ribbon:not(.compact) .pf-rbn-label{display:none}.pf-ribbon:not(.compact) .pf-rbn-tool{padding:4px 5px;min-width:36px}.pf-ribbon:not(.compact) .pf-rbn-tool svg{width:20px;height:20px}.pf-ribbon:not(.compact) .pf-rbn-tool span{display:none}.pf-ribbon:not(.compact) .pf-rbn-actions{padding-top:0}}
+/* Light mode — elegant white ribbon */
+[data-theme="light"] .pf-ribbon-wrap{background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.08),0 0 0 1px rgba(0,0,0,.05)}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-label{color:#5f6368}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-sep{background:#e0e0e0}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-tool{color:#444746}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-tool:hover{background:#e8f0fe;color:#1a73e8}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-toggle{color:#5f6368;border-left-color:#e0e0e0}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-toggle:hover{color:#1a73e8;background:#e8f0fe}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-edge{color:#5f6368}
+[data-theme="light"] .pf-ribbon-wrap .pf-rbn-edge:hover{color:#1a73e8}
 
 /* ── DETAIL FRAME (Mail-Lesefläche) ──────────────────────── */
 .pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden}
@@ -1529,16 +1548,15 @@ function pfInit() {
   pfRibbonInit(); // init fixed ribbon
   _pfInitToolbar(); // bind preview toolbar buttons
   fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
-    pfRenderFolders(data);
     document.getElementById('pf-folders-loading').style.display='none';
     pfLoadHealth(); // Ampeln laden
-    // Auto-select: Standardkonto bevorzugen, sonst erstes Konto
+    // Auto-select: Standardkonto bevorzugen, sonst erstes Konto — NACH DOM-Aufbau in onReady-Callback
     const stdEmail = data.standard_konto || '';
     const autoKonto = (stdEmail && data.konten?.find(k=>k.email===stdEmail)) || data.konten?.[0];
-    if(autoKonto) {
-      const ib = autoKonto.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || autoKonto.ordner?.[0];
-      if(ib) pfSelectFolder(autoKonto.email, ib.name, ib.label||ib.name);
-    }
+    const autoIb = autoKonto && (autoKonto.ordner?.find(o=>o.name.toLowerCase().includes('inbox')||o.name.toLowerCase().includes('posteingang')) || autoKonto.ordner?.[0]);
+    pfRenderFolders(data, ()=>{
+      if(autoKonto && autoIb) pfSelectFolder(autoKonto.email, autoIb.name, autoIb.label||autoIb.name);
+    });
     // Periodisches Refresh: Unread-Badge + Ampeln (Intervall aus Einstellungen)
     if(_pfRefreshTimer) clearInterval(_pfRefreshTimer);
     fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{
@@ -2040,7 +2058,7 @@ function pfReplyAll() {
   pfReply(); // reuse pfReply — To: is the sender; CC from the mail can be added manually
 }
 
-function pfRenderFolders(data) {
+function pfRenderFolders(data, onReady) {
   _pfFolderData = data; // cache for re-render after star toggle
   const tree = document.getElementById('pf-folder-tree');
   const fromSel = document.getElementById('pf-comp-from');
@@ -2193,6 +2211,7 @@ function pfRenderFolders(data) {
     });
 
     _pfUpdateSidebarBadge();
+    if(onReady) onReady();
   });
 }
 
