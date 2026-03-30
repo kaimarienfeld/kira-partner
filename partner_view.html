@@ -1589,7 +1589,7 @@ async function pushToGitHub() {
     const getData=await getResp.json();
     const sha=getData.sha;
     if (!sha){throw new Error('Kein SHA vom Server — Datei nicht gefunden?');}
-    syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})','ok');
+    syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})`, 'ok');
     // Robust UTF-8 → base64 decode
     const b64decode = b64 => {
       const bin = atob(b64.replace(/\s/g,''));
