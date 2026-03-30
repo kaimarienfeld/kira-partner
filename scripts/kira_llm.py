@@ -650,6 +650,16 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
     except Exception:
         pass
 
+    # Offene Vorgänge (Case Engine) — Paket 7, session-nn
+    try:
+        from case_engine import get_vorgang_summary_for_kira
+        vs = get_vorgang_summary_for_kira(limit=8)
+        if vs and vs.strip():
+            prompt += f"\n\nOFFENE VORGÄNGE (Case Engine):\n{vs}\n"
+            prompt += "\nNutze vorgang_kontext_laden für den vollständigen Kontext eines Vorgangs.\n"
+    except Exception:
+        pass
+
     return prompt
 
 
@@ -1158,6 +1168,48 @@ def get_tools(config=None):
             }
         })
 
+    # ── Vorgang-Tool (Paket 7, session-nn) ───────────────────────────────────
+    tools.append({
+        "name": "vorgang_kontext_laden",
+        "description": (
+            "Lädt den vollständigen Vorgang-Kontext: verknüpfte Mails, Tasks, Angebote, Rechnungen + "
+            "Statushistorie. Nutze dies IMMER wenn Kai über einen Kunden oder laufenden Vorgang spricht, "
+            "um den kompletten Sachstand zu kennen. Kann auch alle offenen Vorgänge eines Kunden "
+            "oder eine Gesamt-Übersicht liefern."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "vorgang_id": {
+                    "type": "integer",
+                    "description": "Vorgang-ID für Detailansicht (V-2026-0001 → ID aus der DB)"
+                },
+                "kunden_email": {
+                    "type": "string",
+                    "description": "Kunden-E-Mail — gibt alle offenen Vorgänge dieses Kunden zurück"
+                },
+            }
+        }
+    })
+
+    tools.append({
+        "name": "vorgang_status_setzen",
+        "description": (
+            "Setzt den Status eines Vorgangs (z.B. 'angebot_versendet', 'angenommen', 'abgeschlossen'). "
+            "Nur erlaubte Statusübergänge sind möglich — das Tool gibt erlaubte Optionen zurück wenn "
+            "ein Übergang nicht möglich ist."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "vorgang_id": {"type": "integer", "description": "Vorgang-ID"},
+                "neuer_status": {"type": "string", "description": "Neuer Status (z.B. 'angenommen', 'abgeschlossen')"},
+                "grund": {"type": "string", "description": "Grund oder Notiz zum Statuswechsel"}
+            },
+            "required": ["vorgang_id", "neuer_status"]
+        }
+    })
+
     return tools
 
 
@@ -1204,6 +1256,8 @@ def execute_tool(name, params):
             "runtime_log_suchen": _tool_runtime_log_suchen,
             "mail_suchen": _tool_mail_suchen,
             "mail_lesen": _tool_mail_lesen,
+            "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
+            "vorgang_status_setzen": _tool_vorgang_status_setzen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -1785,6 +1839,83 @@ def _tool_mail_lesen(p):
         f"--- Mailinhalt ---\n{text[:15000]}"
     )
     return {"ok": True, "message": msg}
+
+
+# ── Vorgang-Tools (Paket 7, session-nn) ──────────────────────────────────────
+
+def _tool_vorgang_kontext_laden(p):
+    """Lädt Vorgang-Kontext — nach ID, Kunden-E-Mail oder Gesamt-Übersicht."""
+    try:
+        from case_engine import get_vorgang_context, get_open_vorgaenge, get_vorgang_summary_for_kira
+        vid   = p.get("vorgang_id")
+        email = (p.get("kunden_email") or "").strip()
+
+        if vid:
+            ctx = get_vorgang_context(int(vid))
+            v = ctx.get("vorgang")
+            if not v:
+                return {"error": f"Vorgang {vid} nicht gefunden"}
+            lines = [
+                f"Vorgang {v['vorgang_nr']} — {v['typ'].upper()} | Status: {v['status']}",
+                f"Titel: {v['titel']}",
+                f"Kunde: {v.get('kunden_name') or ''} <{v.get('kunden_email') or ''}>",
+                f"Erstellt: {v['erstellt_am'][:10]}  Konto: {v.get('konto') or '—'}",
+            ]
+            history = ctx.get("status_history", [])
+            if history:
+                lines.append(f"\nStatusverlauf ({len(history)} Einträge):")
+                for h in history[-5:]:
+                    lines.append(f"  {h['geaendert_am'][:16]}: {h['von_status']} → {h['zu_status']} ({h.get('actor','?')})")
+            tasks = ctx.get("tasks", [])
+            if tasks:
+                lines.append(f"\nVerknüpfte Tasks ({len(tasks)}):")
+                for t in tasks[:5]:
+                    lines.append(f"  [T{t['id']}] {t['status']} — {t['titel'][:60]}")
+            links = ctx.get("links", [])
+            mails = [l for l in links if l['entitaet_typ'] == 'mail']
+            if mails:
+                lines.append(f"\nVerknüpfte Mails: {len(mails)}")
+            return {"ok": True, "message": "\n".join(lines), "kontext": ctx}
+
+        elif email:
+            vorgaenge = get_open_vorgaenge(kunden_email=email, limit=20)
+            if not vorgaenge:
+                return {"ok": True, "message": f"Keine offenen Vorgänge für {email}"}
+            lines = [f"Offene Vorgänge für {email} ({len(vorgaenge)}):"]
+            for v in vorgaenge:
+                lines.append(f"  [{v['id']}] {v['vorgang_nr']} {v['typ'].upper()} | {v['status']} | {v['titel'][:50]}")
+            return {"ok": True, "message": "\n".join(lines), "vorgaenge": vorgaenge}
+
+        else:
+            summary = get_vorgang_summary_for_kira(limit=10)
+            return {"ok": True, "message": summary or "Keine offenen Vorgänge"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_vorgang_status_setzen(p):
+    """Setzt den Status eines Vorgangs über die Case Engine."""
+    try:
+        from case_engine import update_status, get_valid_transitions, get_vorgang
+        vid          = p.get("vorgang_id")
+        neuer_status = (p.get("neuer_status") or "").strip()
+        grund        = (p.get("grund") or "").strip()
+        if not vid or not neuer_status:
+            return {"error": "vorgang_id und neuer_status erforderlich"}
+        v = get_vorgang(int(vid))
+        if not v:
+            return {"error": f"Vorgang {vid} nicht gefunden"}
+        ok = update_status(int(vid), neuer_status, grund=grund, actor="kira")
+        if ok:
+            return {"ok": True, "message": f"Vorgang {v['vorgang_nr']}: Status → {neuer_status}"}
+        erlaubt = get_valid_transitions(v["typ"], v["status"])
+        return {
+            "error": f"Übergang '{v['status']}' → '{neuer_status}' nicht erlaubt",
+            "erlaubte_uebergaenge": erlaubt,
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────

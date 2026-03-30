@@ -139,6 +139,92 @@ def get_db():
     db.row_factory = sqlite3.Row
     return db
 
+def _ensure_case_engine_tables():
+    """Erstellt Case-Engine-Tabellen falls noch nicht vorhanden (session-nn)."""
+    db = sqlite3.connect(str(TASKS_DB))
+    try:
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS vorgaenge (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                vorgang_nr          TEXT UNIQUE,
+                typ                 TEXT NOT NULL,
+                status              TEXT NOT NULL DEFAULT 'neu',
+                titel               TEXT,
+                kunden_email        TEXT,
+                kunden_name         TEXT,
+                konto               TEXT,
+                betrag              REAL,
+                betrag_waehrung     TEXT DEFAULT 'EUR',
+                prioritaet          TEXT DEFAULT 'mittel',
+                entscheidungsstufe  TEXT DEFAULT 'B',
+                konfidenz           REAL DEFAULT 0.5,
+                quelle              TEXT DEFAULT 'mail',
+                erstellt_am         TEXT DEFAULT CURRENT_TIMESTAMP,
+                aktualisiert_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+                abgeschlossen_am    TEXT,
+                erwartet_bis        TEXT,
+                notiz               TEXT,
+                letzter_status_grund TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_vg_typ      ON vorgaenge(typ);
+            CREATE INDEX IF NOT EXISTS idx_vg_status   ON vorgaenge(status);
+            CREATE INDEX IF NOT EXISTS idx_vg_email    ON vorgaenge(kunden_email);
+            CREATE INDEX IF NOT EXISTS idx_vg_erstellt ON vorgaenge(erstellt_am);
+
+            CREATE TABLE IF NOT EXISTS vorgang_links (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                vorgang_id      INTEGER NOT NULL,
+                entitaet_typ    TEXT NOT NULL,
+                entitaet_id     TEXT NOT NULL,
+                rolle           TEXT,
+                erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_vl_vorgang  ON vorgang_links(vorgang_id);
+            CREATE INDEX IF NOT EXISTS idx_vl_entitaet ON vorgang_links(entitaet_typ, entitaet_id);
+
+            CREATE TABLE IF NOT EXISTS vorgang_status_history (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                vorgang_id      INTEGER NOT NULL,
+                alter_status    TEXT,
+                neuer_status    TEXT,
+                grund           TEXT,
+                actor           TEXT DEFAULT 'system',
+                erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_vsh_vorgang ON vorgang_status_history(vorgang_id);
+
+            CREATE TABLE IF NOT EXISTS vorgang_signals (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                vorgang_id      INTEGER,
+                stufe           TEXT NOT NULL,
+                titel           TEXT,
+                nachricht       TEXT,
+                typ             TEXT,
+                payload_json    TEXT,
+                angezeigt       INTEGER DEFAULT 0,
+                aktion          TEXT,
+                erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_vs_angezeigt ON vorgang_signals(angezeigt);
+            CREATE INDEX IF NOT EXISTS idx_vs_stufe     ON vorgang_signals(stufe);
+        """)
+        for migration in [
+            "ALTER TABLE tasks ADD COLUMN vorgang_id INTEGER",
+            "ALTER TABLE tasks ADD COLUMN snooze_until TEXT",
+            "ALTER TABLE ausgangsrechnungen ADD COLUMN vorgang_id INTEGER",
+            "ALTER TABLE angebote ADD COLUMN vorgang_id INTEGER",
+        ]:
+            try:
+                db.execute(migration)
+            except Exception:
+                pass
+        db.commit()
+    finally:
+        db.close()
+
 def esc(s):
     return str(s or "").replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;')
 
@@ -9937,6 +10023,97 @@ window.onerror = function(msg, src, line, col, err) {{
   if(btn) btn.title = 'JS OK \u2013 Server neu starten';
   document.title = document.title.replace(' \u2013 ', ' \u2713 \u2013 ');
 }})();
+
+/* ── Vorgang-Signal-Polling (Paket 8, session-nn) ── */
+(function() {
+  'use strict';
+
+  // Inject CSS für Toast + Modal
+  const _css = document.createElement('style');
+  _css.textContent = `
+#_vg-toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.vg-toast{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#333);border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;min-width:280px;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:all;cursor:pointer;animation:_vgSlideIn .25s ease}
+.vg-toast.stufe-c{border-left-color:#ef4444}
+.vg-toast-title{font-size:12px;font-weight:600;opacity:.65;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.vg-toast-body{font-size:13px;line-height:1.4}
+.vg-toast-close{float:right;opacity:.4;cursor:pointer;font-size:16px;line-height:1;margin:-2px -4px 0 8px}
+.vg-toast-close:hover{opacity:.9}
+@keyframes _vgSlideIn{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
+#_vg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center}
+#_vg-modal{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#444);border-top:4px solid #ef4444;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+#_vg-modal h3{margin:0 0 8px;font-size:17px}
+#_vg-modal p{margin:0 0 20px;font-size:14px;opacity:.8;line-height:1.5;white-space:pre-wrap}
+#_vg-modal .modal-btns{display:flex;gap:10px;justify-content:flex-end}
+#_vg-modal button{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600}
+#_vg-modal .btn-ok{background:#ef4444;color:#fff}
+#_vg-modal .btn-snooze{background:var(--btn-bg,#2a2a2a);color:var(--text,#e0e0e0);border:1px solid var(--border,#444)}
+  `;
+  document.head.appendChild(_css);
+
+  // Toast Container
+  const _tc = document.createElement('div');
+  _tc.id = '_vg-toast-container';
+  document.body.appendChild(_tc);
+
+  let _shownSignals = new Set();
+  let _modalOpen = false;
+
+  function _markGelesen(signal_id, aktion) {
+    fetch('/api/vorgang/signal/gelesen', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({signal_id, aktion})
+    }).catch(()=>{});
+  }
+
+  function _showToast(sig) {
+    const t = document.createElement('div');
+    t.className = 'vg-toast' + (sig.stufe === 'C' ? ' stufe-c' : '');
+    t.innerHTML =
+      '<span class="vg-toast-close" title="Schließen">&#10005;</span>' +
+      '<div class="vg-toast-title">Vorgang ' + (sig.stufe === 'C' ? '&#9888; Aktion erforderlich' : '&#9432; Hinweis') + '</div>' +
+      '<div class="vg-toast-body">' + sig.titel + (sig.nachricht ? '<br><small style="opacity:.7">' + sig.nachricht.split('\\n')[0] + '</small>' : '') + '</div>';
+    _tc.appendChild(t);
+    t.querySelector('.vg-toast-close').onclick = e => { e.stopPropagation(); _markGelesen(sig.id, 'geschlossen'); t.remove(); };
+    t.onclick = () => { _markGelesen(sig.id, 'geklickt'); t.remove(); };
+    setTimeout(() => { if(t.parentNode) { _markGelesen(sig.id, 'auto_timeout'); t.remove(); } }, 12000);
+  }
+
+  function _showModal(sig) {
+    if (_modalOpen) return;
+    _modalOpen = true;
+    const ov = document.createElement('div');
+    ov.id = '_vg-modal-overlay';
+    ov.innerHTML =
+      '<div id="_vg-modal">' +
+      '<h3>&#9888; ' + sig.titel + '</h3>' +
+      '<p>' + (sig.nachricht || '') + '</p>' +
+      '<div class="modal-btns">' +
+      '<button class="btn-snooze" id="_vgSnooze">Später</button>' +
+      '<button class="btn-ok" id="_vgOk">Verstanden</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_vgOk').onclick = () => { _markGelesen(sig.id, 'bestaetigt'); ov.remove(); _modalOpen = false; };
+    ov.querySelector('#_vgSnooze').onclick = () => { _markGelesen(sig.id, 'snoozed'); ov.remove(); _modalOpen = false; };
+  }
+
+  async function _pollSignals() {
+    try {
+      const r = await fetch('/api/vorgang/signals?limit=5');
+      if (!r.ok) return;
+      const d = await r.json();
+      (d.signals || []).forEach(sig => {
+        if (_shownSignals.has(sig.id)) return;
+        _shownSignals.add(sig.id);
+        if (sig.stufe === 'C') _showModal(sig);
+        else _showToast(sig);
+      });
+    } catch(e) {}
+  }
+
+  // Polling: 10s Intervall, erster Check nach 5s
+  setTimeout(() => { _pollSignals(); setInterval(_pollSignals, 10000); }, 5000);
+})();
 </script>
 </body>
 </html>"""
@@ -11267,6 +11444,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/browse/folder':
             self._api_browse_folder()
+
+        # ── Presence-API (Paket 9, session-nn) ───────────────────────────────
+        elif self.path == '/api/presence':
+            try:
+                from presence_detector import get_idle_seconds, is_user_present
+                idle = get_idle_seconds()
+                self._json({"ok": True, "idle_seconds": idle, "present": is_user_present()})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+
+        # ── Vorgang-API (Paket 6, session-nn) ────────────────────────────────
+        elif self.path == '/api/vorgaenge' or self.path.startswith('/api/vorgaenge?'):
+            self._api_vorgaenge_list()
+
+        elif self.path == '/api/vorgang/signals':
+            self._api_vorgang_signals()
+
+        elif self.path.startswith('/api/vorgang/kunde/'):
+            self._api_vorgang_kunde()
+
+        elif re.match(r'^/api/vorgang/\d+$', self.path):
+            self._api_vorgang_detail()
 
         else:
             self._respond(404, 'text/plain', b'Not found')
@@ -14242,6 +14441,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._handle_channel_webhook(body, kanal='instagram')
             return
 
+        # ── Vorgang-API POST (Paket 6, session-nn) ───────────────────────────
+        if self.path == '/api/vorgang/neu':
+            self._api_vorgang_neu(body)
+            return
+
+        if re.match(r'^/api/vorgang/\d+/status$', self.path):
+            self._api_vorgang_status(body)
+            return
+
+        if re.match(r'^/api/vorgang/\d+/link$', self.path):
+            self._api_vorgang_link(body)
+            return
+
+        if self.path == '/api/vorgang/signal/gelesen':
+            self._api_vorgang_signal_gelesen(body)
+            return
+
         self._respond(404, 'text/plain', b'Not found')
 
     def _handle_whatsapp_webhook(self, raw_body: bytes, body: dict):
@@ -14717,6 +14933,132 @@ class DashboardHandler(BaseHTTPRequestHandler):
         finally:
             db.close()
 
+    # ── Vorgang-API Implementierung (Paket 6, session-nn) ─────────────────────
+
+    def _api_vorgaenge_list(self):
+        """GET /api/vorgaenge[?typ=...&email=...&limit=50] — Offene Vorgänge."""
+        try:
+            from case_engine import get_open_vorgaenge
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            typ        = qs.get('typ',   [None])[0]
+            email      = qs.get('email', [None])[0]
+            limit      = int(qs.get('limit', ['50'])[0])
+            vorgaenge  = get_open_vorgaenge(typ=typ, kunden_email=email, limit=limit)
+            self._json({"ok": True, "vorgaenge": vorgaenge})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_detail(self):
+        """GET /api/vorgang/{id} — Vollständiger Kontext eines Vorgangs."""
+        try:
+            from case_engine import get_vorgang_context
+            vid = int(self.path.split('/')[-1])
+            ctx = get_vorgang_context(vid)
+            if ctx.get("vorgang") is None:
+                self._respond(404, 'application/json',
+                              json.dumps({"ok": False, "error": "Vorgang nicht gefunden"}).encode())
+                return
+            self._json({"ok": True, **ctx})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_kunde(self):
+        """GET /api/vorgang/kunde/{email} — Alle Vorgänge eines Kunden."""
+        try:
+            from case_engine import get_open_vorgaenge
+            email = urllib.parse.unquote(self.path.split('/api/vorgang/kunde/')[-1])
+            vorgaenge = get_open_vorgaenge(kunden_email=email, limit=100)
+            self._json({"ok": True, "email": email, "vorgaenge": vorgaenge})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_signals(self):
+        """GET /api/vorgang/signals — Ausstehende B/C-Signale (für Toast/Modal)."""
+        try:
+            from case_engine import get_pending_signals
+            qs     = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            limit  = int(qs.get('limit', ['5'])[0])
+            signals = get_pending_signals(max_count=limit)
+            self._json({"ok": True, "signals": signals})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_neu(self, body: dict):
+        """POST /api/vorgang/neu — Neuen Vorgang manuell anlegen."""
+        try:
+            from case_engine import create_vorgang
+            typ           = body.get("typ", "sonstiger_vorgang")
+            kunden_email  = body.get("kunden_email", "")
+            kunden_name   = body.get("kunden_name", "")
+            titel         = body.get("titel", "")
+            konfidenz     = float(body.get("konfidenz", 0.9))
+            konto         = body.get("konto")
+            quelle        = body.get("quelle", "manuell")
+            vid = create_vorgang(
+                typ=typ, kunden_email=kunden_email, kunden_name=kunden_name,
+                titel=titel, quelle=quelle, konfidenz=konfidenz,
+                konto=konto, entscheidungsstufe="A",
+            )
+            self._json({"ok": True, "vorgang_id": vid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_status(self, body: dict):
+        """POST /api/vorgang/{id}/status — Statusübergang."""
+        try:
+            from case_engine import update_status, get_valid_transitions, get_vorgang
+            vid = int(re.search(r'/api/vorgang/(\d+)/status', self.path).group(1))
+            neuer_status = body.get("status", "")
+            grund        = body.get("grund", "")
+            actor        = body.get("actor", "kai")
+            if not neuer_status:
+                self._json({"ok": False, "error": "status fehlt"})
+                return
+            v = get_vorgang(vid)
+            if v is None:
+                self._json({"ok": False, "error": "Vorgang nicht gefunden"})
+                return
+            ok = update_status(vid, neuer_status, grund=grund, actor=actor)
+            if ok:
+                self._json({"ok": True, "vorgang_id": vid, "neuer_status": neuer_status})
+            else:
+                erlaubt = get_valid_transitions(v["typ"], v["status"])
+                self._json({"ok": False, "error": f"Übergang nicht erlaubt",
+                            "erlaubte_uebergaenge": erlaubt,
+                            "aktueller_status": v["status"]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_link(self, body: dict):
+        """POST /api/vorgang/{id}/link — Entität mit Vorgang verknüpfen."""
+        try:
+            from case_engine import link_entity
+            vid          = int(re.search(r'/api/vorgang/(\d+)/link', self.path).group(1))
+            entitaet_typ = body.get("entitaet_typ", "")
+            entitaet_id  = str(body.get("entitaet_id", ""))
+            rolle        = body.get("rolle", "zugehoerig")
+            if not entitaet_typ or not entitaet_id:
+                self._json({"ok": False, "error": "entitaet_typ und entitaet_id erforderlich"})
+                return
+            link_id = link_entity(vid, entitaet_typ, entitaet_id, rolle=rolle)
+            self._json({"ok": True, "link_id": link_id})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_vorgang_signal_gelesen(self, body: dict):
+        """POST /api/vorgang/signal/gelesen — Signal als angezeigt markieren."""
+        try:
+            from case_engine import mark_signal_shown
+            signal_id = int(body.get("signal_id", 0))
+            aktion    = body.get("aktion", "gesehen")
+            if not signal_id:
+                self._json({"ok": False, "error": "signal_id fehlt"})
+                return
+            mark_signal_shown(signal_id, aktion)
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _html(self, html: str):
         b = html.encode('utf-8', errors='replace')
         self._respond(200, 'text/html; charset=utf-8', b)
@@ -14785,6 +15127,7 @@ def run_server(open_browser=True):
     auto_open = config.get("server", {}).get("auto_open_browser", True)
 
     _kill_old_instances(port)
+    _ensure_case_engine_tables()
     rlog_ensure_cfg()
     alog("Server", "Start", f"Port {port} | Python {__import__('sys').version.split()[0]}", "ok")
     rlog('system', 'server_started', f"Kira Dashboard gestartet auf Port {port}",
@@ -14796,6 +15139,14 @@ def run_server(open_browser=True):
 
     if open_browser and auto_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+
+    # Signal-Watcher für Desktop-Overlays starten (Paket 9, session-nn)
+    try:
+        from activity_window import start_signal_watcher
+        start_signal_watcher()
+        print("[Signal-Watcher] Desktop-Overlay aktiv (15s Intervall)")
+    except Exception as _sw_err:
+        print(f"[Signal-Watcher] Nicht verfügbar: {_sw_err}")
 
     # Mail-Monitor starten (Echtzeit-IMAP-Polling)
     monitor_cfg = config.get("mail_monitor", {})

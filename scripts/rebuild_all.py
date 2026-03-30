@@ -73,13 +73,16 @@ def rebuild_schema(db):
             konfidenz         TEXT DEFAULT 'mittel',
             mit_termin        INTEGER DEFAULT 0,
             manuelle_pruefung INTEGER DEFAULT 0,
-            beantwortet       INTEGER DEFAULT 0
+            beantwortet       INTEGER DEFAULT 0,
+            vorgang_id        INTEGER,
+            snooze_until      TEXT
         );
-        CREATE INDEX idx_tasks_status ON tasks(status);
-        CREATE INDEX idx_tasks_typ    ON tasks(typ);
-        CREATE INDEX idx_tasks_kat    ON tasks(kategorie);
-        CREATE INDEX idx_tasks_email  ON tasks(kunden_email);
-        CREATE INDEX idx_tasks_msgid  ON tasks(message_id);
+        CREATE INDEX idx_tasks_status   ON tasks(status);
+        CREATE INDEX idx_tasks_typ      ON tasks(typ);
+        CREATE INDEX idx_tasks_kat      ON tasks(kategorie);
+        CREATE INDEX idx_tasks_email    ON tasks(kunden_email);
+        CREATE INDEX idx_tasks_msgid    ON tasks(message_id);
+        CREATE INDEX idx_tasks_vorgang  ON tasks(vorgang_id);
 
         CREATE TABLE task_kira_context (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,7 +237,88 @@ def rebuild_schema(db):
         );
         CREATE INDEX IF NOT EXISTS idx_lh_datum ON loeschhistorie(geloescht_am);
         CREATE INDEX IF NOT EXISTS idx_lh_konto ON loeschhistorie(konto);
+
+        -- ── Case Engine (session-nn) ───────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS vorgaenge (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            vorgang_nr          TEXT UNIQUE,
+            typ                 TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'neu',
+            titel               TEXT,
+            kunden_email        TEXT,
+            kunden_name         TEXT,
+            konto               TEXT,
+            betrag              REAL,
+            betrag_waehrung     TEXT DEFAULT 'EUR',
+            prioritaet          TEXT DEFAULT 'mittel',
+            entscheidungsstufe  TEXT DEFAULT 'B',
+            konfidenz           REAL DEFAULT 0.5,
+            quelle              TEXT DEFAULT 'mail',
+            erstellt_am         TEXT DEFAULT CURRENT_TIMESTAMP,
+            aktualisiert_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+            abgeschlossen_am    TEXT,
+            erwartet_bis        TEXT,
+            notiz               TEXT,
+            letzter_status_grund TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_vg_typ      ON vorgaenge(typ);
+        CREATE INDEX IF NOT EXISTS idx_vg_status   ON vorgaenge(status);
+        CREATE INDEX IF NOT EXISTS idx_vg_email    ON vorgaenge(kunden_email);
+        CREATE INDEX IF NOT EXISTS idx_vg_erstellt ON vorgaenge(erstellt_am);
+
+        CREATE TABLE IF NOT EXISTS vorgang_links (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            vorgang_id      INTEGER NOT NULL,
+            entitaet_typ    TEXT NOT NULL,
+            entitaet_id     TEXT NOT NULL,
+            rolle           TEXT,
+            erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_vl_vorgang  ON vorgang_links(vorgang_id);
+        CREATE INDEX IF NOT EXISTS idx_vl_entitaet ON vorgang_links(entitaet_typ, entitaet_id);
+
+        CREATE TABLE IF NOT EXISTS vorgang_status_history (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            vorgang_id      INTEGER NOT NULL,
+            alter_status    TEXT,
+            neuer_status    TEXT,
+            grund           TEXT,
+            actor           TEXT DEFAULT 'system',
+            erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_vsh_vorgang ON vorgang_status_history(vorgang_id);
+
+        CREATE TABLE IF NOT EXISTS vorgang_signals (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            vorgang_id      INTEGER,
+            stufe           TEXT NOT NULL,
+            titel           TEXT,
+            nachricht       TEXT,
+            typ             TEXT,
+            payload_json    TEXT,
+            angezeigt       INTEGER DEFAULT 0,
+            aktion          TEXT,
+            erstellt_am     TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (vorgang_id) REFERENCES vorgaenge(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_vs_angezeigt ON vorgang_signals(angezeigt);
+        CREATE INDEX IF NOT EXISTS idx_vs_stufe     ON vorgang_signals(stufe);
     """)
+
+    # Migrations für Bestands-Tabellen (vorgang_id Spalte)
+    for migration in [
+        "ALTER TABLE ausgangsrechnungen ADD COLUMN vorgang_id INTEGER",
+        "ALTER TABLE angebote ADD COLUMN vorgang_id INTEGER",
+        "ALTER TABLE tasks ADD COLUMN vorgang_id INTEGER",
+        "ALTER TABLE tasks ADD COLUMN snooze_until TEXT",
+    ]:
+        try:
+            db.execute(migration)
+        except Exception:
+            pass  # Spalte existiert bereits
+
     db.commit()
 
 

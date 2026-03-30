@@ -1,5 +1,5 @@
 {
-  "last_session": "session-ll",
+  "last_session": "session-nn",
   "date": "2026-03-30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
@@ -30,7 +30,8 @@
     "session-hh (2026-03-30): IMAP-Postfach + Ordner-System Komplett-Umbau. (1) Phase 0: _ensure_geloeschte_protokoll_table() + geloeschte_protokoll Tabelle in tasks.db. (2) Phase 1: mail_monitor.py — _get_sync_ordner(), _ordner_erlaubt() config-basiert (kein hardcoded ORDNER_EINSCHLIESSEN mehr), Entwürfe+Gelöschte jetzt verdrahtet. (3) Phase 2: /api/mail/konto/postfach-ordner (POST), /api/mail/verschieben (POST), /api/mail/protokoll (GET). (4) Phase 3: /api/mail/folders komplett neu — Live-IMAP mit _decode_imap_utf7() (RFC 3501 Modified UTF-7), 60s Cache, DB-Fallback, Kira-/Zusatz-Ordner-Split. (5) Phase 4: JS-Frontend — zwei Panels (Screenshot 1: Zusätzliche Postfach-Ordner, Screenshot 2: Sync-Ordner), _pfCurrentMsgId, pfOpenVerschiebenMenu()/pfVerschiebenNach(), showKritischModal() bei Deaktivieren. (6) Phase 5: archiv_cleanup.py — tägl. Bereinigung von Gelöschte-Ordnern (EML+Attachments löschen, mail.json bleibt), geloeschte_protokoll Eintrag (300 Zeichen), tägl. Background-Thread in run_server() + daily_check.py Integration. (7) Phase 6: kira_llm.py _build_data_context() — GELÖSCHTE MAILS PROTOKOLL Sektion (letzte 20, mit Kurzinhalt). (8) Phase 7: Tests — UTF-7 Fix, postfach-ordner add/remove, protokoll-Endpoint, dry-run cleanup. 3 Bugs gefunden+gefixt: UTF-7-Decoding fehlte, ordner-als-Liste-Handling, _ensure_geloeschte_protokoll_table nur on-demand.",
     "session-jj (2026-03-30): Vollständige System-Analyse + Bugfixes (10 Fehler). (1) _analyse/KIRA_SYSTEM_ANALYSE.md erstellt: vollständige Feature/LLM/DB/Mail-Architektur-Dokumentation. (2) ISS-021: kira_llm.py Standard-Modell claude-sonnet-4-20250514 → claude-sonnet-4-6. (3) ISS-020: ARCHIV_ROOT in daily_check.py + build_databases.py + ARCHIVER_DIR in mail_monitor.py jetzt aus config.json gelesen mit Fallback. KNOWLEDGE_DIR in build_databases.py relativ zu __file__. (4) ISS-019: kira_proaktiv.py — Logging-Handler wenn kein Handler vorhanden (Daemon-Modus war bisher stumm). (5) ISS-018: task_manager.py — try/finally um alle schreibenden DB-Operationen. (6) ISS-003: server.py — alle 7 SyntaxWarnings behoben (JS-Regex-Escapes: \\d→\\\\d, \\s→\\\\s, \\(→\\\\(, \\)→\\\\), \\.→\\\\., \\/→\\\\/).",
     "session-kk (2026-03-30): Postfach Mail-Rendering + Kira-Kontext-Integration. (A1) iframe height fix: min-height:0 + iframe-mode CSS + overflow:hidden — iframe füllt jetzt kompletten Preview-Bereich. (A2) Text-Rendering: HTML-Entities dekodieren + HTML-in-Text als iframe. (B4) GET /api/mail/kira-kontext: EML-Volltext + letzte 5 Absender-Mails + offene Tasks nach Absender-Domain. (B1) Kira-Button prominent lila (gradient #7c3aed), Glow, Kira-Augen-Icon. (B2) pfKiraMailContext(): openKiraWorkspace statt showPanel, Lade-Spinner, Ladetext, Auto-Send mit 5000 Zeichen + Verlauf + Tasks. (B3) kiraSetQuickActions mail-Typ.",
-    "session-ll (2026-03-30): Automatisches Modell-Validierungs-System. kira_llm.py: ModelNotFoundError, _MODEL_CACHE/TTL, _send_ntfy_push(), _fetch_provider_models() (24h-Cache, GET /v1/models + /api/tags für alle Provider-Typen), _model_in_list() (Prefix-Match für dated snapshots), _validate_model(), _auto_update_model() (config.json + ntfy Push + elog), validate_all_providers() (state-file). _call_anthropic() + _call_openai_compat() fangen Modell-404/NotFoundError → sofortiger Auto-Update → ModelNotFoundError → Fallback auf nächsten Provider. server.py: Import erweitert, POST /api/kira/provider/check-models Endpoint, 🟡 Status-Icon bei veraltetem Modell, 🔍 Modell-Button pro Provider-Karte, Stale-Infozeile (gelb + reason + empfohlenes Modell), checkProviderModel() JS-Funktion, _model_validation_loop (20s Delay + 24h-Intervall). KIRA_SYSTEM_ANALYSE.md: Aktualisiert mit session-kk+ll Änderungen, neue Sektion 3.5, alle behobenen Bugs markiert, neue Endpunkte, Prioritäts-Matrix."
+    "session-ll (2026-03-30): Automatisches Modell-Validierungs-System. kira_llm.py: ModelNotFoundError, _MODEL_CACHE/TTL, _send_ntfy_push(), _fetch_provider_models() (24h-Cache, GET /v1/models + /api/tags für alle Provider-Typen), _model_in_list() (Prefix-Match für dated snapshots), _validate_model(), _auto_update_model() (config.json + ntfy Push + elog), validate_all_providers() (state-file). _call_anthropic() + _call_openai_compat() fangen Modell-404/NotFoundError → sofortiger Auto-Update → ModelNotFoundError → Fallback auf nächsten Provider. server.py: Import erweitert, POST /api/kira/provider/check-models Endpoint, 🟡 Status-Icon bei veraltetem Modell, 🔍 Modell-Button pro Provider-Karte, Stale-Infozeile (gelb + reason + empfohlenes Modell), checkProviderModel() JS-Funktion, _model_validation_loop (20s Delay + 24h-Intervall). KIRA_SYSTEM_ANALYSE.md: Aktualisiert mit session-kk+ll Änderungen, neue Sektion 3.5, alle behobenen Bugs markiert, neue Endpunkte, Prioritäts-Matrix.",
+    "session-nn (2026-03-30): KIRA Case Engine + Multi-Agent-Architektur komplett implementiert. (1) DB: vorgaenge/vorgang_links/vorgang_status_history/vorgang_signals Tabellen + vorgang_id in tasks/angebote/ausgangsrechnungen. (2) case_engine.py: dict-basierte Statusmaschinen für 10 Vorgangstypen (transitions-kompatibel), vollständige CRUD-API, Entscheidungsstufe A/B/C-Logik, Signal-Queue, Vorgang-Summary für Kira-Kontext. (3) vorgang_router.py: Thin Routing-Layer Mail-Klassifizierung → Vorgang, Kategorie→Typ-Mapping. (4) mail_monitor.py + daily_check.py: Beide Task-INSERT-Stellen mit Router verdrahtet. (5) server.py: 8 neue Vorgang-API-Endpoints + /api/presence + Signal-Polling-JS (Toast Stufe-B, Modal Stufe-C). (6) kira_llm.py: vorgang_kontext_laden + vorgang_status_setzen Tools + System-Prompt Vorgang-Übersicht. (7) presence_detector.py: Windows ctypes GetLastInputInfo (idle detection). (8) activity_window.py: tkinter -topmost Desktop-Overlay + Signal-Watcher-Thread. (9) case_engine_backfill.py: Backfill für Rechnungen/Angebote/Tasks (--dry-run, idempotent)."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -96,26 +97,40 @@
     "modell-validierung-auto-update-system",
     "model-not-found-provider-fallback",
     "check-models-api-endpoint",
-    "model-stale-ui-warnung"
+    "model-stale-ui-warnung",
+    "case-engine-db-schema",
+    "case-engine-status-machines-10-typen",
+    "case-engine-signal-queue",
+    "vorgang-router-mail-integration",
+    "vorgang-api-8-endpoints",
+    "kira-tool-vorgang-kontext-laden",
+    "kira-tool-vorgang-status-setzen",
+    "vorgang-system-prompt-erweiterung",
+    "signal-polling-toast-modal-js",
+    "presence-detector-windows-ctypes",
+    "activity-window-desktop-overlay",
+    "signal-watcher-thread",
+    "case-engine-backfill-script"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ können vom User manuell gelöscht werden (aus session-cc)",
     "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
-    "ISS-003: SyntaxWarnings — BEHOBEN (session-jj)",
     "Google OAuth noch nicht verdrahtet",
     "Provider-Persistierung nach OAuth-Login fehlt",
     "SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2)",
     "geloeschte_protokoll-Anzeige in Einstellungen-UI fehlt noch",
     "Zu Kira hinzufügen-Button aus Postfach (Ordner direkt zu sync_ordner hinzufügen)",
-    "bereinigung_frist_tage / geloeschte_bereinigung_aktiv noch nicht in Einstellungen-UI"
+    "bereinigung_frist_tage / geloeschte_bereinigung_aktiv noch nicht in Einstellungen-UI",
+    "case_engine_backfill.py noch nicht ausgeführt — erst --dry-run, dann live: python case_engine_backfill.py --dry-run",
+    "Vorgang-Übersicht im Dashboard noch nicht eingebaut (nur API + Kira-Tool vorhanden)"
   ],
-  "next_step": "Modell-Validierung nach Server-Neustart testen (knowledge/model_validation_state.json prüfen). Offene UX: geloeschte_protokoll-Anzeige in Einstellungen, bereinigung_frist_tage, Google OAuth.",
+  "next_step": "Server neu starten → Signal-Watcher + Case Engine testen. Dann: python case_engine_backfill.py --dry-run ausführen um Backfill-Kandidaten zu sehen.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
     "runtime_events.db wird automatisch beim ersten Server-Start erstellt",
     "activity_log.py NICHT anfassen — Backward-Compat (ADR-001)",
-    "server.py hat ~9450 Zeilen — vor Arbeit server_map.md lesen!",
+    "server.py hat ~15600 Zeilen (nach session-nn) — vor Arbeit server_map.md lesen!",
     "build_einstellungen() gibt ~55KB HTML zurück (neue es-* Architektur). esShowSec(id) wechselt Sektionen, esShowProtoTab(id) wechselt Protokoll-Tabs.",
     "kira_llm.py: validate_all_providers() schreibt knowledge/model_validation_state.json — wird beim Build der Provider-Karten in Einstellungen eingelesen (🟡-Icon).",
     "neustart_kira.vbs liegt in memory/scripts/ — Windows-Error beim Start ist harmlos",
@@ -133,7 +148,10 @@
     "active_budget_model: Python-Variable in build_einstellungen(), iteriert über providers bis erster aktiver mit status='ok' gefunden. _BUDGET_DISPLAY dict maps provider typ → model string.",
     "IMAP-Ordnernamen kommen von Exchange/Office365 in Modified UTF-7 (RFC 3501): Entw&APw-rfe statt Entwürfe. _decode_imap_utf7() in server.py decodiert das. Ohne Decoding schlagen Vergleiche mit config.json-Ordnernamen fehl.",
     "_ensure_geloeschte_protokoll_table() muss am Anfang jedes Endpunkts aufgerufen werden der die Tabelle braucht (ist nur on-demand, NICHT beim Server-Start). Aktuell in _api_mail_folders() + _api_mail_protokoll().",
-    "_api_mail_konto_postfach_ordner(): ordner muss String sein (nicht Array). Der Handler normalisiert jetzt Listen aber sendet als Single-String. JS sendet Ordnernamen einzeln (aktiv=true/false statt komplette Liste)."
+    "_api_mail_konto_postfach_ordner(): ordner muss String sein (nicht Array). Der Handler normalisiert jetzt Listen aber sendet als Single-String. JS sendet Ordnernamen einzeln (aktiv=true/false statt komplette Liste).",
+    "Case Engine: tasks.thread_id = internes 'T{id}' Format (NICHT mail_index.db.thread_id aus IMAP-Headers). Nie vertauschen!",
+    "Case Engine Backfill: case_engine_backfill.py erst mit --dry-run testen! Idempotent — überspringt Datensätze mit vorhandener vorgang_id.",
+    "Signal-Polling in Browser: alle 10s GET /api/vorgang/signals. Toast für Stufe-B (12s Timeout), Modal für Stufe-C (muss bestätigt werden). mark_signal_shown() mit aktion='gesehen'/'geklickt'/'bestaetigt'/'snoozed'."
   ],
   "tracking_files": {
     "user_briefs": "user_briefs.md — Original-Aufträge (session-g bis j eingetragen)",

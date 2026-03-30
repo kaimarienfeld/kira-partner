@@ -219,3 +219,27 @@ Commit: 66241b0
 **Status:** erledigt
 
 ---
+
+
+## 2026-03-30 — Session-Start (session-mm)
+**Auftrag:** Postfach / Mail-Arbeitsfläche Komplett-Umbau nach neuen HTML-Vorlagen (02_postfach_action_ribbon_v4.html, 02_postfach_attachment_bar_v1.html, 02_postfach_mail_viewer_states_v1.html, 02_postfach_mail_detail_header_v1.html, 02_postfach_mail_detail_focus_v1.html, 02_postfach_thread_hints_v1.html, 02_postfach_image_gallery_viewer_v1.html). Ziele: (1) Feste Hauptleiste/Ribbon über Postfach (Outlook-Style, Vollmodus/Kompaktmodus mit Pfeil, keine Scrollbalken). (2) Alle Ribbon-Aktionen funktional anbinden. (3) Mail-Kopfbereich neu nach Vorlage (Betreff dekodiert, Avatar, Name/E-Mail, Datum rechts, Aktionen). (4) Mail-Viewer-Zustände (HTML/Text/Blockiert mit State-Chips + Trust-Banner). (5) Thread-Hinweise als Chips (geantwortet/weitergeleitet/Wiedervorlage/Kira/erledigt). (6) Anhang-Leiste: eingeklappt by default, aufklappbar mit Vorschau/Aktionen. (7) Bild-Galerie-Viewer. (8) Kira- und Logging-Anbindung für alle Mail-Aktionen.
+**Status:** erledigt (siehe Commits 4010271, 3571077 — Fluent UI Ribbon + Mail & Konten Tabs + E-Mail-Signaturen)
+
+---
+
+## 2026-03-30 18:00 — Session-Start (session-nn)
+
+**Auftrag:** Großer Architektur-Umbau: KIRA Case Engine + Multi-Agent-System. Arbeitsanweisung: `_archiv/arbeitsanweisung_claude_case_engine_multiagent.md`. Kernziel: Weg von Einzelmail-Verarbeitung, hin zu vorgangs- und entscheidungsbasierter Arbeitslogik. Neue Vorgangslogik (cases), Verknüpfungsschicht (Mail+Rechnung+Angebot+Kunde+Task), Statusmaschinen pro Vorgangstyp, 3 Entscheidungsstufen (A/B/C), Aktivfenster/Aktive-Assistenz, Präsenz-Logik, Kira-Workspace korrekt verdrahten.
+**Status:** erledigt
+
+**Erledigt:**
+- Paket 1: rebuild_all.py — 4 neue Tabellen (vorgaenge, vorgang_links, vorgang_status_history, vorgang_signals), vorgang_id + snooze_until in tasks
+- Paket 2: case_engine.py — dict-basierte Statusmaschinen für 10 Vorgangstypen, vollständige CRUD-API, Signal-Queue, transitions-kompatible Signaturen
+- Paket 3: vorgang_router.py — Routing-Layer zwischen Mail-Klassifizierung und Case Engine (Stufe A/B/C)
+- Paket 4+5: mail_monitor.py + daily_check.py — beide Task-INSERT-Stellen mit Router-Integration verdrahtet (commit + route call)
+- Paket 6: server.py — 7 neue Vorgang-API Endpoints (GET /api/vorgaenge, /api/vorgang/{id}, /api/vorgang/kunde/{email}, /api/vorgang/signals, POST /api/vorgang/neu, /{id}/status, /{id}/link, /signal/gelesen)
+- Paket 7: kira_llm.py — 2 neue Tools (vorgang_kontext_laden, vorgang_status_setzen), System-Prompt um offene Vorgänge erweitert
+- Paket 8: server.py — Signal-Polling-JS (10s), Toast für Stufe-B, Modal für Stufe-C, CSS-Injection im Dashboard
+- Paket 9: presence_detector.py (Windows ctypes GetLastInputInfo), activity_window.py (tkinter -topmost Desktop-Overlay), Signal-Watcher-Thread + /api/presence Endpoint
+- Paket 10: case_engine_backfill.py — Backfill für Rechnungen/Angebote/Tasks mit --dry-run Option, idempotent
+**Offen geblieben:** Backfill noch nicht ausgeführt (muss manuell als `python case_engine_backfill.py --dry-run` getestet werden).

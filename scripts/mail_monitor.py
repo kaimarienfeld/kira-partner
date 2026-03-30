@@ -971,6 +971,33 @@ def _process_mail(mail_data, konto_label, folder_name):
     finally:
         db.close()
 
+    # ── Case Engine: Vorgang-Routing (session-nn) ─────────────────────────────
+    try:
+        _tid = task_id_new  # NameError wenn Task-Insert fehlschlug → Router überspringen
+        from vorgang_router import route_classified_mail as _vr_route
+        _ke = re.search(r'<([^>]+@[^>]+)>', absender)
+        _kunden_email_vr = _ke.group(1).lower() if _ke else absender.strip().lower()
+        _kunden_name_vr  = (absender.split("<")[0].strip() if "<" in absender else "") or ""
+        _route_result = _vr_route(
+            task_id=_tid,
+            classification_result=result,
+            mail_message_id=msg_id,
+            kunden_email=_kunden_email_vr,
+            kunden_name=_kunden_name_vr,
+            konto=konto_label,
+            betreff=betreff,
+        )
+        if _route_result.get("stufe") in ("B", "C") and _route_result.get("vorgang_id"):
+            _elog('system', 'vorgang_signal',
+                  f"Vorgang-Signal Stufe {_route_result['stufe']}: {_route_result.get('vorgang_typ','')} | {betreff[:60]}",
+                  source='mail_monitor', modul='vorgang_router', actor_type='system',
+                  status='ok', context_id=msg_id)
+    except NameError:
+        pass  # task_id_new nicht gesetzt = Task-Insert fehlgeschlagen
+    except Exception as _ve:
+        _elog('system', 'vorgang_router_fehler', f"Router-Fehler: {_ve}",
+              source='mail_monitor', modul='vorgang_router', actor_type='system', status='fehler')
+
     # In kunden.db speichern
     try:
         kdb = sqlite3.connect(str(KUNDEN_DB))

@@ -1,0 +1,549 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+KIRA Case Engine — Kernmodul (session-nn)
+Vorgangslogik: Anlegen, Zuordnen, Status-Übergänge, Verknüpfungen, Kontext.
+
+Statusmaschinen: dict-basiert, transitions-Library-kompatible Schnittstelle
+vorbereitet (kann später mit `pip install transitions` umgestellt werden).
+
+Entscheidungsstufen:
+  A = still automatisch verarbeiten
+  B = Vorschlag erzeugen (SSE-Toast)
+  C = Aktivfenster (kritisch / unklar)
+"""
+import sqlite3, json
+from datetime import datetime
+from pathlib import Path
+
+SCRIPTS_DIR   = Path(__file__).parent
+KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
+TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
+
+# ── Statusmaschinen ───────────────────────────────────────────────────────────
+# Struktur: {vorgang_typ: {von_status: [gueltige_nachfolger]}}
+# transitions-Library-Vorbereitung: Die Transition-Dicts sind identisch zur
+# transitions.Machine-Syntax und können 1:1 übertragen werden.
+TRANSITIONS: dict[str, dict[str, list[str]]] = {
+    "lead": {
+        "neu":                    ["qualifiziert", "kein_bedarf", "archiviert"],
+        "qualifiziert":           ["angebot_gesendet", "antwort_vorbereitet", "kein_bedarf"],
+        "antwort_vorbereitet":    ["wartet_auf_rueckmeldung", "kein_bedarf"],
+        "wartet_auf_rueckmeldung":["angebot_gesendet", "termin_offen", "kein_bedarf", "archiviert"],
+        "angebot_gesendet":       ["gewonnen", "verloren", "kein_bedarf"],
+        "termin_offen":           ["angebot_gesendet", "kein_bedarf", "archiviert"],
+        "gewonnen":               ["abgeschlossen"],
+        "kein_bedarf":            ["archiviert"],
+        "verloren":               ["archiviert"],
+        "abgeschlossen":          [],
+        "archiviert":             [],
+    },
+    "angebot": {
+        "neu":             ["offen", "archiviert"],
+        "offen":           ["nachgefasst_1", "rueckmeldung", "zurueckgestellt", "verloren", "abgelehnt"],
+        "nachgefasst_1":   ["nachgefasst_2", "rueckmeldung", "zurueckgestellt", "verloren"],
+        "nachgefasst_2":   ["nachgefasst_3", "rueckmeldung", "zurueckgestellt", "verloren"],
+        "nachgefasst_3":   ["rueckmeldung", "nachfass_sommer", "verloren"],
+        "nachfass_sommer": ["rueckmeldung", "verloren", "archiviert"],
+        "zurueckgestellt": ["offen", "nachgefasst_1", "verloren", "archiviert"],
+        "rueckmeldung":    ["gewonnen", "verloren", "abgelehnt"],
+        "gewonnen":        ["umgesetzt"],
+        "umgesetzt":       ["abgeschlossen"],
+        "verloren":        ["archiviert"],
+        "abgelehnt":       ["archiviert"],
+        "abgeschlossen":   [],
+        "archiviert":      [],
+    },
+    "rechnung": {
+        "erkannt":    ["offen", "storniert"],
+        "offen":      ["zugeordnet", "ueberfaellig", "storniert"],
+        "zugeordnet": ["bezahlt", "ueberfaellig"],
+        "ueberfaellig":["mahnung_1", "bezahlt"],
+        "mahnung_1":  ["mahnung_2", "bezahlt"],
+        "mahnung_2":  ["mahnung_3", "bezahlt"],
+        "mahnung_3":  ["streitfall", "bezahlt"],
+        "teilbezahlt":["offen", "bezahlt"],
+        "bezahlt":    ["erledigt"],
+        "streitfall": ["erledigt", "archiviert"],
+        "storniert":  ["archiviert"],
+        "erledigt":   [],
+        "archiviert": [],
+    },
+    "eingangsrechnung": {
+        "eingegangen": ["geprueft", "abgelehnt"],
+        "geprueft":    ["freigegeben", "unklar", "abgelehnt"],
+        "freigegeben": ["bezahlt"],
+        "unklar":      ["geprueft", "abgelehnt"],
+        "bezahlt":     ["erledigt"],
+        "abgelehnt":   ["archiviert"],
+        "erledigt":    [],
+        "archiviert":  [],
+    },
+    "mahnung": {
+        "erkannt":   ["bewertet"],
+        "bewertet":  ["eskaliert", "ignoriert"],
+        "eskaliert": ["erledigt"],
+        "ignoriert": ["archiviert"],
+        "erledigt":  [],
+        "archiviert":[],
+    },
+    "zahlung": {
+        "erkannt":  ["gematcht", "ungeklaert"],
+        "gematcht": ["erledigt"],
+        "ungeklaert":["gematcht", "archiviert"],
+        "erledigt": [],
+        "archiviert":[],
+    },
+    "anfrage": {
+        "neu":           ["in_bearbeitung", "geschlossen"],
+        "in_bearbeitung":["geantwortet", "weitergeleitet", "geschlossen"],
+        "geantwortet":   ["erledigt"],
+        "weitergeleitet":["erledigt"],
+        "geschlossen":   ["archiviert"],
+        "erledigt":      [],
+        "archiviert":    [],
+    },
+    "projekt": {
+        "angefragt":   ["beauftragt", "abgebrochen"],
+        "beauftragt":  ["laufend"],
+        "laufend":     ["abgeschlossen", "abgebrochen"],
+        "abgeschlossen":["archiviert"],
+        "abgebrochen": ["archiviert"],
+        "archiviert":  [],
+    },
+    "termin": {
+        "erkannt":     ["bestaetigt", "abgesagt"],
+        "bestaetigt":  ["stattgefunden", "abgesagt"],
+        "stattgefunden":["erledigt"],
+        "abgesagt":    ["archiviert"],
+        "erledigt":    [],
+        "archiviert":  [],
+    },
+    "sonstiger_vorgang": {
+        "neu":      ["in_bearbeitung", "archiviert"],
+        "in_bearbeitung":["erledigt", "archiviert"],
+        "erledigt": [],
+        "archiviert":[],
+    },
+}
+
+# Status die als "abgeschlossen" gelten
+ABGESCHLOSSENE_STATUS = {
+    "abgeschlossen", "archiviert", "erledigt", "kein_bedarf",
+    "verloren", "abgelehnt", "storniert",
+}
+
+# Initiale Status pro Typ (= Startzustand)
+INITIAL_STATUS = {
+    "lead": "neu",
+    "angebot": "neu",
+    "rechnung": "erkannt",
+    "eingangsrechnung": "eingegangen",
+    "mahnung": "erkannt",
+    "zahlung": "erkannt",
+    "anfrage": "neu",
+    "projekt": "angefragt",
+    "termin": "erkannt",
+    "sonstiger_vorgang": "neu",
+}
+
+# ── transitions-kompatible Schnittstelle (Vorbereitung für spätere Library) ──
+def can_transition(vorgang_typ: str, von_status: str, zu_status: str) -> bool:
+    """Prüft ob ein Statusübergang erlaubt ist."""
+    return zu_status in TRANSITIONS.get(vorgang_typ, {}).get(von_status, [])
+
+def get_valid_transitions(vorgang_typ: str, current_status: str) -> list[str]:
+    """Gibt alle erlaubten Folgestatus zurück."""
+    return TRANSITIONS.get(vorgang_typ, {}).get(current_status, [])
+
+def is_final_status(status: str) -> bool:
+    """True wenn der Vorgang in einem Endzustand ist."""
+    return status in ABGESCHLOSSENE_STATUS
+
+# ── Entscheidungsstufen ───────────────────────────────────────────────────────
+def classify_decision_level(
+    konfidenz: float,
+    kategorie: str,
+    vorgang_typ: str,
+    ist_bekannter_kunde: bool = False,
+    hat_offenen_vorgang: bool = False,
+) -> str:
+    """
+    Bestimmt Entscheidungsstufe A, B oder C.
+    A = still automatisch (kein UI-Signal)
+    B = Vorschlag zeigen (SSE-Toast)
+    C = Aktivfenster (Rückfrage erforderlich)
+    """
+    # Kritische Typen → immer mindestens B
+    kritische_typen = {"mahnung", "zahlung", "eingangsrechnung"}
+
+    if konfidenz >= 0.85 and vorgang_typ not in kritische_typen:
+        return "A"
+    if konfidenz < 0.45:
+        return "C"
+    if vorgang_typ in kritische_typen and konfidenz < 0.7:
+        return "C"
+    return "B"
+
+# ── DB-Helper ─────────────────────────────────────────────────────────────────
+def _get_db():
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    return db
+
+def _now() -> str:
+    return datetime.now().isoformat(sep=' ', timespec='seconds')
+
+def _next_vorgang_nr(db) -> str:
+    """Generiert eindeutige Vorgangsnummer V-YYYY-NNNN."""
+    year = datetime.now().year
+    row = db.execute(
+        "SELECT COUNT(*) as cnt FROM vorgaenge WHERE vorgang_nr LIKE ?",
+        (f"V-{year}-%",)
+    ).fetchone()
+    seq = (row["cnt"] if row else 0) + 1
+    return f"V-{year}-{seq:04d}"
+
+# ── Kern-Funktionen ───────────────────────────────────────────────────────────
+
+def create_vorgang(
+    typ: str,
+    kunden_email: str = None,
+    kunden_name: str = None,
+    titel: str = None,
+    quelle: str = "mail",
+    konfidenz: float = 0.7,
+    konto: str = None,
+    betrag: float = None,
+    entscheidungsstufe: str = None,
+    notiz: str = None,
+) -> int:
+    """
+    Legt einen neuen Vorgang an.
+    Gibt die neue vorgang_id zurück.
+    """
+    if typ not in TRANSITIONS:
+        typ = "sonstiger_vorgang"
+
+    initial_status = INITIAL_STATUS.get(typ, "neu")
+    if entscheidungsstufe is None:
+        entscheidungsstufe = "B"
+
+    db = _get_db()
+    try:
+        vorgang_nr = _next_vorgang_nr(db)
+        now = _now()
+        db.execute("""
+            INSERT INTO vorgaenge
+                (vorgang_nr, typ, status, titel, kunden_email, kunden_name,
+                 konto, betrag, prioritaet, entscheidungsstufe, konfidenz,
+                 quelle, erstellt_am, aktualisiert_am, notiz)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            vorgang_nr, typ, initial_status,
+            titel or f"{typ.capitalize()} {vorgang_nr}",
+            (kunden_email or "").lower(), kunden_name or "",
+            konto or "", betrag, "mittel", entscheidungsstufe,
+            konfidenz, quelle, now, now, notiz or ""
+        ))
+        vorgang_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db.execute("""
+            INSERT INTO vorgang_status_history
+                (vorgang_id, alter_status, neuer_status, grund, actor, erstellt_am)
+            VALUES (?,?,?,?,?,?)
+        """, (vorgang_id, None, initial_status, f"Vorgang angelegt via {quelle}", "system", now))
+        db.commit()
+        return vorgang_id
+    finally:
+        db.close()
+
+
+def find_open_vorgang(
+    kunden_email: str,
+    typ: str,
+    max_alter_tage: int = 180,
+) -> int | None:
+    """
+    Sucht einen offenen Vorgang für kunden_email + typ.
+    Gibt vorgang_id zurück oder None wenn keiner gefunden.
+    Ältere als max_alter_tage werden ignoriert (de-dup-Schutz).
+    """
+    if not kunden_email:
+        return None
+    email = kunden_email.lower()
+    db = _get_db()
+    try:
+        row = db.execute("""
+            SELECT id FROM vorgaenge
+            WHERE LOWER(kunden_email) = ?
+              AND typ = ?
+              AND status NOT IN ('abgeschlossen','archiviert','erledigt','verloren',
+                                 'abgelehnt','storniert','kein_bedarf')
+              AND date(erstellt_am) >= date('now', ? || ' days')
+            ORDER BY erstellt_am DESC LIMIT 1
+        """, (email, typ, f"-{max_alter_tage}")).fetchone()
+        return row["id"] if row else None
+    finally:
+        db.close()
+
+
+def link_entity(
+    vorgang_id: int,
+    entitaet_typ: str,
+    entitaet_id: str,
+    rolle: str = None,
+) -> int:
+    """
+    Verknüpft eine Entität (task/mail/angebot/rechnung/…) mit einem Vorgang.
+    entitaet_typ: 'task' | 'mail' | 'angebot' | 'ausgangsrechnung' |
+                  'eingangsrechnung' | 'zahlung' | 'dokument' | 'kira_konv' | 'wissen'
+    entitaet_id: ID als String (task.id, message_id, angebot.id, …)
+    Gibt link_id zurück.
+    """
+    db = _get_db()
+    try:
+        # Duplikat-Schutz
+        existing = db.execute("""
+            SELECT id FROM vorgang_links
+            WHERE vorgang_id=? AND entitaet_typ=? AND entitaet_id=?
+        """, (vorgang_id, entitaet_typ, str(entitaet_id))).fetchone()
+        if existing:
+            return existing["id"]
+
+        db.execute("""
+            INSERT INTO vorgang_links (vorgang_id, entitaet_typ, entitaet_id, rolle, erstellt_am)
+            VALUES (?,?,?,?,?)
+        """, (vorgang_id, entitaet_typ, str(entitaet_id), rolle or "", _now()))
+        link_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        # aktualisiert_am des Vorgangs updaten
+        db.execute("UPDATE vorgaenge SET aktualisiert_am=? WHERE id=?", (_now(), vorgang_id))
+        db.commit()
+        return link_id
+    finally:
+        db.close()
+
+
+def update_status(
+    vorgang_id: int,
+    neuer_status: str,
+    grund: str = "",
+    actor: str = "system",
+    force: bool = False,
+) -> bool:
+    """
+    Führt einen validierten Statusübergang durch.
+    force=True überspringt Validierung (nur für Migrationen/Korrekturen).
+    Gibt True zurück wenn Übergang durchgeführt wurde.
+    """
+    db = _get_db()
+    try:
+        row = db.execute(
+            "SELECT typ, status FROM vorgaenge WHERE id=?", (vorgang_id,)
+        ).fetchone()
+        if not row:
+            return False
+
+        alter_status = row["status"]
+        vorgang_typ  = row["typ"]
+
+        if not force and not can_transition(vorgang_typ, alter_status, neuer_status):
+            return False
+
+        now = _now()
+        db.execute("""
+            UPDATE vorgaenge
+            SET status=?, aktualisiert_am=?, letzter_status_grund=?,
+                abgeschlossen_am=CASE WHEN ? IN ('abgeschlossen','archiviert','erledigt',
+                                                   'verloren','abgelehnt','storniert','kein_bedarf')
+                                      THEN ? ELSE abgeschlossen_am END
+            WHERE id=?
+        """, (neuer_status, now, grund, neuer_status, now, vorgang_id))
+
+        db.execute("""
+            INSERT INTO vorgang_status_history
+                (vorgang_id, alter_status, neuer_status, grund, actor, erstellt_am)
+            VALUES (?,?,?,?,?,?)
+        """, (vorgang_id, alter_status, neuer_status, grund, actor, now))
+
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def get_vorgang(vorgang_id: int) -> dict | None:
+    """Gibt einen Vorgang als dict zurück."""
+    db = _get_db()
+    try:
+        row = db.execute("SELECT * FROM vorgaenge WHERE id=?", (vorgang_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        db.close()
+
+
+def get_vorgang_context(vorgang_id: int) -> dict:
+    """
+    Vollständiger Kontext eines Vorgangs:
+    Vorgang-Daten + alle verknüpften Entitäten + Statushistorie.
+    Wird von Kira, API und Aktivfenster genutzt.
+    """
+    db = _get_db()
+    try:
+        vorgang = db.execute("SELECT * FROM vorgaenge WHERE id=?", (vorgang_id,)).fetchone()
+        if not vorgang:
+            return {}
+
+        links = db.execute("""
+            SELECT * FROM vorgang_links WHERE vorgang_id=? ORDER BY erstellt_am
+        """, (vorgang_id,)).fetchall()
+
+        history = db.execute("""
+            SELECT * FROM vorgang_status_history
+            WHERE vorgang_id=? ORDER BY erstellt_am DESC LIMIT 20
+        """, (vorgang_id,)).fetchall()
+
+        # Tasks aus tasks.db laden
+        task_ids = [l["entitaet_id"] for l in links if l["entitaet_typ"] == "task"]
+        tasks = []
+        if task_ids:
+            placeholders = ",".join("?" * len(task_ids))
+            rows = db.execute(
+                f"SELECT id,typ,kategorie,titel,status,kunden_email,datum_mail FROM tasks WHERE id IN ({placeholders})",
+                [int(t) for t in task_ids if str(t).isdigit()]
+            ).fetchall()
+            tasks = [dict(r) for r in rows]
+
+        return {
+            "vorgang":   dict(vorgang),
+            "links":     [dict(l) for l in links],
+            "history":   [dict(h) for h in history],
+            "tasks":     tasks,
+            "gueltige_uebergaenge": get_valid_transitions(vorgang["typ"], vorgang["status"]),
+        }
+    finally:
+        db.close()
+
+
+def create_signal(
+    stufe: str,
+    titel: str,
+    nachricht: str,
+    vorgang_id: int = None,
+    typ: str = None,
+    payload: dict = None,
+) -> int:
+    """
+    Erstellt ein Stufe-A/B/C-Signal in vorgang_signals.
+    Stufe B → SSE-Toast; Stufe C → Aktivfenster-Modal.
+    Stufe A → kein Signal (wird nicht eingetragen).
+    Gibt signal_id zurück (0 bei Stufe A).
+    """
+    if stufe == "A":
+        return 0
+    db = _get_db()
+    try:
+        db.execute("""
+            INSERT INTO vorgang_signals
+                (vorgang_id, stufe, titel, nachricht, typ, payload_json, angezeigt, erstellt_am)
+            VALUES (?,?,?,?,?,?,0,?)
+        """, (
+            vorgang_id, stufe, titel, nachricht, typ or "",
+            json.dumps(payload or {}, ensure_ascii=False), _now()
+        ))
+        signal_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db.commit()
+        return signal_id
+    finally:
+        db.close()
+
+
+def get_pending_signals(max_count: int = 10) -> list[dict]:
+    """Gibt unangezeigte Signale zurück (neueste zuerst)."""
+    db = _get_db()
+    try:
+        rows = db.execute("""
+            SELECT * FROM vorgang_signals
+            WHERE angezeigt=0
+            ORDER BY stufe DESC, erstellt_am DESC
+            LIMIT ?
+        """, (max_count,)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
+def mark_signal_shown(signal_id: int, aktion: str = "") -> None:
+    """Markiert ein Signal als angezeigt."""
+    db = _get_db()
+    try:
+        db.execute(
+            "UPDATE vorgang_signals SET angezeigt=1, aktion=? WHERE id=?",
+            (aktion, signal_id)
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def get_open_vorgaenge(
+    typ: str = None,
+    kunden_email: str = None,
+    limit: int = 50,
+) -> list[dict]:
+    """Gibt offene Vorgänge zurück, optional gefiltert."""
+    db = _get_db()
+    try:
+        where = ["status NOT IN ('abgeschlossen','archiviert','erledigt','verloren',"
+                 "'abgelehnt','storniert','kein_bedarf')"]
+        params: list = []
+        if typ:
+            where.append("typ=?")
+            params.append(typ)
+        if kunden_email:
+            where.append("LOWER(kunden_email)=?")
+            params.append(kunden_email.lower())
+        params.append(limit)
+        rows = db.execute(
+            f"SELECT * FROM vorgaenge WHERE {' AND '.join(where)} "
+            "ORDER BY prioritaet DESC, aktualisiert_am DESC LIMIT ?",
+            params
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
+def update_task_vorgang_id(task_id: int, vorgang_id: int) -> None:
+    """Setzt vorgang_id-Spalte in der tasks-Tabelle."""
+    db = _get_db()
+    try:
+        db.execute("UPDATE tasks SET vorgang_id=? WHERE id=?", (vorgang_id, task_id))
+        db.commit()
+    finally:
+        db.close()
+
+
+def get_vorgang_summary_for_kira(limit: int = 5) -> str:
+    """
+    Kompakte Zusammenfassung offener Vorgänge für Kira-System-Prompt.
+    """
+    db = _get_db()
+    try:
+        rows = db.execute("""
+            SELECT typ, status, kunden_name, kunden_email, titel, vorgang_nr, aktualisiert_am
+            FROM vorgaenge
+            WHERE status NOT IN ('abgeschlossen','archiviert','erledigt','verloren',
+                                 'abgelehnt','storniert','kein_bedarf')
+            ORDER BY aktualisiert_am DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        if not rows:
+            return ""
+        lines = [f"OFFENE VORGÄNGE ({len(rows)})"]
+        for r in rows:
+            name = r["kunden_name"] or r["kunden_email"] or "?"
+            lines.append(f"  [{r['vorgang_nr']}] {r['typ'].upper()} → {r['status']} | {name} | {r['titel']}")
+        return "\n".join(lines)
+    finally:
+        db.close()

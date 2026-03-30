@@ -421,11 +421,26 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
                 if not thread_id:
                     tasks_db.execute("UPDATE tasks SET thread_id=? WHERE id=?",
                                      (f"T{new_id}", new_id))
+                tasks_db.commit()  # commit vor Router-Aufruf
                 stats["tasks_erstellt"] += 1
                 if msgid:
                     existing_ids.add(msgid)
                 if kat == "Angebotsrueckmeldung":
                     _try_update_angebot_from_mail(k_email, text, tasks_db)
+                # ── Case Engine: Vorgang-Routing (session-nn) ─────────────────
+                try:
+                    from vorgang_router import route_classified_mail as _vr_route
+                    _vr_route(
+                        task_id=new_id,
+                        classification_result=cl,
+                        mail_message_id=msgid,
+                        kunden_email=k_email,
+                        kunden_name=m.get("kunden_name", ""),
+                        konto=konto,
+                        betreff=betr,
+                    )
+                except Exception as _ve:
+                    pass  # Router-Fehler stoppen nicht den Recheck
             except Exception as e:
                 stats["fehler"] += 1
                 print(f"  [recheck] Task-Fehler: {e}")
@@ -861,6 +876,21 @@ def process_new_mails(new_mails, stats):
             # Auto-Update Angebot-Status bei Angebotsrückmeldung
             if kat == "Angebotsrueckmeldung":
                 _try_update_angebot_from_mail(k_email, text, tasks_db)
+            # ── Vorgang-Router (Paket 4+5) ────────────────────────────────────
+            tasks_db.commit()  # commit vor Router-Aufruf (eigene DB-Connection)
+            try:
+                from vorgang_router import route_classified_mail as _vr_route
+                _vr_route(
+                    task_id=new_id,
+                    classification_result=cl,
+                    mail_message_id=msgid,
+                    kunden_email=k_email,
+                    kunden_name=m.get('kunden_name', ''),
+                    konto=konto,
+                    betreff=betr,
+                )
+            except Exception as _ve:
+                pass
         except Exception as e:
             print(f"  Task-Fehler: {e}")
 
