@@ -2344,7 +2344,7 @@ window.pfKiraMailContext = async function() {
   lines.push('', '---');
   lines.push('Bitte lies diese Mail, fasse kurz zusammen was wichtig ist, und frag mich was du brauchst um zu helfen. Welcher n\u00e4chste Schritt w\u00e4re sinnvoll?');
 
-  const msg = lines.join('\n');
+  const msg = lines.join('\\n');
 
   // Lade-Indikator entfernen, Nachricht senden
   const doSend = () => {
