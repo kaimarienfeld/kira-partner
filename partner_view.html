@@ -980,7 +980,8 @@ const CFG = {
   "ntfy_server": "https://ntfy.sh",
   "gh_owner": "kaimarienfeld",
   "gh_repo": "kira-partner",
-  "feedback_token": "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"
+  "feedback_token": "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",
+  "gh_token": "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"
 };
 
 /* ── FEATURE-DATEN ── generiert durch generate_partner_view.py ─ */
@@ -1389,7 +1390,7 @@ function loadAdminSettings() {
     pw_kai:'',pw_leni:'',ntfy_kai:CFG.ntfy_kai,ntfy_kai_mode:'immediate',
     ntfy_leni:CFG.ntfy_leni,ntfy_leni_auto:'1',
     ntfy_leni_msg:'Neue Funktionen bei KIRA Partner! Schau mal rein 🌟',
-    gh_token:'',last_push:'',last_push_ok:false,
+    gh_token:CFG.gh_token||'',last_push:'',last_push_ok:false,
     leni_email:'',leni_notif_method:'ntfy',leni_notif_freq:'sofort'
   };
   return Object.assign(defaults, JSON.parse(localStorage.getItem('kira_pv_admin')||'{}'));
@@ -1568,7 +1569,8 @@ function syncLog(msg,type) {
 }
 async function pushToGitHub() {
   const s=loadAdminSettings();
-  if (!s.gh_token){showToast('Bitte erst GitHub Token eingeben','⚠️');return;}
+  const ghToken=document.getElementById('cfg-gh-token')?.value.trim()||s.gh_token||CFG.gh_token;
+  if (!ghToken){showToast('Bitte erst GitHub Token eingeben','⚠️');return;}
   const owner=CFG.gh_owner,repo=CFG.gh_repo,path='index.html';
   const btn=document.getElementById('btn-gh-push');
   btn.disabled=true;btn.textContent='⏳ Verbinde...';
@@ -1577,21 +1579,21 @@ async function pushToGitHub() {
   try {
     syncLog('Hole aktuelle Version...','info');
     const getResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
-      {headers:{'Authorization':`token ${s.gh_token}`,'Accept':'application/vnd.github.v3+json'}});
+      {headers:{'Authorization':`token ${ghToken}`,'Accept':'application/vnd.github.v3+json'}});
     if (!getResp.ok){const e=await getResp.json();throw new Error(e.message||`HTTP ${getResp.status}`);}
     const getData=await getResp.json();
     const sha=getData.sha;
     const currentHtml=decodeURIComponent(escape(atob(getData.content.replace(/\n/g,''))));
     syncLog('OK Version geladen','ok');
     syncLog('Aktualisiere Einstellungen...','info');
-    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token};
+    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token,gh_token:ghToken};
     let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
     syncLog('OK Einstellungen aktualisiert','ok');
     syncLog('Pushe zu GitHub...','info');
     const content=btoa(unescape(encodeURIComponent(newHtml)));
     const putResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
       method:'PUT',
-      headers:{'Authorization':`token ${s.gh_token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      headers:{'Authorization':`token ${ghToken}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
       body:JSON.stringify({message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha})
     });
     if (!putResp.ok){const e=await putResp.json();throw new Error(e.message||`HTTP ${putResp.status}`);}
@@ -1604,7 +1606,19 @@ async function pushToGitHub() {
     if (s.ntfy_leni_auto==='1'&&s.ntfy_leni){
       syncLog('Sende Push an Leni...','info');
       await sendNtfy(s.ntfy_leni,'✨ KIRA Partner wurde aktualisiert',s.ntfy_leni_msg||'Kai hat die Liste aktualisiert!',3);
-      syncLog('OK Leni benachrichtigt','ok');
+      syncLog('OK Leni benachrichtigt (Push)','ok');
+    }
+    const leniMail=document.getElementById('cfg-leni-email')?.value.trim()||s.leni_email;
+    if (leniMail) {
+      syncLog('Sende Update-Mail an Leni...','info');
+      try {
+        const mr=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({type:'update',to:leniMail,link:`https://${owner}.github.io/${repo}`})
+        });
+        if (mr.ok) syncLog('OK Leni per Mail benachrichtigt','ok');
+        else syncLog('Mail-Versand: Kira-App aktiv? (SMTP prüfen)','warn');
+      } catch(_){syncLog('Mail-Versand übersprungen (Kira-App nicht erreichbar)','warn');}
     }
   } catch(e) {
     syncLog(`FEHLER: ${e.message}`,'err');

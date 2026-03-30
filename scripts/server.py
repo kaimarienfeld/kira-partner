@@ -13095,6 +13095,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         f"Freue mich auf dein Feedback!\n"
                         f"Kai"
                     )
+                elif mail_type == 'update':
+                    msg['Subject'] = '✨ Neuigkeiten bei KIRA Partner!'
+                    text = (
+                        f"Hallo Leni,\n\n"
+                        f"Kai hat die KIRA Partner-Seite aktualisiert — "
+                        f"es gibt neue Funktionen oder Neuigkeiten zu entdecken!\n\n"
+                        f"Schau einfach kurz rein:\n{link}\n\n"
+                        f"Freue mich auf dein Feedback!\n"
+                        f"Kai"
+                    )
                 else:  # password
                     pw = body.get('password', '')
                     msg['Subject'] = 'Dein Zugang zu KIRA Partner'
