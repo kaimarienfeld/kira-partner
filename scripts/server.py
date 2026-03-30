@@ -2933,6 +2933,8 @@ def build_einstellungen():
     mail_archiv_cfg = config.get("mail_archiv", {})
     archiv_pfad = mail_archiv_cfg.get("pfad", "")
     neue_mails_archivieren = mail_archiv_cfg.get("neue_mails_archivieren", True)
+    bereinigung_aktiv      = mail_archiv_cfg.get("geloeschte_bereinigung_aktiv", True)
+    bereinigung_frist      = int(mail_archiv_cfg.get("bereinigung_frist_tage", 90))
     sync_ordner_cfg = mail_archiv_cfg.get("sync_ordner", {})
 
     # Sync-Ordner HTML pro Konto generieren
@@ -4046,6 +4048,14 @@ function esShowProtoTab(id) {{
     <div class="es-row">
       <div class="es-row-label"><span>Neue Mails archivieren</span><span class="es-row-hint">Eingehende Mails automatisch als JSON+EML im Archiv speichern</span></div>
       <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-archiv-aktiv"><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Gel&ouml;schte Elemente bereinigen</span><span class="es-row-hint">EML + Anh&auml;nge nach Frist l&ouml;schen — Kurzprotokoll (Absender, Betreff, 300 Zeichen) bleibt dauerhaft</span></div>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-archiv-bereinigung-aktiv" {'checked' if bereinigung_aktiv else ''}><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Bereinigungsfrist (Tage)</span><span class="es-row-hint">Gel&ouml;schte Mails im Archiv werden nach dieser Frist bereinigt (Standard: 90 Tage)</span></div>
+      <input type="number" id="cfg-archiv-bereinigung-frist" value="{bereinigung_frist}" min="7" max="3650" style="width:80px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);text-align:right">
     </div>
     <div class="es-row">
       <div class="es-row-label"><span>Archiv-Status</span><span id="es-archiv-status-text" class="es-row-hint">–</span></div>
@@ -7173,8 +7183,10 @@ function saveSettings() {{
       ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false
     }},
     mail_archiv: {{
-      pfad:                    document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
-      neue_mails_archivieren:  document.getElementById('cfg-archiv-aktiv')?.checked ?? true
+      pfad:                         document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
+      neue_mails_archivieren:       document.getElementById('cfg-archiv-aktiv')?.checked ?? true,
+      geloeschte_bereinigung_aktiv: document.getElementById('cfg-archiv-bereinigung-aktiv')?.checked ?? true,
+      bereinigung_frist_tage:       parseInt(document.getElementById('cfg-archiv-bereinigung-frist')?.value || '90', 10)
     }}
   }};
   fetch('/api/einstellungen',{{
