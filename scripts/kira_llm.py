@@ -494,6 +494,26 @@ def _build_data_context(config):
     except Exception:
         pass
 
+    # Schlafende Mails (Snooze) — Kira kennt alle Mails die auf Erinnerung warten
+    try:
+        if MAIL_INDEX_DB.exists():
+            snooze_conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            snooze_conn.row_factory = sqlite3.Row
+            snooze_rows = snooze_conn.execute(
+                "SELECT konto, betreff, absender, datum, snooze_until "
+                "FROM mails WHERE snooze_until IS NOT NULL AND datetime(snooze_until) > datetime('now') "
+                "ORDER BY snooze_until ASC"
+            ).fetchall()
+            snooze_conn.close()
+            if snooze_rows:
+                ctx += f"\n=== SCHLAFENDE MAILS — ERNEUT ERINNERN ({len(snooze_rows)}) ===\n"
+                ctx += "(Diese Mails wurden vom Nutzer zurückgestellt und wecken sich automatisch)\n"
+                for r in snooze_rows:
+                    ctx += (f"  Erinnert {r['snooze_until'][:16]} | {r['absender'] or '?'} | "
+                            f"{(r['betreff'] or '')[:60]} | Konto: {r['konto']}\n")
+    except Exception:
+        pass
+
     # Gelöschte-Protokoll: Kira kann auf bereinigten Mail-Kontext zugreifen
     try:
         gp_rows = db.execute("""

@@ -67,6 +67,7 @@ def _ensure_mail_columns():
             ('flagged',       'INTEGER DEFAULT 0'),
             ('pinned',        'INTEGER DEFAULT 0'),
             ('kira_verwendet','INTEGER DEFAULT 0'),
+            ('snooze_until',  'TEXT DEFAULT NULL'),
         ]:
             try:
                 conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {typedef}")
@@ -843,11 +844,27 @@ def build_postfach():
     <div class="pf-mid-meta" id="pf-mid-meta"></div>
   </div>
   <div id="pf-bulk-bar">
-    <span class="pf-bulk-cnt" id="pf-bulk-cnt">0 ausgew&#228;hlt</span>
-    <button class="pf-bulk-btn" onclick="pfBulkMarkRead(true)">Als gelesen markieren</button>
-    <button class="pf-bulk-btn" onclick="pfBulkMarkRead(false)">Als ungelesen markieren</button>
-    <button class="pf-bulk-btn red" onclick="pfBulkDelete()">L&#246;schen</button>
-    <button class="pf-bulk-btn" onclick="pfClearSelection()">&#x2715; Abbrechen</button>
+    <!-- Single-Mail-Modus (eine Mail angeklickt) -->
+    <div id="pf-bar-single" style="display:none;align-items:center;gap:2px;flex:1">
+      <button class="pf-bar-btn" id="pf-bar-reply" onclick="pfReply()" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
+      <button class="pf-bar-btn" id="pf-bar-replyall" onclick="pfForward()" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
+      <button class="pf-bar-btn" id="pf-bar-forward" onclick="pfForward()" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
+      <div class="pf-bar-sep"></div>
+      <button class="pf-bar-btn pf-bar-del" id="pf-bar-delete" onclick="pfBarDeleteCurrent()" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>L\u00f6schen</button>
+      <button class="pf-bar-btn" id="pf-bar-flag" onclick="pfBarFlagCurrent()" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Kennzeichnen</button>
+      <button class="pf-bar-btn" id="pf-bar-pin" onclick="pfBarPinCurrent()" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>Heften</button>
+      <div class="pf-bar-sep"></div>
+      <button class="pf-bar-btn pf-bar-snooze" id="pf-bar-snooze" onclick="pfOpenSnoozeMenu(this)" title="Erneut erinnern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Erinnern</button>
+      <button class="pf-bar-btn" id="pf-bar-move" onclick="pfOpenVerschiebenMenu(this)" title="Verschieben"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Verschieben</button>
+    </div>
+    <!-- Bulk-Modus (mehrere Mails gecheckt) -->
+    <div id="pf-bar-bulk" style="display:none;align-items:center;gap:6px;flex:1">
+      <span class="pf-bulk-cnt" id="pf-bulk-cnt">0 ausgew&#228;hlt</span>
+      <button class="pf-bulk-btn" onclick="pfBulkMarkRead(true)">Als gelesen</button>
+      <button class="pf-bulk-btn" onclick="pfBulkMarkRead(false)">Als ungelesen</button>
+      <button class="pf-bulk-btn red" onclick="pfBulkDelete()">L&#246;schen</button>
+      <button class="pf-bulk-btn" onclick="pfClearSelection()">&#x2715; Abbrechen</button>
+    </div>
   </div>
   <div id="pf-list-wrap">
     <div class="pf-list-empty" id="pf-list-empty" style="display:none">
@@ -1098,13 +1115,39 @@ def build_postfach():
 .pf-item-flag-badge{color:#f59e0b;font-size:12px;flex-shrink:0;line-height:1}
 .pf-item-pin-badge{color:#3b82f6;font-size:11px;flex-shrink:0;line-height:1;margin-left:2px}
 .pf-item-kira-badge{background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid rgba(139,92,246,.3);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4}
-/* Bulk bar */
-#pf-bulk-bar{display:none;align-items:center;gap:8px;padding:7px 14px;background:rgba(59,130,246,.08);border-bottom:1px solid rgba(59,130,246,.2);font-size:12px;flex-shrink:0}
+/* Aktionsleiste (single + bulk) */
+#pf-bulk-bar{display:none;align-items:center;gap:4px;padding:5px 10px;background:var(--bg-raised);border-bottom:1px solid var(--border);font-size:12px;flex-shrink:0}
 #pf-bulk-bar.visible{display:flex}
+#pf-bar-single,#pf-bar-bulk{display:none;align-items:center;gap:2px;flex:1}
+.pf-bar-btn{background:none;border:none;cursor:pointer;padding:4px 7px;border-radius:6px;color:var(--text-muted);display:flex;align-items:center;gap:4px;font-size:12px;transition:background .1s,color .1s;flex-shrink:0}
+.pf-bar-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-bar-btn.active{color:#f59e0b}
+.pf-bar-btn.active-pin{color:#3b82f6}
+.pf-bar-btn.pf-bar-del:hover{background:rgba(200,60,60,.12);color:#c83c3c}
+.pf-bar-btn.pf-bar-snooze:hover{color:#f59e0b}
+.pf-bar-btn svg{width:15px;height:15px;display:block;flex-shrink:0}
+.pf-bar-sep{width:1px;height:18px;background:var(--border);margin:0 3px;flex-shrink:0}
+/* Snooze-Dropdown */
+.pf-snooze-menu{position:fixed;z-index:9999;background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:8px;min-width:220px;max-width:280px}
+.pf-snooze-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);padding:2px 8px 6px}
+.pf-snooze-opt{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:7px 10px;border-radius:7px;font-size:13px;color:var(--text);transition:background .1s}
+.pf-snooze-opt:hover{background:var(--bg-hover)}
+.pf-snooze-cancel{color:#ef4444;margin-top:4px;border-top:1px solid var(--border);padding-top:9px}
+.pf-snooze-custom-row{display:flex;gap:5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.pf-snooze-custom-inp{flex:1;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
+.pf-snooze-custom-btn{padding:5px 10px;font-size:12px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer}
+.pf-snooze-custom-btn:hover{background:#2563eb}
 .pf-bulk-cnt{font-weight:600;color:#3b82f6;flex:1}
 .pf-bulk-btn{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text);transition:.1s}
 .pf-bulk-btn:hover{background:var(--bg-hover)}
 .pf-bulk-btn.red:hover{background:rgba(200,60,60,.12);color:#c83c3c;border-color:rgba(200,60,60,.3)}
+/* Ordner-Badge Varianten */
+.pf-folder-badge{background:rgba(59,130,246,.15);color:#3b82f6;border-radius:9px;font-size:11px;font-weight:600;padding:1px 6px;flex-shrink:0;line-height:1.5;margin-left:auto}
+.pf-folder-badge-inbox{background:#3b82f6;color:#fff;border-radius:9px;font-size:12px;font-weight:700;padding:2px 7px;flex-shrink:0;line-height:1.5;margin-left:auto;min-width:20px;text-align:center}
+.pf-folder-badge-draft{background:rgba(100,116,139,.15);color:#64748b;border-radius:9px;font-size:11px;padding:1px 6px;flex-shrink:0;line-height:1.5;margin-left:auto;font-style:italic}
+.pf-folder-badge-snooze{background:rgba(245,158,11,.15);color:#f59e0b;border-radius:9px;font-size:11px;font-weight:600;padding:1px 6px;flex-shrink:0;line-height:1.5;margin-left:auto}
+/* Snooze-Badge auf Mail-Item */
+.pf-item-snooze-badge{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4}
 /* New preview toolbar */
 .pf-prev-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .pf-tb-btn{background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:6px;color:var(--text-muted);display:flex;align-items:center;gap:5px;font-size:12px;transition:background .1s,color .1s}
@@ -1372,13 +1415,166 @@ function pfToggleSelect(msgId, checked) {
   pfUpdateBulkBar();
 }
 function pfUpdateBulkBar() {
-  const bar=document.getElementById('pf-bulk-bar');
-  const cnt=document.getElementById('pf-bulk-cnt');
+  const bar    = document.getElementById('pf-bulk-bar');
+  const single = document.getElementById('pf-bar-single');
+  const bulk   = document.getElementById('pf-bar-bulk');
+  const cnt    = document.getElementById('pf-bulk-cnt');
   if(!bar) return;
-  const n=_pfSelected.size;
-  if(n>0){bar.classList.add('visible');if(cnt)cnt.textContent=n+' ausgew\u00e4hlt';}
-  else{bar.classList.remove('visible');}
+  const n = _pfSelected.size;
+  if(n > 0) {
+    // Bulk-Modus
+    bar.classList.add('visible');
+    if(single) single.style.display='none';
+    if(bulk)   bulk.style.display='flex';
+    if(cnt)    cnt.textContent = n + ' ausgew\u00e4hlt';
+  } else if(_pfCurrentMail) {
+    // Single-Modus
+    bar.classList.add('visible');
+    if(single) single.style.display='flex';
+    if(bulk)   bulk.style.display='none';
+    // Flag/Pin-Buttons aktualisieren
+    const m = _pfCurrentMail;
+    const bFlag = document.getElementById('pf-bar-flag');
+    const bPin  = document.getElementById('pf-bar-pin');
+    if(bFlag) bFlag.classList.toggle('active', !!(m.flagged));
+    if(bPin)  bPin.classList.toggle('active-pin', !!(m.pinned));
+  } else {
+    bar.classList.remove('visible');
+    if(single) single.style.display='none';
+    if(bulk)   bulk.style.display='none';
+  }
 }
+// Aktionsleiste — Single-Mail-Aktionen
+function pfBarDeleteCurrent() {
+  if(!_pfCurrentMail) return;
+  const id = _pfCurrentMail.message_id;
+  showKritischModal('Mail l\u00f6schen','Diese Mail endg\u00fcltig l\u00f6schen?','LOESCHEN',()=>{
+    fetch('/api/mail/loeschen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[id]})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        const el=document.querySelector('[data-msgid="'+id+'"]');
+        if(el) el.remove();
+        _pfCurrentMail=null;
+        document.getElementById('pf-preview').style.display='none';
+        document.getElementById('pf-preview-empty').style.display='flex';
+        pfUpdateBulkBar();
+      }
+    }).catch(()=>{});
+  },'Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.');
+}
+function pfBarFlagCurrent() {
+  if(!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if(el) pfToggleFlag(_pfCurrentMail.message_id, el);
+}
+function pfBarPinCurrent() {
+  if(!_pfCurrentMail) return;
+  const el = document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+  if(el) pfTogglePin(_pfCurrentMail.message_id, el);
+}
+
+// ── Snooze / Erneut erinnern ─────────────────────────────
+let _pfSnoozeMenu = null;
+window.pfOpenSnoozeMenu = function(btn) {
+  if(_pfSnoozeMenu) { _pfSnoozeMenu.remove(); _pfSnoozeMenu=null; return; }
+  if(!_pfCurrentMail) return;
+  const menu = document.createElement('div');
+  menu.id = 'pf-snooze-menu';
+  menu.className = 'pf-snooze-menu';
+  const now = new Date();
+  const todayEvening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
+  const tomorrowMorning = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 8, 0, 0);
+  const nextMonday = new Date(now); nextMonday.setDate(now.getDate()+(8-now.getDay())%7||7); nextMonday.setHours(8,0,0,0);
+  const _toISO = d => d.toISOString().slice(0,19).replace('T',' ');
+  const presets = [
+    {label:'30 Minuten', iso: _toISO(new Date(now.getTime()+30*60000))},
+    {label:'1 Stunde',   iso: _toISO(new Date(now.getTime()+60*60000))},
+    {label:'2 Stunden',  iso: _toISO(new Date(now.getTime()+2*3600000))},
+    {label:'4 Stunden',  iso: _toISO(new Date(now.getTime()+4*3600000))},
+    {label:'Heute Abend (18:00)', iso: _toISO(todayEvening)},
+    {label:'Morgen fr\u00fch (08:00)', iso: _toISO(tomorrowMorning)},
+    {label:'N\u00e4chste Woche', iso: _toISO(nextMonday)},
+  ];
+  let html = '<div class="pf-snooze-title">&#x23F0; Erneut erinnern</div>';
+  presets.forEach(p=>{
+    html += '<button class="pf-snooze-opt" onclick="pfSnoozeUntil(\''+p.iso+'\',this.closest(\'#pf-snooze-menu\'))">'+p.label+'</button>';
+  });
+  html += '<div class="pf-snooze-custom-row">'
+    +'<input class="pf-snooze-custom-inp" id="pf-snooze-custom" placeholder="z.B. 2h30m oder 2026-04-01 09:00" />'
+    +'<button class="pf-snooze-custom-btn" onclick="pfSnoozeCustom()">OK</button>'
+    +'</div>';
+  if(_pfCurrentMail.snooze_until) {
+    html += '<button class="pf-snooze-opt pf-snooze-cancel" onclick="pfSnoozeUntil(null,this.closest(\'#pf-snooze-menu\'))">&#x274C; Erinnerung aufheben</button>';
+  }
+  menu.innerHTML = html;
+  const rect = btn.getBoundingClientRect();
+  menu.style.top  = (rect.bottom+6+window.scrollY)+'px';
+  menu.style.left = (rect.left+window.scrollX)+'px';
+  document.body.appendChild(menu);
+  _pfSnoozeMenu = menu;
+  const _close = e=>{ if(!menu.contains(e.target)&&e.target!==btn){ menu.remove(); _pfSnoozeMenu=null; document.removeEventListener('mousedown',_close); } };
+  setTimeout(()=>document.addEventListener('mousedown',_close),10);
+};
+window.pfSnoozeUntil = function(isoDatetime, menuEl) {
+  if(!_pfCurrentMail) return;
+  if(menuEl) { menuEl.remove(); _pfSnoozeMenu=null; }
+  const konto = _pfCurrentMail.konto || _pfCurrentKonto || '';
+  fetch('/api/mail/snooze',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message_id:_pfCurrentMail.message_id, snooze_until:isoDatetime, konto})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      _pfCurrentMail.snooze_until = isoDatetime;
+      const itemEl=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
+      if(isoDatetime) {
+        // Mail aus aktueller Inbox-Ansicht entfernen (snooze versteckt sie)
+        if(_pfCurrentFolder && /inbox|posteingang/i.test(_pfCurrentFolder)) {
+          if(itemEl) itemEl.remove();
+          _pfCurrentMail=null;
+          document.getElementById('pf-preview').style.display='none';
+          document.getElementById('pf-preview-empty').style.display='flex';
+          pfUpdateBulkBar();
+        }
+        showToast('Erinnerung gesetzt: '+d.snooze_label,'ok');
+        // Snooze-Badge auf Bar-Button
+        const sb=document.getElementById('pf-bar-snooze');
+        if(sb) sb.classList.add('active');
+      } else {
+        showToast('Erinnerung aufgehoben','info');
+        const sb=document.getElementById('pf-bar-snooze');
+        if(sb) sb.classList.remove('active');
+      }
+      if(d.imap_ordner_erstellt) showToast('IMAP-Ordner "Erneut erinnern" automatisch angelegt','info');
+    } else { showToast('Fehler: '+(d.error||'?'),'fehler'); }
+  }).catch(()=>{showToast('Verbindungsfehler','fehler');});
+};
+window.pfSnoozeCustom = function() {
+  const inp = document.getElementById('pf-snooze-custom');
+  if(!inp) return;
+  const val = inp.value.trim();
+  if(!val) return;
+  // Versuche ISO-Datum zuerst
+  const isoMatch = val.match(/^(\d{4}-\d{2}-\d{2})\s*(\d{2}:\d{2}(?::\d{2})?)$/);
+  if(isoMatch) {
+    pfSnoozeUntil(isoMatch[1]+' '+(isoMatch[2].length===5?isoMatch[2]+':00':isoMatch[2]), _pfSnoozeMenu);
+    return;
+  }
+  // Parse Zeitdauer: 2h30m, 45min, 3d, 1h, etc.
+  const now = new Date();
+  let ms = 0;
+  val.replace(/(\d+(?:\.\d+)?)\s*([dhm](?:in)?)/gi, (_, n, u) => {
+    const x = parseFloat(n);
+    if(u.toLowerCase()==='d') ms += x*86400000;
+    else if(u.toLowerCase()==='h') ms += x*3600000;
+    else ms += x*60000;
+  });
+  if(ms > 0) {
+    const target = new Date(now.getTime()+ms);
+    pfSnoozeUntil(target.toISOString().slice(0,19).replace('T',' '), _pfSnoozeMenu);
+  } else {
+    showToast('Format nicht erkannt. Beispiele: 2h30m, 45min, 1d, 2026-04-01 09:00','fehler');
+  }
+};
+
 function pfClearSelection() {
   _pfSelected.forEach(id=>{const el=document.querySelector('[data-msgid="'+id+'"]');if(el)el.classList.remove('selected');});
   _pfSelected.clear();
@@ -1537,7 +1733,7 @@ function pfRenderFolders(data) {
     const subDiv = document.createElement('div');
     subDiv.className = 'pf-combined-sub'+(_pfCombinedExpanded?' open':'');
     subDiv.id = 'pf-combined-sub';
-    [{type:'inbox',icon:'inbox',label:'Posteingang'},{type:'sent',icon:'sent',label:'Gesendet'},{type:'drafts',icon:'draft',label:'Entw\u00fcrfe'}].forEach(sf=>{
+    [{type:'inbox',icon:'inbox',label:'Posteingang'},{type:'unread',icon:'inbox',label:'Ungelesene'},{type:'sent',icon:'sent',label:'Gesendet'},{type:'drafts',icon:'draft',label:'Entw\u00fcrfe'},{type:'snoozed',icon:'star',label:'Erinnert mich'}].forEach(sf=>{
       const si = document.createElement('div');
       si.className = 'pf-combined-sub-item';
       si.dataset.folderType = sf.type;
@@ -1577,11 +1773,13 @@ function pfRenderFolders(data) {
       _pfFavorites.forEach(fav=>{
         const fi = document.createElement('div');
         fi.className = 'pf-fav-item';
+        fi.dataset.konto = fav.konto;
+        fi.dataset.folder = fav.folder;
         const domain = (fav.konto||'').split('@')[1]||fav.konto;
         fi.innerHTML = pfFolderIconWrap(fav.folder)
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+fav.label+'</span>'
           +'<span style="font-size:10px;color:var(--text-muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:80px">'+domain+'</span>';
-        fi.onclick = ()=>pfSelectFolder(fav.konto, fav.folder, fav.label);
+        fi.onclick = ()=>pfSelectFolder(fav.konto, fav.folder, fav.label, fi);
         tree.appendChild(fi);
       });
       // Unread inboxes (dedup with saved favorites)
@@ -1589,10 +1787,12 @@ function pfRenderFolders(data) {
         if(_pfFavorites.some(f=>f.konto===konto.email && f.folder===inbox.name)) return;
         const fi = document.createElement('div');
         fi.className = 'pf-fav-item';
+        fi.dataset.konto = konto.email;
+        fi.dataset.folder = inbox.name;
         fi.innerHTML = pfFolderIconWrap('inbox')
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
           +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
-        fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName);
+        fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName, fi);
         tree.appendChild(fi);
       });
       const sep = document.createElement('div'); sep.className='pf-fav-sep'; tree.appendChild(sep);
@@ -1629,9 +1829,22 @@ function pfRenderFolders(data) {
         const item = document.createElement('div');
         item.className = 'pf-folder-item';
         item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
+        const _fn = (ord.name||'').toLowerCase();
+        const _isDraft = _fn.includes('draft')||_fn.includes('entwurf');
+        const _isInbox = _fn.includes('inbox')||_fn.includes('posteingang');
+        const _isSnooze= _fn.includes('erinnern');
+        let _badge = '';
+        if(_isInbox && ord.unread>0)
+          _badge = '<span class="pf-folder-badge-inbox">'+ord.unread+'</span>';
+        else if(_isDraft && (ord.count||0)>0)
+          _badge = '<span class="pf-folder-badge-draft">'+(ord.count)+'</span>';
+        else if(_isSnooze && (ord.count||0)>0)
+          _badge = '<span class="pf-folder-badge-snooze">'+(ord.count)+'</span>';
+        else if(ord.unread>0)
+          _badge = '<span class="pf-folder-badge">'+ord.unread+'</span>';
         item.innerHTML = pfFolderIconWrap(ord.name)
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ord.label||ord.name)+'</span>'
-          +(ord.unread>0?'<span class="pf-folder-badge">'+ord.unread+'</span>':'');
+          +_badge;
         const starBtn = document.createElement('button');
         starBtn.className = 'pf-star-btn'+(isStarred?' starred':'');
         starBtn.title = isStarred ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzuf\u00fcgen';
@@ -1657,15 +1870,22 @@ function pfToggleKonto(email, safe) {
 }
 
 // ── Select Folder ────────────────────────────────────────
-window.pfSelectFolder = function(email, folder, label) {
+window.pfSelectFolder = function(email, folder, label, favEl) {
   _pfCurrentKonto=email; _pfCurrentFolder=folder; _pfOffset=0; _pfSearch='';
   _pfCurrentFolderLabel = label;
   document.getElementById('pf-mid-title').textContent=label;
   document.getElementById('pf-search').value='';
-  document.querySelectorAll('.pf-folder-item').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
   const id='pf-fi-'+email.replace(/[@.]/g,'_')+'_'+folder.replace(/[^a-z0-9]/gi,'_');
   const el=document.getElementById(id);
   if(el) el.classList.add('active');
+  // Wenn direkt über Favoriten-Klick → Favorit highlighten
+  if(favEl) { favEl.classList.add('active'); }
+  else {
+    // Favorit-Item per data-Attribut finden
+    const fi = document.querySelector('.pf-fav-item[data-konto="'+email+'"][data-folder="'+folder+'"]');
+    if(fi) fi.classList.add('active');
+  }
   pfLoadList(true);
 };
 
@@ -1786,6 +2006,7 @@ function pfRenderMailItem(m, container) {
       +(m.flagged?'<span class="pf-item-flag-badge" title="Gekennzeichnet">&#x2691;</span>':'<span class="pf-item-flag-badge" style="display:none" title="Gekennzeichnet">&#x2691;</span>')
       +(m.pinned?'<span class="pf-item-pin-badge" title="Angeheftet">&#x1F4CD;</span>':'<span class="pf-item-pin-badge" style="display:none" title="Angeheftet">&#x1F4CD;</span>')
       +(m.kira_verwendet?'<span class="pf-item-kira-badge" title="Von Kira verwendet">Kira</span>':'')
+      +(m.snooze_until?'<span class="pf-item-snooze-badge" title="Erneut erinnern: '+esc(m.snooze_until)+'">&#x23F0;</span>':'')
       +'<span class="pf-item-datum">'+esc(datum)+'</span>'
     +'</div>'
     +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
@@ -1850,6 +2071,7 @@ window.pfOpenMail = function(m, el) {
   _pfActiveItem=el; el.classList.add('active');
   _pfCurrentMail = m;
   _pfCurrentMsgId = m.message_id || null;  // für Verschieben-Funktion
+  pfUpdateBulkBar();  // Aktionsleiste für Single-Auswahl anzeigen
   document.getElementById('pf-preview-empty').style.display='none';
   document.getElementById('pf-preview').style.display='flex';
   document.getElementById('pf-preview').style.flexDirection='column';
@@ -2121,6 +2343,18 @@ pfStartAutoRefresh();
 if(document.getElementById('panel-postfach')&&document.getElementById('panel-postfach').classList.contains('active')){
   pfInit();
 }
+// Bulk-Bar + Item-Aktionen global exponieren (HTML onclick-Attribute brauchen window-Scope)
+window.pfBulkDelete = pfBulkDelete;
+window.pfBulkMarkRead = pfBulkMarkRead;
+window.pfClearSelection = pfClearSelection;
+window.pfUpdateBulkBar = pfUpdateBulkBar;
+window.pfToggleSelect = pfToggleSelect;
+window.pfToggleRead = pfToggleRead;
+window.pfToggleFlag = pfToggleFlag;
+window.pfTogglePin = pfTogglePin;
+window.pfBarDeleteCurrent = pfBarDeleteCurrent;
+window.pfBarFlagCurrent = pfBarFlagCurrent;
+window.pfBarPinCurrent = pfBarPinCurrent;
 // Global exposieren damit showPanel() pfInit() aufrufen kann
 window.pfInit = pfInit;
 })();
@@ -9800,6 +10034,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/favorites'):
             self._api_mail_favorites_get()
 
+        elif self.path == '/api/mail/snooze/count':
+            self._api_mail_snooze_count()
+
         elif self.path.startswith('/api/mail/combined/konten'):
             self._api_mail_combined_konten_get()
 
@@ -10856,6 +11093,88 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_snooze(self, body):
+        """POST /api/mail/snooze — Snooze setzen oder aufheben.
+        {message_id, snooze_until: 'YYYY-MM-DD HH:MM:SS' | null, konto: email}
+        Legt bei erstem Snooze den IMAP-Ordner "Erneut erinnern" automatisch an.
+        """
+        from datetime import datetime as _dt
+        _ensure_mail_columns()
+        message_id   = body.get('message_id', '')
+        snooze_until = body.get('snooze_until')  # None = aufheben
+        konto        = body.get('konto', '')
+        if not message_id:
+            self._json({'ok': False, 'error': 'message_id fehlt'})
+            return
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.execute("UPDATE mails SET snooze_until=? WHERE message_id=?", (snooze_until, message_id))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+            return
+
+        # IMAP-Ordner "Erneut erinnern" auto-anlegen + in sync_ordner eintragen
+        imap_ordner_erstellt = False
+        SNOOZE_FOLDER = 'Erneut erinnern'
+        if snooze_until and konto:
+            try:
+                cfg_path = SCRIPTS_DIR / 'config.json'
+                cfg = json.loads(cfg_path.read_text('utf-8')) if cfg_path.exists() else {}
+                sync_ordner = cfg.get('mail_archiv', {}).get('sync_ordner', {})
+                if SNOOZE_FOLDER not in sync_ordner.get(konto, []):
+                    # IMAP-Ordner erstellen
+                    try:
+                        archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+                        if archiver_cfg.exists():
+                            cfg_arc = json.loads(archiver_cfg.read_text('utf-8'))
+                            konto_dict = next((k for k in cfg_arc.get('konten', []) if k.get('email') == konto), None)
+                            if konto_dict:
+                                from mail_monitor import imap_connect as _imap_connect
+                                imap = _imap_connect(konto_dict)
+                                # Ordner erstellen (ignoriere Fehler falls er schon existiert)
+                                imap.create(SNOOZE_FOLDER)
+                                try: imap.logout()
+                                except: pass
+                                imap_ordner_erstellt = True
+                    except Exception:
+                        pass
+                    # In sync_ordner eintragen (auch wenn IMAP-Erstellung fehlschlug)
+                    if konto not in sync_ordner:
+                        sync_ordner[konto] = []
+                    if SNOOZE_FOLDER not in sync_ordner[konto]:
+                        sync_ordner[konto].append(SNOOZE_FOLDER)
+                        if 'mail_archiv' not in cfg:
+                            cfg['mail_archiv'] = {}
+                        cfg['mail_archiv']['sync_ordner'] = sync_ordner
+                        cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
+
+        # Anzeigetext für snooze_until
+        snooze_label = ''
+        if snooze_until:
+            try:
+                sd = _dt.fromisoformat(snooze_until.replace(' ', 'T'))
+                snooze_label = sd.strftime('%d.%m.%Y %H:%M')
+            except Exception:
+                snooze_label = snooze_until
+        self._json({'ok': True, 'snooze_label': snooze_label, 'imap_ordner_erstellt': imap_ordner_erstellt})
+
+    def _api_mail_snooze_count(self):
+        """GET /api/mail/snooze/count — Anzahl aktuell schlafender Mails."""
+        _ensure_mail_columns()
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            count = conn.execute(
+                "SELECT COUNT(*) FROM mails WHERE snooze_until IS NOT NULL AND datetime(snooze_until) > datetime('now')"
+            ).fetchone()[0]
+            conn.close()
+            self._json({'count': count})
+        except Exception as e:
+            self._json({'count': 0, 'error': str(e)})
+
     def _api_mail_kira_markieren(self, body):
         """POST /api/mail/kira-markieren — Mail als von Kira verwendet markieren."""
         _ensure_mail_columns()
@@ -10880,7 +11199,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         q           = qs.get('q', [''])[0].strip()
         offset      = int(qs.get('offset', ['0'])[0])
         limit       = min(int(qs.get('limit', ['50'])[0]), 200)
-        folder_type = qs.get('folder_type', ['all'])[0].lower()  # inbox|sent|drafts|all
+        folder_type = qs.get('folder_type', ['all'])[0].lower()  # inbox|sent|drafts|all|unread|snoozed
         try:
             cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8')) if (SCRIPTS_DIR / 'config.json').exists() else {}
             konten = cfg.get('combined_postfach', {}).get('konten', [])
@@ -10895,17 +11214,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
             'sent':   ["LOWER(folder) LIKE '%sent%'", "LOWER(folder) LIKE '%gesendet%'"],
             'drafts': ["LOWER(folder) LIKE '%draft%'", "LOWER(folder) LIKE '%entwurf%'"],
         }
-        if folder_type in _FOLDER_PATTERNS:
+        extra_where = ''
+        if folder_type == 'snoozed':
+            folder_clause = "1=1"  # alle Ordner — snooze_until filtert
+            extra_where = " AND snooze_until IS NOT NULL AND datetime(snooze_until) > datetime('now')"
+        elif folder_type == 'unread':
+            inbox_parts = ' OR '.join(_FOLDER_PATTERNS['inbox'])
+            folder_clause = f"({inbox_parts})"
+            extra_where = " AND gelesen=0 AND (snooze_until IS NULL OR datetime(snooze_until) <= datetime('now'))"
+        elif folder_type in _FOLDER_PATTERNS:
             folder_clause = '(' + ' OR '.join(_FOLDER_PATTERNS[folder_type]) + ')'
         else:  # 'all' — inbox + sent (skip internal/spam/trash)
             inbox_parts  = ' OR '.join(_FOLDER_PATTERNS['inbox'])
             sent_parts   = ' OR '.join(_FOLDER_PATTERNS['sent'])
             folder_clause = f"({inbox_parts} OR {sent_parts})"
+            extra_where = " AND (snooze_until IS NULL OR datetime(snooze_until) <= datetime('now'))"
         try:
             conn = sqlite3.connect(str(MAIL_INDEX_DB))
             conn.row_factory = sqlite3.Row
             placeholders = ','.join(['?' for _ in konten])
-            where  = f"konto IN ({placeholders}) AND {folder_clause}"
+            where  = f"konto IN ({placeholders}) AND {folder_clause}{extra_where}"
             params = list(konten)
             if q:
                 where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
@@ -10916,7 +11244,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             rows  = conn.execute(
                 f"SELECT id,konto,betreff,absender,datum,message_id,hat_anhaenge,anhaenge,thread_id,text_plain,gelesen,"
                 f"COALESCE(flagged,0) as flagged,COALESCE(pinned,0) as pinned,"
-                f"COALESCE(kira_verwendet,0) as kira_verwendet "
+                f"COALESCE(kira_verwendet,0) as kira_verwendet,snooze_until "
                 f"FROM mails WHERE {where} ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -10941,6 +11269,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'flagged':        bool(r['flagged']),
                     'pinned':         bool(r['pinned']),
                     'kira_verwendet': bool(r['kira_verwendet']),
+                    'snooze_until':   r['snooze_until'] or '',
                 })
             conn.close()
             self._json({'total': total, 'mails': mails})
@@ -10962,6 +11291,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             params = [konto, folder]
             where  = "konto=? AND folder=?"
+            # Snoozed Mails in Inbox-Ansicht ausblenden (aber nicht im Snooze-Ordner)
+            _folder_low = folder.lower()
+            if 'inbox' in _folder_low or 'posteingang' in _folder_low:
+                where += " AND (snooze_until IS NULL OR datetime(snooze_until) <= datetime('now'))"
             if q:
                 where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
                 like = f"%{q}%"
@@ -10973,7 +11306,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 f"SELECT id,konto,konto_label,betreff,absender,an,datum,message_id,"
                 f"hat_anhaenge,anhaenge,thread_id,text_plain,gelesen,"
                 f"COALESCE(flagged,0) as flagged,COALESCE(pinned,0) as pinned,"
-                f"COALESCE(kira_verwendet,0) as kira_verwendet FROM mails WHERE {where} "
+                f"COALESCE(kira_verwendet,0) as kira_verwendet,snooze_until FROM mails WHERE {where} "
                 f"ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
@@ -11009,6 +11342,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'flagged':       bool(r['flagged']),
                     'pinned':        bool(r['pinned']),
                     'kira_verwendet': bool(r['kira_verwendet']),
+                    'snooze_until':  r['snooze_until'] or '',
                 })
 
             conn.close()
@@ -11908,6 +12242,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/loeschen':
             self._api_mail_loeschen(body)
+            return
+
+        if self.path == '/api/mail/snooze':
+            self._api_mail_snooze(body)
             return
 
         if self.path == '/api/mail/kira-markieren':
@@ -13114,6 +13452,36 @@ def run_server(open_browser=True):
 
     _cleanup_t = threading.Thread(target=_archiv_cleanup_loop, daemon=True, name="ArchivCleanup")
     _cleanup_t.start()
+
+    # Snooze-Wecker: jede Minute abgelaufene Snoozed-Mails aufwecken
+    def _snooze_waker_loop():
+        import time as _time
+        _time.sleep(30)  # kurze Verzögerung
+        while True:
+            try:
+                _ensure_mail_columns()
+                conn = sqlite3.connect(str(MAIL_INDEX_DB))
+                rows = conn.execute(
+                    "SELECT message_id FROM mails WHERE snooze_until IS NOT NULL "
+                    "AND datetime(snooze_until) <= datetime('now')"
+                ).fetchall()
+                if rows:
+                    ids = [r[0] for r in rows]
+                    conn.executemany(
+                        "UPDATE mails SET snooze_until=NULL, gelesen=0 WHERE message_id=?",
+                        [(mid,) for mid in ids]
+                    )
+                    conn.commit()
+                    rlog('system', 'snooze_wakeup',
+                         f"{len(ids)} Snooze-Mail(s) aufgeweckt",
+                         source='server', modul='snooze', actor_type='system', status='ok')
+                conn.close()
+            except Exception:
+                pass
+            _time.sleep(60)
+
+    _snooze_t = threading.Thread(target=_snooze_waker_loop, daemon=True, name="SnoozeWaker")
+    _snooze_t.start()
 
     try:
         httpd.serve_forever()

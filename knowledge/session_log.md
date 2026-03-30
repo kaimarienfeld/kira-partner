@@ -152,3 +152,23 @@
 **Status:** erledigt
 
 ---
+
+## 2026-03-30 — Session-Start (session-ii)
+
+**Auftrag:** Postfach-Rebuild: (1) pfBulkDelete IIFE-Scope-Bug beheben. (2) Unread-Badge INBOX prominent/fett. (3) Favoriten-Klick filtert korrekt + Active State. (4) Gemeinsames Postfach: "Ungelesene" + "Erinnert mich" Sub-Ordner. (5) Aktionsleiste auch bei Einzel-Auswahl (Single-Mode vs Bulk-Mode). (6) Snooze/Erneut erinnern: Dropdown (Presets + Freitext), IMAP-Ordner auto-anlegen, Kira LLM-Kontext ohne Limit.
+**Status:** erledigt
+
+**Erledigt:**
+- Bug: pfBulkDelete/pfBulkMarkRead/pfClearSelection als window.* exponiert (IIFE-Scope-Problem)
+- Favoriten: pfSelectFolder bereinigt active von .pf-fav-item + data-konto/data-folder Attribute für Highlight
+- Badge: INBOX=fetter blauer Badge, Entwürfe=grauer Italic-Total-Badge, Snooze-Ordner=gelb, andere=wie gehabt
+- Combined Postfach: "Ungelesene" (folder_type=unread, nur gelesen=0 INBOX-Mails) + "Erinnert mich" (folder_type=snoozed) Sub-Items
+- Aktionsleiste: pf-bulk-bar mit Single-Modus (Antworten/Allen/Weiterleiten/Löschen/Kennzeichnen/Heften/Erinnern/Verschieben) + Bulk-Modus getrennt; pfOpenMail ruft pfUpdateBulkBar auf
+- Snooze: snooze_until Spalte in mails, POST /api/mail/snooze + GET /api/mail/snooze/count, IMAP-Ordner auto-CREATE + in sync_ordner eintragen, Dropdown mit 7 Presets + Freitext-Parser (2h30m / YYYY-MM-DD HH:MM), Snooze-Badge auf Mail-Item, Snooze-Wecker-Thread alle 60s, Inbox filtert snoozed-Mails aus
+- kira_llm.py: SCHLAFENDE MAILS-Sektion ohne Limit (alle aktiven Snooze-Mails)
+**Offen geblieben:** Google OAuth, SMTP-Passwort-Auth, Stats-Zeile klickbar, Wissens-DB auto-pflege
+
+## 2026-03-30 — Session-Ende (session-ii)
+**Status:** erledigt
+
+---
