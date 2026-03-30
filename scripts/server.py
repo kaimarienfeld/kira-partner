@@ -390,10 +390,12 @@ def build_dashboard(tasks, db):
     try:
         org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
         term_html = ""
+        _ORG_TYP = {"termin": "Termin", "frist": "Frist", "rueckruf": "Rückruf"}
         for r in org_rows:
             dat = esc(r['datum_erkannt'] or '')
             desc = esc((r['beschreibung'] or '')[:45])
-            typ = esc(r['typ'] or '')
+            raw_org_typ = r['typ'] or ''
+            typ = esc(_ORG_TYP.get(raw_org_typ, raw_org_typ.title()))
             # Urgency color based on date
             urgency = "normal"
             try:
@@ -404,7 +406,9 @@ def build_dashboard(tasks, db):
             except: pass
             dat_display = dat[:10] if dat else "–"
             badge = ""
-            if urgency == "urgent": badge = f'<span class="dash-term-badge dash-tag-red">heute</span>'
+            if urgency == "urgent":
+                if diff < 0: badge = f'<span class="dash-term-badge dash-tag-red">&#x26A0; &uuml;berf&auml;llig</span>'
+                else: badge = f'<span class="dash-term-badge dash-tag-red">heute</span>'
             elif urgency == "soon": badge = f'<span class="dash-term-badge dash-tag-amber">bald</span>'
             term_html += f'''<div class="dash-term-item">
   <span class="dash-term-date {urgency}">{dat_display}</span>
@@ -414,19 +418,34 @@ def build_dashboard(tasks, db):
     except: term_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Termine erfasst</div>'
 
     # ── Zone C3: Geschäft aktuell ──
+    _TYP_LABELS = {
+        "sonstiger_vorgang": "Vorgang",
+        "eingangsrechnung": "Eingangsrechnung",
+        "zahlungserinnerung": "Zahlungserinnerung",
+        "routine_zahlung": "Routinezahlung",
+        "kundenvorgang": "Kundenvorgang",
+        "beleg": "Beleg",
+        "rechnung": "Rechnung",
+        "angebot": "Angebot",
+        "anfrage": "Anfrage",
+        "lead": "Lead",
+        "nachfass": "Nachfass",
+    }
     try:
         gesch_rows = db.execute("SELECT typ,datum,betrag,gegenpartei,gegenpartei_email FROM geschaeft ORDER BY datum DESC LIMIT 5").fetchall()
         biz_html = ""
         for r in gesch_rows:
-            typ = esc(r['typ'] or '')
+            raw_typ = r['typ'] or ''
+            typ = esc(_TYP_LABELS.get(raw_typ, raw_typ.replace("_"," ").title() if raw_typ else ''))
             betrag = r['betrag'] or 0
             name = esc((r['gegenpartei'] or r['gegenpartei_email'] or '')[:30])
-            # Color by type
-            if "Zahlung" in typ or "Eingang" in typ:
+            # Color by type (use raw DB value for reliable matching)
+            rt = raw_typ.lower()
+            if rt in ("routine_zahlung", "eingangsrechnung", "beleg") or "zahlung" in rt and "erinnerung" not in rt:
                 dot_color = "#1D9E75"; val_color = "#1D9E75"; prefix = "+"
-            elif "überfällig" in typ.lower() or "Mahnung" in typ:
+            elif "mahnung" in rt or "zahlungserinnerung" in rt or "ueberfaellig" in rt:
                 dot_color = "#E24B4A"; val_color = "#E24B4A"; prefix = ""
-            elif "Nachfass" in typ:
+            elif rt == "nachfass":
                 dot_color = "#EF9F27"; val_color = "#BA7517"; prefix = ""
             else:
                 dot_color = "#888780"; val_color = "var(--text-secondary)"; prefix = ""
