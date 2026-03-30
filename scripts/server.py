@@ -80,6 +80,29 @@ def _ensure_mail_columns():
         pass
     # Gelöschte-Protokoll-Tabelle in tasks.db sicherstellen
     _ensure_geloeschte_protokoll_table()
+    # Signaturen-Tabelle sicherstellen
+    _ensure_mail_signaturen_table()
+
+def _ensure_mail_signaturen_table():
+    """Erstellt mail_signaturen-Tabelle in tasks.db (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS mail_signaturen (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                konto       TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                html        TEXT NOT NULL DEFAULT '',
+                ist_default INTEGER NOT NULL DEFAULT 0,
+                erstellt    TEXT NOT NULL DEFAULT (datetime('now')),
+                geaendert   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_sig_konto ON mail_signaturen(konto)")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
 
 def _ensure_geloeschte_protokoll_table():
     """Erstellt geloeschte_protokoll-Tabelle in tasks.db (idempotent)."""
@@ -4123,7 +4146,7 @@ function esShowSec(id) {{
   if(panel) panel.classList.add('es-active');
   var nav = document.querySelector('.es-sn[data-essec="'+id+'"]');
   if(nav) nav.classList.add('act');
-  if(id==='mail') {{ esLoadMailKonten(); esLoadMailArchiv(); }}
+  if(id==='mail') {{ esLoadMailKonten(); esLoadMailArchiv(); esLoadSignaturen(); }}
   if(id==='integrationen') {{ esIntegLoad(); }}
 }}
 function esShowProtoTab(id) {{
@@ -4813,9 +4836,16 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: MAIL & KONTEN ─────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-mail">
   <div class="es-sec-h">Mail &amp; Konten</div>
-  <div class="es-sec-sub">Mailkonten verwalten, IMAP-Verbindungen testen und Archiv konfigurieren.</div>
 
   <style>
+  /* ── Mail-Tab-Bar ── */
+  .es-mail-tabs{{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;flex-shrink:0}}
+  .es-mail-tab{{padding:8px 18px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .14s,border-color .14s;letter-spacing:.01em}}
+  .es-mail-tab:hover{{color:var(--text)}}
+  .es-mail-tab.act{{color:var(--accent,#1a73e8);border-bottom-color:var(--accent,#1a73e8)}}
+  [data-theme="light"] .es-mail-tab.act{{color:#1a73e8;border-bottom-color:#1a73e8}}
+  .es-mail-panel{{display:none}}
+  .es-mail-panel.act{{display:block}}
   /* ── Konto-Karten ── */
   .es-mk-card{{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--bg-raised)}}
   .es-mk-card-head{{display:flex;align-items:center;gap:10px;margin-bottom:10px}}
@@ -4903,23 +4933,59 @@ function esShowProtoTab(id) {{
   .es-kira-ord-list{{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}}
   .es-kira-ord-chip{{display:flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border-radius:6px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer}}
   .es-kira-ord-chip.active{{background:rgba(79,125,249,.15);border-color:var(--accent);color:var(--accent)}}
+  /* ── Signaturen-Tab ── */
+  .es-sig-list{{margin-top:4px}}
+  .es-sig-item{{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-raised);transition:border-color .14s}}
+  .es-sig-item:hover{{border-color:var(--accent)}}
+  .es-sig-name{{flex:1;font-size:13px;font-weight:600;color:var(--text)}}
+  .es-sig-konto{{font-size:11px;color:var(--text-muted);margin-top:2px}}
+  .es-sig-default-badge{{font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(79,125,249,.15);color:var(--accent);font-weight:600;flex-shrink:0}}
+  .es-sig-actions{{display:flex;gap:6px;flex-shrink:0}}
+  .es-sig-empty{{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-raised);border-radius:8px;border:1px dashed var(--border)}}
+  /* Signatur-Editor-Modal */
+  .es-sig-modal-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}}
+  .es-sig-modal{{background:var(--bg-card);border-radius:14px;width:760px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 80px rgba(0,0,0,.45);border:1px solid var(--border)}}
+  .es-sig-modal-head{{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--border)}}
+  .es-sig-modal-title{{font-size:15px;font-weight:700;color:var(--text)}}
+  .es-sig-modal-body{{flex:1;overflow-y:auto;padding:16px 22px}}
+  .es-sig-modal-foot{{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)}}
+  .es-sig-field{{margin-bottom:14px}}
+  .es-sig-field label{{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}}
+  .es-sig-field input,.es-sig-field select{{width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;color:var(--text)}}
+  .es-sig-field input:focus,.es-sig-field select:focus{{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}}
+  #es-sig-quill-wrap .ql-toolbar{{background:var(--bg-raised);border-color:var(--border);border-radius:7px 7px 0 0}}
+  #es-sig-quill-wrap .ql-container{{background:var(--bg);border-color:var(--border);border-radius:0 0 7px 7px;min-height:200px;font-size:13px;color:var(--text)}}
   </style>
 
-  <!-- Gesamt-Stats + Alle-Aktionen -->
-  <div class="es-mk-total" id="es-mk-total">
-    <div class="es-mk-total-info"><strong id="es-mk-total-cnt">–</strong> Mails im Index</div>
-    <div style="display:flex;gap:8px">
-      <button class="es-mk-btn sec" onclick="esMkAlleAbrufen(this)">&#x25BA; Alle abrufen</button>
-      <button class="es-mk-btn sec" onclick="esMkAlleTest()">&#x26A1; Alle testen</button>
-    </div>
+  <!-- Tab-Leiste -->
+  <div class="es-mail-tabs" id="es-mail-tabs">
+    <button class="es-mail-tab act" data-tab="mailkonten" onclick="esMailTab('mailkonten',this)">Mailkonten</button>
+    <button class="es-mail-tab" data-tab="monitor" onclick="esMailTab('monitor',this)">Mail-Monitor</button>
+    <button class="es-mail-tab" data-tab="klassifizierung" onclick="esMailTab('klassifizierung',this)">Klassifizierung</button>
+    <button class="es-mail-tab" data-tab="signaturen" onclick="esMailTab('signaturen',this)">Signaturen</button>
+    <button class="es-mail-tab" data-tab="archiv" onclick="esMailTab('archiv',this)">Archiv</button>
+    <button class="es-mail-tab" data-tab="sync" onclick="esMailTab('sync',this)">Sync &amp; Kira-Zugang</button>
   </div>
 
-  <!-- Konto-Liste -->
-  <div id="es-mail-konten-list"><div style="padding:12px;color:var(--text-muted);font-size:13px">Lade Konten...</div></div>
-  <button class="es-mk-btn" style="margin-top:8px" onclick="esMkWizardOpen()">+ Konto hinzuf&uuml;gen</button>
+  <!-- ── TAB: MAILKONTEN ── -->
+  <div class="es-mail-panel act" id="es-mtp-mailkonten">
+    <!-- Gesamt-Stats + Alle-Aktionen -->
+    <div class="es-mk-total" id="es-mk-total">
+      <div class="es-mk-total-info"><strong id="es-mk-total-cnt">–</strong> Mails im Index</div>
+      <div style="display:flex;gap:8px">
+        <button class="es-mk-btn sec" onclick="esMkAlleAbrufen(this)">&#x25BA; Alle abrufen</button>
+        <button class="es-mk-btn sec" onclick="esMkAlleTest()">&#x26A1; Alle testen</button>
+      </div>
+    </div>
+    <!-- Konto-Liste -->
+    <div id="es-mail-konten-list"><div style="padding:12px;color:var(--text-muted);font-size:13px">Lade Konten...</div></div>
+    <button class="es-mk-btn" style="margin-top:8px" onclick="esMkWizardOpen()">+ Konto hinzuf&uuml;gen</button>
+  </div>
 
+  <!-- ── TAB: MAIL-MONITOR ── -->
+  <div class="es-mail-panel" id="es-mtp-monitor">
   <!-- Mail-Monitor -->
-  <div class="es-grp" style="margin-top:24px">
+  <div class="es-grp" style="margin-top:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <div class="es-grp-h" style="margin-bottom:0">Mail-Monitor</div>
       <div id="es-mail-monitor-badge"></div>
@@ -4973,9 +5039,12 @@ function esShowProtoTab(id) {{
       <button class="es-mk-btn sec" style="font-size:11px;padding:4px 10px" onclick="esMailMonitorNow(this)">&#x25BA; Jetzt abrufen</button>
     </div>
   </div>
+  </div><!-- /es-mtp-monitor -->
 
+  <!-- ── TAB: MAIL-KLASSIFIZIERUNG ── -->
+  <div class="es-mail-panel" id="es-mtp-klassifizierung">
   <!-- Mail-Klassifizierung -->
-  <div class="es-grp">
+  <div class="es-grp" style="margin-top:0">
     <div class="es-grp-h">Mail-Klassifizierung</div>
     <div class="es-grp-sub">KI-basierte Kategorisierung eingehender Mails mit LLM.</div>
     <div class="es-row">
@@ -5004,9 +5073,26 @@ function esShowProtoTab(id) {{
     </div>
     <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
   </div>
+  </div><!-- /es-mtp-klassifizierung -->
 
+  <!-- ── TAB: SIGNATUREN ── -->
+  <div class="es-mail-panel" id="es-mtp-signaturen">
+    <div class="es-grp" style="margin-top:0">
+      <div class="es-grp-h">E-Mail-Signaturen</div>
+      <div class="es-grp-sub">Erstelle mehrere Signaturen pro Konto. Beim Verfassen wird die Standard-Signatur automatisch eingef&uuml;gt.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="es-mk-btn" onclick="esSigNeu()">+ Neue Signatur</button>
+      </div>
+      <div class="es-sig-list" id="es-sig-list">
+        <div class="es-sig-empty">Signaturen werden geladen&hellip;</div>
+      </div>
+    </div>
+  </div><!-- /es-mtp-signaturen -->
+
+  <!-- ── TAB: ARCHIV ── -->
+  <div class="es-mail-panel" id="es-mtp-archiv">
   <!-- Archiv-Ordner -->
-  <div class="es-grp">
+  <div class="es-grp" style="margin-top:0">
     <div class="es-grp-h">&#x1F4C1; Mail-Archiv-Ordner <span style="color:#e06060;font-size:11px;font-weight:400">PFLICHT</span></div>
     <div class="es-grp-sub">KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext. Das Archiv ist deine exportierbare Datenbasis.</div>
     <div class="es-row">
@@ -5038,13 +5124,17 @@ function esShowProtoTab(id) {{
     </div>
     <div id="es-reindex-progress" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
   </div>
+  </div><!-- /es-mtp-archiv -->
 
+  <!-- ── TAB: SYNC & KIRA-ZUGANG ── -->
+  <div class="es-mail-panel" id="es-mtp-sync">
   <!-- Sync-Ordner + KIRA-Zugang -->
-  <div class="es-grp">
+  <div class="es-grp" style="margin-top:0">
     <div class="es-grp-h">Sync-Ordner &amp; KIRA-Zugang</div>
     <div class="es-grp-sub">Welche IMAP-Ordner &uuml;berwacht werden. KIRA LLM-Zugang: KIRA kann diese Ordner lesen und f&uuml;r Antworten nutzen.</div>
     <div id="es-sync-ordner-list"><div style="padding:8px;color:var(--text-muted);font-size:12px">Wird geladen...</div></div>
   </div>
+  </div><!-- /es-mtp-sync -->
 
   <script>
   // ── Mail-Konten laden ──────────────────────────────────────────────────────
@@ -5867,6 +5957,191 @@ function esShowProtoTab(id) {{
       if(btn) {{btn.disabled=false;btn.textContent='\u25ba Jetzt abrufen';}}
       showToast(d.ok?'Abruf gestartet':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
     }}).catch(()=>{{ if(btn) {{btn.disabled=false;btn.textContent='\u25ba Jetzt abrufen';}} }});
+  }};
+
+  // ── Mail-Tab Switching ─────────────────────────────────────────────────────
+  window.esMailTab = function(tabId, btn) {{
+    document.querySelectorAll('.es-mail-tab').forEach(b=>b.classList.remove('act'));
+    document.querySelectorAll('.es-mail-panel').forEach(p=>p.classList.remove('act'));
+    if(btn) btn.classList.add('act');
+    const panel = document.getElementById('es-mtp-'+tabId);
+    if(panel) panel.classList.add('act');
+    // Lazy-load pro Tab
+    if(tabId==='signaturen') esLoadSignaturen();
+    if(tabId==='sync') esLoadMailArchiv();
+    if(tabId==='archiv') esLoadMailArchiv();
+  }};
+
+  // ── Signaturen ─────────────────────────────────────────────────────────────
+  window.esLoadSignaturen = function() {{
+    fetch('/api/mail/signaturen').then(r=>r.json()).then(d=>{{
+      const list = document.getElementById('es-sig-list');
+      if(!list) return;
+      const sigs = d.signaturen || [];
+      if(!sigs.length) {{
+        list.innerHTML='<div class="es-sig-empty">Noch keine Signaturen angelegt.<br>Klicke \u201e+ Neue Signatur\u201c um zu beginnen.</div>';
+        return;
+      }}
+      // Gruppierung nach Konto
+      const byKonto = {{}};
+      sigs.forEach(s=>{{
+        if(!byKonto[s.konto]) byKonto[s.konto]=[];
+        byKonto[s.konto].push(s);
+      }});
+      let html='';
+      Object.entries(byKonto).forEach(([konto,ks])=>{{
+        html+=`<div style="margin-bottom:20px">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${{konto}}</div>`;
+        ks.forEach(s=>{{
+          html+=`<div class="es-sig-item" id="es-sig-item-${{s.id}}">
+            <div style="flex:1;min-width:0">
+              <div class="es-sig-name">${{s.name||'Ohne Titel'}}</div>
+              <div class="es-sig-konto">${{s.konto}}</div>
+            </div>
+            ${{s.ist_default?'<span class="es-sig-default-badge">&#x2605; Standard</span>':''}}
+            <div class="es-sig-actions">
+              ${{!s.ist_default?`<button class="es-mk-btn sec" style="font-size:11px;padding:3px 9px" title="Als Standard setzen" onclick="esSigSetDefault(${{s.id}},'${{s.konto.replace(/'/g,"\\'")}}')">&#x2605;</button>`:'<button class="es-mk-btn sec" style="font-size:11px;padding:3px 9px;opacity:.4" disabled title="Ist bereits Standard">&#x2605;</button>'}}
+              <button class="es-mk-btn sec" style="font-size:11px;padding:3px 9px" onclick="esSigEdit(${{s.id}})">&#x270E; Bearbeiten</button>
+              <button class="es-mk-btn danger" style="font-size:11px;padding:3px 9px" onclick="esSigDelete(${{s.id}},'${{(s.name||'').replace(/'/g,"\\'")}}')">&#x1F5D1;</button>
+            </div>
+          </div>`;
+        }});
+        html+='</div>';
+      }});
+      list.innerHTML=html;
+    }}).catch(()=>{{
+      const list=document.getElementById('es-sig-list');
+      if(list) list.innerHTML='<div class="es-sig-empty" style="color:#c84444">Fehler beim Laden der Signaturen.</div>';
+    }});
+  }};
+
+  // Signatur-Editor-State
+  let _sigEdit = {{id:null,konto:'',name:'',html:'',quill:null}};
+
+  window.esSigNeu = function() {{
+    _sigEdit = {{id:null,konto:'',name:'',html:'',quill:null}};
+    _esSigModalOpen('Neue Signatur');
+  }};
+  window.esSigEdit = function(id) {{
+    fetch('/api/mail/signaturen').then(r=>r.json()).then(d=>{{
+      const s=(d.signaturen||[]).find(x=>x.id===id);
+      if(!s){{showToast('Signatur nicht gefunden','fehler');return;}}
+      _sigEdit = {{id:s.id,konto:s.konto,name:s.name,html:s.html,quill:null}};
+      _esSigModalOpen('Signatur bearbeiten');
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+  window.esSigDelete = function(id,name) {{
+    if(!confirm('Signatur \u201e'+name+'\u201c wirklich l\u00f6schen?')) return;
+    fetch('/api/mail/signaturen/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id}})}})
+    .then(r=>r.json()).then(d=>{{
+      showToast(d.ok?'Signatur gel\u00f6scht':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
+      if(d.ok) esLoadSignaturen();
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+  window.esSigSetDefault = function(id,konto) {{
+    fetch('/api/mail/signaturen/default',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id,konto:konto}})}})
+    .then(r=>r.json()).then(d=>{{
+      showToast(d.ok?'Standard-Signatur gesetzt':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
+      if(d.ok) esLoadSignaturen();
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+
+  function _esSigModalOpen(title) {{
+    // Konten für Dropdown
+    fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
+      const konten=(data.konten||[]).filter(k=>k.aktiv!==false).map(k=>k.email);
+      const kontoOpts=konten.map(e=>`<option value="${{e}}" ${{e===_sigEdit.konto?'selected':''}}>${{e}}</option>`).join('');
+      const modal=document.createElement('div');
+      modal.className='es-sig-modal-overlay';
+      modal.id='es-sig-modal';
+      modal.innerHTML=`
+        <div class="es-sig-modal">
+          <div class="es-sig-modal-head">
+            <span class="es-sig-modal-title">${{title}}</span>
+            <button onclick="document.getElementById('es-sig-modal')?.remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1">&times;</button>
+          </div>
+          <div class="es-sig-modal-body">
+            <div class="es-sig-field">
+              <label>Konto</label>
+              <select id="es-sig-konto">${{kontoOpts||'<option value="">Kein aktives Konto</option>'}}</select>
+            </div>
+            <div class="es-sig-field">
+              <label>Name der Signatur</label>
+              <input type="text" id="es-sig-name" value="${{_sigEdit.name||''}}" placeholder="z.B. Standard, Formal, Kurz">
+            </div>
+            <div class="es-sig-field">
+              <label>Signatur (HTML-Editor)</label>
+              <div id="es-sig-quill-wrap">
+                <div id="es-sig-quill-editor"></div>
+              </div>
+            </div>
+          </div>
+          <div class="es-sig-modal-foot">
+            <button class="es-mk-btn sec" onclick="document.getElementById('es-sig-modal')?.remove()">Abbrechen</button>
+            <button class="es-mk-btn" onclick="esSigSave()">Speichern</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      // Quill laden
+      _esSigInitQuill();
+    }}).catch(()=>showToast('Fehler beim Laden der Konten','fehler'));
+  }}
+
+  function _esSigInitQuill() {{
+    if(window.Quill) {{
+      _esSigSetupQuill();
+      return;
+    }}
+    // Quill CDN laden
+    const css=document.createElement('link');
+    css.rel='stylesheet';
+    css.href='https://cdn.quilljs.com/1.3.7/quill.snow.css';
+    document.head.appendChild(css);
+    const scr=document.createElement('script');
+    scr.src='https://cdn.quilljs.com/1.3.7/quill.min.js';
+    scr.onload=_esSigSetupQuill;
+    document.head.appendChild(scr);
+  }}
+
+  function _esSigSetupQuill() {{
+    const el=document.getElementById('es-sig-quill-editor');
+    if(!el||!window.Quill) return;
+    _sigEdit.quill=new Quill('#es-sig-quill-editor', {{
+      theme:'snow',
+      modules:{{
+        toolbar:[
+          ['bold','italic','underline','strike'],
+          [{{color:[]}},{{'background':[]}}],
+          [{{font:[]}},{{'size':['small',false,'large','huge']}}],
+          [{{list:'ordered'}},{{'list':'bullet'}}],
+          ['link','image'],
+          ['clean']
+        ]
+      }}
+    }});
+    // Initial-HTML setzen
+    if(_sigEdit.html) {{
+      _sigEdit.quill.clipboard.dangerouslyPasteHTML(_sigEdit.html);
+    }}
+  }}
+
+  window.esSigSave = function() {{
+    const konto=(document.getElementById('es-sig-konto')?.value||'').trim();
+    const name=(document.getElementById('es-sig-name')?.value||'').trim();
+    const html=_sigEdit.quill?_sigEdit.quill.root.innerHTML:'';
+    if(!konto){{showToast('Konto w\u00e4hlen','warnung');return;}}
+    if(!name){{showToast('Name eingeben','warnung');return;}}
+    fetch('/api/mail/signaturen/save',{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{id:_sigEdit.id,konto,name,html}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(d.ok){{
+        showToast('Signatur gespeichert','ok');
+        document.getElementById('es-sig-modal')?.remove();
+        esLoadSignaturen();
+      }} else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }}).catch(()=>showToast('Fehler','fehler'));
   }};
   </script>
 </div>
@@ -10984,6 +11259,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/protokoll'):
             self._api_mail_protokoll()
 
+        elif self.path == '/api/mail/signaturen':
+            self._api_mail_signaturen_get()
+
         elif self.path.startswith('/api/browse/result'):
             self._api_browse_result()
 
@@ -12536,6 +12814,84 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    # ── Signaturen ─────────────────────────────────────────────────────────────
+
+    def _api_mail_signaturen_get(self):
+        """GET /api/mail/signaturen — Alle Signaturen."""
+        _ensure_mail_signaturen_table()
+        try:
+            db = get_db()
+            rows = db.execute(
+                "SELECT id, konto, name, html, ist_default, erstellt, geaendert FROM mail_signaturen ORDER BY konto, ist_default DESC, name"
+            ).fetchall()
+            db.close()
+            self._json({'ok': True, 'signaturen': [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_signaturen_save(self, body):
+        """POST /api/mail/signaturen/save — Signatur anlegen oder aktualisieren."""
+        _ensure_mail_signaturen_table()
+        try:
+            sig_id  = body.get('id')          # None = neu
+            konto   = body.get('konto', '').strip()
+            name    = body.get('name', '').strip()
+            html    = body.get('html', '')
+            if not konto or not name:
+                self._json({'ok': False, 'error': 'konto und name erforderlich'}); return
+            db = get_db()
+            now = datetime.now().isoformat(timespec='seconds')
+            if sig_id:
+                db.execute(
+                    "UPDATE mail_signaturen SET konto=?, name=?, html=?, geaendert=? WHERE id=?",
+                    (konto, name, html, now, int(sig_id))
+                )
+            else:
+                db.execute(
+                    "INSERT INTO mail_signaturen (konto, name, html, ist_default, erstellt, geaendert) VALUES (?,?,?,0,?,?)",
+                    (konto, name, html, now, now)
+                )
+            db.commit()
+            db.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_signaturen_delete(self, body):
+        """POST /api/mail/signaturen/delete — Signatur löschen."""
+        _ensure_mail_signaturen_table()
+        try:
+            sig_id = int(body.get('id', 0))
+            if not sig_id:
+                self._json({'ok': False, 'error': 'id fehlt'}); return
+            db = get_db()
+            db.execute("DELETE FROM mail_signaturen WHERE id=?", (sig_id,))
+            db.commit()
+            db.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_signaturen_default(self, body):
+        """POST /api/mail/signaturen/default — Standard-Signatur für ein Konto setzen (id=0 = keine)."""
+        _ensure_mail_signaturen_table()
+        try:
+            konto  = body.get('konto', '').strip()
+            sig_id = int(body.get('id', 0))
+            if not konto:
+                self._json({'ok': False, 'error': 'konto fehlt'}); return
+            db = get_db()
+            db.execute("UPDATE mail_signaturen SET ist_default=0 WHERE konto=?", (konto,))
+            if sig_id:
+                db.execute("UPDATE mail_signaturen SET ist_default=1 WHERE id=? AND konto=?", (sig_id, konto))
+            db.commit()
+            db.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    # ── Ende Signaturen ────────────────────────────────────────────────────────
+
     def _api_mail_konto_stats(self):
         """GET /api/mail/konten/stats?email= — Archiv+Index-Stats für ein Konto."""
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -13155,6 +13511,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/microsoft-app/test':
             self._api_mail_microsoft_app_test()
+            return
+
+        if self.path == '/api/mail/signaturen/save':
+            self._api_mail_signaturen_save(body)
+            return
+
+        if self.path == '/api/mail/signaturen/delete':
+            self._api_mail_signaturen_delete(body)
+            return
+
+        if self.path == '/api/mail/signaturen/default':
+            self._api_mail_signaturen_default(body)
             return
 
         if self.path == '/api/whatsapp/secrets-speichern':
