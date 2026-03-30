@@ -107,3 +107,16 @@
 **Umsetzung:** (1) daily_check.py: recheck_mails(seit, bis, dry_run) + get_recheck_progress() + --seit/--bis/--trocken CLI. (2) server.py: POST /api/mail/nachklassifizieren + GET /api/mail/nachklassifizieren/status + UI-Button in Einstellungen > Mail-Klassifizierung. (3) Nachklassifizierung durchgeführt: 5 neue Tasks (Angebotsrückmeldung Kaufmann A-SB260093, Betonkosmetik Horsting, Amir Sad Lead, Calumex Lead, Handwerker).
 
 **Status:** erledigt
+
+---
+
+## 2026-03-29 — Session-Start (session-gg)
+
+**Auftrag:** (Continuation session-ff) Folgefragen: (1) Klassifiziert Kira neue Mails wieder automatisch? (2) Dashboard "Geschäft aktuell" zeigt unleserliche Rohdaten ("sonstiger_vorgang: Timon...") — übersichtlicher machen. Nächste Termine zeigt alte Daten mit falschem Badge "heute".
+
+**Diagnose:** mail_monitor war immer korrekt. Dashboard-Problem: geschaeft.typ = Raw-DB-Werte ohne Label-Mapping + organisation-Badge "heute" für vergangene Termine.
+
+**Umsetzung:** build_dashboard() server.py: (1) _TYP_LABELS dict: sonstiger_vorgang→"Vorgang", zahlungserinnerung→"Zahlungserinnerung" etc. (2) Farbprüfung auf raw_typ (zuverlässig). (3) _ORG_TYP dict: termin/frist/rueckruf→Deutsch. (4) Badge "⚠ überfällig" statt "heute" wenn diff < 0. Commit 1e4ca49.
+
+## 2026-03-29 — Session-Ende (session-gg)
+**Status:** erledigt
