@@ -989,31 +989,29 @@ def build_postfach():
 
     <!-- ── 1. Mail-Kopf ──────────────────────────────────────── -->
     <div class="pf-mail-head" id="pf-mail-head">
-      <div class="pf-subject-bar">
-        <div class="pf-subject-text" id="pf-prev-betreff"></div>
+      <div class="pf-head-dateline">
         <div class="pf-date-stack" id="pf-prev-datum"></div>
       </div>
-      <div class="pf-header-meta">
-        <div class="pf-sender-col">
-          <div class="pf-avatar" id="pf-avatar">?</div>
-          <div class="pf-identity">
-            <div class="pf-from-line" id="pf-prev-absender"></div>
-            <div class="pf-to-line" id="pf-prev-to"></div>
-          </div>
+      <div class="pf-subject-text" id="pf-prev-betreff"></div>
+      <div class="pf-sender-row">
+        <div class="pf-avatar" id="pf-avatar">?</div>
+        <div class="pf-identity">
+          <div class="pf-from-line" id="pf-prev-absender"></div>
+          <div class="pf-to-line" id="pf-prev-to"></div>
         </div>
-        <div class="pf-head-actions" id="pf-prev-toolbar">
-          <button class="pf-ha-btn" id="pf-tb-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
-          <button class="pf-ha-btn" id="pf-tb-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
-          <button class="pf-ha-btn" id="pf-tb-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
-          <div class="pf-ha-sep"></div>
-          <button class="pf-ha-icon" id="pf-tb-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
-          <button class="pf-ha-icon" id="pf-tb-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
-          <button class="pf-ha-icon" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
-          <button class="pf-ha-icon del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
-          <button class="pf-ha-icon" id="pf-tb-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
-          <div class="pf-ha-sep"></div>
-          <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
-        </div>
+      </div>
+      <div class="pf-head-actions" id="pf-prev-toolbar">
+        <button class="pf-ha-btn" id="pf-tb-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
+        <button class="pf-ha-btn" id="pf-tb-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
+        <button class="pf-ha-btn" id="pf-tb-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
+        <div class="pf-ha-sep"></div>
+        <button class="pf-ha-icon" id="pf-tb-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
+        <button class="pf-ha-icon" id="pf-tb-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
+        <button class="pf-ha-icon" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
+        <button class="pf-ha-icon del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+        <button class="pf-ha-icon" id="pf-tb-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+        <div style="flex:1"></div>
+        <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
       </div>
     </div>
 
@@ -1122,7 +1120,7 @@ def build_postfach():
 
 <style>
 /* ── Postfach Shell ─────────────────────────────────────── */
-.pf-shell{display:flex;height:calc(100vh - 56px - var(--pf-ribbon-h,48px));overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
+.pf-shell{display:flex;width:100%;height:calc(100vh - 56px - var(--pf-ribbon-h,48px));overflow:hidden;gap:0;--pf-left-w:245px;--pf-mid-w:350px}
 /* LEFT SIDEBAR */
 .pf-left{width:var(--pf-left-w);min-width:160px;max-width:380px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
 .pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -1370,28 +1368,35 @@ def build_postfach():
 .pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden}
 
 /* ── MAIL-KOPF ───────────────────────────────────────────── */
-.pf-mail-head{padding:14px 20px 10px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0}
-.pf-subject-bar{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
-.pf-subject-text{font-size:16px;font-weight:700;color:var(--text);flex:1;min-width:0;line-height:1.3;word-break:break-word}
-.pf-date-stack{font-size:12px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;padding-top:2px}
-.pf-header-meta{display:flex;flex-direction:column;gap:6px}
-.pf-sender-col{display:flex;align-items:center;gap:12px;min-width:0}
-.pf-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;background:#3b82f6}
+.pf-mail-head{padding:16px 20px 14px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0;display:flex;flex-direction:column;gap:0;min-width:0;overflow:hidden}
+.pf-head-dateline{display:flex;justify-content:flex-end;margin-bottom:5px}
+.pf-date-stack{font-size:11.5px;color:var(--text-muted);white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.pf-subject-text{font-size:18px;font-weight:600;color:var(--text);line-height:1.35;word-break:break-word;letter-spacing:-.2px;margin-bottom:12px}
+.pf-sender-row{display:flex;align-items:center;gap:11px;margin-bottom:12px;min-width:0}
+.pf-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:-.5px;box-shadow:0 1px 4px rgba(0,0,0,.15);background:#3b82f6}
 .pf-identity{min-width:0;flex:1}
-.pf-from-line{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf-to-line{font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
-.pf-head-actions{display:flex;align-items:center;gap:3px;flex-wrap:wrap;flex-shrink:0}
-.pf-ha-btn{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:5px;white-space:nowrap;transition:.12s}
-.pf-ha-btn:hover{background:var(--bg-hover);border-color:var(--border)}
-.pf-ha-btn svg{width:14px;height:14px;flex-shrink:0}
-.pf-ha-icon{background:none;border:none;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--text-muted);display:flex;align-items:center;transition:.12s}
+.pf-from-line{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.pf-to-line{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;line-height:1.3}
+.pf-head-actions{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;min-width:0}
+.pf-ha-btn{background:transparent;border:1.5px solid var(--border);border-radius:20px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,border-color .15s,box-shadow .15s;letter-spacing:.01em;flex-shrink:0}
+.pf-ha-btn:hover{background:var(--bg-hover);border-color:#0078d4;box-shadow:0 1px 5px rgba(0,120,212,.14);color:#0078d4}
+.pf-ha-btn svg{width:14px;height:14px;flex-shrink:0;opacity:.75;transition:opacity .15s}
+.pf-ha-btn:hover svg{opacity:1}
+.pf-ha-icon{width:30px;height:30px;border-radius:50%;border:none;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);transition:background .15s,color .15s;flex-shrink:0}
 .pf-ha-icon:hover{background:var(--bg-hover);color:var(--text)}
-.pf-ha-icon.del-btn:hover{background:rgba(200,60,60,.12);color:#c83c3c}
+.pf-ha-icon.del-btn:hover{background:rgba(200,60,60,.1);color:#c83c3c}
 .pf-ha-icon.active{color:#f59e0b}
+.pf-ha-icon.active:hover{color:#f59e0b}
 .pf-ha-icon.pin-active{color:#3b82f6}
 .pf-ha-icon svg{width:16px;height:16px;display:block}
-.pf-ha-sep{width:1px;height:20px;background:var(--border);margin:0 3px;flex-shrink:0}
-[data-theme="light"] .pf-mail-head{background:#fff}
+.pf-ha-sep{width:1px;height:20px;background:var(--border);margin:0 1px;flex-shrink:0;opacity:.6}
+.pf-kira-btn{background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%) !important;border-color:transparent !important;color:#fff !important;font-weight:600 !important;padding:6px 14px !important;box-shadow:0 2px 10px rgba(79,70,229,.35) !important;letter-spacing:.02em}
+.pf-kira-btn:hover{opacity:.9;box-shadow:0 4px 16px rgba(79,70,229,.45) !important;transform:translateY(-1px);border-color:transparent !important;color:#fff !important}
+.pf-kira-btn svg{opacity:1 !important;color:#fff}
+[data-theme="light"] .pf-mail-head{background:#ffffff;box-shadow:0 1px 0 #e8eaed}
+[data-theme="light"] .pf-ha-btn{border-color:#d0d3d8}
+[data-theme="light"] .pf-ha-btn:hover{border-color:#0078d4;background:#f0f6ff}
+[data-theme="light"] .pf-ha-icon:hover{background:#f0f2f5}
 
 /* ── HINT-SECTION ────────────────────────────────────────── */
 .pf-hint-section{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -9725,7 +9730,7 @@ a{color:var(--accent);text-decoration:none;}
 a:hover{text-decoration:underline;}
 
 /* ═══ APP SHELL — Sidebar + Main ═══ */
-.app-shell{display:flex;flex:1;min-height:100vh;}
+.app-shell{display:flex;flex:1;min-width:0;min-height:100vh;}
 
 /* Sidebar — warm light grey, matches light UI theme */
 .sidebar{width:var(--sidebar-w);background:#EDECE8;border-right:0.5px solid rgba(0,0,0,.1);
@@ -9804,7 +9809,7 @@ a:hover{text-decoration:underline;}
 [data-theme="dark"] .sidebar.collapsed .sidebar-item::after{background:var(--bg-overlay);color:var(--text);}
 
 /* Main content */
-.main-area{flex:1;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
+.main-area{flex:1;min-width:0;overflow:hidden;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
   display:flex;flex-direction:column;min-height:100vh;}
 .sidebar.collapsed ~ .main-area,.app-shell.sb-collapsed .main-area{margin-left:var(--sidebar-collapsed-w);}
 
