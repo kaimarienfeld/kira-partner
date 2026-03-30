@@ -10130,6 +10130,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             html = generate_html()
             self._html(html)
 
+        elif self.path == '/partner':
+            pv_path = SCRIPTS_DIR.parent / 'partner_view.html'
+            try:
+                html = pv_path.read_text('utf-8')
+                self._html(html)
+            except FileNotFoundError:
+                self.send_error(404, 'partner_view.html nicht gefunden')
+
         elif self.path == '/api/tasks/open':
             db = get_db()
             rows = db.execute("SELECT * FROM tasks WHERE status='offen' ORDER BY prioritaet DESC, datum_mail DESC").fetchall()
