@@ -153,6 +153,23 @@
 
 ---
 
+## 2026-03-30 — Session-Start (session-ll)
+
+**Auftrag:** Automatisches Model-Validierungs-System implementieren: Erkennt wenn LLM-Modelle unavailable werden (Anthropic/OpenAI/OpenRouter/Ollama), korrigiert automatisch auf bestes verfügbares Modell, sendet ntfy-Push + Dashboard-Meldung, updated config.json persistent. Danach KIRA_SYSTEM_ANALYSE.md aktualisieren.
+**Status:** erledigt
+
+## 2026-03-30 — Session-Ende (session-ll)
+**Erledigt:**
+- kira_llm.py: `ModelNotFoundError` Klasse, `_MODEL_CACHE`/TTL, `_send_ntfy_push()`, `_fetch_provider_models()` (24h-Cache, alle 4 Provider-Typen), `_model_in_list()`, `_validate_model()`, `_auto_update_model()` (config.json + ntfy), `validate_all_providers()` (schreibt state-file)
+- kira_llm.py: `_call_anthropic()` + `_call_openai_compat()` fangen Modell-404/NotFoundError → Auto-Update + `ModelNotFoundError` → Fallback auf nächsten Provider
+- server.py: Import erweitert, `POST /api/kira/provider/check-models` Endpoint, 🟡 Status-Icon für veraltete Modelle, 🔍 Modell-Button pro Provider-Karte, Stale-Model-Warnung (gelb), `checkProviderModel()` JS-Funktion, `_model_validation_loop` Hintergrund-Thread (20s + 24h)
+- KIRA_SYSTEM_ANALYSE.md: Aktualisiert (session-kk + session-ll Änderungen, alle behobenen Fehler markiert, neue Sektion 3.5 Modell-Validierung, neue Endpunkte, aktualisierte Prioritäts-Matrix)
+- Beide Dateien syntaktisch korrekt (py_compile OK)
+**Offen geblieben:** FEHLER-05 (NULL-Check mail_monitor), FEHLER-07 (State-File Race Condition) — weiterhin offen.
+**Status:** erledigt
+
+---
+
 ## 2026-03-30 — Session-Start (session-ii)
 
 **Auftrag:** Postfach-Rebuild: (1) pfBulkDelete IIFE-Scope-Bug beheben. (2) Unread-Badge INBOX prominent/fett. (3) Favoriten-Klick filtert korrekt + Active State. (4) Gemeinsames Postfach: "Ungelesene" + "Erinnert mich" Sub-Ordner. (5) Aktionsleiste auch bei Einzel-Auswahl (Single-Mode vs Bulk-Mode). (6) Snooze/Erneut erinnern: Dropdown (Presets + Freitext), IMAP-Ordner auto-anlegen, Kira LLM-Kontext ohne Limit.

@@ -100,6 +100,15 @@ class ProviderUnavailableError(Exception):
     pass
 
 
+class ModelNotFoundError(ProviderUnavailableError):
+    """Modell nicht gefunden — Auto-Update wird versucht, Fallback auf nächsten Provider."""
+    pass
+
+
+_MODEL_CACHE: dict = {}      # {provider_id: (timestamp_float, [model_id_strings])}
+_MODEL_CACHE_TTL = 86400     # 24 Stunden
+
+
 # ── Config & Secrets ──────────────────────────────────────────────────────────
 def _load_secrets():
     try:
@@ -238,6 +247,250 @@ def check_provider_status(provider):
             return {"status": "no_package", "message": f"pip install {pkg}"}
 
     return {"status": "ok", "message": "Bereit"}
+
+
+# ── Model-Validierung & Auto-Update ──────────────────────────────────────────
+_MODEL_FALLBACK_RANKING = {
+    "anthropic":  [
+        "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
+    ],
+    "openai":     [
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1-2025-04-14", "o3-mini",
+    ],
+    "openrouter": [
+        "anthropic/claude-sonnet-4", "openai/gpt-4o",
+        "google/gemini-2.5-pro-preview", "deepseek/deepseek-r1",
+        "meta-llama/llama-4-maverick",
+    ],
+    "ollama":     [],   # dynamisch — alles was lokal läuft
+}
+
+_MODEL_VALIDATION_STATE_FILE = KNOWLEDGE_DIR / "model_validation_state.json"
+
+
+def _send_ntfy_push(title: str, message: str, priority: str = "default"):
+    """Sendet eine ntfy Push-Notification basierend auf config.json ntfy-Einstellungen."""
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        ntfy_cfg = cfg.get("ntfy", {})
+        if not ntfy_cfg.get("aktiv"):
+            return
+        topic = ntfy_cfg.get("topic_name", "")
+        server = ntfy_cfg.get("server", "https://ntfy.sh")
+        if not topic or topic.startswith("raumkult-dein"):
+            return
+        import urllib.request
+        data = message.encode('utf-8')
+        req = urllib.request.Request(f"{server}/{topic}", data=data)
+        req.add_header("Title", title)
+        req.add_header("Priority", priority)
+        req.add_header("Tags", "robot,warning")
+        urllib.request.urlopen(req, timeout=8)
+    except Exception:
+        pass
+
+
+def _model_in_list(model_id: str, available: list) -> bool:
+    """Prüft ob ein Modell verfügbar ist. Unterstützt Prefix-Match für dated snapshots.
+
+    Beispiel: 'claude-sonnet-4-6' matched 'claude-sonnet-4-6-20250514' (und umgekehrt).
+    """
+    for m in available:
+        if m == model_id:
+            return True
+        if m.startswith(model_id + "-202"):   # dated snapshot
+            return True
+        if model_id.startswith(m + "-202"):   # config hat dated, API hat base
+            return True
+    return False
+
+
+def _fetch_provider_models(provider) -> list:
+    """Holt verfügbare Modelle vom Provider. Ergebnis wird 24h gecacht."""
+    typ = provider.get("typ", "")
+    pid = provider.get("id", typ)
+
+    # Cache-Prüfung
+    cache_entry = _MODEL_CACHE.get(pid)
+    if cache_entry:
+        ts, models = cache_entry
+        if time.time() - ts < _MODEL_CACHE_TTL:
+            return models
+
+    models = []
+    try:
+        key = _get_provider_key(provider)
+        ptype = PROVIDER_TYPES.get(typ, {})
+        base_url = provider.get("base_url") or ptype.get("base_url", "")
+        import urllib.request
+
+        if typ == "anthropic":
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": key,
+                    "anthropic-version": "2023-06-01",
+                }
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            models = [m["id"] for m in data.get("data", [])]
+
+        elif typ in ("openai", "openrouter", "custom"):
+            api_base = (base_url or "https://api.openai.com/v1").rstrip("/")
+            req = urllib.request.Request(
+                f"{api_base}/models",
+                headers={"Authorization": f"Bearer {key}"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            models = [m["id"] for m in data.get("data", [])]
+
+        elif typ == "ollama":
+            ol_base = (base_url or "http://localhost:11434").replace("/v1", "").rstrip("/")
+            req = urllib.request.Request(f"{ol_base}/api/tags")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            models = [m["name"] for m in data.get("models", [])]
+
+    except Exception:
+        pass
+
+    if models:
+        _MODEL_CACHE[pid] = (time.time(), models)
+
+    return models
+
+
+def _validate_model(provider) -> dict:
+    """Prüft ob das konfigurierte Modell des Providers noch verfügbar ist.
+
+    Returns:
+        {"valid": bool, "model": str, "available_models": list, "reason": str}
+    """
+    model = provider.get("model", "")
+    typ = provider.get("typ", "")
+
+    if not model:
+        return {"valid": False, "model": model, "reason": "Kein Modell konfiguriert"}
+
+    available = _fetch_provider_models(provider)
+
+    if not available:
+        # API nicht erreichbar — kein false-positive auslösen
+        return {
+            "valid": True,
+            "model": model,
+            "reason": "Provider-API nicht erreichbar — Validierung übersprungen",
+            "skipped": True,
+        }
+
+    if _model_in_list(model, available):
+        return {"valid": True, "model": model, "available_count": len(available)}
+
+    return {
+        "valid": False,
+        "model": model,
+        "available_models": available[:20],   # erste 20 für Übersicht
+        "reason": f"'{model}' nicht in Provider-Modellliste ({len(available)} verfügbar)",
+    }
+
+
+def _auto_update_model(provider) -> dict:
+    """Wechselt automatisch zum besten verfügbaren Modell und speichert in config.json.
+
+    Returns:
+        {"changed": bool, "old_model": str, "new_model": str}
+    """
+    typ = provider.get("typ", "")
+    old_model = provider.get("model", "")
+    pid = provider.get("id", "")
+    pname = provider.get("name", typ)
+
+    available = _fetch_provider_models(provider)
+    if not available:
+        return {"changed": False, "old_model": old_model, "new_model": old_model,
+                "reason": "Modellliste nicht abrufbar"}
+
+    # Fallback-Ranking durchsuchen
+    new_model = None
+    for candidate in _MODEL_FALLBACK_RANKING.get(typ, []):
+        if _model_in_list(candidate, available):
+            new_model = candidate
+            break
+
+    # Kein Treffer im Ranking → erstes verfügbares nehmen
+    if not new_model and available:
+        new_model = available[0]
+
+    if not new_model or new_model == old_model:
+        return {"changed": False, "old_model": old_model, "new_model": old_model}
+
+    # config.json aktualisieren
+    try:
+        c = json.loads(CONFIG_FILE.read_text('utf-8'))
+        for p in c.get("llm", {}).get("providers", []):
+            if p.get("id") == pid:
+                p["model"] = new_model
+                break
+        CONFIG_FILE.write_text(json.dumps(c, ensure_ascii=False, indent=2), 'utf-8')
+    except Exception as e:
+        return {"changed": False, "old_model": old_model, "new_model": new_model,
+                "error": str(e)}
+
+    # Push + Event-Log
+    _send_ntfy_push(
+        "⚠ Kira: Modell-Wechsel",
+        f"{pname}: {old_model} → {new_model}",
+        priority="high",
+    )
+    _elog("llm", "model_auto_update",
+          f"Provider {pid}: {old_model} → {new_model}",
+          source="kira_llm", modul="kira", submodul="model_validation",
+          status="ok", provider=pid,
+          entity_snapshot={"old_model": old_model, "new_model": new_model,
+                           "available_count": len(available)})
+
+    return {"changed": True, "old_model": old_model, "new_model": new_model}
+
+
+def validate_all_providers() -> dict:
+    """Validiert alle aktiven Provider, korrigiert veraltete Modelle automatisch.
+
+    Schreibt Ergebnis nach knowledge/model_validation_state.json (für Dashboard/UI).
+    Returns: {provider_id: validation_result_dict}
+    """
+    results = {}
+    for provider in get_providers():
+        typ = provider.get("typ", "")
+        pid = provider.get("id", typ)
+
+        # Nur Provider mit Key (und erreichbarer API) prüfen
+        if PROVIDER_TYPES.get(typ, {}).get("needs_key", True):
+            if not _get_provider_key(provider):
+                results[pid] = {"status": "no_key", "skipped": True}
+                continue
+
+        vr = _validate_model(provider)
+        if not vr.get("valid") and not vr.get("skipped"):
+            update = _auto_update_model(provider)
+            vr["auto_update"] = update
+
+        results[pid] = vr
+
+    # Ergebnis persistieren damit server.py es lesen kann
+    try:
+        state = {
+            "timestamp": datetime.now().isoformat(),
+            "results": results,
+        }
+        _MODEL_VALIDATION_STATE_FILE.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2), 'utf-8'
+        )
+    except Exception:
+        pass
+
+    return results
 
 
 # ── DB Initialisierung ───────────────────────────────────────────────────────
@@ -1517,6 +1770,10 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
         except anthropic.APIStatusError as e:
             if e.status_code in (502, 503, 529):
                 raise ProviderUnavailableError(f"Server überlastet ({e.status_code})")
+            if e.status_code == 404 and "not_found_error" in str(e).lower():
+                _MODEL_CACHE.pop(provider.get("id", ""), None)  # Cache leeren
+                _auto_update_model(provider)
+                raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
             raise
         except Exception as e:
             if any(x in str(e).lower() for x in ("overloaded", "timeout", "connection")):
@@ -1593,6 +1850,17 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
             raise ProviderUnavailableError("API Key ungültig")
         except openai.RateLimitError:
             raise ProviderUnavailableError("Rate Limit / Guthaben leer")
+        except openai.NotFoundError:
+            _MODEL_CACHE.pop(provider.get("id", ""), None)
+            _auto_update_model(provider)
+            raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
+        except openai.BadRequestError as e:
+            err = str(e).lower()
+            if any(x in err for x in ("model_not_found", "does not exist", "unknown model", "invalid model")):
+                _MODEL_CACHE.pop(provider.get("id", ""), None)
+                _auto_update_model(provider)
+                raise ModelNotFoundError(f"Modell '{model}' ungültig — Auto-Update versucht")
+            raise
         except Exception as e:
             err = str(e).lower()
             if any(x in err for x in ("overloaded", "503", "502", "timeout", "connection", "refused")):

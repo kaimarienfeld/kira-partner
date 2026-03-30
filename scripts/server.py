@@ -32,7 +32,8 @@ from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversat
                        get_conversation_messages as kira_get_messages,
                        get_api_key as kira_get_api_key, get_config as get_llm_config,
                        get_all_providers, save_provider_key, check_provider_status,
-                       PROVIDER_TYPES, generate_daily_briefing)
+                       PROVIDER_TYPES, generate_daily_briefing,
+                       _validate_model, _auto_update_model, validate_all_providers)
 from mail_monitor import start_monitor_thread, get_monitor_status, stop_monitor
 
 PORT = 8765
@@ -3302,6 +3303,15 @@ def build_einstellungen():
 
     # Multi-Provider Karten generieren
     providers = get_all_providers()
+    # Modell-Validierungsstatus laden (von Hintergrund-Thread geschrieben)
+    _mv_state = {}
+    try:
+        _mv_file = KNOWLEDGE_DIR / "model_validation_state.json"
+        if _mv_file.exists():
+            _mv_state = json.loads(_mv_file.read_text('utf-8')).get("results", {})
+    except Exception:
+        pass
+
     provider_cards = ""
     for i, prov in enumerate(providers):
         pid = prov.get("id", "")
@@ -3312,7 +3322,16 @@ def build_einstellungen():
         pprio = prov.get("prioritaet", i + 1)
         ptype_info = PROVIDER_TYPES.get(ptyp, {})
         pstatus = check_provider_status(prov)
-        status_icon = "🟢" if pstatus["status"] == "ok" else ("🔑" if pstatus["status"] == "no_key" else "📦")
+        _mv_result = _mv_state.get(pid, {})
+        _model_stale = pstatus["status"] == "ok" and not _mv_result.get("valid", True) and not _mv_result.get("skipped")
+        if _model_stale:
+            status_icon = "🟡"
+        elif pstatus["status"] == "ok":
+            status_icon = "🟢"
+        elif pstatus["status"] == "no_key":
+            status_icon = "🔑"
+        else:
+            status_icon = "📦"
         status_text = esc(pstatus["message"])
         needs_key = ptype_info.get("needs_key", True)
 
@@ -3376,6 +3395,31 @@ def build_einstellungen():
               </select>
             </div>'''
 
+        # Stale-model-Infozeile + "Modell prüfen"-Button
+        _mv_auto = _mv_result.get("auto_update", {})
+        if _model_stale:
+            _mv_reason = esc(_mv_result.get("reason", "Modell nicht mehr verfügbar"))
+            _mv_new = esc(_mv_auto.get("new_model", ""))
+            _stale_row = (
+                f'<div style="font-size:11px;margin:4px 0;padding:4px 8px;background:rgba(255,200,0,.12);'
+                f'border:1px solid rgba(255,200,0,.4);border-radius:4px;color:#c8a200;">'
+                f'⚠ {_mv_reason}'
+                + (f' → <b>{_mv_new}</b> empfohlen' if _mv_new else '')
+                + '</div>'
+            )
+        else:
+            _stale_row = ""
+
+        _main_status_txt = (
+            "⚠ Modell veraltet — Auto-Update ausgeführt" if _model_stale and _mv_auto.get("changed")
+            else "⚠ Modell veraltet" if _model_stale
+            else ("API Key aktiv — Chat bereit" if pstatus["status"] == "ok" else status_text)
+        )
+        _main_status_color = (
+            "color:#c8a200;font-weight:700" if _model_stale
+            else ("color:#5cb85c;font-weight:700" if pstatus["status"] == "ok" else "color:var(--muted)")
+        )
+
         provider_cards += f'''<div class="provider-card" id="pcard-{esc(pid)}" style="{opacity}border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:8px">
@@ -3387,11 +3431,13 @@ def build_einstellungen():
               <span style="font-size:10px;color:var(--muted)">Prio {pprio}</span>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',-1)" title="Höhere Priorität">▲</button>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',1)" title="Niedrigere Priorität">▼</button>
+              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#8a6ff0;border:1px solid #8a6ff0;border-radius:4px;cursor:pointer" onclick="checkProviderModel('{js_esc(pid)}')" title="Modell jetzt prüfen">🔍 Modell</button>
               <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="paktiv-{esc(pid)}" {aktiv_checked} onchange="toggleProvider('{js_esc(pid)}',this.checked)"> Aktiv</label>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#e84545;border:1px solid #e84545;border-radius:4px;cursor:pointer" onclick="deleteProvider('{js_esc(pid)}')" title="Entfernen">✕</button>
             </div>
           </div>
-          <div style="font-size:11px;margin-bottom:4px;{'color:#5cb85c;font-weight:700' if pstatus['status']=='ok' else 'color:var(--muted)'}">{'API Key aktiv — Chat bereit' if pstatus['status']=='ok' else status_text}</div>
+          <div style="font-size:11px;margin-bottom:4px;{_main_status_color}">{_main_status_txt}</div>
+          {_stale_row}
           {model_row}
           {key_row}
           {base_url_row}
@@ -7918,6 +7964,35 @@ function deleteProvider(pid) {{
       }}).catch(()=>showToast('Fehler'));
     }}
   );
+}}
+
+// Modell-Verfügbarkeit prüfen (sofort, nicht warten auf Hintergrund-Thread)
+function checkProviderModel(pid) {{
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  fetch('/api/kira/provider/check-models',{{
+    method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:pid}})
+  }}).then(r=>r.json()).then(d=>{{
+    btn.disabled = false;
+    btn.textContent = '🔍 Modell';
+    if(!d.ok) {{ showToast(d.error||'Fehler bei Modell-Prüfung'); return; }}
+    const r = d.result||{{}};
+    if(r.valid) {{
+      showToast('✓ Modell verfügbar: ' + (r.model||''));
+    }} else if(r.auto_update && r.auto_update.changed) {{
+      showToast('⚠ Modell veraltet → automatisch auf ' + r.auto_update.new_model + ' umgestellt');
+      setTimeout(()=>location.reload(),1200);
+    }} else {{
+      showToast('⚠ Modell veraltet: ' + (r.reason||'Nicht verfügbar'));
+    }}
+  }}).catch(()=>{{
+    btn.disabled=false;
+    btn.textContent='🔍 Modell';
+    showToast('Verbindungsfehler');
+  }});
 }}
 
 // Wissen level switching (Bibliothek / Regelsteuerung / Neu)
@@ -12708,6 +12783,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Modell-Verfügbarkeit prüfen (sofort + Auto-Update)
+        if self.path == '/api/kira/provider/check-models':
+            pid = body.get('provider_id', '').strip()
+            try:
+                all_provs = get_all_providers()
+                if pid:
+                    provs = [p for p in all_provs if p.get("id") == pid]
+                else:
+                    provs = [p for p in all_provs if p.get("aktiv", True)]
+                if not provs:
+                    self._json({'ok': False, 'error': 'Provider nicht gefunden'})
+                    return
+                results = {}
+                for p in provs:
+                    vr = _validate_model(p)
+                    if not vr.get('valid') and not vr.get('skipped'):
+                        vr['auto_update'] = _auto_update_model(p)
+                    results[p.get('id', p.get('typ'))] = vr
+                # Direkt zurückgeben (state-file wird in validate_all_providers geschrieben,
+                # hier nur Einzel-Ergebnis)
+                single = results.get(pid, next(iter(results.values()), {})) if pid else results
+                self._json({'ok': True, 'result': single, 'all': results})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Task actions
         m = re.match(r'/api/task/(\d+)/(\w[\w-]*)', self.path)
         if m:
@@ -13695,6 +13796,20 @@ def run_server(open_browser=True):
 
     _snooze_t = threading.Thread(target=_snooze_waker_loop, daemon=True, name="SnoozeWaker")
     _snooze_t.start()
+
+    # Modell-Validierung: einmal 20s nach Start, dann alle 24h
+    def _model_validation_loop():
+        import time as _time
+        _time.sleep(20)
+        while True:
+            try:
+                validate_all_providers()
+            except Exception as _e:
+                pass
+            _time.sleep(86400)
+
+    _model_val_t = threading.Thread(target=_model_validation_loop, daemon=True, name="ModelValidation")
+    _model_val_t.start()
 
     try:
         httpd.serve_forever()
