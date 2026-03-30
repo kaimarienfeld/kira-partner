@@ -1588,20 +1588,39 @@ async function pushToGitHub() {
     if (!getResp.ok){const e=await getResp.json();throw new Error(e.message||`HTTP ${getResp.status}`);}
     const getData=await getResp.json();
     const sha=getData.sha;
-    const currentHtml=decodeURIComponent(escape(atob(getData.content.replace(/\n/g,''))));
-    syncLog('OK Version geladen','ok');
+    if (!sha){throw new Error('Kein SHA vom Server — Datei nicht gefunden?');}
+    syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})','ok');
+    // Robust UTF-8 → base64 decode
+    const b64decode = b64 => {
+      const bin = atob(b64.replace(/\s/g,''));
+      const bytes = new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      return new TextDecoder('utf-8').decode(bytes);
+    };
+    const b64encode = str => {
+      const bytes = new TextEncoder().encode(str);
+      let bin='';
+      for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    };
+    const currentHtml=b64decode(getData.content);
     syncLog('Aktualisiere Einstellungen...','info');
     const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token,gh_token:ghToken};
     let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
     syncLog('OK Einstellungen aktualisiert','ok');
     syncLog('Pushe zu GitHub...','info');
-    const content=btoa(unescape(encodeURIComponent(newHtml)));
+    const content=b64encode(newHtml);
+    const putBody={message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha};
     const putResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
       method:'PUT',
       headers:{'Authorization':`token ${ghToken}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
-      body:JSON.stringify({message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha})
+      body:JSON.stringify(putBody)
     });
-    if (!putResp.ok){const e=await putResp.json();throw new Error(e.message||`HTTP ${putResp.status}`);}
+    if (!putResp.ok){
+      let eMsg=`HTTP ${putResp.status}`;
+      try{const e=await putResp.json();eMsg=e.message||eMsg;syncLog(`GitHub Antwort: ${JSON.stringify(e)}`,'err');}catch(_){}
+      throw new Error(eMsg);
+    }
     syncLog('OK Erfolgreich gepusht!','ok');
     syncLog('GitHub Pages baut neu (~1 Minute)','info');
     const now=new Date().toLocaleString('de-DE');
