@@ -1495,18 +1495,39 @@ window.pfOpenSnoozeMenu = function(btn) {
     {label:'Morgen fr\u00fch (08:00)', iso: _toISO(tomorrowMorning)},
     {label:'N\u00e4chste Woche', iso: _toISO(nextMonday)},
   ];
-  let html = '<div class="pf-snooze-title">&#x23F0; Erneut erinnern</div>';
+  // Titel (keine onclick-Strings — DOM-Methoden vermeiden Quote-Escaping-Probleme)
+  const titleEl = document.createElement('div');
+  titleEl.className = 'pf-snooze-title';
+  titleEl.textContent = '\u23f0 Erneut erinnern';
+  menu.appendChild(titleEl);
   presets.forEach(p=>{
-    html += '<button class="pf-snooze-opt" onclick="pfSnoozeUntil(\''+p.iso+'\',this.closest(\'#pf-snooze-menu\'))">'+p.label+'</button>';
+    const b = document.createElement('button');
+    b.className = 'pf-snooze-opt';
+    b.textContent = p.label;
+    b.addEventListener('click', ()=>pfSnoozeUntil(p.iso, menu));
+    menu.appendChild(b);
   });
-  html += '<div class="pf-snooze-custom-row">'
-    +'<input class="pf-snooze-custom-inp" id="pf-snooze-custom" placeholder="z.B. 2h30m oder 2026-04-01 09:00" />'
-    +'<button class="pf-snooze-custom-btn" onclick="pfSnoozeCustom()">OK</button>'
-    +'</div>';
+  // Freitext-Zeile
+  const customRow = document.createElement('div');
+  customRow.className = 'pf-snooze-custom-row';
+  const inp = document.createElement('input');
+  inp.className = 'pf-snooze-custom-inp';
+  inp.id = 'pf-snooze-custom';
+  inp.placeholder = 'z.B. 2h30m oder 2026-04-01 09:00';
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') pfSnoozeCustom(); });
+  const okBtn = document.createElement('button');
+  okBtn.className = 'pf-snooze-custom-btn';
+  okBtn.textContent = 'OK';
+  okBtn.addEventListener('click', ()=>pfSnoozeCustom());
+  customRow.appendChild(inp); customRow.appendChild(okBtn);
+  menu.appendChild(customRow);
   if(_pfCurrentMail.snooze_until) {
-    html += '<button class="pf-snooze-opt pf-snooze-cancel" onclick="pfSnoozeUntil(null,this.closest(\'#pf-snooze-menu\'))">&#x274C; Erinnerung aufheben</button>';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'pf-snooze-opt pf-snooze-cancel';
+    cancelBtn.textContent = '\u274c Erinnerung aufheben';
+    cancelBtn.addEventListener('click', ()=>pfSnoozeUntil(null, menu));
+    menu.appendChild(cancelBtn);
   }
-  menu.innerHTML = html;
   const rect = btn.getBoundingClientRect();
   menu.style.top  = (rect.bottom+6+window.scrollY)+'px';
   menu.style.left = (rect.left+window.scrollX)+'px';
