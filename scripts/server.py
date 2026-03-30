@@ -905,7 +905,8 @@ def build_postfach():
         <button class="pf-tb-btn del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         <div style="flex:1"></div>
         <button class="pf-tb-btn" id="pf-tb-move" title="In anderen Ordner verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Verschieben</button>
-        <button class="pf-tb-btn" id="pf-tb-kira" title="Kira fragen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Kira</button>
+        <div class="pf-tb-sep"></div>
+        <button class="pf-tb-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen \u2014 l\u00e4dt kompletten Kontext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
       </div>
     </div>
     <div class="pf-prev-anhaenge" id="pf-prev-anhaenge" style="display:none"></div>
@@ -1028,7 +1029,8 @@ def build_postfach():
 .pf-prev-anhaenge{padding:8px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
 .pf-att-chip:hover{border-color:#3b82f6;color:#3b82f6}
-.pf-prev-body{flex:1;overflow-y:auto;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.pf-prev-body{flex:1;overflow-y:auto;min-height:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.pf-prev-body.iframe-mode{overflow:hidden;padding:0;display:flex;flex-direction:column}
 .pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
 .pf-thread-cnt{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px}
 .pf-thread-msg{padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px}
@@ -1157,6 +1159,13 @@ def build_postfach():
 .pf-tb-btn.del-btn:hover{background:rgba(200,60,60,.12);color:#c83c3c}
 .pf-tb-btn svg{width:16px;height:16px;display:block;flex-shrink:0}
 .pf-tb-sep{width:1px;height:20px;background:var(--border);margin:0 3px;flex-shrink:0}
+/* Kira-Button — prominent, Kira-Lila */
+.pf-kira-btn{background:linear-gradient(135deg,#7c3aed,#6d28d9)!important;color:#fff!important;border-radius:8px!important;padding:6px 14px!important;font-weight:600!important;font-size:12.5px!important;gap:6px!important;box-shadow:0 2px 8px rgba(124,58,237,.35);transition:box-shadow .15s,transform .1s,background .15s!important}
+.pf-kira-btn:hover{background:linear-gradient(135deg,#8b5cf6,#7c3aed)!important;box-shadow:0 4px 16px rgba(124,58,237,.55)!important;transform:translateY(-1px);color:#fff!important}
+.pf-kira-btn:active{transform:translateY(0)}
+.pf-kira-btn svg{color:#fff!important;opacity:.9;width:15px!important;height:15px!important}
+.pf-kira-btn.loading{opacity:.7;pointer-events:none;cursor:wait}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 
 <script>
@@ -1698,7 +1707,7 @@ function _pfInitToolbar() {
   document.getElementById('pf-tb-reply')?.addEventListener('click',()=>pfReply());
   document.getElementById('pf-tb-replyall')?.addEventListener('click',()=>pfReplyAll());
   document.getElementById('pf-tb-forward')?.addEventListener('click',()=>pfForward());
-  document.getElementById('pf-tb-kira')?.addEventListener('click',()=>pfKiraContext());
+  document.getElementById('pf-tb-kira')?.addEventListener('click',()=>pfKiraMailContext());
   document.getElementById('pf-tb-read')?.addEventListener('click',()=>{
     if(!_pfCurrentMail) return;
     const el=document.querySelector('[data-msgid="'+_pfCurrentMail.message_id+'"]');
@@ -2114,19 +2123,29 @@ window.pfOpenMail = function(m, el) {
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
     const body = document.getElementById('pf-prev-body');
     body.innerHTML = '';
-    if(d.html) {
-      body.style.padding = '0';
-      body.style.overflow = 'hidden';
+    const rawText = d.text || '';
+    // HTML-Mail via iframe (füllt kompletten Bereich)
+    const hasHtml = !!d.html;
+    const textLooksLikeHtml = !hasHtml && /^\\s*(<html|<!doctype)/i.test(rawText);
+    if(hasHtml || textLooksLikeHtml) {
+      body.classList.add('iframe-mode');
+      body.style.padding = '';
+      body.style.overflow = '';
+      body.style.whiteSpace = '';
       const iframe = document.createElement('iframe');
       iframe.setAttribute('sandbox', 'allow-same-origin allow-popups-to-escape-sandbox');
-      iframe.style.cssText = 'width:100%;height:100%;border:none;background:#fff;display:block';
-      iframe.srcdoc = d.html;
+      iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;display:block;min-height:0';
+      iframe.srcdoc = hasHtml ? d.html : rawText;
       body.appendChild(iframe);
     } else {
+      body.classList.remove('iframe-mode');
       body.style.padding = '20px';
       body.style.overflow = 'auto';
       body.style.whiteSpace = 'pre-wrap';
-      body.textContent = d.text || '(kein Inhalt)';
+      // HTML-Entities dekodieren (z.B. &amp; → &, &lt; → <)
+      const tmp = document.createElement('div');
+      tmp.innerHTML = rawText;
+      body.textContent = tmp.textContent || '(kein Inhalt)';
     }
     if(d.anhaenge&&d.anhaenge.length>0) {
       const wrap=document.getElementById('pf-prev-anhaenge');
@@ -2261,14 +2280,85 @@ window.pfKiraDraft=function(){
     document.getElementById('pf-comp-body').value=d.response||d.text||'(keine Antwort)';
   }).catch(()=>document.getElementById('pf-comp-body').value='Fehler');
 };
-window.pfKiraContext=function(){
-  const betreff=document.getElementById('pf-prev-betreff').textContent;
-  const body=document.getElementById('pf-prev-body').textContent.slice(0,1000);
-  showPanel('kira');
-  setTimeout(()=>{
-    const inp=document.getElementById('kiraInput');
-    if(inp){inp.value='Analysiere diese Mail: '+betreff+'. Inhalt: '+body;inp.focus();}
-  },300);
+window.pfKiraContext=function(){ pfKiraMailContext(); }; // Compat
+
+window.pfKiraMailContext = async function() {
+  if(!_pfCurrentMail) return;
+  const btn = document.getElementById('pf-tb-kira');
+  const origHtml = btn ? btn.innerHTML : '';
+  if(btn) { btn.classList.add('loading'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg> Lade...'; }
+
+  let ctx = null;
+  try {
+    const r = await fetch('/api/mail/kira-kontext?message_id='+encodeURIComponent(_pfCurrentMail.message_id));
+    ctx = await r.json();
+  } catch(e) { ctx = null; }
+
+  if(btn) { btn.classList.remove('loading'); btn.innerHTML = origHtml; }
+
+  // Kira Workspace öffnen (Overlay — bleibt im Postfach!)
+  openKiraWorkspace('chat');
+  const betreff = _pfCurrentMail.betreff || ctx?.betreff || '(kein Betreff)';
+  const absender = _pfCurrentMail.absender_short || _pfCurrentMail.absender || ctx?.absender || '';
+  setKiraContextBar('\U0001F4E7 Mail', betreff, absender ? [absender] : []);
+  kiraSetQuickActions('mail');
+
+  // Lade-Nachricht im Chat anzeigen
+  const area = document.getElementById('kiraChatArea');
+  const loadEl = document.createElement('div');
+  loadEl.id = 'kira-mail-loading';
+  loadEl.style.cssText = 'padding:12px 16px;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px';
+  loadEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg> Stelle gerade Informationen zusammen\u2026';
+  if(area) area.appendChild(loadEl);
+
+  // Kontext-Nachricht aufbauen
+  const mailText = (ctx?.text || '').trim();
+  const lines = [
+    '\U0001F4E7 **Mail zur Analyse:**',
+    'Von: ' + (ctx?.absender || absender),
+    ctx?.an ? 'An: ' + ctx.an : '',
+    'Datum: ' + (ctx?.datum || _pfCurrentMail.datum || ''),
+    'Betreff: ' + betreff,
+    '',
+    '**Inhalt:**',
+    mailText.slice(0, 5000) || '(kein Textinhalt — evtl. nur HTML)',
+  ].filter(Boolean);
+
+  // Sender-Verlauf anhängen wenn vorhanden
+  if(ctx?.sender_verlauf?.length) {
+    lines.push('', '\U0001F4CC **Bisherige Mails von diesem Absender:**');
+    ctx.sender_verlauf.forEach(v => {
+      lines.push('  \u2022 ' + (v.datum||'') + ' \u2014 ' + (v.betreff||'') + (v.snippet ? ': '+v.snippet.slice(0,80) : ''));
+    });
+  }
+
+  // Offene Tasks anhängen wenn vorhanden
+  if(ctx?.offene_tasks?.length) {
+    lines.push('', '\U0001F4CB **Offene Aufgaben zu diesem Absender:**');
+    ctx.offene_tasks.forEach(t => {
+      lines.push('  \u2022 ['+t.kategorie+'] ' + t.titel + (t.datum ? ' ('+t.datum+')' : ''));
+    });
+  }
+
+  lines.push('', '---');
+  lines.push('Bitte lies diese Mail, fasse kurz zusammen was wichtig ist, und frag mich was du brauchst um zu helfen. Welcher n\u00e4chste Schritt w\u00e4re sinnvoll?');
+
+  const msg = lines.join('\n');
+
+  // Lade-Indikator entfernen, Nachricht senden
+  const doSend = () => {
+    if(loadEl.parentNode) loadEl.remove();
+    const inp = document.getElementById('kiraInput');
+    if(inp) {
+      inp.value = msg;
+      inp.style.height = 'auto';
+      inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+      sendKiraMsg();
+    }
+  };
+
+  // Kurze Pause damit Lade-Animation sichtbar ist
+  setTimeout(doSend, 400);
 };
 window.pfOpenAtt=function(p){window.open('/api/file?path='+p,'_blank');};
 
@@ -8585,6 +8675,7 @@ function kiraSetQuickActions(typ) {{
     kunde:    ['Kundenhistorie zusammenfassen','Offene Posten','Kommunikationsnotiz','Nächster Schritt'],
     suche:    ['Suche in Mails','Suche in Aufgaben','Suche in Wissen','Volltext-Suche'],
     dokument: ['Zusammenfassen','Kernaussagen','Aktionspunkte','Fragen generieren'],
+    mail:     ['Was ist zu tun?','Antwort vorschlagen','Aufgabe daraus erstellen','Risiko einschätzen','Weiterleiten an?'],
   }};
   const items = sets[typ] || sets.frage;
   bar.innerHTML = '<span class="kw-quick-lbl">Schnell:</span>' +
@@ -10043,6 +10134,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/read?'):
             self._read_mail()
 
+        elif self.path.startswith('/api/mail/kira-kontext?'):
+            self._api_mail_kira_kontext()
+
         elif self.path == '/api/mail/folders':
             self._api_mail_folders()
 
@@ -10628,6 +10722,104 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 except: pass
                 kdb.close()
             except: pass
+
+        self._json(result)
+
+    def _api_mail_kira_kontext(self):
+        """GET /api/mail/kira-kontext?message_id=X
+        Liefert vollständigen Mail-Text + Sender-Verlauf (letzte 5) + offene Tasks des Absenders.
+        Kira bekommt damit sofort vollständigen Kundenverlauf ohne manuelles Nachsuchen."""
+        _ensure_mail_columns()
+        qs     = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(qs)
+        msg_id = params.get('message_id', [''])[0]
+        if not msg_id:
+            self._json({"error": "Missing message_id"})
+            return
+
+        result = {
+            "betreff": "", "absender": "", "datum": "", "an": "",
+            "text": "", "anhaenge": [],
+            "sender_verlauf": [],   # letzte 5 Mails desselben Absenders
+            "offene_tasks": [],     # passende offene Tasks
+        }
+
+        # ── 1. Primär-Mail aus mail_index.db + EML ─────────────────────────
+        absender_email = ""
+        try:
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT betreff,absender,an,datum,text_plain,mail_folder_pfad,eml_path "
+                "FROM mails WHERE message_id=?", (msg_id,)
+            ).fetchone()
+            if row:
+                result["betreff"]  = row["betreff"]  or ""
+                result["absender"] = row["absender"] or ""
+                result["an"]       = row["an"]       or ""
+                result["datum"]    = row["datum"]    or ""
+                result["text"]     = row["text_plain"] or ""
+                # EML als bessere Textquelle
+                for eml_candidate in [row["eml_path"] or "", row["mail_folder_pfad"] or ""]:
+                    if not eml_candidate: continue
+                    ep = Path(eml_candidate) if eml_candidate.endswith('.eml') else Path(eml_candidate) / "mail.eml"
+                    if ep.exists():
+                        t, _ = self._parse_eml_content(ep)
+                        if t and len(t) > len(result["text"]):
+                            result["text"] = t
+                        break
+                # Absender-E-Mail extrahieren für Verlauf-Suche
+                import re as _re3
+                m_addr = _re3.search(r'[\w.+-]+@[\w.-]+', result["absender"])
+                if m_addr:
+                    absender_email = m_addr.group(0).lower()
+            conn.close()
+        except Exception:
+            pass
+
+        # ── 2. Sender-Verlauf: letzte 5 Mails desselben Absenders ──────────
+        if absender_email:
+            try:
+                conn2 = sqlite3.connect(str(MAIL_INDEX_DB))
+                conn2.row_factory = sqlite3.Row
+                verlauf_rows = conn2.execute(
+                    "SELECT betreff, datum, text_plain FROM mails "
+                    "WHERE LOWER(absender) LIKE ? AND message_id != ? "
+                    "ORDER BY datum DESC LIMIT 5",
+                    (f"%{absender_email}%", msg_id)
+                ).fetchall()
+                for r in verlauf_rows:
+                    snippet = (r["text_plain"] or "")[:120].replace('\n', ' ').strip()
+                    result["sender_verlauf"].append({
+                        "betreff": r["betreff"] or "",
+                        "datum":   (r["datum"] or "")[:10],
+                        "snippet": snippet,
+                    })
+                conn2.close()
+            except Exception:
+                pass
+
+        # ── 3. Offene Tasks des Absenders (tasks.db) ────────────────────────
+        if absender_email:
+            try:
+                domain = absender_email.split('@')[-1] if '@' in absender_email else ''
+                db3 = get_db()
+                task_rows = db3.execute(
+                    "SELECT titel, kategorie, kunden_email, datum_mail FROM aufgaben "
+                    "WHERE status='offen' AND ("
+                    "  LOWER(kunden_email) LIKE ? OR LOWER(kunden_email) LIKE ? "
+                    ") ORDER BY datum_mail DESC LIMIT 8",
+                    (f"%{absender_email}%", f"%{domain}%")
+                ).fetchall()
+                for r in task_rows:
+                    result["offene_tasks"].append({
+                        "titel":    (r["titel"] or "")[:80],
+                        "kategorie": r["kategorie"] or "",
+                        "datum":    (r["datum_mail"] or "")[:10],
+                    })
+                db3.close()
+            except Exception:
+                pass
 
         self._json(result)
 
