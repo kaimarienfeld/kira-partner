@@ -13061,6 +13061,52 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Partner-View: Leni-Feedback als GitHub-Issue anlegen
+        if self.path == '/api/partner/feedback-issue':
+            try:
+                import urllib.request as _urllib
+                secrets_path = SCRIPTS_DIR / 'secrets.json'
+                try:
+                    secrets = json.loads(secrets_path.read_text('utf-8'))
+                except Exception:
+                    secrets = {}
+                token = secrets.get('partner_feedback_token', '')
+                if not token:
+                    self._json({'ok': False, 'error': 'partner_feedback_token fehlt in secrets.json'})
+                    return
+                gh_owner = body.get('gh_owner', 'kaimarienfeld')
+                gh_repo  = body.get('gh_repo', 'kira-partner')
+                feature  = body.get('featureName') or body.get('featureId', '?')
+                react    = body.get('react', '')
+                text     = body.get('text', '')
+                date     = body.get('date', '')
+                title    = f"[Feedback] {feature}" + (f" — {react}" if react else "")
+                issue_body = "\n\n".join([
+                    f"**Funktion:** {feature}",
+                    f"**Reaktion:** {react or '(keine)'}",
+                    f"**Feedback:**\n{text or '(kein Text)'}",
+                    f"**Datum:** {date}",
+                    f"**Feature-ID:** `{body.get('featureId','?')}`",
+                ])
+                payload = json.dumps({'title': title, 'body': issue_body, 'labels': ['leni-feedback']}).encode('utf-8')
+                req = _urllib.Request(
+                    f'https://api.github.com/repos/{gh_owner}/{gh_repo}/issues',
+                    data=payload,
+                    headers={
+                        'Authorization': f'Bearer {token}',
+                        'Accept': 'application/vnd.github+json',
+                        'X-GitHub-Api-Version': '2022-11-28',
+                        'Content-Type': 'application/json',
+                    },
+                    method='POST'
+                )
+                with _urllib.urlopen(req, timeout=10) as resp:
+                    result = json.loads(resp.read())
+                self._json({'ok': True, 'issue_url': result.get('html_url', '')})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Partner-View: Mail an Leni senden (Willkommen oder Passwort)
         if self.path == '/api/partner/send-leni-mail':
             try:

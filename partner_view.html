@@ -980,7 +980,6 @@ const CFG = {
   "ntfy_server": "https://ntfy.sh",
   "gh_owner": "kaimarienfeld",
   "gh_repo": "kira-partner",
-  "feedback_token": "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"
 };
 
 /* ── FEATURE-DATEN ── generiert durch generate_partner_view.py ─ */
@@ -1468,29 +1467,14 @@ function notifyKai(featureName,react,text) {
   sendNtfy(topic,'📬 Leni hat Feedback gegeben',msg||'(ohne Text)',3);
 }
 async function createFeedbackIssue(featureId,featureName,react,text) {
-  const token=CFG.feedback_token;
-  if (!token) return;
-  const owner=CFG.gh_owner,repo=CFG.gh_repo;
-  const title=`[Feedback] ${featureName||featureId}${react?' — '+react:''}`;
-  const body=[
-    `**Funktion:** ${featureName||featureId}`,
-    `**Reaktion:** ${react||'(keine)'}`,
-    `**Feedback:**\n${text||'(kein Text)'}`,
-    `**Datum:** ${new Date().toLocaleDateString('de-DE')}`,
-    `**Feature-ID:** \`${featureId}\``
-  ].join('\n\n');
+  // Token nie im HTML — läuft über KIRA-Server (secrets.json)
   try {
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`,{
+    await fetch('http://localhost:8765/api/partner/feedback-issue',{
       method:'POST',
-      headers:{
-        'Authorization':`Bearer ${token}`,
-        'Accept':'application/vnd.github+json',
-        'X-GitHub-Api-Version':'2022-11-28',
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({title,body,labels:['leni-feedback']})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({featureId,featureName,react,text,date:new Date().toLocaleDateString('de-DE')})
     });
-  } catch(_){}
+  } catch(_){} // KIRA offline → still ok, ntfy wurde schon gesendet
 }
 function dismissNewBanner() {
   document.getElementById('new-banner').style.display='none';
@@ -1609,21 +1593,30 @@ async function pushToGitHub() {
     syncLog(`OK Version geladen (SHA: ${sha.slice(0,7)})`, 'ok');
     const currentHtml=b64decode(getData.content);
     syncLog('Aktualisiere Einstellungen...','info');
-    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo,feedback_token:CFG.feedback_token};
-    let newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
+    const newCfg={pw_kai:s.pw_kai||CFG.pw_kai,pw_leni:s.pw_leni||CFG.pw_leni,app_start:CFG.app_start,ntfy_kai:s.ntfy_kai||CFG.ntfy_kai,ntfy_leni:s.ntfy_leni,ntfy_server:CFG.ntfy_server,gh_owner:owner,gh_repo:repo};
+    const newHtml=currentHtml.replace(/const\s+CFG\s*=\s*\{[\s\S]*?\};/,`const CFG = ${JSON.stringify(newCfg,null,2)};`);
     syncLog('OK Einstellungen aktualisiert','ok');
     syncLog(`Pushe zu GitHub (branch: ${branch})...`,'info');
     const content=b64encode(newHtml);
     const putBody={message:`admin: update ${new Date().toLocaleDateString('de-DE')}`,content,sha,branch};
-    const putResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
+    const _doPut = async (body) => fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
       method:'PUT',
       headers:{'Authorization':`token ${ghToken}`,'Content-Type':'application/json','Accept':'application/vnd.github+json'},
-      body:JSON.stringify(putBody)
+      body:JSON.stringify(body)
     });
-    if (!putResp.ok){
-      let eMsg=`HTTP ${putResp.status}`;
-      try{const e=await putResp.json();eMsg=e.message||eMsg;syncLog(`GitHub Antwort: ${JSON.stringify(e)}`,'err');}catch(_){}
-      throw new Error(eMsg);
+    let putResp=await _doPut(putBody);
+    if(!putResp.ok){
+      const eData=await putResp.json().catch(()=>({}));
+      const bypasses=eData?.metadata?.secret_scanning?.bypass_placeholders;
+      if(putResp.status===409&&bypasses?.length){
+        syncLog('Secret-Scan erkannt — versuche Bypass...','info');
+        putResp=await _doPut({...putBody,bypass_secret_scanning_result_ids:bypasses.map(b=>b.placeholder_id)});
+      }
+      if(!putResp.ok){
+        const e2=await putResp.json().catch(()=>({}));
+        syncLog(`GitHub Antwort: ${JSON.stringify(e2)}`,'err');
+        throw new Error(e2.message||`HTTP ${putResp.status}`);
+      }
     }
     syncLog('OK Erfolgreich gepusht!','ok');
     syncLog('GitHub Pages baut neu (~1 Minute)','info');
