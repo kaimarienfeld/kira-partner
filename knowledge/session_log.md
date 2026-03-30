@@ -184,3 +184,21 @@
 **Status:** erledigt
 
 ---
+
+## 2026-03-30 10:00 — Session-Start (session-kk)
+**Auftrag:** Postfach: (1) Mail-Inhalt Rendering kaputt — bei EML nur kleines Stück sichtbar (iframe height), Text-Mails zeigen JSON/Formatierungs-Elemente. (2) Kira-Button: extrem präsent machen, klick führt ins leere beheben — Kira soll Chatfenster öffnen mit kompletten Mail-Kontext, Auto-Send, lädt Kundenverlauf vor, "stelle gerade Informationen zusammen" Meldung.
+**Status:** erledigt
+
+## 2026-03-30 10:45 — Session-Ende (session-kk)
+**Erledigt:** 
+- A1: iframe height fix — min-height:0 + iframe-mode CSS-Klasse, overflow:hidden
+- A2: Text-Rendering — HTML-Entities dekodieren, HTML-in-Text als iframe
+- B4: GET /api/mail/kira-kontext — volltext EML + letzte 5 Absender-Mails + offene Tasks
+- B1: Kira-Button — prominent lila, Glow, Kira-Icon mit Augen+Lächeln
+- B2: pfKiraMailContext() — openKiraWorkspace (kein showPanel), Lade-Spinner, Auto-Send, 5000 Zeichen + Verlauf + Tasks
+- B3: kiraSetQuickActions 'mail'-Typ
+Commit: 66241b0
+**Offen geblieben:** Keine.
+**Status:** erledigt
+
+---
