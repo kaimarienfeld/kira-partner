@@ -33,11 +33,11 @@ PROVIDER_TYPES = {
     "anthropic": {
         "name": "Anthropic (Claude)",
         "models": [
-            ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+            ("claude-sonnet-4-6", "Claude Sonnet 4.6"),
             ("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
             ("claude-opus-4-6", "Claude Opus 4.6"),
         ],
-        "default_model": "claude-sonnet-4-20250514",
+        "default_model": "claude-sonnet-4-6",
         "pip_package": "anthropic",
         "supports_tools": True,
         "needs_key": True,

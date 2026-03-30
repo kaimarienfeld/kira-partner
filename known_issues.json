@@ -1,7 +1,72 @@
 {
-  "_updated": "2026-03-29 session-y",
+  "_updated": "2026-03-30 session-jj",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
+    {
+      "id": "ISS-021",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/kira_llm.py",
+      "area": "llm",
+      "title": "Standard-Modell-ID veraltet (claude-sonnet-4-20250514 → claude-sonnet-4-6)",
+      "description": "kira_llm.py nutzte claude-sonnet-4-20250514 als Standard-Modell. Korrekte aktuelle ID ist claude-sonnet-4-6. Veraltete Snapshots können HTTP 404 zurückgeben.",
+      "discovered": "2026-03-30",
+      "fixed": "2026-03-30",
+      "session": "session-jj",
+      "fix_summary": "PROVIDER_TYPES[anthropic].models[0] und default_model auf claude-sonnet-4-6 umgestellt."
+    },
+    {
+      "id": "ISS-020",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/daily_check.py, scripts/build_databases.py, scripts/mail_monitor.py",
+      "area": "mail, system",
+      "title": "Hardcodierte absolute Pfade (ARCHIV_ROOT, KNOWLEDGE_DIR, ARCHIVER_DIR)",
+      "description": "ARCHIV_ROOT in daily_check.py und build_databases.py sowie ARCHIVER_DIR in mail_monitor.py waren absolut hardcoded. Bricht bei OneDrive-Pfad-Änderungen. KNOWLEDGE_DIR in build_databases.py zeigte auf .claude/projects-Pfad statt relativ.",
+      "discovered": "2026-03-30",
+      "fixed": "2026-03-30",
+      "session": "session-jj",
+      "fix_summary": "Alle drei Dateien lesen Pfade jetzt aus config.json (mail_archiv.pfad) mit Fallback auf die alten Hardcoded-Werte. build_databases.py KNOWLEDGE_DIR ist jetzt relativ zu __file__."
+    },
+    {
+      "id": "ISS-019",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/kira_proaktiv.py",
+      "area": "system",
+      "title": "Logging stumm im Daemon-Modus (kein Handler wenn als Modul importiert)",
+      "description": "logging.basicConfig() wurde nur in if __name__ == '__main__' aufgerufen. Im Daemon-Modus via mail_monitor.py hatte der Logger keinen Handler → log.error/debug verschwanden lautlos.",
+      "discovered": "2026-03-30",
+      "fixed": "2026-03-30",
+      "session": "session-jj",
+      "fix_summary": "Nach getLogger() prüfen ob handlers leer → StreamHandler mit Formatter hinzufügen."
+    },
+    {
+      "id": "ISS-018",
+      "status": "fixed",
+      "priority": "important",
+      "module": "scripts/task_manager.py",
+      "area": "tasks",
+      "title": "DB-Verbindungen in task_manager.py ohne try/finally",
+      "description": "update_task_status() und increment_reminder() nutzten db.close() am Ende ohne try/finally. Bei Exception zwischen connect und close blieb die Verbindung offen.",
+      "discovered": "2026-03-30",
+      "fixed": "2026-03-30",
+      "session": "session-jj",
+      "fix_summary": "try/finally-Blöcke um alle DB-Operationen in beiden Schreib-Funktionen ergänzt."
+    },
+    {
+      "id": "ISS-003",
+      "status": "fixed",
+      "priority": "important",
+      "module": "scripts/server.py",
+      "area": "server",
+      "title": "SyntaxWarnings: ungültige Escape-Sequenzen in JS-Regex innerhalb Python-Strings",
+      "description": "JavaScript-Regex-Muster wie \\d, \\s, \\(, \\), \\., \\/ in Python-Strings ohne Raw-String-Prefix erzeugten SyntaxWarnings. In Python 3.12+ sind das potenzielle SyntaxErrors beim Server-Start.",
+      "discovered": "2026-03-10 session-i",
+      "fixed": "2026-03-30",
+      "session": "session-jj",
+      "fix_summary": "7 Stellen in server.py: \\d → \\\\d, \\s → \\\\s, \\( → \\\\(, \\) → \\\\), \\. → \\\\., \\/ → \\\\/. py_compile --W always::SyntaxWarning gibt 0 Warnings."
+    },
     {
       "id": "ISS-015",
       "status": "fixed",

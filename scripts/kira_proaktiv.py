@@ -43,6 +43,11 @@ MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 CONFIG_FILE   = SCRIPTS_DIR / "config.json"
 
 log = logging.getLogger("kira_proaktiv")
+if not log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter('%(asctime)s [kira_proaktiv] %(levelname)s: %(message)s'))
+    log.addHandler(_h)
+    log.setLevel(logging.INFO)
 
 # Status-Datei: verhindert Spam-Aktionen (gleiche Aktion nicht 2x am Tag)
 SCAN_STATE_FILE = KNOWLEDGE_DIR / "proaktiv_state.json"

@@ -1574,7 +1574,7 @@ window.pfSnoozeCustom = function() {
   const val = inp.value.trim();
   if(!val) return;
   // Versuche ISO-Datum zuerst
-  const isoMatch = val.match(/^(\d{4}-\d{2}-\d{2})\s*(\d{2}:\d{2}(?::\d{2})?)$/);
+  const isoMatch = val.match(/^(\\d{4}-\\d{2}-\\d{2})\\s*(\\d{2}:\\d{2}(?::\\d{2})?)$/);
   if(isoMatch) {
     pfSnoozeUntil(isoMatch[1]+' '+(isoMatch[2].length===5?isoMatch[2]+':00':isoMatch[2]), _pfSnoozeMenu);
     return;
@@ -1582,7 +1582,7 @@ window.pfSnoozeCustom = function() {
   // Parse Zeitdauer: 2h30m, 45min, 3d, 1h, etc.
   const now = new Date();
   let ms = 0;
-  val.replace(/(\d+(?:\.\d+)?)\s*([dhm](?:in)?)/gi, (_, n, u) => {
+  val.replace(/(\\d+(?:\\.\\d+)?)\\s*([dhm](?:in)?)/gi, (_, n, u) => {
     const x = parseFloat(n);
     if(u.toLowerCase()==='d') ms += x*86400000;
     else if(u.toLowerCase()==='h') ms += x*3600000;
@@ -1944,7 +1944,7 @@ function pfGetInitials(name) {
   const s=(name||'').trim();
   if(!s) return '?';
   if(s.includes('@')) return s[0].toUpperCase();
-  const parts=s.split(/\s+/);
+  const parts=s.split(/\\s+/);
   if(parts.length>=2) return (parts[0][0]+(parts[1][0]||'')).toUpperCase();
   return s.slice(0,2).toUpperCase();
 }
@@ -1999,7 +1999,7 @@ function pfRenderMailItem(m, container) {
   const initials = pfGetInitials(absender);
   const color = pfAvatarColor(absender);
   const datum = pfFormatDatum(m.datum||'');
-  const preview = (m.text_plain||'').replace(/\s+/g,' ').slice(0,60);
+  const preview = (m.text_plain||'').replace(/\\s+/g,' ').slice(0,60);
 
   // Checkbox wrap
   const cbxWrap = document.createElement('div');
@@ -2156,8 +2156,8 @@ function pfDoMarkRead(m) {
   if(_pfMarkReadMode==='manuell') return;
   let delay = 0;
   if(_pfMarkReadMode !== 'sofort') {
-    const minM = _pfMarkReadMode.match(/^(\d+)min$/);
-    const secM = _pfMarkReadMode.match(/^(\d+)s$/);
+    const minM = _pfMarkReadMode.match(/^(\\d+)min$/);
+    const secM = _pfMarkReadMode.match(/^(\\d+)s$/);
     if(minM) delay = parseInt(minM[1]) * 60000;
     else if(secM) delay = parseInt(secM[1]) * 1000;
   }
@@ -6774,7 +6774,7 @@ function jumpToSeg(kat) {{
     if(sel) {{ sel.value='hoch'; applyKommFilters2(); }} return;
   }}
   document.querySelectorAll('#km-seg-nav .km-seg-t').forEach(t=>{{
-    const m = t.getAttribute('onclick')?.match(/kommSegFilter\(this,'([^']+)'\)/);
+    const m = t.getAttribute('onclick')?.match(/kommSegFilter\\(this,'([^']+)'\\)/);
     if(m && m[1]===kat) kommSegFilter(t,kat);
   }});
 }}
@@ -6807,7 +6807,7 @@ function selectKommItem(tid, ev) {{
     const files = ctx.anhang_pfad.split(';').filter(Boolean);
     files.forEach(f=>{{
       const fname = f.split('\\\\').pop().split('/').pop();
-      const ftype = fname.toLowerCase().match(/\.pdf$/) ? '&#x1F4C4;' : fname.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) ? '&#x1F5BC;' : '&#x1F4CE;';
+      const ftype = fname.toLowerCase().match(/\\.pdf$/) ? '&#x1F4C4;' : fname.toLowerCase().match(/\\.(jpg|jpeg|png|gif)$/) ? '&#x1F5BC;' : '&#x1F4CE;';
       attHtml += '<div class="km-ctx-att" onclick="openAttachments(\\''+encodeURIComponent(f)+'\\')">'+ftype+' '+escH(fname)+'</div>';
     }});
   }}
@@ -8362,7 +8362,7 @@ function newKiraChat() {{
 async function serverNeustart() {{
   // Sofort Ladescreen zeigen — kein schwarzer Tab, kein 404
   document.open();
-  document.write('<!doctype html><html><head><meta charset=utf-8><style>*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0d0d0d;color:#ccc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px}}.spin{{font-size:36px;animation:rot 1s linear infinite}}@keyframes rot{{to{{transform:rotate(360deg)}}}}p{{font-size:15px;opacity:.8}}small{{font-size:12px;opacity:.45}}</style></head><body><div class=spin>↻</div><p>Server wird neu gestartet …</p><small id=s>0s</small><script>let t=0;setInterval(()=>{{t++;document.getElementById("s").textContent=t+"s";}},1000);<\/script></body></html>');
+  document.write('<!doctype html><html><head><meta charset=utf-8><style>*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0d0d0d;color:#ccc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px}}.spin{{font-size:36px;animation:rot 1s linear infinite}}@keyframes rot{{to{{transform:rotate(360deg)}}}}p{{font-size:15px;opacity:.8}}small{{font-size:12px;opacity:.45}}</style></head><body><div class=spin>↻</div><p>Server wird neu gestartet …</p><small id=s>0s</small><script>let t=0;setInterval(()=>{{t++;document.getElementById("s").textContent=t+"s";}},1000);<\\/script></body></html>');
   document.close();
   // Neustart anstoßen (Server antwortet kurz bevor er sich killt)
   try {{ await fetch('/api/server/neustart',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}}); }} catch(e) {{}}

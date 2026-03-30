@@ -172,3 +172,8 @@
 **Status:** erledigt
 
 ---
+
+## 2026-03-30 — Session-Start (session-jj)
+
+**Auftrag:** Vollständige System-Analyse erstellen (_analyse/KIRA_SYSTEM_ANALYSE.md) + alle gefundenen Fehler direkt beheben: Modell-ID veraltet, hardcoded Pfade, stummes Logging im Daemon-Modus, DB-Verbindungs-Leaks, SyntaxWarnings in server.py.
+**Status:** offen

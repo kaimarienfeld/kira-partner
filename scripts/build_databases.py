@@ -17,9 +17,14 @@ from pathlib import Path
 from datetime import datetime
 from html.parser import HTMLParser
 
-ARCHIV_ROOT = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
-KNOWLEDGE_DIR = Path(r"C:\Users\kaimr\.claude\projects\C--Users-kaimr-OneDrive---rauMKult-Sichtbeton-00-rauMKult-Auftr-ge-Anfragen\memory\knowledge")
+_SCRIPTS_DIR = Path(__file__).parent
+KNOWLEDGE_DIR = _SCRIPTS_DIR.parent / "knowledge"
 KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
+_cfg_bd = json.loads((_SCRIPTS_DIR / "config.json").read_text('utf-8')) if (_SCRIPTS_DIR / "config.json").exists() else {}
+_archiv_pfad_bd = _cfg_bd.get("mail_archiv", {}).get("pfad", "").strip()
+ARCHIV_ROOT = Path(_archiv_pfad_bd) / "Archiv" if _archiv_pfad_bd else Path(
+    r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv"
+)
 
 MAILBOXEN = [
     "anfrage_raumkult_eu",

@@ -29,14 +29,27 @@ from task_manager import get_due_reminders, increment_reminder, load_config
 from llm_classifier import classify_mail, extract_email, is_system_sender, kategorie_to_task_typ
 from llm_response_gen import generate_draft
 
-ARCHIV_ROOT = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
-MAILBOXEN = ["anfrage_raumkult_eu","info_raumkult_eu","invoice_sichtbeton-cire_de",
-             "kaimrf_rauMKultSichtbeton_onmicrosoft_com","shop_sichtbeton-cire_de"]
-KONTO_LABEL = {
-    "anfrage@raumkult.eu":"anfrage","info@raumkult.eu":"info",
-    "invoice@sichtbeton-cire.de":"invoice","shop@sichtbeton-cire.de":"shop",
-    "kaimrf@rauMKultSichtbeton.onmicrosoft.com":"intern",
-}
+_cfg_dc = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+_archiv_pfad = _cfg_dc.get("mail_archiv", {}).get("pfad", "").strip()
+ARCHIV_ROOT = Path(_archiv_pfad) / "Archiv" if _archiv_pfad else Path(
+    r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv"
+)
+_konten_dc = _cfg_dc.get("mail_archiv", {}).get("konten", [])
+MAILBOXEN = (
+    [k["email"].replace('@', '_').replace('.', '_').lower()
+     for k in _konten_dc if k.get("aktiv", True) and k.get("email")]
+    or ["anfrage_raumkult_eu","info_raumkult_eu","invoice_sichtbeton-cire_de",
+        "kaimrf_rauMKultSichtbeton_onmicrosoft_com","shop_sichtbeton-cire_de"]
+)
+KONTO_LABEL = (
+    {k["email"]: k.get("konto_label", k["email"].split("@")[0])
+     for k in _konten_dc if k.get("aktiv", True) and k.get("email")}
+    or {
+        "anfrage@raumkult.eu":"anfrage","info@raumkult.eu":"info",
+        "invoice@sichtbeton-cire.de":"invoice","shop@sichtbeton-cire.de":"shop",
+        "kaimrf@rauMKultSichtbeton.onmicrosoft.com":"intern",
+    }
+)
 EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com",
                   "invoicefetcher.email"}  # DATEV-Weiterleitung
 

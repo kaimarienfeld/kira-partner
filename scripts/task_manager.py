@@ -32,21 +32,23 @@ def update_task_status(task_id: int, status: str, notiz: str = "") -> bool:
     if status not in TASK_STATUS:
         return False
     db = get_tasks_db()
-    now = datetime.now().isoformat()
-    erledigt = now if status == "erledigt" else None
+    try:
+        now = datetime.now().isoformat()
+        erledigt = now if status == "erledigt" else None
 
-    config = load_config()
-    stunden = config.get("aufgaben", {}).get("erinnerung_intervall_stunden", 24)
-    naechste = None if status in ("erledigt", "ignorieren") else \
-               (datetime.now() + timedelta(hours=stunden)).isoformat()
+        config = load_config()
+        stunden = config.get("aufgaben", {}).get("erinnerung_intervall_stunden", 24)
+        naechste = None if status in ("erledigt", "ignorieren") else \
+                   (datetime.now() + timedelta(hours=stunden)).isoformat()
 
-    db.execute("""UPDATE tasks SET status=?, aktualisiert_am=?, erledigt_am=?,
-                  naechste_erinnerung=?, notiz=CASE WHEN ?!='' THEN ? ELSE notiz END
-                  WHERE id=?""",
-               (status, now, erledigt, naechste,
-                notiz, notiz, task_id))
-    db.commit()
-    db.close()
+        db.execute("""UPDATE tasks SET status=?, aktualisiert_am=?, erledigt_am=?,
+                      naechste_erinnerung=?, notiz=CASE WHEN ?!='' THEN ? ELSE notiz END
+                      WHERE id=?""",
+                   (status, now, erledigt, naechste,
+                    notiz, notiz, task_id))
+        db.commit()
+    finally:
+        db.close()
     return True
 
 
@@ -88,10 +90,12 @@ def increment_reminder(task_id: int):
     stunden = config.get("aufgaben", {}).get("erinnerung_intervall_stunden", 24)
     naechste = (datetime.now() + timedelta(hours=stunden)).isoformat()
     db = get_tasks_db()
-    db.execute("UPDATE tasks SET erinnerungen=erinnerungen+1, naechste_erinnerung=? WHERE id=?",
-               (naechste, task_id))
-    db.commit()
-    db.close()
+    try:
+        db.execute("UPDATE tasks SET erinnerungen=erinnerungen+1, naechste_erinnerung=? WHERE id=?",
+                   (naechste, task_id))
+        db.commit()
+    finally:
+        db.close()
 
 
 def load_config() -> dict:

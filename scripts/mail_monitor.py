@@ -43,7 +43,14 @@ MAIL_INDEX_DB  = KNOWLEDGE_DIR / "mail_index.db"
 CONFIG_FILE    = SCRIPTS_DIR / "config.json"
 
 # Archiver-Pfade (Token-Cache teilen!)
-ARCHIVER_DIR  = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv")
+_archiver_pfad = ""
+try:
+    _archiver_pfad = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8')).get("mail_archiv", {}).get("pfad", "").strip()
+except Exception:
+    pass
+ARCHIVER_DIR  = Path(_archiver_pfad) if _archiver_pfad else Path(
+    r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv"
+)
 ARCHIVER_CFG  = ARCHIVER_DIR / "raumkult_config.json"
 TOKEN_DIR     = ARCHIVER_DIR / "tokens"
 
