@@ -6191,6 +6191,19 @@ function esInfoPopup(btn, text) {{
     </div>
     <div id="es-reindex-progress" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
   </div>
+
+  <!-- Gelöschte Mails Protokoll -->
+  <div class="es-grp">
+    <div class="es-grp-h">Gel&ouml;schte Mails Protokoll</div>
+    <div class="es-grp-sub">Kurzprotokoll der automatisch bereinigten Mails (EML + Anh&auml;nge). Absender, Betreff und Kurzinhalt bleiben dauerhaft erhalten.</div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Protokoll anzeigen</span><span class="es-row-hint">Letzte 50 Bereinigungen laden</span></div>
+      <button class="es-mk-btn sec" onclick="esLadeProtokoll(this)">Protokoll laden</button>
+    </div>
+    <div id="es-protokoll-container" style="display:none;margin-top:8px">
+      <div id="es-protokoll-list"></div>
+    </div>
+  </div>
   </div><!-- /es-mtp-archiv -->
 
   <!-- ── TAB: SYNC & KIRA-ZUGANG ── -->
@@ -6850,6 +6863,30 @@ function esInfoPopup(btn, text) {{
       else showToast('Pfad nicht gefunden oder nicht erreichbar','fehler');
     }}).catch(()=>{{}});
   }};
+  window.esLadeProtokoll = function(btn) {{
+    if(btn) {{ btn.textContent = 'Lade\u2026'; btn.disabled = true; }}
+    fetch('/api/mail/protokoll?limit=50').then(r=>r.json()).then(d=>{{
+      const cont = document.getElementById('es-protokoll-container');
+      const list = document.getElementById('es-protokoll-list');
+      if(!cont || !list) return;
+      cont.style.display = '';
+      var rows = d.eintraege || [];
+      if(!rows.length) {{
+        list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px">Keine Eintr\u00e4ge</div>';
+      }} else {{
+        list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+          + '<tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted)">Datum</th>'
+          + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted)">Von</th>'
+          + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted)">Betreff</th></tr>'
+          + rows.map(r=>'<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted);white-space:nowrap">'+(r.geloescht_am||'').substring(0,10)+'</td>'
+              + '<td style="padding:4px 8px;border-bottom:1px solid var(--border);overflow:hidden;max-width:180px;text-overflow:ellipsis;white-space:nowrap">'+escH(r.absender||'')+'</td>'
+              + '<td style="padding:4px 8px;border-bottom:1px solid var(--border);overflow:hidden;max-width:260px;text-overflow:ellipsis;white-space:nowrap">'+escH(r.betreff||'')+'</td></tr>').join('')
+          + '</table>';
+      }}
+      if(btn) {{ btn.textContent = 'Aktualisieren'; btn.disabled = false; }}
+    }}).catch(()=>{{if(btn){{btn.textContent='Protokoll laden';btn.disabled=false;}}}});
+  }};
+
   window.esReindex = function(btn) {{
     if(btn){{btn.textContent='Läuft...';btn.disabled=true;}}
     fetch('/api/mail/archiv/reindex',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
