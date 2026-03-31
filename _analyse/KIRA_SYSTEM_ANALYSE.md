@@ -670,16 +670,22 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | Einstellungen: Graph Kalender | ✅ Erledigt | zz | Scope-Status + Pruef-Button |
 | Google OAuth | ✅ Erledigt | aaa | google_oauth.py, Browser-Flow, Wizard, Einstellungen > Integrationen |
 
-### Erledigt (session-bbb, 2026-03-31)
+### Erledigt (session-bbb + session-ccc, 2026-03-31/04-01)
 
 | Feature / Komponente | Status |
 |---|---|
-| Belegvorlagen-Modul | ✅ Erledigt (session-bbb) — HTML-Editor + JS + Backend + GET/POST/DELETE API |
+| Belegvorlagen-Modul | ✅ Erledigt (session-bbb) — HTML-Editor + JS + Backend + GET/POST/DELETE /api/belegvorlagen, Storage knowledge/belegvorlagen/*.json |
 | Sprachmodul | ✅ Erledigt (session-bbb) — Web Speech API Mikrofon-Button im Kira-Chat |
 | Dokument-Export | ✅ Erledigt (session-bbb) — CSV/JSON Export fuer Tasks/Kunden/Vorgaenge/Mails |
 | Cloud-Backup | ✅ Erledigt (session-bbb) — daily_check.py Step 7, manuell via /api/backup/jetzt |
-| Urlaubsmodus-Smart | ✅ Erledigt (session-bbb) — Auto-Reply in mail_monitor.py, Einstellungen UI |
-| Zeiterfassung | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Timer, manuelle Eintraege, SQLite |
+| Urlaubsmodus-Smart | ✅ Erledigt (session-bbb) — Auto-Reply in mail_monitor.py, Tracking-Log urlaub_autoreply_log.json |
+| Zeiterfassung | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Timer, manuelle Eintraege, SQLite zeiterfassung in tasks.db, GET/POST/DELETE /api/zeiterfassung |
+| Cashflow-Prognose | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Monats-KPI-Karten + CSS-Balkendiagramm aus ausgangsrechnungen (bezahlt/offen), letzten 12 Monate |
+| CRM Pipeline | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Kanban-Board 5 Spalten (neu/angebot_gesendet/verhandlung/gewonnen/verloren) aus vorgaenge WHERE typ IN ('lead','angebot','anfrage') |
+| Angebots-Kalkulation | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Material/Arbeit/Fremd-Zeilen, GK/Marge/MwSt-Berechnung, _kalLastNetto global, kalKiraAngebot() uebergibt Netto an Kira |
+| Eingangsrechnungen-Auto-Scan | ✅ Erledigt (session-bbb) — mail_monitor.py _auto_scan_eingangsrechnung(): Regex-Betrag-Extraktion, INSERT OR IGNORE INTO geschaeft bei Kategorie 'Rechnung / Beleg' |
+| DB-Autopflege | ✅ Erledigt (session-bbb) — daily_check.py Step 8: alte Tasks loeschen, wissen_regeln dedup, VACUUM tasks.db + mail_index.db |
+| Foto-Analyse | ✅ Erledigt (session-bbb+ccc) — Frontend: FileReader-Upload, _kiraAttachment global, sendKiraMsg schickt bild-Payload. Backend: kira_llm.chat(bild=) Parameter, Anthropic vision content-list (image+text Block) |
 
 ### Offen / Kai-Aktionen erforderlich
 
