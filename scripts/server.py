@@ -4467,6 +4467,7 @@ def build_einstellungen():
               <span style="font-size:10px;color:var(--muted)">Prio {pprio}</span>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',-1)" title="Höhere Priorität">▲</button>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',1)" title="Niedrigere Priorität">▼</button>
+              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#0891b2;border:1px solid #0891b2;border-radius:4px;cursor:pointer" onclick="testProvider('{js_esc(pid)}')" title="Verbindung testen">⚡ Test</button>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#8a6ff0;border:1px solid #8a6ff0;border-radius:4px;cursor:pointer" onclick="checkProviderModel('{js_esc(pid)}')" title="Modell jetzt prüfen">🔍 Modell</button>
               <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="paktiv-{esc(pid)}" {aktiv_checked} onchange="toggleProvider('{js_esc(pid)}',this.checked)"> Aktiv</label>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#e84545;border:1px solid #e84545;border-radius:4px;cursor:pointer" onclick="deleteProvider('{js_esc(pid)}')" title="Entfernen">✕</button>
@@ -10145,6 +10146,31 @@ function checkProviderModel(pid) {{
     btn.disabled=false;
     btn.textContent='🔍 Modell';
     showToast('Verbindungsfehler');
+  }});
+}}
+
+function testProvider(pid) {{
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  const t0 = Date.now();
+  fetch('/api/kira/provider/test',{{
+    method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{provider_id:pid}})
+  }}).then(r=>r.json()).then(d=>{{
+    const ms = Date.now()-t0;
+    btn.disabled = false;
+    btn.textContent = '⚡ Test';
+    if(d.ok) {{
+      showToast(`✓ Verbindung OK — ${d.antwort||''} (${ms}ms)`,'ok');
+    }} else {{
+      showToast('✗ Test fehlgeschlagen: '+(d.error||'Unbekannt'),'fehler');
+    }}
+  }}).catch(()=>{{
+    btn.disabled=false;
+    btn.textContent='⚡ Test';
+    showToast('Verbindungsfehler','fehler');
   }});
 }}
 
@@ -15832,6 +15858,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': True, 'result': single, 'all': results})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Provider Verbindungstest
+        if self.path == '/api/kira/provider/test':
+            pid = body.get('provider_id', '').strip()
+            try:
+                from kira_llm import get_all_providers, _call_anthropic, _call_openai_compat
+                all_provs = get_all_providers()
+                provs = [p for p in all_provs if p.get("id") == pid] if pid else [p for p in all_provs if p.get("aktiv", True)]
+                if not provs:
+                    self._json({'ok': False, 'error': 'Provider nicht gefunden'})
+                    return
+                p = provs[0]
+                typ = p.get('typ', '')
+                if typ == 'anthropic':
+                    result = _call_anthropic(p, "Antworte nur mit: OK", "", [], max_tokens=16, temperature=0.0)
+                else:
+                    result = _call_openai_compat(p, "Antworte nur mit: OK", "", [], max_tokens=16, temperature=0.0)
+                antwort = (result.get('text') or '').strip()[:40]
+                self._json({'ok': True, 'antwort': antwort, 'model': p.get('model', '?')})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)[:200]})
             return
 
         # Task actions

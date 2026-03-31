@@ -187,7 +187,7 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Provider aktiv/inaktiv | paktiv-{id} | Toggle |
 | ✅ | Provider hinzufügen/löschen | addProvider() | Verbunden |
 | ✅ | API-Key speichern | saveProviderKey() | Speichert in secrets.json |
-| 💡 | Provider Verbindungstest | Button pro Provider | Test-API-Call mit Ergebnis-Anzeige |
+| ✅ | Provider Verbindungstest | ⚡ Test-Button pro Provider | POST /api/kira/provider/test — Mini-Chat → Toast mit Latenz, session-rr |
 | 💡 | Provider-Timeout | `llm.provider_timeout` | Sekunden bis Timeout (aktuell hardcoded) |
 | 💡 | Fallback-Provider | `llm.fallback_provider_id` | Bei Fehler auf Backup-Provider |
 | 💡 | Provider-Kosten-Tracking | `llm.kosten_tracking` | Token-Verbrauch anzeigen |
