@@ -1,5 +1,5 @@
 # KIRA — Vollständige System-Analyse
-**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-31 (session-nn)
+**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-31 (session-pp)
 **Analysiert:** 35+ Python-Module, 8 SQLite-Datenbanken, 70+ API-Endpunkte
 **Projektpfad:** `memory/` (Git-Repo)
 
@@ -8,6 +8,8 @@
 > - session-kk: Postfach Mail-Rendering + Kira-Button Redesign (commit 66241b0).
 > - session-ll: Automatisches Modell-Validierungssystem implementiert.
 > - session-nn: Case Engine (Vorgänge), 5 neue Tools (17 total), Desktop-Overlay, Presence-Detection, Backfill-Skript, GAP-Analyse + Roadmap ergänzt.
+> - session-oo: **VOLLSTÄNDIGE AKTIVE ASSISTENZ** — Alle 10 Pakete implementiert: Idempotenz, Circuit Breaker, Rate-Limiting, Mail-Senden HITL, Konversations-Gedächtnis, Vorgang-Scans, Autonomy-Loop, ReAct, Feedback-Lernen, FTS5-Suche, MS-Graph-Kalender, Audit-Trail, Live-Migration (83 Vorgänge).
+> - session-pp: Bug-Fixes B-04 (NULL-Check mail_monitor), B-05 (Race Condition proaktiv_state.json), Task-Löschen Server-Blockade. Alle GAPs geschlossen.
 
 ---
 
@@ -905,12 +907,17 @@ Die 15 bekannten Issues ISS-001 bis ISS-015 sind laut Projektdokumentation alle 
 | 02 | ARCHIV_ROOT hardcoded | daily_check.py:32 | Mail-Scan bricht ab | KRITISCH | ✅ jj |
 | 03 | KNOWLEDGE_DIR absolut | build_databases.py:21 | Rebuild schlägt fehl | KRITISCH | ✅ jj |
 | 04 | Logging stumm im Daemon | kira_proaktiv.py:45 | Fehler unsichtbar | KRITISCH | ✅ jj |
-| 05 | NULL-Check fehlt | mail_monitor.py | Angebots-Verknüpfung failts lautlos | WICHTIG | offen |
+| 05 | NULL-Check fehlt (_auto_angebot_aktion) | mail_monitor.py | TypeError wenn msg_id/kunde_name None | WICHTIG | ✅ pp |
 | 06 | DB-Verbindungs-Leak | task_manager.py | SQLite-Locks möglich | WICHTIG | ✅ jj |
-| 07 | State-File Race Condition | kira_proaktiv.py:61 | Doppelte Tasks möglich | WICHTIG | offen |
+| 07 | State-File Race Condition | kira_proaktiv.py:61 | Doppelte Tasks möglich | WICHTIG | ✅ pp |
 | 08 | SyntaxWarnings | server.py | Zukünftiger Server-Crash | WICHTIG | ✅ jj |
 | 09 | Konten hardcoded | daily_check.py:33 | Neue Konten ignoriert | NIEDRIG | ✅ jj |
-| 10 | Ungültige Modell-Option | kira_llm.py:50 | Fehler wenn gewählt | NIEDRIG | 🔄 ll |
+| 10 | Ungültige Modell-Option | kira_llm.py:50 | Fehler wenn gewählt | NIEDRIG | ✅ ll |
+| 11 | rechnung_bezahlt: blindes UPDATE | kira_llm.py | Duplikat-Statistik-Einträge | HOCH | ✅ oo |
+| 12 | Kein Exponential Backoff bei API-Fehlern | kira_llm.py | Endloser Fehler-Loop | MITTEL | ✅ oo |
+| 13 | kira_konversationen nicht im System-Prompt | kira_llm.py | Kein Gedächtnis | MITTEL | ✅ oo |
+| 14 | System-Prompt wächst unbegrenzt | kira_llm.py:570 | Context-Degradierung | NIEDRIG | ✅ oo |
+| 15 | Task-Löschen blockiert Server (sync kira_chat) | server.py | Server 10-30s eingefroren | HOCH | ✅ pp |
 
 ### Neu implementiert (session-ll)
 | Feature | Datei | Beschreibung |
@@ -944,6 +951,49 @@ Die 15 bekannten Issues ISS-001 bis ISS-015 sind laut Projektdokumentation alle 
 | State-Machine-Validierung | case_engine.py | Ungültige Übergänge werden abgelehnt (HTTP 400 mit erlaubten Übergängen) |
 | Query-String Routing-Fix | server.py | `/api/vorgang/signals?limit=5` → `startswith()` statt `==` |
 | f-String Escaping-Fix | server.py | Alle `{}`/`{{}}` in eingebetteten JS-Blöcken korrekt gedoppelt |
+
+---
+
+### Neu implementiert (session-oo) — Vollständige Aktive Assistenz
+| Feature | Datei | Beschreibung |
+|---|---|---|
+| Tool-Idempotenz | kira_llm.py | rechnung_bezahlt, angebot_status, eingangsrechnung_erledigt, task_erledigen: Pre-Check + Early Return |
+| Circuit Breaker + Backoff | kira_llm.py | `_CIRCUIT_BREAKER`: 3 Fehler/60s → Provider-Circuit 300s offen, Exponential Backoff 2^attempt |
+| Rate-Limiting | kira_llm.py | `_rate_check_and_record()`: max 20 LLM-Calls/Min (rolling window) |
+| `mail_approve_queue` | tasks.db | HITL-Gate-Tabelle: pending/approved/rejected/sent/expired |
+| Tool: `mail_senden` | kira_llm.py | Erstellt Entwurf in Approval-Queue, Signal Stufe B, sendet NIE direkt |
+| Mail-Approve API | server.py | `GET /api/mail/approve/pending`, `POST /api/mail/approve/{id}` |
+| Mail-Approve Dashboard | server.py | Header-Badge "N Freigabe", Preview-Modal, Approve/Reject/Edit |
+| Konversations-Gedächtnis | kira_llm.py | letzte 3 Sessions pro Kunde in system_prompt, Token-Budget 800 |
+| Tool: `konversation_suchen` | kira_llm.py | Sucht in kira_konversationen nach Suchbegriff, max 5 Sessions |
+| Tägliche Memory-Summary | kira_proaktiv.py | Scan 6: fasst Kira-Konversationen via LLM, speichert in wissen_regeln |
+| Context-Window-Budgets | kira_llm.py | Runtime-Log max 30, Wissen max 20, Memory max 3200 Zeichen |
+| Scan: Angebot-Followup | kira_proaktiv.py | Scan 7: angebot_versendet > 7 Tage → Nachfass-Entwurf in approval queue |
+| Scan: Mahnung-Eskalation | kira_proaktiv.py | Scan 8: mahnung > 14 Tage → Signal Stufe B |
+| Scan: Autonomy-Decision | kira_proaktiv.py | Scan 9: LLM analysiert alle Vorgänge → Konfidenz-Stufen A/B/C |
+| Tool: `vorgang_naechste_aktion_vorschlagen` | kira_llm.py | valid_transitions → LLM wählt optimalen nächsten Schritt |
+| ReAct-Schleife | kira_llm.py | `start_react_task()`: max 5 Runden, [WEITER]-Signal, Background-Thread |
+| API: `/api/kira/task` | server.py | Komplexe Aufgabe → task_id + SSE-Stream-Polling |
+| User-Interrupt | server.py | `DELETE /api/kira/task/{id}` |
+| 👍/👎 Feedback | server.py | Pro Kira-Antwort im Workspace, `POST /api/kira/feedback` |
+| Auto-Wissensregel aus 👎 | server.py | LLM extrahiert Lernregel, INSERT wissen_regeln Kategorie auto_gelernt |
+| Stil-Lernen aus Mail-Edits | server.py | Diff > 40% → LLM extrahiert Stil-Regel |
+| FTS5 Mail-Index | mail_index.db | Virtual Table mail_fts, BM25-Ranking, Auto-Trigger |
+| Tool: `semantisch_suchen` | kira_llm.py | FTS5 MATCH statt LIKE, Top-10 BM25-sortiert |
+| MS Graph Kalender | graph_calendar.py | MSAL silent acquire, Calendars.ReadWrite Scope |
+| Tool: `termin_erstellen` | kira_llm.py | POST Graph /me/events, Stufe B Signal, UTC→Europe/Berlin |
+| Tool: `termine_anzeigen` | kira_llm.py | GET Graph /me/calendarView, nächste 7 Tage |
+| actor_type-Standard | runtime_log.py | kira_autonom / kira_vorschlag / user / system |
+| Dashboard-Tab: Kira-Aktivitäten | server.py | Timeline: letzte 30 Tage, 🤖/👤 Icons, Filter nach actor_type |
+| API: `/api/kira/aktivitaeten` | server.py | Events nach actor_type kira_autonom/kira_vorschlag |
+| Live-Migration | case_engine_backfill.py | 83 Vorgänge aus Bestandsdaten (2026-03-31 06:38) |
+
+### Neu implementiert (session-pp) — Bug-Fixes
+| Feature | Datei | Beschreibung |
+|---|---|---|
+| B-04 NULL-Check | mail_monitor.py | _auto_angebot_aktion: msg_id/kunde_name/a_nummer abgesichert |
+| B-05 Race Condition | kira_proaktiv.py | threading.Lock + atomischer os.replace()-Schreibvorgang |
+| Task-Löschen entblockt | server.py | Synchrones kira_chat() entfernt; Lernregel direkt ohne LLM gespeichert |
 
 ---
 
@@ -1061,9 +1111,9 @@ Idempotent: bereits migrierte Datensätze (vorgang_id ≠ NULL) werden überspru
 
 ## 12. GAP-Analyse: Vollständige Aktive Assistenz
 
-### 12.1 Was KIRA heute ist (Code-Realität)
+### 12.1 Was KIRA heute ist (Code-Realität) — Stand: 2026-03-31
 
-KIRA ist kein wirklich autonomer Agent — sie ist ein **reaktives Expertensystem mit LLM-Verstärkung**:
+KIRA ist eine **vollständige aktive Assistenz** mit Autonomy Loop, HITL-Gate und Multi-Step-Planung:
 
 | Dimension | Aktueller Stand | Bewertung |
 |---|---|---|
@@ -1071,14 +1121,18 @@ KIRA ist kein wirklich autonomer Agent — sie ist ein **reaktives Expertensyste
 | Klassifizierung | 3-stufig, ~95% Accuracy | ✅ Sehr gut |
 | Task-Erstellung | Automatisch bei antwort_noetig=1 | ✅ Vollständig |
 | Vorgang-Tracking | State Machine, 10 Typen (session-nn) | ✅ Implementiert |
-| Kira-Chat | Reaktiv auf User-Anfragen | ✅ Funktional |
-| LLM-Aufruf | Anthropic primary, 3 Fallbacks | ✅ Robust |
-| Proaktive Scans | kira_proaktiv.py (5 Scans, 15 Min) | ⚠️ Begrenzt |
-| Autonomes Handeln | Keine eigenständigen Aktionen | ❌ Fehlt |
-| Email-Senden | Nur Entwürfe, kein Send | ❌ Fehlt |
-| Lernen aus Feedback | Wissen-Regeln manuell | ⚠️ Halbautomatisch |
-| Kalender-Integration | Keine | ❌ Fehlt |
-| Multi-Step-Planung | Keine (kein Agent-Loop) | ❌ Fehlt |
+| Kira-Chat | Reaktiv + proaktiv mit Gedächtnis | ✅ Vollständig |
+| LLM-Aufruf | Anthropic primary, 3 Fallbacks + Circuit Breaker + Backoff | ✅ Robust |
+| Proaktive Scans | 9 Scans inkl. Autonomy-Decision-Loop (session-oo) | ✅ Vollständig |
+| Autonomes Handeln | Autonomy-Loop: Stufe A (still) / B (Toast) / C (Modal) | ✅ Implementiert |
+| Email-Senden | HITL-Gate: mail_approve_queue, Dashboard-Badge + Modal | ✅ Implementiert |
+| Lernen aus Feedback | 👍/👎 → Auto-Wissensregel + Stil-Lernen aus Mail-Edits | ✅ Implementiert |
+| Kalender-Integration | MS Graph Calendars.ReadWrite, Tool: termin_erstellen | ✅ Implementiert |
+| Multi-Step-Planung | ReAct-Schleife: chat_react(), max 5 Runden, User-Interrupt | ✅ Implementiert |
+| Konversations-Gedächtnis | Tier-2 Episodic Memory, tägliche Summary, Tool: konversation_suchen | ✅ Implementiert |
+| Semantische Suche | FTS5 BM25-Ranking, Tool: semantisch_suchen | ✅ Implementiert |
+| Audit-Trail | Dashboard-Tab "Kira-Aktivitäten", actor_type kira_autonom/kira_vorschlag | ✅ Implementiert |
+| Live-Migration | 83 Vorgänge aus Bestandsdaten (2026-03-31) | ✅ Abgeschlossen |
 
 ### 12.2 Der entscheidende Unterschied: Reaktiv vs. Proaktiv
 
