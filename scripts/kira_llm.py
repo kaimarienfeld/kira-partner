@@ -1316,6 +1316,27 @@ def get_tools(config=None):
         }
     })
 
+    # ── Semantische Mail-Suche via FTS5 (Paket 7, session-oo) ────────────────
+    if MAIL_INDEX_DB.exists():
+        tools.append({
+            "name": "semantisch_suchen",
+            "description": (
+                "Durchsucht alle 12.000+ Mails mit SQLite FTS5 — schneller und praeziser als mail_suchen. "
+                "Findet relevante Mails nach Inhalt, Betreff und Absender mit BM25-Ranking. "
+                "Bevorzuge dieses Tool gegenueber mail_suchen fuer alle inhaltlichen Mail-Suchen."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string",
+                              "description": "Suchbegriff (FTS5: 'Sichtbeton Kosten' oder 'Angebot*' oder '\"genaue Phrase\"')"},
+                    "limit": {"type": "integer", "description": "Max. Ergebnisse (Standard: 10)", "default": 10},
+                    "konto": {"type": "string", "description": "Nur dieses Konto durchsuchen (optional)"}
+                },
+                "required": ["query"]
+            }
+        })
+
     # ── Vorgang-Naechste-Aktion Tool (Paket 4, session-oo) ───────────────────
     tools.append({
         "name": "vorgang_naechste_aktion_vorschlagen",
@@ -1424,6 +1445,7 @@ def execute_tool(name, params):
             "mail_lesen": _tool_mail_lesen,
             "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
             "vorgang_status_setzen": _tool_vorgang_status_setzen,
+            "semantisch_suchen": _tool_semantisch_suchen,
             "vorgang_naechste_aktion_vorschlagen": _tool_vorgang_naechste_aktion_vorschlagen,
             "konversation_suchen": _tool_konversation_suchen,
             "mail_senden": _tool_mail_senden,
@@ -2107,6 +2129,66 @@ def _tool_vorgang_status_setzen(p):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+def _tool_semantisch_suchen(p):
+    """FTS5-Volltextsuche in Mail-Archiv mit BM25-Ranking (Paket 7, session-oo)."""
+    query = (p.get("query") or "").strip()
+    limit = max(1, min(int(p.get("limit") or 10), 30))
+    konto = (p.get("konto") or "").strip()
+    if not query:
+        return {"error": "query erforderlich"}
+    if not MAIL_INDEX_DB.exists():
+        return {"error": "mail_index.db nicht vorhanden"}
+    try:
+        mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+        mdb.row_factory = sqlite3.Row
+        # Pruefen ob FTS-Tabelle vorhanden
+        has_fts = mdb.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='mail_fts'"
+        ).fetchone()
+        if not has_fts:
+            mdb.close()
+            # Fallback auf LIKE-Suche
+            return _tool_mail_suchen(p)
+
+        sql_args = [query, limit]
+        konto_filter = ""
+        if konto:
+            konto_filter = " AND m.konto=?"
+            sql_args = [query] + [konto, limit]
+
+        rows = mdb.execute(f"""
+            SELECT m.message_id, m.betreff, m.absender, m.datum_iso, m.konto,
+                   m.folder, m.hat_anhaenge, m.text_plain,
+                   rank
+            FROM mail_fts
+            JOIN mails m ON mail_fts.rowid = m.id
+            WHERE mail_fts MATCH ? {konto_filter}
+            ORDER BY rank
+            LIMIT ?
+        """, sql_args).fetchall()
+        mdb.close()
+
+        results = []
+        for r in rows:
+            results.append({
+                "message_id": r["message_id"],
+                "betreff": r["betreff"],
+                "absender": r["absender"],
+                "datum": (r["datum_iso"] or "")[:16],
+                "konto": r["konto"],
+                "folder": r["folder"],
+                "hat_anhaenge": bool(r["hat_anhaenge"]),
+                "vorschau": (r["text_plain"] or "")[:200].replace('\n', ' '),
+            })
+        return {"ok": True, "query": query, "treffer": len(results), "ergebnisse": results}
+    except Exception as e:
+        # FTS5-Syntaxfehler -> Fallback
+        try:
+            return _tool_mail_suchen(p)
+        except Exception:
+            return {"error": str(e)}
 
 
 def _tool_vorgang_naechste_aktion_vorschlagen(p):

@@ -48,6 +48,49 @@ try:
 except Exception:
     pass
 
+# Paket 7 (session-oo): FTS5 Virtual Table fuer Mail-Volltext-Suche
+try:
+    _mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+    _mdb.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS mail_fts USING fts5(
+            betreff, text_plain, absender,
+            content=mails,
+            content_rowid=id
+        )
+    """)
+    for _trg_sql in [
+        """CREATE TRIGGER IF NOT EXISTS mail_fts_insert AFTER INSERT ON mails BEGIN
+            INSERT INTO mail_fts(rowid, betreff, text_plain, absender)
+            VALUES (new.id, new.betreff, new.text_plain, new.absender); END""",
+        """CREATE TRIGGER IF NOT EXISTS mail_fts_delete AFTER DELETE ON mails BEGIN
+            INSERT INTO mail_fts(mail_fts, rowid, betreff, text_plain, absender)
+            VALUES ('delete', old.id, old.betreff, old.text_plain, old.absender); END""",
+        """CREATE TRIGGER IF NOT EXISTS mail_fts_update AFTER UPDATE ON mails BEGIN
+            INSERT INTO mail_fts(mail_fts, rowid, betreff, text_plain, absender)
+            VALUES ('delete', old.id, old.betreff, old.text_plain, old.absender);
+            INSERT INTO mail_fts(rowid, betreff, text_plain, absender)
+            VALUES (new.id, new.betreff, new.text_plain, new.absender); END""",
+    ]:
+        try: _mdb.execute(_trg_sql)
+        except Exception: pass
+    _mdb.commit()
+    _fts_count = _mdb.execute("SELECT COUNT(*) FROM mail_fts").fetchone()[0]
+    _mdb.close()
+    if _fts_count == 0:
+        def _fts_rebuild_bg():
+            import sqlite3 as _sq
+            try:
+                _c = _sq.connect(str(MAIL_INDEX_DB))
+                _c.execute("INSERT INTO mail_fts(mail_fts) VALUES('rebuild')")
+                _c.commit()
+                _c.close()
+            except Exception:
+                pass
+        import threading as _thr
+        _thr.Thread(target=_fts_rebuild_bg, daemon=True, name="FtsRebuild").start()
+except Exception:
+    pass
+
 # Paket 6 (session-oo): kira_feedback — Thumbs up/down Bewertungen
 try:
     _db = sqlite3.connect(str(TASKS_DB))
