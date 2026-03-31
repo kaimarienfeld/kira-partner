@@ -4237,7 +4237,10 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
           <span>Signale &amp; Warnungen</span>
           <button class="btn btn-xs btn-muted" onclick="openKiraWorkspace('chat')" style="font-size:10px">Kira</button>
         </div>
-        <div class="gh-zone-body">{warn_html}</div>
+        <div class="gh-zone-body">
+          <div id="gesch-kira-signals"></div>
+          {warn_html}
+        </div>
       </div>
     </div>"""
     return html
@@ -9347,6 +9350,7 @@ function showPanel(name) {{
   closeMobileSidebar();
   if(name==='postfach' && typeof window.pfInit==='function') {{ window.pfInit(); }}
   if(name==='dashboard') {{ setTimeout(loadDashKalender, 400); }}
+  if(name==='geschaeft') {{ setTimeout(loadGeschKiraSignale, 500); }}
 }}
 
 // Prio-Karte Kebab-Menu
@@ -10084,6 +10088,43 @@ function showGeschTab(name) {{
   }});
   document.getElementById('gesch-'+name)?.classList.add('active');
   localStorage.setItem('kira_gesch_tab', name);
+  if(name==='uebersicht') setTimeout(loadGeschKiraSignale, 300);
+}}
+
+function loadGeschKiraSignale() {{
+  const el=document.getElementById('gesch-kira-signals');
+  if(!el) return;
+  const _STUFE_LABEL={{'B':'Vorschlag','C':'Wichtig'}};
+  const _STUFE_COLOR={{'B':'#7C3AED','C':'#E24B4A'}};
+  fetch('/api/vorgang/signals?alle=1&limit=8').then(function(r){{return r.json();}}).then(function(d){{
+    if(!d.ok||!d.signals||d.signals.length===0){{el.innerHTML='';return;}}
+    let html='<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">&#x2728; Kira-Hinweise</div>';
+    d.signals.forEach(function(s){{
+      const stufe=s.stufe||'B';
+      const dot='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+(_STUFE_COLOR[stufe]||'#888')+'"></span>';
+      const badge=s.angezeigt?'<span style="font-size:9px;color:var(--muted);margin-left:4px">&#x2713;</span>':'';
+      const act=s.angezeigt?'':'<span style="font-size:10px;cursor:pointer;color:var(--accent);margin-left:auto" onclick="geschSignalMarkSeen('+s.id+',this)">OK</span>';
+      const sub=s.vorgang_titel||s.kunden_name||s.vorgang_typ||'';
+      html+='<div class="gh-warn-item" id="gesch-sig-'+s.id+'" style="background:rgba('+
+        (stufe==='C'?'226,75,74':'124,58,237')+',0.04);border-radius:5px;padding:4px 6px;margin-bottom:4px">'
+        +'<div class="gh-warn-dot" style="background:'+(_STUFE_COLOR[stufe]||'#888')+'"></div>'
+        +'<div class="gh-warn-body" style="flex:1;min-width:0">'
+        +'<div class="gh-warn-text" style="font-size:12px">'+dot+' '+escH(s.titel||'')+badge+'</div>'
+        +(s.nachricht?'<div class="gh-warn-sub" style="font-size:11px">'+escH((s.nachricht||'').substring(0,80))+'</div>':'')
+        +(sub?'<div class="gh-warn-sub" style="font-size:10px;color:var(--muted)">'+escH(sub)+'</div>':'')
+        +'</div>'+act+'</div>';
+    }});
+    html+='</div>';
+    el.innerHTML=html;
+  }}).catch(function(){{el.innerHTML='';}});
+}}
+
+function geschSignalMarkSeen(id,btn) {{
+  if(btn)btn.remove();
+  fetch('/api/vorgang/signal/gelesen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{signal_id:id,aktion:'gesehen'}})}});
+  const el=document.getElementById('gesch-sig-'+id);
+  if(el)el.style.opacity='.5';
 }}
 
 // Geschäft: Kira mit Datensatz-Kontext öffnen
@@ -18499,12 +18540,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self._json(result)
 
     def _api_vorgang_signals(self):
-        """GET /api/vorgang/signals — Ausstehende B/C-Signale (für Toast/Modal)."""
+        """GET /api/vorgang/signals — B/C-Signale.
+           ?alle=1 -> auch bereits angezeigte (letzte 7 Tage), fuer Geschaeft-Panel."""
         try:
-            from case_engine import get_pending_signals
-            qs     = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            limit  = int(qs.get('limit', ['5'])[0])
-            signals = get_pending_signals(max_count=limit)
+            qs    = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            limit = int(qs.get('limit', ['20'])[0])
+            alle  = qs.get('alle', ['0'])[0] == '1'
+            if alle:
+                from case_engine import _get_db
+                db = _get_db()
+                try:
+                    rows = db.execute("""
+                        SELECT vs.*, v.typ as vorgang_typ, v.kunden_name, v.titel as vorgang_titel
+                        FROM vorgang_signals vs
+                        LEFT JOIN vorgaenge v ON vs.vorgang_id = v.id
+                        WHERE vs.erstellt_am >= datetime('now', '-7 days')
+                        ORDER BY vs.stufe DESC, vs.erstellt_am DESC
+                        LIMIT ?
+                    """, (limit,)).fetchall()
+                    signals = [dict(r) for r in rows]
+                finally:
+                    db.close()
+            else:
+                from case_engine import get_pending_signals
+                signals = get_pending_signals(max_count=limit)
             self._json({"ok": True, "signals": signals})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
