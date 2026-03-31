@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "2026-03-30-session-hh",
+  "_updated": "session-zz",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -338,8 +338,8 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
-      "last_updated": "2026-03-28",
+      "status": "partial",
+      "last_updated": "2026-03-31",
       "description": "Google Calendar / Outlook Sync für erkannte Termine, Auto-Erinnerung bei Fristen"
     },
     {
@@ -710,6 +710,78 @@
       "status": "done",
       "last_updated": "2026-03-30",
       "description": "_build_data_context() liest geloeschte_protokoll (letzte 20) und fügt GELÖSCHTE MAILS PROTOKOLL Sektion ein."
+    },
+    {
+      "id": "mail-vorlagen-editor",
+      "name": "Mail-Vorlagen Editor",
+      "icon": "📝",
+      "leni_name": "Wiederverwendbare E-Mail-Vorlagen",
+      "leni_desc": "Erstelle und verwalte E-Mail-Vorlagen fuer haeufige Situationen (Angebot, Nachfass, Anfrage). Kira schlaegt passende Vorlagen beim Verfassen vor.",
+      "leni_visible": true,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "DB mail_vorlagen, CRUD API, Tab Einstellungen > Mail > Vorlagen, Modal-Editor"
+    },
+    {
+      "id": "kalender-widget-dashboard",
+      "name": "Kalender-Widget Dashboard + Tab",
+      "icon": "📅",
+      "leni_name": "Kalender direkt im Cockpit",
+      "leni_desc": "Deine naechsten Termine aus Outlook erscheinen direkt im Dashboard. Im Organisations-Bereich gibt es eine vollstaendige Kalenderansicht mit Tage-Filter.",
+      "leni_visible": true,
+      "module": "server.py + graph_calendar.py",
+      "status": "partial",
+      "last_updated": "2026-03-31",
+      "description": "GET /api/kira/termine, Dashboard cal_panel, Org Kalender-Tab live, Azure Calendars.Read Scope erforderlich"
+    },
+    {
+      "id": "kira-postfach-einstellungen",
+      "name": "Kira-Postfach Einstellungen",
+      "icon": "✨",
+      "leni_name": "Kiras E-Mail-Konto konfigurieren",
+      "leni_desc": "Lege fest von welchem Konto Kira E-Mails sendet und pruefe die Kalender-Verbindung direkt in den Einstellungen.",
+      "leni_visible": false,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "Tab Einstellungen > Mail > Kira-Postfach, _resolve_graph_konto(), Graph-Pruef-Button"
+    },
+    {
+      "id": "geschaeft-kira-signale",
+      "name": "Geschaeft Kira-Signale Panel",
+      "icon": "🔔",
+      "leni_name": "Kira-Hinweise im Geschaeft",
+      "leni_desc": "Kira zeigt ihre Hinweise und Vorschlaege direkt im Geschaeft-Bereich an — sofort sichtbar ohne extra Panel oeffnen.",
+      "leni_visible": true,
+      "module": "server.py + case_engine.py",
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "loadGeschKiraSignale(), /api/vorgang/signals?alle=1, OK-Button"
+    },
+    {
+      "id": "wissen-kira-badge",
+      "name": "Von Kira gelernt Badge",
+      "icon": "🤖",
+      "leni_name": "Was Kira selbst gelernt hat",
+      "leni_desc": "Im Wissensbereich siehst du jetzt sofort welche Regeln Kira automatisch aus Korrekturen und Feedback gelernt hat — markiert mit dem Kira-Badge.",
+      "leni_visible": true,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "_wissen_card() zeigt Badge bei quelle=auto_gelernt"
+    },
+    {
+      "id": "chat-kontext-menu",
+      "name": "Chat Kontext-Menu",
+      "icon": "📌",
+      "leni_name": "Kontext schnell in den Chat einfuegen",
+      "leni_desc": "Mit dem + Button im Chat kannst du schnell offene Aufgaben, aktive Vorgaenge oder den aktuellen Kontext als Referenz in die Nachricht einfuegen.",
+      "leni_visible": true,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "kiraKontextMenuToggle(), 3 Optionen: Aufgaben/Vorgaenge/Kontext-Bar"
     }
   ]
 }

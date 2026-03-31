@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-03-31 21:00 — Session-Start (session-zz / Nacht-Abarbeitung)
+
+**Auftrag:** Nacht-Abarbeitung §14 Offene Posten aus KIRA_SYSTEM_ANALYSE.md. P1: Kira Live-Chip, Activity-Drawer, Direkte E-Mail-Antwort. P2: Mail-Vorlagen Editor, Kalender-Widget, Kira-Postfach, Signale-Panel. P3: Chat Kontext-Sidebar, Wissen Feedback-Loop. Ausnahmeregel: nie blockieren, Kai-Aktionen dokumentieren und weiter.
+**Status:** erledigt
+
+### Was erledigt wurde
+
+1. **Session-xx-docs:** Docs-Konsolidierung abgeschlossen. 7 alte Dateien geloescht, alle Referenzen auf KIRA_SYSTEM_ANALYSE.md aktualisiert.
+2. **P1 Kira Live-Chip + Activity-Drawer:** Bereits implementiert (verifiziert, kein Doppelbau).
+3. **P2 Mail-Vorlagen Editor:** Komplett neu. DB-Tabelle mail_vorlagen, 3 API-Endpoints, Tab in Einstellungen > Mail > Vorlagen, Modal-Editor (Name/Kategorie/Betreff/Text/Signatur/Kira-aktiv). Commit 52753bf.
+4. **P2 Kalender-Widget:** GET /api/kira/termine, _resolve_graph_konto(), Dashboard cal_panel (loadDashKalender), Organisation Kalender-Tab live (loadOrgKalender). Commit 2710a60.
+5. **P2 Kira-Postfach Einstellungen:** Tab Einstellungen > Mail > Kira-Postfach mit Absender-Dropdown, Graph-Pruefen-Button, Speichern. Commit 2695819.
+6. **P2 Signale-Panel live:** loadGeschKiraSignale() + #gesch-kira-signals in Geschaeft Zone + /api/vorgang/signals?alle=1. Commit 7491163.
+7. **P3 Von-Kira-gelernt Badge:** _wissen_card() zeigt Badge bei quelle=auto_gelernt. Chat-Kontext-Menu (+ Button) mit 3 Optionen. Commit fdd194f.
+
+### Offen (Kai-Aktionen)
+
+- Azure Entra App: Calendars.Read Scope aktivieren (fuer Graph Kalender-Zugriff)
+- WhatsApp Business API Token hinterlegen
+- Gmail-Draft r1565559517660587330: [PASSWORT] durch echtes Passwort ersetzen und senden
+
+---
+
+## 2026-03-31 23:59 — Session-Ende (session-zz)
+
+**Erledigt:** Alle P1/P2/P3 Tasks abgearbeitet. 4 Commits. feature_registry.json +6 Eintraege. partner_view.html regeneriert (43/63 sichtbar, 26 done / 4 partial / 13 planned).
+**Offen geblieben:** Kai-Aktionen Azure/WhatsApp/Gmail-Draft.
+**Status:** erledigt
+
+---
+
 ## 2026-03-29 22:15 — Session-Start (session-y)
 
 **Auftrag:** Continuation Session: Mail-Bug beheben (keine neuen Mails kommen an), WhatsApp Einstellungen fehlen in Integrationen, Kira System tot → beheben. + Mail & Konten Einstellungen Komplett-Overhaul mit Konto-Karten, Stats, Buttons, Archiv-Panel, IMAP-Ordner.
@@ -470,4 +501,29 @@
 ## 2026-03-31 21:00 — Session-Start (session-yy)
 
 **Auftrag:** Weiter bitte — autonomer Modus. Naechstes Feature: Kunden-360-Ansicht (Kundenprofil-Panel mit allen Interaktionen: Mails, Tasks, Vorgaenge, Rechnungen).
+**Status:** erledigt
+
+---
+
+## 2026-03-31 22:00 — Session-Ende (session-yy)
+
+**Erledigt:**
+
+- Antwort-Zitat (Reply Quoting) aus vorheriger Session: pfReply() mit quoted body + in_reply_to (Commit ecec464)
+- Kunden-360-Ansicht vollstaendig implementiert:
+  - 360-Grad-Button (teal Gradient) in Mail-Preview-Toolbar neben Kira-Button
+  - Overlay-Drawer in pf-right (position:absolute;inset:0), 5 Tabs
+  - API GET /api/kunden/360?email= aggregiert kunden.db + tasks.db
+  - data-k360-msgid fuer sichere Message-ID-Weitergabe
+  - Playwright getestet: Drawer, Button, Close alle OK
+  - Commit 3c7d76f
+
+**Offen geblieben:** Eingangsrechnungen-Scanner, Zu-Kira-Ordner-Button, Outlook-Kalender (wartet auf Azure-Scope)
+**Status:** erledigt
+
+---
+
+## 2026-04-01 00:00 — Session-Start (session-zz) — Nacht-Abarbeitung
+
+**Auftrag:** Alle offenen Posten aus KIRA_SYSTEM_ANALYSE.md Abschnitt 14 systematisch abarbeiten. Prioritaet 1: Kira Live-Chip + Activity-Drawer, Direkte E-Mail-Antwort (bereits done). Prioritaet 2: Mail-Vorlagen, Kalender (Azure-abhaengig), Einstellungen-Erweiterungen, Signale-Panel. Prioritaet 3: Chat Kontext-Sidebar, Wissen Feedback-Loop, Google OAuth.
 **Status:** offen
