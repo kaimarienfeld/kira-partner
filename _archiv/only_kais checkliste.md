@@ -292,7 +292,7 @@ Funktioniert?
 
 
 
-&#x20;- Dann Frage Komma das Verschieben der vertikalen Fenster Komma ist das Nach Neustart dann so gespeichert Wenn nicht bitte nachholen
+### ✅ ERLEDIGT (session-vv verifiziert) — Fenster-Split Position: localStorage pf_pane_w speichert left+mid, pfInitResize() restauriert beim naechsten Oeffnen. Funktioniert bereits.
 
 &#x20;
 

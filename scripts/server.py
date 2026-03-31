@@ -3486,6 +3486,23 @@ function pfStartAutoRefresh() {
 }
 pfStartAutoRefresh();
 
+// ── Globales Ungelesen-Badge-Polling (alle Panels, alle 2 min) ───────────
+function _pfGlobalBadgeUpdate() {
+  fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
+    let total=0;
+    (data.konten||[]).forEach(k=>{
+      (k.ordner||[]).forEach(o=>{
+        if(/inbox|posteingang/i.test(o.name)) total+=(o.unread||0);
+      });
+    });
+    _pfTotalUnread = total;
+    _pfUpdateSidebarBadge();
+  }).catch(()=>{});
+}
+// Sofort beim Laden + alle 2 Minuten
+_pfGlobalBadgeUpdate();
+setInterval(_pfGlobalBadgeUpdate, 120000);
+
 // Postfach aufrufen (bereits aktiv beim Laden)
 if(document.getElementById('panel-postfach')&&document.getElementById('panel-postfach').classList.contains('active')){
   pfInit();
@@ -7992,7 +8009,7 @@ def generate_html() -> str:
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
-    <div class="sidebar-logo" id="sidebarLogo">K</div>
+    <div class="sidebar-logo" id="sidebarLogo"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><defs><radialGradient id="sl-bg" cx="38%" cy="28%" r="72%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="55%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4c1d95"/></radialGradient><radialGradient id="sl-spec" cx="35%" cy="22%" r="40%"><stop offset="0%" stop-color="rgba(255,255,255,.55)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient></defs><circle cx="15" cy="15" r="14" fill="url(#sl-bg)"/><circle cx="15" cy="15" r="14" fill="url(#sl-spec)"/><ellipse cx="11" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/><ellipse cx="19" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/><ellipse cx="11.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/><ellipse cx="19.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/><path d="M11 19.5 Q15 22 19 19.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>
     <div class="sidebar-brand-text">
       <span class="sidebar-brand-name" id="brandName">Kira</span>
       <span class="sidebar-brand-sub" id="brandSub">Assistenz</span>
@@ -8590,16 +8607,37 @@ def generate_html() -> str:
 
 <!-- Später Dialog Modal -->
 <div class="modal-ov" id="spaeterModal">
-  <div class="modal" style="max-width:420px">
-    <h3 style="margin:0 0 6px">&#x23F0; Wann erinnern?</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Kira fragt dich wann &mdash; schreib einfach nat&uuml;rlich, z.B. <em>morgen 10 Uhr</em>, <em>n&auml;chste Woche Montag</em>, <em>in 3 Stunden</em>.</p>
+  <div class="modal" style="max-width:440px">
+    <h3 style="margin:0 0 6px">&#x23F0; Sp&auml;ter erinnern</h3>
     <input type="hidden" id="sp-tid">
-    <input type="text" id="sp-wann" placeholder="morgen 10 Uhr …"
-      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px;margin-bottom:10px;box-sizing:border-box"
-      onkeydown="if(event.key==='Enter')saveSpaeter()">
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Wann erinnern?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="ignorier-grund-btn" onclick="setSpaeterSchnell(this,'in 2 Stunden')">+2h</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterSchnell(this,'morgen 9 Uhr')">Morgen 9h</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterSchnell(this,'übermorgen')">Übermorgen</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterSchnell(this,'nächste Woche Montag')">Nä. Woche</button>
+      </div>
+      <input type="datetime-local" id="sp-datum" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:4px;box-sizing:border-box">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">oder natürlich eingeben:</div>
+      <input type="text" id="sp-wann" placeholder="morgen 10 Uhr, in 3 Stunden …"
+        style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;box-sizing:border-box"
+        onkeydown="if(event.key==='Enter')saveSpaeter()">
+    </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">&#x1F914; Warum sp&auml;ter? <span style="font-weight:400;text-transform:none">(Kira lernt daraus)</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+        <button class="ignorier-grund-btn" onclick="setSpaeterGrund(this,'Noch keine Zeit')">Keine Zeit</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterGrund(this,'Warte auf Info')">Warte auf Info</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterGrund(this,'Muss noch überlegen')">Überlegen</button>
+        <button class="ignorier-grund-btn" onclick="setSpaeterGrund(this,'Nicht dringend')">Nicht dringend</button>
+      </div>
+      <input type="text" id="sp-grund" placeholder="Eigener Grund (optional) …"
+        style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;box-sizing:border-box">
+    </div>
     <div id="sp-kira-resp" style="display:none;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5"></div>
     <div class="modal-actions">
-      <button class="btn btn-later" id="sp-save-btn" onclick="saveSpaeter()">Kira fragen</button>
+      <button class="btn btn-later" id="sp-save-btn" onclick="saveSpaeter()">&#x23F0; Erinnerung setzen</button>
       <button class="btn btn-ignore" onclick="closeSpaeterDialog()">Abbrechen</button>
     </div>
   </div>
@@ -8826,15 +8864,19 @@ function handleLogoUpload(input) {{
   }};
   reader.readAsDataURL(file);
 }}
+const _KIRA_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><defs><radialGradient id="sl-bg" cx="38%" cy="28%" r="72%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="55%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4c1d95"/></radialGradient><radialGradient id="sl-spec" cx="35%" cy="22%" r="40%"><stop offset="0%" stop-color="rgba(255,255,255,.55)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient></defs><circle cx="15" cy="15" r="14" fill="url(#sl-bg)"/><circle cx="15" cy="15" r="14" fill="url(#sl-spec)"/><ellipse cx="11" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/><ellipse cx="19" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/><ellipse cx="11.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/><ellipse cx="19.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/><path d="M11 19.5 Q15 22 19 19.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>';
 function applyLogo(val) {{
   const el = document.getElementById('sidebarLogo');
   if(!el) return;
   if(val && (val.startsWith('http')||val.startsWith('data:'))) {{
     el.innerHTML = '<img src="'+val+'" alt="">';
+    el.style.background='transparent';
+  }} else if(val && val !== 'K') {{
+    el.innerHTML=''; el.textContent = val;
+    el.style.background='';
   }} else {{
-    el.textContent = val || 'K';
-    const img = el.querySelector('img');
-    if(img) img.remove();
+    el.innerHTML = _KIRA_LOGO_SVG;
+    el.style.background='transparent';
   }}
   localStorage.setItem('kira_logo', val);
 }}
@@ -8858,6 +8900,8 @@ function applyLogoSize(val) {{
     el.style.width = px; el.style.height = px;
     const img = el.querySelector('img');
     if(img) {{ img.style.width=px; img.style.height=px; }}
+    const svg = el.querySelector('svg');
+    if(svg) {{ svg.setAttribute('width',px); svg.setAttribute('height',px); }}
   }}
   localStorage.setItem('kira_logo_size', val||'');
 }}
@@ -11558,41 +11602,66 @@ function showKiraToast(msg){{showToast('Kira: '+msg,'info');}}
 function openSpaeterDialog(tid){{
   document.getElementById('sp-tid').value=tid;
   document.getElementById('sp-wann').value='';
+  document.getElementById('sp-datum').value='';
+  document.getElementById('sp-grund').value='';
   document.getElementById('sp-kira-resp').style.display='none';
   document.getElementById('sp-kira-resp').textContent='';
-  document.getElementById('sp-save-btn').textContent='Kira fragen';
+  document.getElementById('sp-save-btn').innerHTML='&#x23F0; Erinnerung setzen';
   document.getElementById('sp-save-btn').disabled=false;
+  document.getElementById('sp-save-btn').onclick=saveSpaeter;
+  document.querySelectorAll('#spaeterModal .ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('spaeterModal').classList.add('open');
   setTimeout(()=>document.getElementById('sp-wann').focus(),80);
 }}
 function closeSpaeterDialog(){{ document.getElementById('spaeterModal').classList.remove('open'); }}
+function setSpaeterSchnell(btn, text){{
+  document.querySelectorAll('#spaeterModal .ignorier-grund-btn').forEach(b=>{{if(b.closest('[id="spaeterModal"]')&&b.parentElement===btn.parentElement)b.classList.remove('active');}});
+  btn.classList.add('active');
+  document.getElementById('sp-wann').value=text;
+  document.getElementById('sp-datum').value='';
+}}
+function setSpaeterGrund(btn, text){{
+  const parent=btn.parentElement;
+  parent.querySelectorAll('.ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sp-grund').value=text;
+}}
 async function saveSpaeter(){{
-  const tid  = document.getElementById('sp-tid').value;
-  const wann = document.getElementById('sp-wann').value.trim();
-  if(!wann){{ document.getElementById('sp-wann').focus(); return; }}
+  const tid   = document.getElementById('sp-tid').value;
+  const datum = document.getElementById('sp-datum').value;
+  const wann  = datum ? new Date(datum).toLocaleString('de-DE',{{hour12:false}}) : document.getElementById('sp-wann').value.trim();
+  const grund = document.getElementById('sp-grund').value.trim();
+  if(!wann){{ document.getElementById('sp-wann').focus(); showToast('Bitte Zeitpunkt angeben'); return; }}
   const btn = document.getElementById('sp-save-btn');
-  btn.textContent='Kira denkt …';
-  btn.disabled=true;
+  btn.innerHTML='Kira denkt\u2026'; btn.disabled=true;
   try{{
     const r = await fetch('/api/task/'+tid+'/spaeter',{{
       method:'POST',headers:{{'Content-Type':'application/json'}},
-      body:JSON.stringify({{wann}})
+      body:JSON.stringify({{wann, datum: datum||null, grund: grund||null}})
     }});
     const d = await r.json();
     if(d.ok){{
+      // Kira-Lernregel aus dem Grund speichern
+      if(grund){{
+        fetch('/api/wissen/neu',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+          body:JSON.stringify({{kategorie:'gelernt',
+            titel:'Spaeter: '+grund.slice(0,60),
+            inhalt:'Aufgabe '+tid+' auf spaeter gesetzt. Grund: "'+grund+'". Zeitpunkt: '+wann+'. Aehnliche Aufgaben koennen aehnlich priorisiert werden.'
+          }})
+        }}).catch(()=>{{}});
+      }}
       const respEl = document.getElementById('sp-kira-resp');
-      respEl.textContent = d.kira_antwort || 'Termin gespeichert.';
+      respEl.textContent = d.kira_antwort || 'Erinnerung gespeichert.';
       respEl.style.display='block';
-      btn.textContent='OK';
-      btn.onclick=()=>{{closeSpaeterDialog();location.reload();}};
-      btn.disabled=false;
+      btn.innerHTML='OK \u2713'; btn.disabled=false;
+      btn.onclick=()=>{{closeSpaeterDialog(); const el=document.getElementById('task-'+tid); if(el){{el.style.opacity='0.3';setTimeout(()=>el.remove(),300);}}}};
     }} else {{
       showToast('Fehler: '+(d.error||'Unbekannt'));
-      btn.textContent='Kira fragen';btn.disabled=false;
+      btn.innerHTML='&#x23F0; Erinnerung setzen';btn.disabled=false;
     }}
   }}catch(e){{
     showToast('Netzwerkfehler');
-    btn.textContent='Kira fragen';btn.disabled=false;
+    btn.innerHTML='&#x23F0; Erinnerung setzen';btn.disabled=false;
   }}
 }}
 document.addEventListener('keydown',e=>{{
@@ -12052,9 +12121,10 @@ a:hover{text-decoration:underline;}
 
 /* Brand / Header area */
 .sidebar-brand{padding:14px 14px 12px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid rgba(0,0,0,.08);min-height:56px;}
-.sidebar-logo{width:30px;height:30px;border-radius:7px;background:var(--accent);color:#fff;display:flex;
-  align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;}
+.sidebar-logo{width:30px;height:30px;border-radius:7px;background:transparent;color:#fff;display:flex;
+  align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;overflow:hidden;}
 .sidebar-logo img{width:30px;height:30px;border-radius:7px;object-fit:cover;}
+.sidebar-logo svg{border-radius:50%;display:block;}
 .sidebar-brand-text{display:flex;flex-direction:column;overflow:hidden;white-space:nowrap;flex:1;}
 .sidebar-brand-name{font-size:var(--fs-md);font-weight:700;color:#1C1C1A;line-height:1.2;}
 .sidebar-brand-sub{font-size:11px;color:#888780;line-height:1.3;}
