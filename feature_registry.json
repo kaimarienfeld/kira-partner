@@ -361,13 +361,13 @@
       "name": "Foto & Video Analyse für Angebote",
       "icon": "📸",
       "leni_name": "Foto hochladen — Angebot rausbekommen",
-      "leni_desc": "Geplant: Fotos oder kurze Videos von der Baustelle hochladen — KI erkennt Betonart, Schadensumfang und Fläche, und schlägt die passende Leistung mit Richtpreis vor. Schätzungen die nicht mehr ins Blaue gehen.",
+      "leni_desc": "Fotos oder Bilder von der Baustelle direkt an Kira schicken — KI analysiert Betonart, Schadensumfang und gibt eine erste Einschaetzung.",
       "leni_visible": true,
       "leni_note": null,
       "module": "kira_llm.py",
-      "status": "planned",
-      "last_updated": "2026-03-28",
-      "description": "Multimodales LLM (Claude/GPT-4o), Betonart/Schadenstyp/Fläche-Erkennung, Richtpreis aus Vergleichsprojekten"
+      "status": "done",
+      "last_updated": "2026-03-31",
+      "description": "FileReader-Upload im Kira-Chat, Anthropic vision content-block (image+text), kira_llm.chat(bild=) Parameter"
     },
     {
       "id": "whatsapp-integration",

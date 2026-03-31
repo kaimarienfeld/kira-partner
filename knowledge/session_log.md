@@ -600,3 +600,15 @@
 - KIRA_SYSTEM_ANALYSE.md Sec 13: Neue Erledigt-Tabelle, Offen-Tabelle auf Kai-Aktionen reduziert
 
 ---
+
+## 2026-04-01 00:15 -- session-ccc: Foto-Analyse Backend-Vervollstaendigung
+**Auftrag:** Autonome Weiterfuehrung -- Foto-Analyse Backend (bild-Parameter in kira_llm.chat + server.py /api/kira/chat)
+**Status:** erledigt
+
+### Erledigt:
+- kira_llm.py chat(): bild=None Parameter, Anthropic vision content-list aufgebaut (image+text Block)
+- server.py /api/kira/chat: bild=body.get('bild') -> kira_chat(..., bild=bild)
+- feature_registry.json: foto-analyse status -> done
+- session_handoff.json + session_log.md aktualisiert
+
+---
