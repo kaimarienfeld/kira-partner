@@ -1303,6 +1303,10 @@ def build_postfach():
         <input class="pf-comp-inp" id="pf-comp-cc" placeholder="(optional)">
       </div>
       <div class="pf-comp-row">
+        <label class="pf-comp-lbl">BCC</label>
+        <input class="pf-comp-inp" id="pf-comp-bcc" placeholder="(optional)">
+      </div>
+      <div class="pf-comp-row">
         <label class="pf-comp-lbl">Betreff</label>
         <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff">
       </div>
@@ -3242,8 +3246,9 @@ window.pfSend=function(){
   if(!to||!subj){showToast('Empfänger und Betreff erforderlich','warnung');return;}
   const btn=document.getElementById('pf-send-btn');
   btn.disabled=true;btn.textContent='Wird gesendet...';
+  const bcc=document.getElementById('pf-comp-bcc')?.value.trim()||'';
   fetch('/api/mail/send',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({from_email:from,to,cc,subject:subj,body_plain:body,bcc:'info@raumkult.eu'})
+    body:JSON.stringify({from_email:from,to,cc,bcc,subject:subj,body_plain:body})
   }).then(r=>r.json()).then(d=>{
     btn.disabled=false;btn.textContent='&#x27A4; Senden';
     if(d.ok){showToast('Mail gesendet ✓','ok');pfCloseCompose();}
