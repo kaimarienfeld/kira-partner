@@ -1035,6 +1035,113 @@ def main():
     except Exception as _ace:
         print(f"  [WARN] Archiv-Bereinigung übersprungen: {_ace}")
 
+    # 7. Auto-Backup (falls konfiguriert)
+    try:
+        _backup_cfg = _cfg_dc.get('backup', {})
+        if _backup_cfg.get('aktiv', False):
+            import shutil as _sh, sqlite3 as _sq_b
+            _backup_dir = Path(_backup_cfg.get('pfad', '') or '') if _backup_cfg.get('pfad') else KNOWLEDGE_DIR / 'backups'
+            _backup_dir.mkdir(parents=True, exist_ok=True)
+            _ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+            _backed = []
+            _src_cfg = SCRIPTS_DIR / 'config.json'
+            if _src_cfg.exists():
+                _sh.copy2(str(_src_cfg), str(_backup_dir / f'{_ts}_config.json'))
+                _backed.append('config.json')
+            for _dbn in ['tasks.db', 'mail_index.db']:
+                _src_db = KNOWLEDGE_DIR / _dbn
+                if not _src_db.exists():
+                    continue
+                _dst_db = _backup_dir / f'{_ts}_{_dbn}'
+                try:
+                    _sc = _sq_b.connect(str(_src_db))
+                    _dc2 = _sq_b.connect(str(_dst_db))
+                    _sc.backup(_dc2)
+                    _sc.close()
+                    _dc2.close()
+                    _backed.append(_dbn)
+                except Exception:
+                    pass
+            _keep_n = int(_backup_cfg.get('keep_n', 7))
+            _grps = {}
+            for _f in sorted(_backup_dir.iterdir()):
+                if not _f.is_file():
+                    continue
+                for _suf in ['_config.json', '_tasks.db', '_mail_index.db']:
+                    if _f.name.endswith(_suf):
+                        _grps.setdefault(_suf, []).append(_f)
+            for _suf, _files in _grps.items():
+                for _old in _files[:-_keep_n]:
+                    try:
+                        _old.unlink()
+                    except Exception:
+                        pass
+            if _backed:
+                print(f"  Auto-Backup: {', '.join(_backed)} -> {_backup_dir}")
+                _elog('system', 'auto_backup', f'Backup: {", ".join(_backed)}',
+                      modul='daily_check', source='daily_check', actor_type='system', status='ok')
+    except Exception as _be:
+        print(f"  [WARN] Auto-Backup fehlgeschlagen: {_be}")
+
+    # ── Step 8: DB-Autopflege ─────────────────────────────────────────────────
+    print("[daily_check] Step 8: DB-Autopflege...")
+    try:
+        import sqlite3 as _sq_maint
+        _maint_db = _sq_maint.connect(str(TASKS_DB))
+        _maint_db.execute("PRAGMA journal_mode=WAL")
+
+        # 1. Alte abgeschlossene Tasks archivieren (status=zur_kenntnis oder erledigt + >90 Tage)
+        _cfg_maint = _cfg_dc
+        _archiv_tage = int(_cfg_maint.get('aufgaben', {}).get('auto_archiv_tage', 90))
+        _archiv_cutoff = (datetime.now() - timedelta(days=_archiv_tage)).strftime('%Y-%m-%d')
+        _deleted_tasks = _maint_db.execute(
+            "DELETE FROM tasks WHERE status IN ('zur_kenntnis','archiviert') AND datum_mail < ? RETURNING id",
+            (_archiv_cutoff,)
+        ).fetchall()
+        _n_del = len(_deleted_tasks)
+
+        # 2. Wissen-Duplikate entfernen (gleicher titel+kategorie, aelteren loeschen)
+        _dup_wissen = _maint_db.execute("""
+            SELECT id FROM wissen_regeln w1
+            WHERE EXISTS (
+                SELECT 1 FROM wissen_regeln w2
+                WHERE w2.titel=w1.titel AND w2.kategorie=w1.kategorie AND w2.id < w1.id
+            )
+        """).fetchall()
+        _n_wissen_dup = len(_dup_wissen)
+        if _dup_wissen:
+            _ids = [str(r[0]) for r in _dup_wissen]
+            _maint_db.execute(f"DELETE FROM wissen_regeln WHERE id IN ({','.join(_ids)})")
+
+        # 3. VACUUM (nur wenn >2% Freiraum)
+        _page_count = _maint_db.execute("PRAGMA page_count").fetchone()[0]
+        _freelist   = _maint_db.execute("PRAGMA freelist_count").fetchone()[0]
+        _did_vacuum = False
+        if _page_count > 0 and _freelist / _page_count > 0.02:
+            _maint_db.execute("VACUUM")
+            _did_vacuum = True
+
+        _maint_db.commit()
+        _maint_db.close()
+
+        # Mail-Index VACUUM
+        try:
+            _mi_db = _sq_maint.connect(str(KNOWLEDGE_DIR / 'mail_index.db'))
+            _mi_freelist = _mi_db.execute("PRAGMA freelist_count").fetchone()[0]
+            _mi_pages    = _mi_db.execute("PRAGMA page_count").fetchone()[0]
+            if _mi_pages > 0 and _mi_freelist / _mi_pages > 0.02:
+                _mi_db.execute("VACUUM")
+            _mi_db.close()
+        except Exception: pass
+
+        print(f"  DB-Autopflege: {_n_del} alte Tasks entfernt, {_n_wissen_dup} Duplikate bereinigt"
+              + (" + VACUUM" if _did_vacuum else ""))
+        _elog('system', 'db_autopflege',
+              f'Tasks entfernt: {_n_del}, Wissen-Duplikate: {_n_wissen_dup}, Vacuum: {_did_vacuum}',
+              modul='daily_check', source='daily_check', actor_type='system', status='ok')
+    except Exception as _me:
+        print(f"  [WARN] DB-Autopflege fehlgeschlagen: {_me}")
+
 
 if __name__ == "__main__":
     import argparse

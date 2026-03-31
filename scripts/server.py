@@ -3947,6 +3947,77 @@ def _load_rechnungen_detail():
     return details, mahnungen
 
 
+def _build_cashflow_panel(ar: list, ar_bezahlt: list) -> str:
+    """Cashflow-Prognose: monatliche Einnahmen (bezahlt vs. offen), Trend-Balken."""
+    from collections import defaultdict
+    monat_offen:  dict = defaultdict(float)
+    monat_bezahlt: dict = defaultdict(float)
+    for r in ar:
+        datum = (r.get('datum') or '')[:7]  # YYYY-MM
+        if not datum:
+            continue
+        betrag = r.get('betrag_brutto') or 0
+        if r.get('status') == 'bezahlt':
+            monat_bezahlt[datum] += betrag
+        else:
+            monat_offen[datum] += betrag
+
+    alle_monate = sorted(set(list(monat_offen.keys()) + list(monat_bezahlt.keys())))
+    if not alle_monate:
+        return "<p class='empty'>Keine Rechnungsdaten vorhanden.</p>"
+
+    max_val = max(
+        (monat_bezahlt.get(m, 0) + monat_offen.get(m, 0)) for m in alle_monate
+    ) or 1
+
+    # Gesamt-KPIs
+    total_bezahlt = sum(r.get('betrag_brutto') or 0 for r in ar_bezahlt)
+    total_offen   = sum(r.get('betrag_brutto') or 0 for r in ar if r.get('status') != 'bezahlt')
+    total_gesamt  = total_bezahlt + total_offen
+
+    html = '<div style="padding:20px">'
+    # KPI-Leiste
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">'
+    html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:130px"><div style="font-size:11px;color:var(--text-muted)">Bezahlt</div><div style="font-size:22px;font-weight:700;color:var(--success,#1D9E75)">{total_bezahlt:,.0f} &euro;</div></div>'
+    html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:130px"><div style="font-size:11px;color:var(--text-muted)">Offen</div><div style="font-size:22px;font-weight:700;color:var(--accent,#378ADD)">{total_offen:,.0f} &euro;</div></div>'
+    html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:130px"><div style="font-size:11px;color:var(--text-muted)">Gesamt fakturiert</div><div style="font-size:22px;font-weight:700;color:var(--text)">{total_gesamt:,.0f} &euro;</div></div>'
+    if total_gesamt > 0:
+        html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:130px"><div style="font-size:11px;color:var(--text-muted)">Zahlungsquote</div><div style="font-size:22px;font-weight:700;color:var(--text)">{total_bezahlt/total_gesamt*100:.0f}%</div></div>'
+    html += '</div>'
+
+    # Balkendiagramm
+    html += '<div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Monatlicher Eingang</div>'
+    html += '<div style="display:flex;flex-direction:column;gap:8px">'
+    monat_de = {
+        '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'Mai','06':'Jun',
+        '07':'Jul','08':'Aug','09':'Sep','10':'Okt','11':'Nov','12':'Dez'
+    }
+    for m in alle_monate[-12:]:  # letzte 12 Monate
+        bez = monat_bezahlt.get(m, 0)
+        off = monat_offen.get(m, 0)
+        total = bez + off
+        pct_bez = int(bez / max_val * 100)
+        pct_off = int(off / max_val * 100)
+        lbl = monat_de.get(m[5:7], m[5:7]) + ' ' + m[2:4]
+        html += f'<div style="display:flex;align-items:center;gap:8px">'
+        html += f'<div style="width:52px;font-size:11px;color:var(--text-muted);text-align:right;flex-shrink:0">{lbl}</div>'
+        html += f'<div style="flex:1;display:flex;gap:2px;height:18px;border-radius:4px;overflow:hidden">'
+        if pct_bez > 0:
+            html += f'<div style="width:{pct_bez}%;background:var(--success,#1D9E75);border-radius:3px 0 0 3px" title="Bezahlt: {bez:,.0f} EUR"></div>'
+        if pct_off > 0:
+            html += f'<div style="width:{pct_off}%;background:var(--accent,#378ADD);opacity:.5;border-radius:{"3px" if pct_bez==0 else "0"} 3px 3px {"3px" if pct_bez==0 else "0"}" title="Offen: {off:,.0f} EUR"></div>'
+        html += '</div>'
+        html += f'<div style="width:80px;font-size:12px;color:var(--text);text-align:right;flex-shrink:0">{total:,.0f} &euro;</div>'
+        html += '</div>'
+    html += '</div>'
+    html += '<div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text-muted)">'
+    html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--success,#1D9E75);margin-right:4px;vertical-align:middle"></span>Bezahlt</span>'
+    html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--accent,#378ADD);opacity:.5;margin-right:4px;vertical-align:middle"></span>Offen</span>'
+    html += '</div>'
+    html += '</div>'
+    return html
+
+
 def build_geschaeft(db):
     """Geschäft Dashboard mit 5 Sub-Tabs: Übersicht, Ausgangsrechnungen, Angebote, Eingangsrechnungen, Mahnungen."""
     try: ar = [dict(r) for r in db.execute("SELECT * FROM ausgangsrechnungen ORDER BY datum DESC").fetchall()]
@@ -3956,6 +4027,8 @@ def build_geschaeft(db):
     try: eingang = [dict(r) for r in db.execute("SELECT * FROM geschaeft WHERE typ IN ('eingangsrechnung','zahlungserinnerung') ORDER BY datum DESC").fetchall()]
     except: eingang = []
     eingang_offen = [r for r in eingang if (r.get("bewertung") or "") != "erledigt"]
+    try: vorgaenge_crm = [dict(r) for r in db.execute("SELECT * FROM vorgaenge WHERE typ IN ('lead','angebot','anfrage') ORDER BY erstellt_am DESC").fetchall()]
+    except: vorgaenge_crm = []
 
     # Detail-Daten laden und anreichern
     re_details, mahnung_details = _load_rechnungen_detail()
@@ -4053,9 +4126,10 @@ def build_geschaeft(db):
       <div class="gesch-tab" onclick="showGeschTab('auswertung')">Auswertung</div>
       <div class="gesch-tab" onclick="showGeschTab('kalkulation')" style="opacity:.5">Kalkulation <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
       <div class="gesch-tab" onclick="showGeschTab('preispositionen')" style="opacity:.5">Preispositionen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
-      <div class="gesch-tab" onclick="showGeschTab('cashflow')" style="opacity:.5">Cashflow <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
+      <div class="gesch-tab" onclick="showGeschTab('cashflow')">&#x1F4B8; Cashflow</div>
       <div class="gesch-tab" onclick="showGeschTab('belegvorlagen');loadBelegVorlagen()">&#x1F4C4; Belegvorlagen</div>
       <div class="gesch-tab" onclick="showGeschTab('zeiterfassung');loadZeiterfassung()">&#x23F1; Zeiterfassung</div>
+      <div class="gesch-tab" onclick="showGeschTab('crm')">&#x1F3AF; CRM Pipeline</div>
     </div>
     <div id="gesch-uebersicht" class="gesch-panel active">{_build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats)}</div>
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
@@ -4066,7 +4140,7 @@ def build_geschaeft(db):
     <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
     <div id="gesch-kalkulation" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4D0;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalkulation</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Projekt- und Leistungskalkulation mit Materialkosten, Arbeitszeit und Gewinnmarge.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
     <div id="gesch-preispositionen" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4CB;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Preispositionen</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Leistungskatalog mit Einzelpreisen, Staffeln und Erfahrungswerten.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
-    <div id="gesch-cashflow" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4B8;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Cashflow</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Liquidit&auml;ts&uuml;bersicht mit Ein- und Auszahlungen, Prognose und Warnungen.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
+    <div id="gesch-cashflow" class="gesch-panel">{_build_cashflow_panel(ar, ar_bezahlt)}</div>
     <div id="gesch-belegvorlagen" class="gesch-panel">
       <div style="padding:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -4189,7 +4263,64 @@ def build_geschaeft(db):
           </div>
         </div>
       </div>
-    </div>"""
+    </div>
+    <!-- CRM Pipeline Panel -->
+    <div id="gesch-crm" class="gesch-panel">{_build_crm_pipeline(vorgaenge_crm)}</div>"""
+    return html
+
+
+def _build_crm_pipeline(vorgaenge: list) -> str:
+    """CRM Lead-Pipeline: Kanban-Ansicht von Leads + Angeboten nach Status."""
+    # Pipeline-Stufen
+    stufen = [
+        ('neu',              '&#x1F4E5; Eingang',          '#378ADD', ['neu']),
+        ('angebot_gesendet', '&#x1F4E4; Angebot gesendet', '#EF9F27', ['angebot_versendet', 'angebot_gesendet']),
+        ('verhandlung',      '&#x1F91D; Verhandlung',      '#7c3aed', ['verhandlung', 'nachgefasst']),
+        ('gewonnen',         '&#x2705; Gewonnen',           '#1D9E75', ['angenommen', 'gewonnen']),
+        ('verloren',         '&#x274C; Verloren',           '#E24B4A', ['abgelehnt', 'storniert', 'verloren']),
+    ]
+
+    def _typ_badge(typ: str) -> str:
+        farben = {'lead': '#7c3aed', 'angebot': '#378ADD', 'anfrage': '#EF9F27'}
+        return f'<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:{farben.get(typ,"#888")}22;color:{farben.get(typ,"#888")};font-weight:700;border:1px solid {farben.get(typ,"#888")}44">{typ}</span>'
+
+    html = '<div style="padding:16px 20px">'
+    # KPI-Zeile
+    leads_open = [v for v in vorgaenge if v.get('typ') in ('lead','anfrage','angebot') and v.get('status') not in ('angenommen','gewonnen','abgelehnt','storniert','verloren')]
+    total_vol  = sum(v.get('betrag') or 0 for v in leads_open)
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">'
+    html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px"><div style="font-size:11px;color:var(--text-muted)">Aktive Vorgaenge</div><div style="font-size:20px;font-weight:700;color:var(--text)">{len(leads_open)}</div></div>'
+    if total_vol > 0:
+        html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px"><div style="font-size:11px;color:var(--text-muted)">Volumen in Pipeline</div><div style="font-size:20px;font-weight:700;color:var(--text)">{total_vol:,.0f} &euro;</div></div>'
+    html += '</div>'
+
+    # Kanban Board
+    html += '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">'
+    for _, label, farbe, stati in stufen:
+        items = [v for v in vorgaenge
+                 if v.get('typ') in ('lead','angebot','anfrage') and v.get('status') in stati]
+        html += f'<div style="min-width:200px;max-width:240px;flex-shrink:0">'
+        html += f'<div style="font-size:12px;font-weight:700;color:{farbe};margin-bottom:8px;display:flex;align-items:center;gap:6px">{label}<span style="background:{farbe}22;color:{farbe};border-radius:10px;padding:0 7px;font-size:11px">{len(items)}</span></div>'
+        html += f'<div style="display:flex;flex-direction:column;gap:6px;min-height:60px">'
+        if not items:
+            html += f'<div style="border:1.5px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--text-muted)">Leer</div>'
+        for v in items[:10]:
+            name = (v.get('kunden_name') or v.get('kunden_email') or '')[:22]
+            titel = (v.get('titel') or '')[:40]
+            betrag = v.get('betrag') or 0
+            html += f'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;transition:box-shadow .12s" onclick="geschKira(\'angebot\',\'{v.get("vorgang_nr","")}\',\'{name}\',null)">'
+            html += f'<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">{_typ_badge(v.get("typ",""))}</div>'
+            if titel:
+                html += f'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">{esc(titel[:38])}</div>'
+            if name:
+                html += f'<div style="font-size:11px;color:var(--text-muted)">{esc(name)}</div>'
+            if betrag:
+                html += f'<div style="font-size:11px;color:var(--accent,#378ADD);font-weight:600;margin-top:3px">{betrag:,.0f} &euro;</div>'
+            html += '</div>'
+        if len(items) > 10:
+            html += f'<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px">+{len(items)-10} weitere</div>'
+        html += '</div></div>'
+    html += '</div></div>'
     return html
 
 

@@ -850,6 +850,62 @@ def _save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2), 'utf-8')
 
 
+# ── Eingangsrechnungs-Auto-Scan (session-bbb) ─────────────────────────────────
+def _auto_scan_eingangsrechnung(mail_data: dict, konto_label: str, kategorie: str,
+                                 msg_id: str, absender: str, betreff: str, text: str):
+    """
+    Wenn kategorie 'Rechnung / Beleg': betrag extrahieren + Eintrag in geschaeft-Tabelle.
+    Idempotent (ON CONFLICT IGNORE via mail_ref).
+    """
+    if kategorie not in ('Rechnung / Beleg',):
+        return
+    try:
+        # Betrag per Regex aus Text extrahieren (EUR-Betrag)
+        betrag = 0.0
+        _betrag_patterns = [
+            r'(?:Gesamtbetrag|Betrag|Total|Summe|Rechnungsbetrag)[^\d]*?([\d]{1,6}[.,]\d{2})',
+            r'([\d]{1,6}[.,]\d{2})\s*(?:EUR|€)',
+        ]
+        _combined = betreff + '\n' + text[:3000]
+        for _pat in _betrag_patterns:
+            _m = re.search(_pat, _combined, re.IGNORECASE)
+            if _m:
+                _raw = _m.group(1).replace('.', '').replace(',', '.')
+                try: betrag = float(_raw)
+                except: pass
+                if betrag > 0:
+                    break
+
+        # Absender-E-Mail
+        _se_m = re.search(r'<([^>]+@[^>]+)>', absender)
+        absender_email = _se_m.group(1).lower() if _se_m else absender.strip().lower()
+        absender_name  = absender.split('<')[0].strip() if '<' in absender else absender_email
+
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""INSERT OR IGNORE INTO geschaeft
+            (typ, datum, betrag, gegenpartei, gegenpartei_email, betreff, konto, mail_ref, quelle)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
+            ('eingangsrechnung',
+             mail_data.get('datum', '')[:10],
+             betrag if betrag > 0 else None,
+             absender_name[:200],
+             absender_email[:200],
+             betreff[:500],
+             konto_label,
+             msg_id,
+             'mail_monitor'))
+        db.commit()
+        db.close()
+        _elog('system', 'eingangsrechnung_erkannt',
+              f'Eingangsrechnung: {absender_email} | {betrag:.2f} EUR | {betreff[:60]}',
+              source='mail_monitor', modul='eingangsrechnungen', actor_type='system',
+              status='ok', context_id=msg_id)
+    except Exception as _e:
+        _elog('system', 'eingangsrechnung_fehler', f'Auto-Scan fehlgeschlagen: {_e}',
+              source='mail_monitor', modul='eingangsrechnungen', actor_type='system',
+              status='fehler', context_id=msg_id)
+
+
 # ── Verarbeitung ─────────────────────────────────────────────────────────────
 def _process_mail(mail_data, konto_label, folder_name):
     """Verarbeitet eine neue Mail: Klassifizierung + Task-Erstellung."""
@@ -997,6 +1053,9 @@ def _process_mail(mail_data, konto_label, folder_name):
     except Exception as _ve:
         _elog('system', 'vorgang_router_fehler', f"Router-Fehler: {_ve}",
               source='mail_monitor', modul='vorgang_router', actor_type='system', status='fehler')
+
+    # ── Eingangsrechnungs-Auto-Scan ───────────────────────────────────────────
+    _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
 
     # In kunden.db speichern
     try:
