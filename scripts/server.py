@@ -4658,8 +4658,8 @@ function esInfoPopup(btn, text) {{
     <span class="es-ms">Log-Eintr.: <b>{rl_total}</b></span>
   </div>
   <div class="es-macts">
-    <button class="es-ma" onclick="showToast('Export: In Vorbereitung')">&#x2197; Export</button>
-    <button class="es-ma" onclick="showToast('Import: In Vorbereitung')">&#x2199; Import</button>
+    <button class="es-ma" onclick="configExport()">&#x2197; Export</button>
+    <button class="es-ma" onclick="configImport()">&#x2199; Import</button>
     <button class="es-ma es-pri" onclick="saveSettings()">Speichern</button>
     <span id="settings-status" style="font-size:11px;color:var(--muted)"></span>
   </div>
@@ -6094,7 +6094,13 @@ function esInfoPopup(btn, text) {{
       'Konto l\u00f6schen \u2014 '+email,
       '<strong>Empfehlung: Konto deaktivieren statt l\u00f6schen.</strong><br><br>Deaktivierte Konten sind f\u00fcr KIRA und im Archiv weiterhin zug\u00e4nglich \u2014 nur Abruf und Senden ist gestoppt.<br><br>L\u00f6schen entfernt nur den Konfigurations-Eintrag. Archiv-Dateien auf der Festplatte bleiben erhalten.',
       'L\u00d6SCHEN',
-      ()=>showToast('Konto-L\u00f6schen: Admin-Feature \u2014 bitte manuell in raumkult_config.json','warnung'),
+      function() {{
+        fetch('/api/mail/konto/loeschen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
+          .then(r=>r.json()).then(d=>{{
+            if(d.ok){{showToast('Konto '+email+' entfernt','ok'); esLoadMailKonten();}}
+            else showToast('Fehler: '+(d.error||'?'),'fehler');
+          }}).catch(()=>showToast('Verbindungsfehler','fehler'));
+      }},
       'Tipp: \u23f8 Deaktivieren \u2014 Archiv bleibt vollst\u00e4ndig zug\u00e4nglich'
     );
   }};
@@ -7353,8 +7359,8 @@ function esInfoPopup(btn, text) {{
         <span style="font-size:12px;color:var(--text);font-weight:600">{rl_db_size}</span>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="es-btn" onclick="showToast('Export: In Vorbereitung')">&#x2197; Config exportieren</button>
-        <button class="es-btn" onclick="showToast('Import: In Vorbereitung')">&#x2199; Config importieren</button>
+        <button class="es-btn" onclick="configExport()">&#x2197; Config exportieren</button>
+        <button class="es-btn" onclick="configImport()">&#x2199; Config importieren</button>
         <button class="es-btn es-btn-red" onclick="resetConfig()">Zur&uuml;cksetzen</button>
       </div>
     </div>
@@ -9567,6 +9573,35 @@ function resetConfig() {{
     }},
     'Ein Backup der aktuellen Konfiguration wird als config.json.bak gespeichert.'
   );
+}}
+
+// Config Export / Import
+function configExport() {{
+  window.open('/api/config/export', '_blank');
+}}
+
+function configImport() {{
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json,application/json';
+  inp.onchange = function() {{
+    const f = inp.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {{
+      let cfg;
+      try {{ cfg = JSON.parse(e.target.result); }} catch(_) {{ showToast('Ung\u00fcltige JSON-Datei'); return; }}
+      if(typeof cfg !== 'object' || Array.isArray(cfg)) {{ showToast('Ung\u00fcltige Konfiguration'); return; }}
+      fetch('/api/config/import', {{method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{config: cfg}})}})
+        .then(r=>r.json()).then(d=>{{
+          if(d.ok){{showToast('Konfiguration importiert \u2014 Seite wird neu geladen\u2026'); setTimeout(()=>location.reload(),1800);}}
+          else showToast(d.error||'Fehler beim Importieren');
+        }}).catch(()=>showToast('Fehler beim Import'));
+    }};
+    reader.readAsText(f);
+  }};
+  inp.click();
 }}
 
 // Änderungsverlauf laden / toggle
@@ -12458,6 +12493,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/kira/circuit_breaker':
             self._api_kira_circuit_breaker_get()
 
+        elif self.path == '/api/config/export':
+            try:
+                cfg  = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                data = json.dumps(cfg, ensure_ascii=False, indent=2).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Content-Disposition', 'attachment; filename="kira_config.json"')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
 
@@ -14706,6 +14754,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_konto_loeschen(self, body):
+        """POST /api/mail/konto/loeschen — Konto aus raumkult_config.json entfernen."""
+        email = (body.get('email') or '').strip().lower()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        try:
+            archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+            if archiver_cfg.exists():
+                cfg = json.loads(archiver_cfg.read_text('utf-8'))
+                vorher = len(cfg.get('konten', []))
+                cfg['konten'] = [k for k in cfg.get('konten', []) if k.get('email', '').lower() != email]
+                if len(cfg['konten']) == vorher:
+                    self._json({'ok': False, 'error': 'Konto nicht gefunden'})
+                    return
+                archiver_cfg.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+            # sync_ordner aus config.json entfernen
+            cfg_path = SCRIPTS_DIR / 'config.json'
+            if cfg_path.exists():
+                kira_cfg = json.loads(cfg_path.read_text('utf-8'))
+                kira_cfg.get('mail_archiv', {}).get('sync_ordner', {}).pop(email, None)
+                cfg_path.write_text(json.dumps(kira_cfg, ensure_ascii=False, indent=2), 'utf-8')
+            rlog('settings', 'konto_geloescht', f'Mail-Konto {email} aus Konfiguration entfernt',
+                 source='server', modul='einstellungen', actor_type='user', status='ok')
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_einstellungen_get(self):
         """GET /api/einstellungen — Lädt aktuelle Einstellungen inkl. mail_klassifizierung."""
         try:
@@ -15098,6 +15174,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/hinzufuegen':
             self._api_mail_konto_hinzufuegen(body)
+            return
+
+        if self.path == '/api/mail/konto/loeschen':
+            self._api_mail_konto_loeschen(body)
             return
 
         if self.path == '/api/mail/konto/oauth-start':
@@ -15851,6 +15931,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     s.login(absender, pw_smtp)
                     s.sendmail(absender, to_addr, msg.as_string())
                 self._json({'ok': True, 'type': mail_type, 'to': to_addr})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Config importieren (aus JSON-Datei)
+        if self.path == '/api/config/import':
+            try:
+                cfg_import = body.get('config')
+                if not isinstance(cfg_import, dict):
+                    self._json({'ok': False, 'error': 'Ungültige Konfiguration — muss ein JSON-Objekt sein'})
+                    return
+                config_path = SCRIPTS_DIR / "config.json"
+                backup_path = SCRIPTS_DIR / "config.json.bak"
+                try:
+                    backup_path.write_text(config_path.read_text('utf-8'), 'utf-8')
+                except Exception:
+                    pass
+                config_path.write_text(json.dumps(cfg_import, ensure_ascii=False, indent=2), 'utf-8')
+                rlog('settings', 'config_import', 'Konfiguration aus Datei importiert',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
+                self._json({'ok': True})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
