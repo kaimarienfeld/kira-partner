@@ -794,6 +794,16 @@ def build_dashboard(tasks, db):
     </div>"""
     except: pass
 
+    cal_panel = (
+        '<div class="dash-panel" id="dash-kal-panel">'
+        '<div class="dash-panel-title" style="cursor:pointer"'
+        ' onclick="showPanel(\'organisation\');setTimeout(()=>{const t=document.querySelector(\'.org-view-tabs .komm-view-tab:last-child\');if(t)t.click();},150)">'
+        '&#x1F4C5; Kalender</div>'
+        '<div class="dash-panel-sub">N&auml;chste Termine &mdash; Outlook-Kalender</div>'
+        '<div id="dash-kal-list" style="min-height:40px;color:var(--muted);font-size:12px;padding:8px 0">Lade...</div>'
+        '</div>'
+    )
+
     work_html = f"""<div class="dash-work-grid">
   <div class="dash-panel">
     <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div>
@@ -806,6 +816,7 @@ def build_dashboard(tasks, db):
       <div class="dash-panel-sub">Kommende 7 Tage</div>
       {term_html}
     </div>
+    {cal_panel}
     {vor_panel}
     <div class="dash-panel">
       <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('geschaeft')">Gesch&auml;ft aktuell</div>
@@ -3855,7 +3866,7 @@ def build_organisation(db):
       <div class="komm-view-tab active" onclick="showOrgView(this,'timeline')">Timeline ({n_total})</div>
       <div class="komm-view-tab" onclick="showOrgView(this,'fristen')">Fristen ({len(groups['frist'])})</div>
       <div class="komm-view-tab" onclick="showOrgView(this,'rueckrufe')">R&uuml;ckrufe ({len(groups['rueckruf'])})</div>
-      <div class="komm-view-tab" onclick="showOrgView(this,'kalender')">Kalender <span class="si-badge planned" style="font-size:9px;padding:1px 5px">In Planung</span></div>
+      <div class="komm-view-tab" onclick="showOrgView(this,'kalender');loadOrgKalender()">Kalender &#x1F4C5;</div>
     </div>"""
 
     def _org_row(o, show_badge=True):
@@ -3878,12 +3889,20 @@ def build_organisation(db):
     # Rückrufe view
     rueckruf_items = "".join(_org_row(o) for o in groups["rueckruf"]) if groups["rueckruf"] else "<p class='empty'>Keine R&uuml;ckrufbitten erkannt.</p>"
 
-    # Kalender (geplant)
-    kalender_html = """<div class="planned-shell" style="min-height:200px;padding:40px 20px">
-      <div class="planned-shell-icon" style="font-size:32px">&#x1F4C5;</div>
-      <div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalender-Ansicht</div>
-      <div class="planned-shell-desc" style="font-size:var(--fs-sm)">Kalender-Sync mit Outlook, Google Calendar und manuellen Eintr&auml;gen.</div>
-      <div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung: Kalender-Sync</div>
+    # Kalender (Graph-API live)
+    kalender_html = """<div style="padding:12px 0">
+      <div id="org-kal-toolbar" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <select id="org-kal-tage" onchange="loadOrgKalender()" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text)">
+          <option value="7">7 Tage</option>
+          <option value="14">14 Tage</option>
+          <option value="30">30 Tage</option>
+        </select>
+        <button onclick="loadOrgKalender()" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text);cursor:pointer">&#x21BB; Aktualisieren</button>
+        <span id="org-kal-konto" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+      <div id="org-kal-list" style="min-height:80px;font-size:13px">
+        <span style="color:var(--muted)">&#x1F4C5; Kalender wird geladen...</span>
+      </div>
     </div>"""
 
     return f"""{tabs_html}
@@ -9218,6 +9237,7 @@ function showPanel(name) {{
   localStorage.setItem('kira_active_tab', name);
   closeMobileSidebar();
   if(name==='postfach' && typeof window.pfInit==='function') {{ window.pfInit(); }}
+  if(name==='dashboard') {{ setTimeout(loadDashKalender, 400); }}
 }}
 
 // Prio-Karte Kebab-Menu
@@ -11710,6 +11730,84 @@ function refreshBriefing() {{
   }}).catch(()=>{{ el.style.opacity='1'; showToast('Fehler'); }});
 }}
 
+// ── Kalender-Widget ───────────────────────────────────────────────────────────
+function _renderTermine(termine, listEl) {{
+  if(!listEl) return;
+  if(!termine || termine.length===0) {{
+    listEl.innerHTML='<span style="color:var(--muted);font-size:12px">Keine Termine in diesem Zeitraum</span>';
+    return;
+  }}
+  const wday=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const mon=['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  let html='';
+  termine.forEach(function(t){{
+    let dateStr='';
+    try{{
+      const d=new Date(t.start);
+      dateStr=wday[d.getDay()]+', '+d.getDate()+'. '+mon[d.getMonth()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    }}catch(e){{dateStr=t.start||'';}}
+    const ort=t.ort?'<span style="color:var(--muted);font-size:11px"> &bull; '+escH(t.ort)+'</span>':'';
+    html+='<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border-faint,var(--border))">'
+      +'<span style="min-width:90px;font-size:11px;color:var(--muted);white-space:nowrap">'+escH(dateStr)+'</span>'
+      +'<div><div style="font-size:12px;line-height:1.3">'+escH(t.betreff||'(kein Titel)')+'</div>'+ort+'</div>'
+      +'</div>';
+  }});
+  listEl.innerHTML=html;
+}}
+
+function loadDashKalender() {{
+  const list=document.getElementById('dash-kal-list');
+  if(!list) return;
+  list.innerHTML='<span style="color:var(--muted);font-size:12px">Lade...</span>';
+  fetch('/api/kira/termine?tage=7').then(function(r){{return r.json();}}).then(function(d){{
+    if(!d.ok){{
+      const msg=d.error||'';
+      if(msg.toLowerCase().indexOf('berechtigung')>=0||msg.toLowerCase().indexOf('scope')>=0||msg.toLowerCase().indexOf('token')>=0){{
+        list.innerHTML='<div style="font-size:11px;color:var(--muted)">&#x26A0; Azure-Berechtigung fehlt &mdash; <a onclick="showPanel(\'einstellungen\');setTimeout(()=>esNavTo(\'mail\'),100)" style="cursor:pointer;color:var(--accent)">Kira-Postfach einrichten</a></div>';
+      }}else{{
+        list.innerHTML='<span style="font-size:11px;color:var(--muted)">Kalender nicht verfugbar</span>';
+      }}
+      return;
+    }}
+    _renderTermine((d.termine||[]).slice(0,5), list);
+  }}).catch(function(){{
+    if(list) list.innerHTML='<span style="font-size:11px;color:var(--muted)">Fehler beim Laden</span>';
+  }});
+}}
+
+function loadOrgKalender() {{
+  const list=document.getElementById('org-kal-list');
+  const konto=document.getElementById('org-kal-konto');
+  const tage=parseInt(document.getElementById('org-kal-tage')?.value||'7');
+  if(!list) return;
+  list.innerHTML='<span style="color:var(--muted)">Lade...</span>';
+  fetch('/api/kira/termine?tage='+tage).then(function(r){{return r.json();}}).then(function(d){{
+    if(konto) konto.textContent=d.konto?'Konto: '+d.konto:'';
+    if(!d.ok){{
+      const msg=d.error||'';
+      let errHtml='<div style="padding:20px;text-align:center;color:var(--muted)">';
+      if(msg.toLowerCase().indexOf('berechtigung')>=0||msg.toLowerCase().indexOf('scope')>=0||msg.toLowerCase().indexOf('token')>=0){{
+        errHtml+='<div style="font-size:24px">&#x26A0;</div>'
+          +'<div style="font-weight:600;margin:8px 0">Azure-Berechtigung erforderlich</div>'
+          +'<div style="font-size:12px">Fur den Kalender-Zugriff muss die Berechtigung<br><code>Calendars.Read</code> in der Azure-App aktiviert sein.</div>'
+          +'<div style="margin-top:12px"><button onclick="showPanel(\'einstellungen\');setTimeout(()=>esNavTo(\'mail\'),100)" style="font-size:12px;padding:5px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer">Kira-Postfach-Einstellungen</button></div>';
+      }}else{{
+        errHtml+='<div style="font-size:20px">&#x1F4C5;</div><div style="margin-top:8px;font-size:13px">'+escH(msg||'Kalender nicht verfugbar')+'</div>';
+      }}
+      errHtml+='</div>';
+      list.innerHTML=errHtml;
+      return;
+    }}
+    if(!d.termine||d.termine.length===0){{
+      list.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">&#x2713; Keine Termine in den nachsten '+tage+' Tagen</div>';
+      return;
+    }}
+    _renderTermine(d.termine, list);
+  }}).catch(function(){{
+    if(list) list.innerHTML='<span style="color:var(--muted)">Fehler beim Laden</span>';
+  }});
+}}
+
 // Monitor-Status prüfen (alle 30s) — aktualisiert Header-Chip
 // ── Kira-Aktivitäten ─────────────────────────────────────────────────────────
 function loadKiraAktivitaeten() {{
@@ -12266,6 +12364,7 @@ document.addEventListener('keydown',e=>{{
   restoreDesign();
   const tab = localStorage.getItem('kira_active_tab');
   if(tab && tab !== 'dashboard') showPanel(tab);
+  setTimeout(loadDashKalender, 800);
   const gt = localStorage.getItem('kira_gesch_tab');
   if(gt && gt !== 'uebersicht') showGeschTab(gt);
 }})();
@@ -13858,6 +13957,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/kira/circuit_breaker':
             self._api_kira_circuit_breaker_get()
+
+        elif self.path.startswith('/api/kira/termine'):
+            self._api_kira_termine()
 
         elif self.path == '/api/config/export':
             try:
@@ -15601,6 +15703,33 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": True, "state": state})
         except Exception as e:
             self._json({"ok": False, "error": str(e), "state": {}})
+
+    def _api_kira_termine(self):
+        """GET /api/kira/termine?tage=7 — Kalender-Termine via Graph-API."""
+        try:
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            tage = int(qs.get('tage', ['7'])[0])
+            tage = max(1, min(tage, 90))
+            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+            konten = cfg.get('mail_konten', [])
+            konto = ""
+            for k in konten:
+                if k.get('provider', '').lower() in ('microsoft', 'exchange', 'ews', 'office365'):
+                    konto = k.get('email', '')
+                    break
+            if not konto and konten:
+                konto = konten[0].get('email', '')
+            if not konto:
+                self._json({"ok": False, "error": "Kein Mail-Konto konfiguriert", "termine": []})
+                return
+            from graph_calendar import liste_termine
+            result = liste_termine(konto, tage=tage)
+            result['konto'] = konto
+            self._json(result)
+        except ImportError:
+            self._json({"ok": False, "error": "graph_calendar nicht verfugbar", "termine": []})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e), "termine": []})
 
     def _api_kira_proaktiv_scan(self):
         """POST /api/kira/proaktiv/scan — Startet proaktiven Scan manuell."""
