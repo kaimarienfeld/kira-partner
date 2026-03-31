@@ -48,6 +48,26 @@ try:
 except Exception:
     pass
 
+# Paket 6 (session-oo): kira_feedback — Thumbs up/down Bewertungen
+try:
+    _db = sqlite3.connect(str(TASKS_DB))
+    _db.execute("""
+        CREATE TABLE IF NOT EXISTS kira_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            message_idx INTEGER NOT NULL,
+            rating TEXT NOT NULL,
+            kommentar TEXT,
+            kira_antwort TEXT,
+            auto_regel_id INTEGER,
+            erstellt_am TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    _db.commit()
+    _db.close()
+except Exception:
+    pass
+
 # Paket 2 (session-oo): mail_approve_queue — HITL-Gate für Mail-Senden durch Kira
 try:
     _db = sqlite3.connect(str(TASKS_DB))
@@ -9415,6 +9435,8 @@ function sendKiraMsg() {{
   }});
 }}
 
+var _kiraMsgIdx = 0;  // Zähler für Feedback-Buttons (Paket 6, session-oo)
+
 function appendKiraMsg(rolle, text, tools, providerInfo, fallbackInfo) {{
   const area = document.getElementById('kiraChatArea');
   const welcome = area.querySelector('.kira-welcome');
@@ -9445,8 +9467,15 @@ function appendKiraMsg(rolle, text, tools, providerInfo, fallbackInfo) {{
       }}
       bubble.appendChild(meta);
     }}
+    const msgIdx = ++_kiraMsgIdx;
     wrap.innerHTML = '<div class="msg-head"><span class="msg-name">Kira</span><span class="msg-time">'+now+'</span></div>';
     wrap.appendChild(bubble);
+    // Feedback-Buttons (Paket 6, session-oo)
+    const fbDiv = document.createElement('div');
+    fbDiv.style.cssText = 'display:flex;gap:6px;margin-top:6px;padding-left:2px;';
+    fbDiv.innerHTML = '<button onclick="kirafb(\'gut\','+msgIdx+',this)" style="background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:2px 8px;cursor:pointer" title="Hilfreich">&#x1F44D;</button>'
+      +'<button onclick="kirafb(\'schlecht\','+msgIdx+',this,'+JSON.stringify(text.substring(0,500))+')" style="background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:2px 8px;cursor:pointer" title="Nicht hilfreich">&#x1F44E;</button>';
+    wrap.appendChild(fbDiv);
   }} else if(rolle==='error') {{
     wrap.className = 'msg error';
     wrap.innerHTML = '<div class="msg-bubble">'+escH(text)+'</div>';
@@ -10130,6 +10159,32 @@ window.onerror = function(msg, src, line, col, err) {{
 
   setTimeout(function() {{ _pollSignals(); setInterval(_pollSignals, 10000); }}, 5000);
 }})();
+
+// ── Kira-Feedback (Paket 6, session-oo) ──────────────────────────────────────
+function kirafb(rating, msgIdx, btn, kiraText) {{
+  var payload = {{
+    session_id: kiraSessionId || '',
+    message_idx: msgIdx,
+    rating: rating,
+    kira_antwort: kiraText || ''
+  }};
+  fetch('/api/kira/feedback', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(payload)
+  }}).then(function(r){{return r.json();}}).then(function(d){{
+    if(d.ok) {{
+      if(btn && btn.parentNode) {{
+        btn.parentNode.querySelectorAll('button').forEach(function(b){{ b.style.opacity='0.4'; b.disabled=true; }});
+        btn.style.opacity='1';
+        btn.style.borderColor = rating==='gut' ? '#059669' : '#dc2626';
+      }}
+      if(d.auto_regel_id) {{
+        showToast('Kira lernt: Wissens-Regel #' + d.auto_regel_id + ' erstellt', 'ok');
+      }}
+    }}
+  }}).catch(function(){{}});
+}}
 
 // ── Mail-Freigabe (Paket 2, session-oo) ──────────────────────────────────────
 var _mailApproveItems = [];
@@ -12848,6 +12903,60 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    # ── Kira-Feedback (Paket 6, session-oo) ──────────────────────────────────
+
+    def _api_kira_feedback(self, body: dict):
+        """POST /api/kira/feedback — Thumbs up/down Bewertung einer Kira-Antwort."""
+        session_id   = body.get("session_id", "")
+        msg_idx      = int(body.get("message_idx", 0))
+        rating       = body.get("rating", "")
+        kommentar    = body.get("kommentar", "") or ""
+        kira_antwort = body.get("kira_antwort", "") or ""
+        if rating not in ("gut", "schlecht"):
+            self._json({"ok": False, "error": "rating muss 'gut' oder 'schlecht' sein"})
+            return
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            cur = db.execute("""
+                INSERT INTO kira_feedback (session_id, message_idx, rating, kommentar, kira_antwort)
+                VALUES (?,?,?,?,?)
+            """, (session_id, msg_idx, rating, kommentar[:500], kira_antwort[:1000]))
+            db.commit()
+            feedback_id = cur.lastrowid
+            auto_regel_id = None
+            if rating == "schlecht" and kira_antwort:
+                try:
+                    from kira_llm import chat as _kc
+                    lern_prompt = (
+                        f"Kira hat folgende Antwort gegeben, die als schlecht bewertet wurde: "
+                        f"'{kira_antwort[:400]}'\n\n"
+                        f"Formuliere eine kurze Lernregel die Kira zukuenftig besser macht. "
+                        f"JSON: {{\"titel\": \"max 100 Zeichen\", \"inhalt\": \"max 200 Zeichen\"}}"
+                    )
+                    lern_result = _kc(lern_prompt)
+                    lern_text = (lern_result.get("text") or "").strip()
+                    import re as _re, json as _j
+                    m = _re.search(r'\{[^}]*"titel"[^}]*\}', lern_text, _re.DOTALL)
+                    if m:
+                        parsed = _j.loads(m.group(0))
+                        titel  = parsed.get("titel", "Auto-Lernregel")[:100]
+                        inhalt = parsed.get("inhalt", lern_text[:200])[:500]
+                        rc = db.execute("""
+                            INSERT INTO wissen_regeln (titel, inhalt, kategorie, quelle, erstellt_am)
+                            VALUES (?,?,'auto_gelernt','feedback_schlecht',CURRENT_TIMESTAMP)
+                        """, (titel, inhalt))
+                        db.commit()
+                        auto_regel_id = rc.lastrowid
+                        db.execute("UPDATE kira_feedback SET auto_regel_id=? WHERE id=?",
+                                   (auto_regel_id, feedback_id))
+                        db.commit()
+                except Exception:
+                    pass
+            db.close()
+            self._json({"ok": True, "feedback_id": feedback_id, "auto_regel_id": auto_regel_id})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     # ── Mail-Approve-Queue (Paket 2, session-oo) ─────────────────────────────
 
     def _api_mail_approve_pending(self):
@@ -12915,11 +13024,41 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         (now, now, queue_id)
                     )
                     db.commit()
-                    db.close()
                     rlog("server", "mail_gesendet",
                          f"Mail #{queue_id} an {row['an']} gesendet ({action})",
                          modul="server", source="server", actor_type="user",
                          status="ok", entity_snapshot={"queue_id": queue_id, "an": row["an"]})
+
+                    # Stil-Lernen: wenn User stark editiert hat (Paket 6-C)
+                    if action == "edit" and new_body:
+                        orig = row["body_plain"] or ""
+                        if orig and len(orig) > 10:
+                            diff_pct = abs(len(new_body) - len(orig)) / max(len(orig), 1)
+                            if diff_pct > 0.40:
+                                try:
+                                    from kira_llm import chat as _kc
+                                    stil_prompt = (
+                                        f"Original-Entwurf von Kira:\n'{orig[:300]}'\n\n"
+                                        f"Nutzer-Version:\n'{new_body[:300]}'\n\n"
+                                        f"Erkenne den Stil-Unterschied und formuliere eine kurze Lernregel. "
+                                        f"JSON: {{\"titel\": \"Stil-Regel: ...\", \"inhalt\": \"...\"}}"
+                                    )
+                                    lern_result = _kc(stil_prompt)
+                                    lern_text = (lern_result.get("text") or "").strip()
+                                    import re as _re, json as _j
+                                    m = _re.search(r'\{[^}]*"titel"[^}]*\}', lern_text, _re.DOTALL)
+                                    if m:
+                                        parsed = _j.loads(m.group(0))
+                                        db.execute("""
+                                            INSERT INTO wissen_regeln (titel, inhalt, kategorie, quelle, erstellt_am)
+                                            VALUES (?,?,'auto_gelernt','mail_stil_diff',CURRENT_TIMESTAMP)
+                                        """, (parsed.get("titel","Stil-Regel")[:100],
+                                              parsed.get("inhalt", lern_text[:200])[:500]))
+                                        db.commit()
+                                except Exception:
+                                    pass
+
+                    db.close()
                     self._json({"ok": True, "message": f"Mail an {row['an']} gesendet."})
                 else:
                     db.close()
@@ -13978,6 +14117,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': True})
             except Exception as ex:
                 self._json({'ok': False, 'error': str(ex)})
+            return
+
+        # Kira-Feedback (Paket 6, session-oo)
+        if self.path == '/api/kira/feedback':
+            self._api_kira_feedback(body)
             return
 
         # ReAct-Task starten (Paket 5, session-oo)
