@@ -4124,7 +4124,7 @@ def build_geschaeft(db):
       <div class="gesch-tab" onclick="showGeschTab('zahlungen')">Zahlungen ({len(ar_bezahlt)})</div>
       <div class="gesch-tab" onclick="showGeschTab('mahnungen')">Mahnungen ({n_mahnungen})</div>
       <div class="gesch-tab" onclick="showGeschTab('auswertung')">Auswertung</div>
-      <div class="gesch-tab" onclick="showGeschTab('kalkulation')" style="opacity:.5">Kalkulation <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
+      <div class="gesch-tab" onclick="showGeschTab('kalkulation');kalInit()">&#x1F4D0; Kalkulation</div>
       <div class="gesch-tab" onclick="showGeschTab('preispositionen')" style="opacity:.5">Preispositionen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
       <div class="gesch-tab" onclick="showGeschTab('cashflow')">&#x1F4B8; Cashflow</div>
       <div class="gesch-tab" onclick="showGeschTab('belegvorlagen');loadBelegVorlagen()">&#x1F4C4; Belegvorlagen</div>
@@ -4138,7 +4138,64 @@ def build_geschaeft(db):
     <div id="gesch-zahlungen" class="gesch-panel">{_build_ar_table(ar_bezahlt, scope="az") if ar_bezahlt else "<p class='empty'>Keine bezahlten Rechnungen.</p>"}</div>
     <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>
     <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
-    <div id="gesch-kalkulation" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4D0;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalkulation</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Projekt- und Leistungskalkulation mit Materialkosten, Arbeitszeit und Gewinnmarge.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
+    <div id="gesch-kalkulation" class="gesch-panel">
+      <div style="padding:20px;max-width:900px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">&#x1F4D0; Angebots-Kalkulation</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Material + Arbeitszeit + Marge &rarr; Angebotspreis</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sec btn-sm" onclick="kalReset()">Neu</button>
+            <button class="btn btn-sec btn-sm" onclick="kalKiraAngebot()">&#x1F916; Kira Angebot</button>
+          </div>
+        </div>
+        <!-- Projektname -->
+        <div style="margin-bottom:12px">
+          <input id="kal-projekt" type="text" placeholder="Projektname / Kundenname" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--text)">
+        </div>
+        <!-- Positionen -->
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Positionen</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px" id="kal-table">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:6px 8px;text-align:left;color:var(--text-muted);font-weight:600;width:40%">Beschreibung</th>
+              <th style="padding:6px 8px;text-align:left;color:var(--text-muted);font-weight:600;width:12%">Typ</th>
+              <th style="padding:6px 4px;text-align:right;color:var(--text-muted);font-weight:600;width:10%">Menge</th>
+              <th style="padding:6px 4px;text-align:right;color:var(--text-muted);font-weight:600;width:14%">Einzelpreis</th>
+              <th style="padding:6px 4px;text-align:right;color:var(--text-muted);font-weight:600;width:14%">Gesamt</th>
+              <th style="width:30px"></th>
+            </tr>
+          </thead>
+          <tbody id="kal-tbody"></tbody>
+        </table>
+        <button class="btn btn-sec btn-sm" onclick="kalAddRow()" style="margin-bottom:16px">+ Position</button>
+        <!-- Kalkulations-Parameter -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">Gemeinkosten %</label>
+            <input id="kal-gemeinkosten" type="number" value="15" min="0" max="100" oninput="kalCalc()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">Gewinnmarge %</label>
+            <input id="kal-marge" type="number" value="20" min="0" max="100" oninput="kalCalc()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">MwSt %</label>
+            <input id="kal-mwst" type="number" value="19" min="0" max="30" oninput="kalCalc()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">Stundensatz (€)</label>
+            <input id="kal-stundensatz" type="number" value="65" min="1" oninput="kalCalc()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)">
+          </div>
+        </div>
+        <!-- Ergebnis -->
+        <div id="kal-result" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:16px">
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Ergebnis</div>
+          <div id="kal-result-rows"></div>
+        </div>
+      </div>
+    </div>
     <div id="gesch-preispositionen" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4CB;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Preispositionen</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Leistungskatalog mit Einzelpreisen, Staffeln und Erfahrungswerten.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
     <div id="gesch-cashflow" class="gesch-panel">{_build_cashflow_panel(ar, ar_bezahlt)}</div>
     <div id="gesch-belegvorlagen" class="gesch-panel">
@@ -9777,6 +9834,8 @@ def generate_html() -> str:
               <div class="kira-ctx-item" onclick="kiraKontextAddKontextBar()">&#x1F4CC; Aktueller Kontext</div>
             </div>
             <button class="kw-ia mic" id="kiraMicBtn" onclick="kiraToggleSprache()" title="Spracheingabe (Web Speech API)">&#x1F3A4;</button>
+            <button class="kw-ia" id="kiraFotoBtn" onclick="document.getElementById('kiraFileInput').click()" title="Bild/Foto hochladen (Foto-Analyse)">&#x1F4CE;</button>
+            <input type="file" id="kiraFileInput" accept="image/*,.pdf" style="display:none" onchange="kiraHandleFileSelect(this)">
             <div class="kw-mode-sel" onclick="toggleKiraModeMenu()">Modus &#x25BE;</div>
             <button class="kw-ia send" onclick="sendKiraMsg()" id="kiraSendBtn">&#x2191;</button>
           </div>
@@ -11117,6 +11176,134 @@ function zeLoeschen() {{
 }}
 
 // Geschäft: Kira mit Datensatz-Kontext öffnen
+// ── Angebots-Kalkulation ─────────────────────────────────────────────────────
+var _kalRowId=0;
+
+function kalInit() {{
+  if(document.getElementById('kal-tbody').children.length===0) {{
+    kalAddRow('material');
+    kalAddRow('arbeit');
+    kalCalc();
+  }}
+}}
+
+function kalAddRow(typ) {{
+  var tbody=document.getElementById('kal-tbody');
+  var rid='kr'+(_kalRowId++);
+  var t=typ||'material';
+  var tr=document.createElement('tr');
+  tr.id=rid;
+  tr.style.borderBottom='1px solid var(--border)';
+  tr.innerHTML='<td style="padding:4px 6px"><input type="text" placeholder="Beschreibung" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--text)" oninput="kalCalc()"></td>'
+    +'<td style="padding:4px 4px"><select onchange="kalRowTypChange(this,\\'' + rid + '\\');" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:5px;font-size:12px;color:var(--text)">'
+    +'<option value="material"'+(t==='material'?' selected':'')+'">Material</option>'
+    +'<option value="arbeit"'+(t==='arbeit'?' selected':'')+'">Arbeit (h)</option>'
+    +'<option value="fremd"'+(t==='fremd'?' selected':'')+'">Fremdleistung</option>'
+    +'</select></td>'
+    +'<td style="padding:4px 4px"><input type="number" value="1" min="0" step="0.5" oninput="kalCalc()" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:5px;font-size:12px;color:var(--text);text-align:right"></td>'
+    +'<td style="padding:4px 4px"><input type="number" value="'+(t==='arbeit'?'65':'0')+'" min="0" step="0.01" oninput="kalCalc()" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:5px;font-size:12px;color:var(--text);text-align:right"></td>'
+    +'<td style="padding:4px 8px;text-align:right;font-size:12px;color:var(--text);font-weight:600" class="kal-row-total">0,00 \u20ac</td>'
+    +'<td style="padding:4px 2px"><button onclick="document.getElementById(\\'' + rid + '\\').remove();kalCalc();" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:2px 5px">\u00d7</button></td>';
+  tbody.appendChild(tr);
+  kalCalc();
+}}
+
+function kalRowTypChange(sel, rid) {{
+  var stundensatz=parseFloat(document.getElementById('kal-stundensatz')?.value||'65');
+  var row=document.getElementById(rid);
+  if(!row)return;
+  var epInput=row.querySelectorAll('input[type="number"]')[1];
+  if(sel.value==='arbeit' && epInput) epInput.value=stundensatz;
+  kalCalc();
+}}
+
+function kalCalc() {{
+  var rows=document.getElementById('kal-tbody')?.querySelectorAll('tr')||[];
+  var sumMat=0, sumArb=0, sumFremd=0;
+  rows.forEach(function(tr){{
+    var inputs=tr.querySelectorAll('input[type="number"]');
+    var menge=parseFloat(inputs[0]?.value||'0')||0;
+    var ep=parseFloat(inputs[1]?.value||'0')||0;
+    var total=menge*ep;
+    var totalCell=tr.querySelector('.kal-row-total');
+    if(totalCell)totalCell.textContent=_kalFmt(total)+' \u20ac';
+    var sel=tr.querySelector('select');
+    var typ=sel?sel.value:'material';
+    if(typ==='arbeit')sumArb+=total;
+    else if(typ==='fremd')sumFremd+=total;
+    else sumMat+=total;
+  }});
+  var gkPct=parseFloat(document.getElementById('kal-gemeinkosten')?.value||'15')||0;
+  var margePct=parseFloat(document.getElementById('kal-marge')?.value||'20')||0;
+  var mwstPct=parseFloat(document.getElementById('kal-mwst')?.value||'19')||0;
+  var sumDirekt=sumMat+sumArb+sumFremd;
+  var gk=sumDirekt*gkPct/100;
+  var selbstkosten=sumDirekt+gk;
+  var marge=selbstkosten*margePct/100;
+  var netto=selbstkosten+marge;
+  var mwst=netto*mwstPct/100;
+  var brutto=netto+mwst;
+  window._kalLastNetto=netto;
+  var el=document.getElementById('kal-result-rows');
+  if(!el)return;
+  el.innerHTML='<div style="display:grid;grid-template-columns:1fr auto;gap:4px 20px;font-size:13px">'
+    +'<span style="color:var(--text-muted)">Material</span><span style="font-weight:600">'+_kalFmt(sumMat)+' \u20ac</span>'
+    +'<span style="color:var(--text-muted)">Arbeit</span><span style="font-weight:600">'+_kalFmt(sumArb)+' \u20ac</span>'
+    +(sumFremd>0?'<span style="color:var(--text-muted)">Fremdleistung</span><span style="font-weight:600">'+_kalFmt(sumFremd)+' \u20ac</span>':'')
+    +'<span style="color:var(--text-muted)">Gemeinkosten (+'+gkPct+'%)</span><span style="font-weight:600">'+_kalFmt(gk)+' \u20ac</span>'
+    +'<span style="color:var(--text-muted)">Selbstkosten</span><span style="font-weight:600">'+_kalFmt(selbstkosten)+' \u20ac</span>'
+    +'<span style="color:var(--text-muted)">Gewinnmarge (+'+margePct+'%)</span><span style="font-weight:600">'+_kalFmt(marge)+' \u20ac</span>'
+    +'<span style="padding-top:8px;font-weight:600;color:var(--text);border-top:1px solid var(--border)">Netto</span><span style="padding-top:8px;font-weight:700;font-size:16px;color:var(--text);border-top:1px solid var(--border)">'+_kalFmt(netto)+' \u20ac</span>'
+    +'<span style="color:var(--text-muted)">MwSt. ('+mwstPct+'%)</span><span>'+_kalFmt(mwst)+' \u20ac</span>'
+    +'<span style="font-weight:700;font-size:15px;color:var(--accent,#378ADD)">Brutto</span><span style="font-weight:700;font-size:18px;color:var(--accent,#378ADD)">'+_kalFmt(brutto)+' \u20ac</span>'
+    +'</div>';
+}}
+
+function _kalFmt(n) {{
+  return n.toFixed(2).replace(/\\B(?=(\\d{{3}})+(?!\\d))/g,'.');
+}}
+
+function kalReset() {{
+  document.getElementById('kal-projekt').value='';
+  document.getElementById('kal-tbody').innerHTML='';
+  document.getElementById('kal-result-rows').innerHTML='';
+  _kalRowId=0;
+  kalAddRow('material');
+  kalAddRow('arbeit');
+  kalCalc();
+}}
+
+function kalKiraAngebot() {{
+  var rows=document.getElementById('kal-tbody')?.querySelectorAll('tr')||[];
+  var positions=[];
+  rows.forEach(function(tr){{
+    var descInput=tr.querySelector('input[type="text"]');
+    var inputs=tr.querySelectorAll('input[type="number"]');
+    var sel=tr.querySelector('select');
+    var desc=descInput?descInput.value.trim():'';
+    var menge=inputs[0]?parseFloat(inputs[0].value||'1'):1;
+    var ep=inputs[1]?parseFloat(inputs[1].value||'0'):0;
+    var typ=sel?sel.value:'material';
+    if(desc)positions.push(typ+': '+desc+' ('+menge+' x '+ep.toFixed(2)+' EUR)');
+  }});
+  var projekt=(document.getElementById('kal-projekt')?.value||'').trim();
+  var netto=window._kalLastNetto||0;
+  openKiraNaked();
+  showKTab('chat');
+  kiraSetQuickActions('angebot');
+  var input=document.getElementById('kiraInput');
+  if(input){{
+    input.value=(projekt?'Projekt: '+projekt+'\n':'')
+      +'Erstelle ein professionelles Angebot auf Basis dieser Kalkulation:\n'
+      +positions.join('\n')
+      +'\n\nKalkulierter Nettopreis: '+netto.toFixed(2)+' EUR'
+      +'\n\nBitte formuliere ein hoefliches, professionelles Angebot fuer ein Sichtbeton-Unternehmen.';
+    input.style.height='auto';
+    input.style.height=Math.min(input.scrollHeight,160)+'px';
+    input.focus();
+  }}
+}}
+
 function geschKira(typ, nr, partner, betrag) {{
   _rtlog('ui','gesch_kira_opened',typ+' '+nr+' via Kira',{{submodul:'geschaeft',context_type:typ,context_id:String(nr)}});
   openKiraNaked();
@@ -12765,6 +12952,43 @@ let kiraSending = false;
 // ── Sprachmodul (session-bbb) ─────────────────────────────────────────────
 var _speechRec = null;
 var _speechActive = false;
+// ── Foto-Analyse: Datei-Upload ───────────────────────────────────────────────
+var _kiraAttachment=null; // {{type, media_type, data, name}}
+
+function kiraHandleFileSelect(input) {{
+  var file=input.files[0];
+  if(!file)return;
+  if(file.size>5*1024*1024){{showToast('Bild zu gross (max. 5 MB)','warn');input.value='';return;}}
+  var reader=new FileReader();
+  reader.onload=function(e){{
+    var b64=e.target.result.split(',')[1];
+    var mediaType=file.type||'image/jpeg';
+    _kiraAttachment={{type:'base64',media_type:mediaType,data:b64,name:file.name}};
+    // Preview-Chip
+    var old=document.getElementById('kira-attach-chip');
+    if(old)old.remove();
+    var chip=document.createElement('div');
+    chip.id='kira-attach-chip';
+    chip.style.cssText='display:inline-flex;align-items:center;gap:6px;background:var(--accent,#378ADD)22;border:1px solid var(--accent,#378ADD);border-radius:6px;padding:3px 10px;font-size:12px;color:var(--text);margin:4px 0 0 0';
+    chip.innerHTML='\uD83D\uDCCE '+escH(file.name.substring(0,30))+'<span onclick="kiraClearAttachment()" style="cursor:pointer;color:var(--text-muted);margin-left:4px">\u00d7</span>';
+    var ia=document.querySelector('.kw-input-area');
+    if(ia)ia.parentNode.insertBefore(chip,ia);
+    showToast('Bild angehaengt: '+file.name,'ok');
+    var btn=document.getElementById('kiraFotoBtn');
+    if(btn)btn.style.color='var(--accent,#378ADD)';
+  }};
+  reader.readAsDataURL(file);
+  input.value='';
+}}
+
+function kiraClearAttachment() {{
+  _kiraAttachment=null;
+  var chip=document.getElementById('kira-attach-chip');
+  if(chip)chip.remove();
+  var btn=document.getElementById('kiraFotoBtn');
+  if(btn)btn.style.color='';
+}}
+
 window.kiraToggleSprache = function() {{
   const btn = document.getElementById('kiraMicBtn');
   if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
@@ -12826,9 +13050,14 @@ function sendKiraMsg() {{
   const btn = document.getElementById('kiraSendBtn');
   btn.disabled = true;
   btn.style.opacity = '.4';
+  var _chatPayload={{nachricht: msg, session_id: kiraSessionId}};
+  if(_kiraAttachment){{
+    _chatPayload.bild={{type:_kiraAttachment.type,media_type:_kiraAttachment.media_type,data:_kiraAttachment.data}};
+    kiraClearAttachment();
+  }}
   fetch('/api/kira/chat', {{
     method:'POST', headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{nachricht: msg, session_id: kiraSessionId}})
+    body: JSON.stringify(_chatPayload)
   }}).then(r=>r.json()).then(data=>{{
     document.getElementById('kira-typing')?.remove();
     if(data.error) {{
@@ -18541,8 +18770,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'error': 'Keine Nachricht'})
                 return
             session_id = body.get('session_id')
+            bild = body.get('bild')  # {type, media_type, data} fuer Foto-Analyse
             try:
-                result = kira_chat(nachricht, session_id)
+                result = kira_chat(nachricht, session_id, bild=bild)
                 self._json(result)
             except Exception as e:
                 self._json({'error': f'Chat-Fehler: {str(e)}'})

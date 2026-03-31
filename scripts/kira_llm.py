@@ -2850,8 +2850,8 @@ def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str
 
 
 # ── Haupt-Chat-Funktion ─────────────────────────────────────────────────────
-def chat(user_message, session_id=None, history=None):
-    """Chat mit automatischem Provider-Fallback."""
+def chat(user_message, session_id=None, history=None, bild=None):
+    """Chat mit automatischem Provider-Fallback. bild={type,media_type,data} fuer Foto-Analyse."""
     config = get_config()
     providers = get_providers()
 
@@ -2871,6 +2871,22 @@ def chat(user_message, session_id=None, history=None):
     system_prompt = build_system_prompt(config)
     tools = get_tools(config)
     session_id = session_id or str(uuid.uuid4())
+
+    # Bild zu Content-List kombinieren (Anthropic vision format)
+    if bild and isinstance(bild, dict) and bild.get("data"):
+        user_content = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": bild.get("media_type", "image/jpeg"),
+                    "data": bild["data"],
+                }
+            },
+            {"type": "text", "text": user_message}
+        ]
+    else:
+        user_content = user_message
 
     if config.get("konversationen_speichern", True):
         _save_message(session_id, "user", user_message)
@@ -2893,8 +2909,9 @@ def chat(user_message, session_id=None, history=None):
 
         try:
             if typ == "anthropic":
-                result = _call_anthropic(provider, user_message, system_prompt, tools, temperature=_chat_temperature)
+                result = _call_anthropic(provider, user_content, system_prompt, tools, temperature=_chat_temperature)
             else:
+                # OpenAI-kompatible Provider: Vision nur wenn Bild-URL-Format
                 result = _call_openai_compat(provider, user_message, system_prompt, tools, temperature=_chat_temperature)
             used_provider = provider
             break
