@@ -724,6 +724,9 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
     elif _sprache == "gemischt":
         prompt += "\n\n\u2501\u2501\u2501 SPRACHE \u2501\u2501\u2501\nAntworte in derselben Sprache wie die Anfrage (Deutsch wenn auf Deutsch gefragt, Englisch wenn auf Englisch).\n"
     # "deutsch" = Standard, kein Override
+    # Chitchat / Smalltalk (aus kira-Einstellungen)
+    if not kira_cfg.get("chitchat_erlaubt", True):
+        prompt += "\n\n\u2501\u2501\u2501 FOKUS \u2501\u2501\u2501\nDu bist ausschlie\u00dflich auf Gesch\u00e4ftsthemen fokussiert. Beantworte keine allgemeinen Wissensfragen, Smalltalk oder Themen ohne direkten Bezug zu den Gesch\u00e4ftsdaten. Weise freundlich darauf hin, dass du f\u00fcr gesch\u00e4ftliche Aufgaben zust\u00e4ndig bist.\n"
     # Benutzerdefinierte System-Prompt-Ergänzung
     custom_prompt = (kira_cfg.get("system_prompt_custom") or "").strip()
     if custom_prompt:

@@ -110,11 +110,13 @@ def _push(title: str, msg: str, priority: str = "default"):
         server = ntfy.get("server", "https://ntfy.sh").rstrip("/")
         if not topic:
             return
+        # Priorität aus Config übernehmen (falls gesetzt), sonst Argument-Default
+        effective_priority = ntfy.get("prioritaet", priority) or priority
         import urllib.request
         req = urllib.request.Request(
             f"{server}/{topic}",
             data=msg.encode('utf-8'),
-            headers={"Title": title, "Priority": priority},
+            headers={"Title": title, "Priority": effective_priority},
             method="POST"
         )
         urllib.request.urlopen(req, timeout=8)

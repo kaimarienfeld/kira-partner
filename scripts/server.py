@@ -4248,7 +4248,8 @@ def build_einstellungen():
     benachrichtigungen = config.get("benachrichtigungen", {})
     email_notification = config.get("email_notification", {})
     llm   = get_llm_config()
-    proto = config.get("protokoll", {})
+    proto         = config.get("protokoll", {})
+    dashboard_cfg = config.get("dashboard", {})
     rtlog_cfg = config.get("runtime_log", {})
     kira_cfg  = config.get("kira", {})
     launcher_variant = kira_cfg.get("launcher_variant", "B")
@@ -4259,8 +4260,9 @@ def build_einstellungen():
     kira_idle_delay  = kira_cfg.get("idle_delay", 10)
     kira_name_cfg    = kira_cfg.get("name", "Kira")
     kira_pers_cfg    = kira_cfg.get("persoenlichkeit", "direkt")
-    kira_sprache_cfg = kira_cfg.get("sprache", "deutsch")
-    kira_prompt_custom = kira_cfg.get("system_prompt_custom", "")
+    kira_sprache_cfg    = kira_cfg.get("sprache", "deutsch")
+    kira_chitchat_cfg   = kira_cfg.get("chitchat_erlaubt", True)
+    kira_prompt_custom  = kira_cfg.get("system_prompt_custom", "")
     kira_kontext_aufgaben   = kira_cfg.get("kontext_aufgaben",   "immer")
     kira_kontext_mails      = kira_cfg.get("kontext_mails",      "immer")
     kira_kontext_rechnungen = kira_cfg.get("kontext_rechnungen", "immer")
@@ -5032,6 +5034,15 @@ function esInfoPopup(btn, text) {{
       <div class="es-rl">Server-URL<div class="es-rd">Standard: https://ntfy.sh</div></div>
       <input class="es-inp" type="text" id="cfg-ntfy-server" value="{esc(ntfy.get('server','https://ntfy.sh'))}" placeholder="https://ntfy.sh">
     </div>
+    <div class="es-row">
+      <div class="es-rl">Push-Priorit&auml;t<div class="es-rd">Dringlichkeit der Benachrichtigungen auf dem Ger&auml;t</div></div>
+      <select class="es-sel" id="cfg-ntfy-prioritaet">
+        <option value="default" {'selected' if ntfy.get('prioritaet','default')=='default' else ''}>Normal (Standard)</option>
+        <option value="low" {'selected' if ntfy.get('prioritaet','')=='low' else ''}>Niedrig &mdash; lautlos</option>
+        <option value="high" {'selected' if ntfy.get('prioritaet','')=='high' else ''}>Hoch &mdash; Ton</option>
+        <option value="urgent" {'selected' if ntfy.get('prioritaet','')=='urgent' else ''}>Dringend &mdash; Durchbrechen</option>
+      </select>
+    </div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="es-btn es-btn-green" onclick="testPush()">Test-Push senden</button>
       <a href="https://ntfy.sh" target="_blank" rel="noopener" class="es-btn" style="text-decoration:none">&#x1F4D6; ntfy.sh Doku</a>
@@ -5323,6 +5334,21 @@ function esInfoPopup(btn, text) {{
   <div class="es-sec-sub">Konfiguration der Dashboard-Ansicht, Protokollierung und Server-Einstellungen.</div>
 
   <div class="es-grp">
+    <div class="es-grp-h">Dashboard-Ansicht</div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Refresh Intervall<div class="es-rd">Daten automatisch nachladen (0 = deaktiviert)</div></div>
+      <select class="es-sel" id="cfg-dashboard-refresh">
+        <option value="0" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==0 else ''}>Deaktiviert</option>
+        <option value="60" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==60 else ''}>1 Minute</option>
+        <option value="180" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==180 else ''}>3 Minuten</option>
+        <option value="300" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==300 else ''}>5 Minuten (Standard)</option>
+        <option value="600" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==600 else ''}>10 Minuten</option>
+        <option value="1800" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==1800 else ''}>30 Minuten</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
     <div class="es-grp-h">Aufgaben-Protokoll</div>
     <div class="es-row">
       <div class="es-rl">Maximale Eintr&auml;ge<div class="es-rd">Wie viele Protokoll-Eintr&auml;ge gespeichert werden</div></div>
@@ -5400,6 +5426,15 @@ function esInfoPopup(btn, text) {{
         <option value="300" {'selected' if kira_idle_delay==300 else ''}>5 Minuten</option>
       </select>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Kira-Position<div class="es-rd">Ecke in der der Launcher angezeigt wird</div></div>
+      <select class="es-sel" id="cfg-kira-position" onchange="applyKiraPosition(this.value)" style="min-width:180px">
+        <option value="bottom-right">Unten rechts (Standard)</option>
+        <option value="bottom-left">Unten links</option>
+        <option value="top-right">Oben rechts</option>
+        <option value="top-left">Oben links</option>
+      </select>
+    </div>
   </div>
 
   <div class="es-grp">
@@ -5424,6 +5459,13 @@ function esInfoPopup(btn, text) {{
         <option value="englisch" {'selected' if kira_sprache_cfg=='englisch' else ''}>Englisch</option>
         <option value="gemischt" {'selected' if kira_sprache_cfg=='gemischt' else ''}>Gemischt &mdash; wie Anfrage</option>
       </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Smalltalk erlaubt<div class="es-rd">Darf Kira auf allgemeine Fragen und Smalltalk eingehen, oder nur Gesch&auml;ftsthemen?</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-kira-chitchat" {'checked' if kira_chitchat_cfg else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
     </div>
     <div class="es-row" style="align-items:flex-start">
       <div class="es-rl" style="padding-top:6px">System-Prompt Erg&auml;nzung<div class="es-rd">Zus&auml;tzliche Anweisungen die Kira immer befolgt</div></div>
@@ -7784,8 +7826,10 @@ def generate_html() -> str:
         _cfg_h = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
         _ntfy_h = _cfg_h.get("ntfy", {})
         ntfy_urlaub_modus = _ntfy_h.get("urlaub_modus", False)
+        _dashboard_refresh_s = int(_cfg_h.get("dashboard", {}).get("refresh_intervall_s", 300) or 300)
     except Exception:
         ntfy_urlaub_modus = False
+        _dashboard_refresh_s = 300
 
     alarm_dot = "<span class='alarm-dot'></span>" if n_antwort > 0 else ""
 
@@ -8680,6 +8724,18 @@ function applyLogo(val) {{
   }}
   localStorage.setItem('kira_logo', val);
 }}
+function applyKiraPosition(val) {{
+  const fab = document.getElementById('kiraFab');
+  if(!fab) return;
+  // Reset all corner positions
+  fab.style.bottom=''; fab.style.top=''; fab.style.left=''; fab.style.right='';
+  const pos = val || 'bottom-right';
+  if(pos==='bottom-right')  {{ fab.style.bottom='20px'; fab.style.right='20px'; }}
+  else if(pos==='bottom-left')  {{ fab.style.bottom='20px'; fab.style.left='20px'; }}
+  else if(pos==='top-right')    {{ fab.style.top='70px';  fab.style.right='20px'; }}
+  else if(pos==='top-left')     {{ fab.style.top='70px';  fab.style.left='20px'; }}
+  localStorage.setItem('kira_position', pos);
+}}
 function applyLogoSize(val) {{
   const el = document.getElementById('sidebarLogo');
   const sizeMap = {{medium:'40px',large:'52px'}};
@@ -8830,6 +8886,9 @@ function restoreDesign() {{
     const v = localStorage.getItem('kira_toast_dauer_'+typ);
     if(v) {{ const inp=document.getElementById('cfg-toast-dauer-'+typ); if(inp) inp.value=v; }}
   }});
+  // Kira-Position
+  const kpos = localStorage.getItem('kira_position')||'';
+  if(kpos) {{ applyKiraPosition(kpos); const sel=document.getElementById('cfg-kira-position'); if(sel) sel.value=kpos; }}
 }}
 
 // KPI click -> jump to Kommunikation with filter
@@ -9615,6 +9674,7 @@ function saveSettings() {{
       aktiv:              document.getElementById('cfg-ntfy-aktiv')?.checked ?? false,
       topic_name:         document.getElementById('cfg-ntfy-topic')?.value.trim() || '',
       server:             document.getElementById('cfg-ntfy-server')?.value.trim() || 'https://ntfy.sh',
+      prioritaet:         document.getElementById('cfg-ntfy-prioritaet')?.value || 'default',
       arbeitszeit_aktiv:  document.getElementById('cfg-ntfy-arbeitszeit-aktiv')?.checked ?? false,
       arbeitszeit_von:    document.getElementById('cfg-ntfy-az-von')?.value || '08:00',
       arbeitszeit_bis:    document.getElementById('cfg-ntfy-az-bis')?.value || '18:00',
@@ -9668,6 +9728,9 @@ function saveSettings() {{
       temperatur:               parseFloat((parseInt(document.getElementById('cfg-llm-temperatur')?.value||'7')/10).toFixed(1)),
       _provider_updates: providerUpdates
     }},
+    dashboard: {{
+      refresh_intervall_s: parseInt(document.getElementById('cfg-dashboard-refresh')?.value||'300')
+    }},
     protokoll: {{
       max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
       tage:          parseInt(document.getElementById('cfg-proto-tage')?.value)||90
@@ -9693,6 +9756,7 @@ function saveSettings() {{
       name:                (document.getElementById('cfg-kira-name')?.value.trim() || 'Kira'),
       persoenlichkeit:     document.getElementById('cfg-kira-persoenlichkeit')?.value || 'direkt',
       sprache:             document.getElementById('cfg-kira-sprache')?.value          || 'deutsch',
+      chitchat_erlaubt:    document.getElementById('cfg-kira-chitchat')?.checked       ?? true,
       system_prompt_custom: (document.getElementById('cfg-kira-prompt-custom')?.value || '').trim(),
       kontext_aufgaben:    document.getElementById('cfg-kira-kontext-aufgaben')?.value   || 'immer',
       kontext_mails:       document.getElementById('cfg-kira-kontext-mails')?.value      || 'immer',
@@ -11375,7 +11439,7 @@ document.addEventListener('keydown',e=>{{
 }})();
 // Kira proaktiv: Insights laden + ggf. Panel öffnen
 setTimeout(()=>kiraProaktivCheck(), 1500);
-// Silent auto-refresh alle 5 Minuten: nur Dashboard-Daten nachladen, kein location.reload()
+// Silent auto-refresh: Dashboard-Daten nachladen (Intervall aus Einstellungen)
 function silentRefreshDashboard() {{
   if(kiraSending) return; // nie unterbrechen wenn Chat aktiv
   const active = document.querySelector('.panel.active');
@@ -11385,7 +11449,7 @@ function silentRefreshDashboard() {{
     if(badge && data.tasks) badge.textContent = data.tasks.length;
   }}).catch(()=>{{}});
 }}
-setInterval(silentRefreshDashboard, 300000);
+if({_dashboard_refresh_s} > 0) setInterval(silentRefreshDashboard, {_dashboard_refresh_s} * 1000);
 
 // ── JS-Diagnose ──────────────────────────────────────────────────────────
 window.onerror = function(msg, src, line, col, err) {{
@@ -11647,7 +11711,20 @@ function _pollKiraStatus() {{
   }}).catch(function(){{}});
 }}
 
-setTimeout(function(){{ _pollKiraStatus(); setInterval(_pollKiraStatus, 15000); }}, 4000);
+// User-Präsenz-Erkennung: Polling pausieren wenn Tab versteckt, sofort neu starten wenn sichtbar
+var _kiraStatusInterval = null;
+function _startKiraPolling() {{
+  if(_kiraStatusInterval) clearInterval(_kiraStatusInterval);
+  _pollKiraStatus();
+  _kiraStatusInterval = setInterval(_pollKiraStatus, 15000);
+}}
+function _stopKiraPolling() {{
+  if(_kiraStatusInterval) {{ clearInterval(_kiraStatusInterval); _kiraStatusInterval = null; }}
+}}
+document.addEventListener('visibilitychange', function() {{
+  if(document.hidden) {{ _stopKiraPolling(); }} else {{ _startKiraPolling(); }}
+}});
+setTimeout(_startKiraPolling, 4000);
 
 function openMailApproveModal() {{
   if(!_mailApproveItems.length) return;
@@ -16228,12 +16305,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if not topic:
                     self._json({'ok': False, 'error': 'Kein Topic angegeben'})
                     return
+                # Priorität aus Einstellungen lesen
+                try:
+                    _cfg_ntfy = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8')).get("ntfy", {})
+                    _prio = _cfg_ntfy.get("prioritaet", "default") or "default"
+                except Exception:
+                    _prio = "default"
                 url = f"{server}/{topic}"
                 req = _urlreq.Request(
                     url,
                     data='Kira Test-Push: Verbindung erfolgreich! \u2728'.encode('utf-8'),
                     headers={'Content-Type': 'text/plain; charset=utf-8',
-                             'Title': 'Kira Assistenz', 'Priority': 'default'},
+                             'Title': 'Kira Assistenz', 'Priority': _prio},
                     method='POST')
                 with _urlreq.urlopen(req, timeout=8) as resp:
                     st = resp.status

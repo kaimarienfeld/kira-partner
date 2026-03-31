@@ -55,7 +55,7 @@ _Stand: 2026-03-29 · session-bb · Analyse-Basis: config.json, server.py (~9250
 | ✅ | Urlaubsmodus planen (bis) | `cfg-urlaub-bis` / `ntfy.urlaub_bis` | datetime-local, saveSettings(), session-u |
 | ✅ | Urlaub-Header-Chip | — | Roter Chip im Header wenn `ntfy.urlaub_modus=true`, session-u |
 | ✅ | Test-Push Button | `testPush()` / `POST /api/ntfy/test` | JS-Funktion + Backend-Endpoint (urllib.request, timeout 8s), session-u |
-| 💡 | Notification-Priorität | `ntfy.prioritaet` | low/default/high/urgent |
+| ✅ | Notification-Priorität | `ntfy.prioritaet` | Select low/default/high/urgent + _push() + test-endpoint, session-ss |
 | 💡 | Welche Events → Push | `ntfy.events[]` | Mail / Aufgabe fällig / Fehler / Daily-Check |
 
 ### 2b. In-App Benachrichtigungen (neu session-t)
@@ -123,7 +123,7 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Server-Port | `cfg-server-port` / `server.port` | hierher verschoben (war Aufgabenlogik), session-t |
 | ✅ | Browser auto-öffnen | `cfg-auto-browser` / `server.auto_open_browser` | hierher verschoben, session-t |
 | 💡 | Dashboard-Kacheln konfigurieren | `dashboard.kacheln[]` | Welche Statistiken auf Start-Seite |
-| 💡 | Refresh-Intervall Dashboard | `dashboard.refresh_intervall` | Auto-Reload alle X Minuten |
+| ✅ | Refresh-Intervall Dashboard | `dashboard.refresh_intervall_s` | Select 0/1/3/5/10/30 Min + silentRefreshDashboard konfigurierbar, session-ss |
 | 💡 | Aufgaben-Ansicht Standard | `dashboard.aufgaben_view` | Liste / Kanban / Kalender |
 | 💡 | KPIs auf Dashboard | `dashboard.kpis[]` | Welche Metriken angezeigt werden |
 
@@ -140,11 +140,12 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Bounce-Distanz | `cfg-kira-bounce` / `kira.bounce_dist` | saveSettings verbunden |
 | ✅ | Bored-Modus | `cfg-kira-idle` / `kira.idle_mode` | saveSettings verbunden |
 | ✅ | Bored-Wartezeit | `cfg-kira-idle-delay` / `kira.idle_delay` | saveSettings verbunden |
-| 💡 | Kira-Position | `kira.position` | Unten rechts / links / oben |
+| ✅ | Kira-Position | localStorage `kira_position` | 4 Ecken select + applyKiraPosition() + restoreDesign(), session-ss |
 | ✅ | Kira-Name anpassen | `kira.name` | Eigener Name statt "Kira" (auch in System-Prompt), session-pp + Bug fix session-qq |
 | ✅ | Kira-Persönlichkeit | `kira.persoenlichkeit` | Professionell / Freundlich / Direkt → System-Prompt-Variante, session-pp + Bug fix session-qq |
 | ✅ | Kira-Sprache | `kira.sprache` | Deutsch/Englisch/gemischt → Prompt-Override, session-rr |
 | 💡 | Kira Quick-Actions editieren | `kira.quick_actions[]` | Welche 7 Items im Quick Panel |
+| ✅ | Kira-Chitchat erlaubt | `kira.chitchat_erlaubt` | Toggle: aus → Fokus-Instruction im System-Prompt, session-ss |
 | 💡 | Kira im Hintergrund aktiv | `kira.background_hints` | Push wenn Kira Idee hat |
 
 ### 6b. LLM-Kontext (neu in §6, session-t verschoben von Dashboard)
@@ -350,7 +351,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ Mittel | Antwort-Länge | `llm.antwort_laenge` | UI + saveSettings + build_system_prompt, session-rr |
 | ✅ Niedrig | Kira-Sprache | `kira.sprache` | Deutsch/Englisch/gemischt — Select + build_system_prompt, session-rr |
 | ✅ Niedrig | LLM-Temperatur | `llm.temperatur` | Range-Slider 0.0–1.0 + Wiring in _call_anthropic/_call_openai_compat, session-rr |
-| 🟢 Niedrig | Kira-Chitchat | `kira.chitchat_erlaubt` | Darf Kira Smalltalk machen? |
+| ✅ Niedrig | Kira-Chitchat | `kira.chitchat_erlaubt` | Toggle + Prompt-Wiring, session-ss |
 
 ---
 
@@ -458,7 +459,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ | Drawer: Proaktiv-Status Sektion | zeigt aktive Scan-Infos |
 | ✅ | CSS: .kira-live-chip alle 4 States | @keyframes kira-spin, session-oo |
 | 📋 | Drawer: Laufende Scans mit Fortschritt | Noch nicht implementiert |
-| 📋 | User-Präsenz-Erkennung für Drawer | document.visibilityState / window focus |
+| ✅ | User-Präsenz-Erkennung für Drawer | visibilitychange → Polling pausieren/fortsetzen, session-ss |
 
 ### Einstellungen 3-Pane Layout
 | Status | Element | Anmerkung |
@@ -483,7 +484,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ | Bearbeiten-Modal | Textarea + Senden, parentElement-Traversal statt closest(), session-oo |
 | ✅ | Badge pf-kira-pending-badge | gelb, zeigt Anzahl Entwürfe, session-oo |
 | ✅ | pfKiraAusgangOpen() | öffnet Postfach + navigiert zu Entwürfe (aus Header-Badge), session-oo |
-| 📋 | Ribbon-Kira-Gruppe für Kira-Mails | [✅ Freigeben][❌ Ablehnen][✎ Bearbeiten] bei Kira-Mail-Auswahl |
+| ✅ | Ribbon-Kira-Gruppe für Kira-Mails | [✅ Freigeben][❌ Ablehnen][✎ Bearbeiten] bei Kira-Mail-Auswahl — pf-rbn-kira-group, session-oo |
 
 ### API-Erweiterungen (session-oo)
 | Status | Endpoint | Anmerkung |
