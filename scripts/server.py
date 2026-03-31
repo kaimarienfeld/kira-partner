@@ -8403,10 +8403,16 @@ def build_wissen(db):
         ts_html = f'<span class="muted" style="font-size:10px;margin-left:8px;opacity:.6" title="Erstellt: {erstellt}">&#x1F4C5; {erstellt[:10]}</span>'
         if geaendert:
             ts_html += f'<span class="muted" style="font-size:10px;margin-left:6px;opacity:.6" title="Ge&auml;ndert: {geaendert}">&#x270F;&#xFE0F; {geaendert[:10]}</span>'
+        # "Von Kira gelernt" Badge
+        quelle = r.get('quelle', '') or ''
+        kat    = r.get('kategorie', '') or ''
+        kira_badge = ''
+        if quelle in ('auto_gelernt', 'mail_stil_diff', 'kira_feedback') or kat == 'gelernt':
+            kira_badge = '<span style="font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;background:rgba(124,58,237,.12);color:#7c3aed;border:1px solid rgba(124,58,237,.25);margin-left:6px;vertical-align:middle" title="Von Kira automatisch gelernt">&#x1F916; Von Kira gelernt</span>'
         return f"""<div class="wissen-card"{id_attr}>
-          <div class="wissen-titel">{esc(r['titel'])}</div>
+          <div class="wissen-titel">{esc(r['titel'])}{kira_badge}</div>
           <div class="wissen-inhalt"{iid_attr}>{esc(r['inhalt'])}</div>
-          <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{ts_html}{edit_btn}{del_btn}</div>
+          <div class="wissen-meta"><span class="muted">{esc(kat)}</span>{ts_html}{edit_btn}{del_btn}</div>
         </div>"""
 
     def _wissen_card_review(r, kat_key):
@@ -9085,7 +9091,13 @@ def generate_html() -> str:
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendKiraMsg()}}"
             oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
           <div class="kw-input-acts">
-            <div class="kw-ia" title="Kontext anhängen" onclick="showToast('Kontext — In Planung')">+</div>
+            <div class="kw-ia" title="Kontext hinzuf&uuml;gen" onclick="kiraKontextMenuToggle(this)" id="kira-ctx-btn">+</div>
+            <div id="kira-ctx-menu" style="display:none;position:absolute;bottom:44px;left:0;z-index:50;background:var(--bg-card,var(--bg-raised));border:1px solid var(--border);border-radius:8px;padding:8px;width:220px;box-shadow:0 4px 20px rgba(0,0,0,.18);font-size:12px">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;padding:0 4px">Kontext hinzuf&uuml;gen</div>
+              <div class="kira-ctx-item" onclick="kiraKontextAddOffeneAufgaben()">&#x1F4CB; Offene Aufgaben</div>
+              <div class="kira-ctx-item" onclick="kiraKontextAddVorgaenge()">&#x1F5C2; Aktive Vorg&auml;nge</div>
+              <div class="kira-ctx-item" onclick="kiraKontextAddKontextBar()">&#x1F4CC; Aktueller Kontext</div>
+            </div>
             <div class="kw-mode-sel" onclick="toggleKiraModeMenu()">Modus &#x25BE;</div>
             <button class="kw-ia send" onclick="sendKiraMsg()" id="kiraSendBtn">&#x2191;</button>
           </div>
@@ -11712,6 +11724,60 @@ function renderKiraLernen(data) {{
   el.innerHTML = html;
 }}
 
+// ── Chat Kontext-Menu ─────────────────────────────────────────
+function kiraKontextMenuToggle(btn) {{
+  const menu = document.getElementById('kira-ctx-menu');
+  if(!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen) {{
+    const closeHandler = function(e) {{
+      if(!btn.contains(e.target) && !menu.contains(e.target)) {{
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeHandler);
+      }}
+    }};
+    setTimeout(()=>document.addEventListener('click', closeHandler), 50);
+  }}
+}}
+
+function _kiraAppendContext(prefix, text) {{
+  const inp = document.getElementById('kiraInput');
+  if(!inp) return;
+  const sep = inp.value.trim() ? '\\n\\n' : '';
+  inp.value = inp.value + sep + prefix + '\\n' + text;
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+  inp.focus();
+  document.getElementById('kira-ctx-menu').style.display = 'none';
+}}
+
+function kiraKontextAddOffeneAufgaben() {{
+  fetch('/api/tasks/open').then(r=>r.json()).then(d=>{{
+    const tasks=(d.tasks||[]).slice(0,5);
+    if(!tasks.length){{showToast('Keine offenen Aufgaben');return;}}
+    const lines=tasks.map(t=>'- '+(t.titel||t.betreff||'Aufgabe')+(t.kunden_name?' ('+t.kunden_name+')':'')).join('\\n');
+    _kiraAppendContext('[Kontext: Offene Aufgaben]', lines);
+  }}).catch(()=>showToast('Fehler beim Laden','fehler'));
+}}
+
+function kiraKontextAddVorgaenge() {{
+  fetch('/api/vorgaenge?limit=5').then(r=>r.json()).then(d=>{{
+    const vg=(d.vorgaenge||d||[]).slice(0,5);
+    if(!vg.length){{showToast('Keine aktiven Vorg\u00e4nge');return;}}
+    const lines=vg.map(v=>'- '+v.typ+': '+(v.titel||'')+(v.kunden_name?' ('+v.kunden_name+')':'')).join('\\n');
+    _kiraAppendContext('[Kontext: Aktive Vorg\u00e4nge]', lines);
+  }}).catch(()=>showToast('Fehler beim Laden','fehler'));
+}}
+
+function kiraKontextAddKontextBar() {{
+  const bar = document.getElementById('kira-kontext-bar');
+  if(!bar || bar.style.display==='none'){{showToast('Kein aktiver Kontext gesetzt');return;}}
+  const txt = bar.textContent||bar.innerText||'';
+  if(!txt.trim()){{showToast('Kein aktiver Kontext');return;}}
+  _kiraAppendContext('[Aktueller Kontext]', txt.trim().substring(0,200));
+}}
+
 // ── Kira Chat ────────────────────────────────────────────────
 let kiraSessionId = null;
 let kiraSending = false;
@@ -13824,6 +13890,8 @@ a:hover{text-decoration:underline;}
 .kw-input-box:focus{outline:none;border-color:#534AB7;}
 .kw-input-acts{display:flex;gap:6px;flex-shrink:0;align-items:center;}
 .kw-ia{width:34px;height:34px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--muted);}
+.kira-ctx-item{padding:6px 8px;border-radius:5px;cursor:pointer;color:var(--text);transition:background .12s;}
+.kira-ctx-item:hover{background:var(--bg);}
 .kw-ia:hover{border-color:#534AB7;color:#534AB7;}
 .kw-ia.send{background:#534AB7;border-color:#534AB7;color:#fff;}
 .kw-ia.send:hover{background:#6358cc;border-color:#6358cc;}
