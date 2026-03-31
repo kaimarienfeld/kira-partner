@@ -634,7 +634,12 @@ def init_conversations_db():
 def build_system_prompt(config=None):
     config = config or get_config()
     today = date.today().isoformat()
-    kira_cfg = config.get("kira", {})
+    # kira_cfg kommt aus config.json["kira"] (Top-Level), NICHT aus dem llm-Sub-Dict
+    try:
+        _full_cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        kira_cfg = _full_cfg.get("kira", {})
+    except Exception:
+        kira_cfg = {}
     kira_name = (kira_cfg.get("name") or "Kira").strip() or "Kira"
 
     # Persönlichkeit-Stil
@@ -718,7 +723,7 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
         prompt += f"\n\n\u2501\u2501\u2501 ZUS\u00c4TZLICHE ANWEISUNGEN \u2501\u2501\u2501\n{custom_prompt}\n"
 
     if config.get("geschaeftsdaten_teilen", True):
-        prompt += "\n" + _build_data_context(config)
+        prompt += "\n" + _build_data_context(config, kira_cfg)
 
     # Runtime-Log Kontext: Kira sieht ihre letzten Aktivitäten
     try:
@@ -787,103 +792,116 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
     return prompt
 
 
-def _build_data_context(config):
+def _build_data_context(config, kira_cfg=None):
     max_items = config.get("max_kontext_items", 50)
     today = date.today().isoformat()
     ctx = "AKTUELLE GESCHÄFTSDATEN:\n"
 
+    # Kontext-Steuerung: "immer" | "relevant" (nur wenn Daten vorhanden) | "nie"
+    kira_cfg = kira_cfg or {}
+    _k_aufgaben    = kira_cfg.get("kontext_aufgaben",   "immer")
+    _k_mails       = kira_cfg.get("kontext_mails",      "immer")
+    _k_rechnungen  = kira_cfg.get("kontext_rechnungen", "immer")
+
     db = sqlite3.connect(str(TASKS_DB))
     db.row_factory = sqlite3.Row
 
-    try:
-        rows = db.execute("SELECT * FROM ausgangsrechnungen ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
-        offen = [r for r in rows if r['status'] == 'offen']
-        bezahlt = [r for r in rows if r['status'] == 'bezahlt']
-        ctx += f"\n=== AUSGANGSRECHNUNGEN ({len(rows)} gesamt, {len(offen)} offen) ===\n"
-        for r in offen:
-            ctx += f"  [{r['id']}] {r['re_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | {r['betrag_brutto'] or 0:,.2f} EUR | OFFEN"
-            if r['mahnung_count'] and r['mahnung_count'] > 0:
-                ctx += f" | {r['mahnung_count']}x gemahnt"
-            ctx += "\n"
-        if bezahlt:
-            ctx += f"  ({len(bezahlt)} bezahlt, älteste: {bezahlt[-1]['datum'] if bezahlt else '-'})\n"
-    except: pass
+    if _k_rechnungen != "nie":
+        try:
+            rows = db.execute("SELECT * FROM ausgangsrechnungen ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+            offen = [r for r in rows if r['status'] == 'offen']
+            bezahlt = [r for r in rows if r['status'] == 'bezahlt']
+            if _k_rechnungen == "immer" or rows:
+                ctx += f"\n=== AUSGANGSRECHNUNGEN ({len(rows)} gesamt, {len(offen)} offen) ===\n"
+                for r in offen:
+                    ctx += f"  [{r['id']}] {r['re_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | {r['betrag_brutto'] or 0:,.2f} EUR | OFFEN"
+                    if r['mahnung_count'] and r['mahnung_count'] > 0:
+                        ctx += f" | {r['mahnung_count']}x gemahnt"
+                    ctx += "\n"
+                if bezahlt:
+                    ctx += f"  ({len(bezahlt)} bezahlt, älteste: {bezahlt[-1]['datum'] if bezahlt else '-'})\n"
+        except: pass
 
-    try:
-        rows = db.execute("SELECT * FROM angebote ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
-        ang_offen = [r for r in rows if r['status'] == 'offen']
-        ctx += f"\n=== ANGEBOTE ({len(rows)} gesamt, {len(ang_offen)} offen) ===\n"
-        for r in ang_offen:
-            nf = r['nachfass_count'] or 0
-            nn = r['naechster_nachfass'] or ''
-            ctx += f"  [{r['id']}] {r['a_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | Nachfass: {nf}/3"
-            if nn and nn <= today:
-                ctx += f" | NACHFASS FÄLLIG ({nn})"
-            ctx += "\n"
-    except: pass
+        try:
+            rows = db.execute("SELECT * FROM angebote ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+            ang_offen = [r for r in rows if r['status'] == 'offen']
+            if _k_rechnungen == "immer" or rows:
+                ctx += f"\n=== ANGEBOTE ({len(rows)} gesamt, {len(ang_offen)} offen) ===\n"
+                for r in ang_offen:
+                    nf = r['nachfass_count'] or 0
+                    nn = r['naechster_nachfass'] or ''
+                    ctx += f"  [{r['id']}] {r['a_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | Nachfass: {nf}/3"
+                    if nn and nn <= today:
+                        ctx += f" | NACHFASS FÄLLIG ({nn})"
+                    ctx += "\n"
+        except: pass
 
-    try:
-        rows = db.execute("SELECT * FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt') ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
-        if rows:
-            ctx += f"\n=== OFFENE EINGANGSRECHNUNGEN ({len(rows)}) ===\n"
-            for r in rows:
-                ctx += f"  [{r['id']}] {r['gegenpartei'] or r['gegenpartei_email'] or '?'} | {r['betreff'][:50]} | {r['betrag'] or 0:,.2f} EUR | {r['datum']}\n"
-    except: pass
+        try:
+            rows = db.execute("SELECT * FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt') ORDER BY datum DESC LIMIT ?", (max_items,)).fetchall()
+            if rows:
+                ctx += f"\n=== OFFENE EINGANGSRECHNUNGEN ({len(rows)}) ===\n"
+                for r in rows:
+                    ctx += f"  [{r['id']}] {r['gegenpartei'] or r['gegenpartei_email'] or '?'} | {r['betreff'][:50]} | {r['betrag'] or 0:,.2f} EUR | {r['datum']}\n"
+        except: pass
 
-    try:
-        rows = db.execute("SELECT kategorie, COUNT(*) as n FROM tasks GROUP BY kategorie ORDER BY n DESC").fetchall()
-        ctx += "\n=== KOMMUNIKATION (Posteingang) ===\n"
-        for r in rows:
-            ctx += f"  {r['kategorie']}: {r['n']} Einträge\n"
-    except: pass
+    if _k_aufgaben != "nie":
+        try:
+            rows = db.execute("SELECT kategorie, COUNT(*) as n FROM tasks GROUP BY kategorie ORDER BY n DESC").fetchall()
+            if _k_aufgaben == "immer" or rows:
+                ctx += "\n=== KOMMUNIKATION (Posteingang) ===\n"
+                for r in rows:
+                    ctx += f"  {r['kategorie']}: {r['n']} Einträge\n"
+        except: pass
 
     # Mail-Kontext aus Archiv: letzte 15 wichtige Mails (INBOX, nicht Newsletter)
-    try:
-        if MAIL_INDEX_DB.exists():
-            mdb = sqlite3.connect(str(MAIL_INDEX_DB))
-            mdb.row_factory = sqlite3.Row
-            mail_rows = mdb.execute("""
-                SELECT absender_short, absender, betreff, datum_iso, datum,
-                       hat_anhaenge, anhaenge, message_id, folder, text_plain
-                FROM mails
-                WHERE (folder LIKE '%INBOX%' OR folder LIKE '%Eingang%' OR folder LIKE 'INBOX')
-                ORDER BY datum_iso DESC LIMIT 15
-            """).fetchall()
-            mdb.close()
-            if mail_rows:
-                # kira_verwendet setzen für alle in den Kontext aufgenommenen Mails
-                used_ids = [m['message_id'] for m in mail_rows if m['message_id']]
-                if used_ids:
-                    try:
-                        mdb2 = sqlite3.connect(str(MAIL_INDEX_DB))
-                        mdb2.executemany(
-                            "UPDATE mails SET kira_verwendet=1 WHERE message_id=?",
-                            [(mid,) for mid in used_ids]
-                        )
-                        mdb2.commit()
-                        mdb2.close()
-                    except Exception:
-                        pass
-                ctx += f"\n=== LETZTE EINGANGSMAILS ({len(mail_rows)}) ===\n"
-                ctx += "(Für vollständigen Mailinhalt: mail_lesen(message_id) aufrufen)\n"
-                for m in mail_rows:
-                    absender_disp = m['absender_short'] or m['absender'] or '?'
-                    datum_disp = (m['datum_iso'] or m['datum'] or '')[:16]
-                    anhang_flag = " [Anhang]" if m['hat_anhaenge'] else ""
-                    text_preview = (m['text_plain'] or '')[:150].replace('\n', ' ')
-                    ctx += f"  [{m['message_id'][:30] if m['message_id'] else '?'}] {datum_disp} | {absender_disp[:40]} | {(m['betreff'] or '')[:60]}{anhang_flag}\n"
-                    if text_preview:
-                        ctx += f"    → {text_preview}...\n"
-    except Exception:
-        pass
+    if _k_mails != "nie":
+        try:
+            if MAIL_INDEX_DB.exists():
+                mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+                mdb.row_factory = sqlite3.Row
+                mail_rows = mdb.execute("""
+                    SELECT absender_short, absender, betreff, datum_iso, datum,
+                           hat_anhaenge, anhaenge, message_id, folder, text_plain
+                    FROM mails
+                    WHERE (folder LIKE '%INBOX%' OR folder LIKE '%Eingang%' OR folder LIKE 'INBOX')
+                    ORDER BY datum_iso DESC LIMIT 15
+                """).fetchall()
+                mdb.close()
+                if mail_rows:
+                    # kira_verwendet setzen für alle in den Kontext aufgenommenen Mails
+                    used_ids = [m['message_id'] for m in mail_rows if m['message_id']]
+                    if used_ids:
+                        try:
+                            mdb2 = sqlite3.connect(str(MAIL_INDEX_DB))
+                            mdb2.executemany(
+                                "UPDATE mails SET kira_verwendet=1 WHERE message_id=?",
+                                [(mid,) for mid in used_ids]
+                            )
+                            mdb2.commit()
+                            mdb2.close()
+                        except Exception:
+                            pass
+                    ctx += f"\n=== LETZTE EINGANGSMAILS ({len(mail_rows)}) ===\n"
+                    ctx += "(Für vollständigen Mailinhalt: mail_lesen(message_id) aufrufen)\n"
+                    for m in mail_rows:
+                        absender_disp = m['absender_short'] or m['absender'] or '?'
+                        datum_disp = (m['datum_iso'] or m['datum'] or '')[:16]
+                        anhang_flag = " [Anhang]" if m['hat_anhaenge'] else ""
+                        text_preview = (m['text_plain'] or '')[:150].replace('\n', ' ')
+                        ctx += f"  [{m['message_id'][:30] if m['message_id'] else '?'}] {datum_disp} | {absender_disp[:40]} | {(m['betreff'] or '')[:60]}{anhang_flag}\n"
+                        if text_preview:
+                            ctx += f"    → {text_preview}...\n"
+        except Exception:
+            pass
 
-    try:
-        ddb = sqlite3.connect(str(DETAIL_DB))
-        ddb.row_factory = sqlite3.Row
-        for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent, skonto_betrag, zahlungsziel_datum FROM rechnungen_detail WHERE skonto_datum >= ? OR zahlungsziel_datum >= ?", (today, today)):
-            ctx += f"  Frist: {r['re_nummer']} — Skonto {r['skonto_prozent']}% bis {r['skonto_datum']}, Ziel bis {r['zahlungsziel_datum']}\n"
-        ddb.close()
-    except: pass
+    if _k_rechnungen != "nie":
+        try:
+            ddb = sqlite3.connect(str(DETAIL_DB))
+            ddb.row_factory = sqlite3.Row
+            for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent, skonto_betrag, zahlungsziel_datum FROM rechnungen_detail WHERE skonto_datum >= ? OR zahlungsziel_datum >= ?", (today, today)):
+                ctx += f"  Frist: {r['re_nummer']} — Skonto {r['skonto_prozent']}% bis {r['skonto_datum']}, Ziel bis {r['zahlungsziel_datum']}\n"
+            ddb.close()
+        except: pass
 
     try:
         rows = db.execute("SELECT titel, inhalt FROM wissen_regeln WHERE kategorie='gelernt' ORDER BY id DESC LIMIT 20").fetchall()
@@ -926,24 +944,25 @@ def _build_data_context(config):
         pass
 
     # Schlafende Mails (Snooze) — Kira kennt alle Mails die auf Erinnerung warten
-    try:
-        if MAIL_INDEX_DB.exists():
-            snooze_conn = sqlite3.connect(str(MAIL_INDEX_DB))
-            snooze_conn.row_factory = sqlite3.Row
-            snooze_rows = snooze_conn.execute(
-                "SELECT konto, betreff, absender, datum, snooze_until "
-                "FROM mails WHERE snooze_until IS NOT NULL AND datetime(snooze_until) > datetime('now') "
-                "ORDER BY snooze_until ASC"
-            ).fetchall()
-            snooze_conn.close()
-            if snooze_rows:
-                ctx += f"\n=== SCHLAFENDE MAILS — ERNEUT ERINNERN ({len(snooze_rows)}) ===\n"
-                ctx += "(Diese Mails wurden vom Nutzer zurückgestellt und wecken sich automatisch)\n"
-                for r in snooze_rows:
-                    ctx += (f"  Erinnert {r['snooze_until'][:16]} | {r['absender'] or '?'} | "
-                            f"{(r['betreff'] or '')[:60]} | Konto: {r['konto']}\n")
-    except Exception:
-        pass
+    if _k_mails != "nie":
+        try:
+            if MAIL_INDEX_DB.exists():
+                snooze_conn = sqlite3.connect(str(MAIL_INDEX_DB))
+                snooze_conn.row_factory = sqlite3.Row
+                snooze_rows = snooze_conn.execute(
+                    "SELECT konto, betreff, absender, datum, snooze_until "
+                    "FROM mails WHERE snooze_until IS NOT NULL AND datetime(snooze_until) > datetime('now') "
+                    "ORDER BY snooze_until ASC"
+                ).fetchall()
+                snooze_conn.close()
+                if snooze_rows:
+                    ctx += f"\n=== SCHLAFENDE MAILS — ERNEUT ERINNERN ({len(snooze_rows)}) ===\n"
+                    ctx += "(Diese Mails wurden vom Nutzer zurückgestellt und wecken sich automatisch)\n"
+                    for r in snooze_rows:
+                        ctx += (f"  Erinnert {r['snooze_until'][:16]} | {r['absender'] or '?'} | "
+                                f"{(r['betreff'] or '')[:60]} | Konto: {r['konto']}\n")
+        except Exception:
+            pass
 
     # Gelöschte-Protokoll: Kira kann auf bereinigten Mail-Kontext zugreifen
     try:

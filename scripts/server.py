@@ -4226,6 +4226,9 @@ def build_einstellungen():
     kira_name_cfg    = kira_cfg.get("name", "Kira")
     kira_pers_cfg    = kira_cfg.get("persoenlichkeit", "direkt")
     kira_prompt_custom = kira_cfg.get("system_prompt_custom", "")
+    kira_kontext_aufgaben   = kira_cfg.get("kontext_aufgaben",   "immer")
+    kira_kontext_mails      = kira_cfg.get("kontext_mails",      "immer")
+    kira_kontext_rechnungen = kira_cfg.get("kontext_rechnungen", "immer")
     # Kira 2.0 erweiterte Einstellungen
     kira_memory_cfg    = kira_cfg.get("memory", {})
     kira_react_cfg     = kira_cfg.get("react", {})
@@ -5377,6 +5380,30 @@ function esInfoPopup(btn, text) {{
         <input class="es-toggle-inp" type="checkbox" id="cfg-llm-auto-wissen" {'checked' if llm.get('auto_wissen_extrahieren', True) else ''}>
         <div class="es-toggle-vis"></div>
       </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kontext: Aufgaben &amp; Kommunikation<div class="es-rd">Wann Kira Aufgaben und Task-Kategorien in den Prompt einbettet</div></div>
+      <select class="es-sel" id="cfg-kira-kontext-aufgaben" style="min-width:160px">
+        <option value="immer" {'selected' if kira_kontext_aufgaben=='immer' else ''}>Immer</option>
+        <option value="relevant" {'selected' if kira_kontext_aufgaben=='relevant' else ''}>Nur wenn vorhanden</option>
+        <option value="nie" {'selected' if kira_kontext_aufgaben=='nie' else ''}>Nie</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kontext: Mails<div class="es-rd">Ob aktuelle Eingangsmails und Snooze-Mails in den Kira-Kontext flie&szlig;en</div></div>
+      <select class="es-sel" id="cfg-kira-kontext-mails" style="min-width:160px">
+        <option value="immer" {'selected' if kira_kontext_mails=='immer' else ''}>Immer</option>
+        <option value="relevant" {'selected' if kira_kontext_mails=='relevant' else ''}>Nur wenn vorhanden</option>
+        <option value="nie" {'selected' if kira_kontext_mails=='nie' else ''}>Nie</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kontext: Rechnungen &amp; Angebote<div class="es-rd">Ob Buchhaltungsdaten (Ausgangsrechnungen, Angebote, Fristen) immer im Prompt stehen</div></div>
+      <select class="es-sel" id="cfg-kira-kontext-rechnungen" style="min-width:160px">
+        <option value="immer" {'selected' if kira_kontext_rechnungen=='immer' else ''}>Immer</option>
+        <option value="relevant" {'selected' if kira_kontext_rechnungen=='relevant' else ''}>Nur wenn offen</option>
+        <option value="nie" {'selected' if kira_kontext_rechnungen=='nie' else ''}>Nie</option>
+      </select>
     </div>
   </div>
 
@@ -9431,6 +9458,9 @@ function saveSettings() {{
       name:                (document.getElementById('cfg-kira-name')?.value.trim() || 'Kira'),
       persoenlichkeit:     document.getElementById('cfg-kira-persoenlichkeit')?.value || 'direkt',
       system_prompt_custom: (document.getElementById('cfg-kira-prompt-custom')?.value || '').trim(),
+      kontext_aufgaben:    document.getElementById('cfg-kira-kontext-aufgaben')?.value   || 'immer',
+      kontext_mails:       document.getElementById('cfg-kira-kontext-mails')?.value      || 'immer',
+      kontext_rechnungen:  document.getElementById('cfg-kira-kontext-rechnungen')?.value || 'immer',
       memory: {{
         aktiv:         document.getElementById('cfg-mem-aktiv')?.checked    ?? true,
         sessions:      parseInt(document.getElementById('cfg-mem-sessions')?.value || '3'),

@@ -141,8 +141,8 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Bored-Modus | `cfg-kira-idle` / `kira.idle_mode` | saveSettings verbunden |
 | ✅ | Bored-Wartezeit | `cfg-kira-idle-delay` / `kira.idle_delay` | saveSettings verbunden |
 | 💡 | Kira-Position | `kira.position` | Unten rechts / links / oben |
-| 💡 | Kira-Name anpassen | `kira.name` 🔗 | Eigener Name statt "Kira" (auch in System-Prompt) |
-| 💡 | Kira-Persönlichkeit | `kira.persoenlichkeit` 🔗 | Professionell / Freundlich / Direkt → System-Prompt-Variante |
+| ✅ | Kira-Name anpassen | `kira.name` | Eigener Name statt "Kira" (auch in System-Prompt), session-pp + Bug fix session-qq |
+| ✅ | Kira-Persönlichkeit | `kira.persoenlichkeit` | Professionell / Freundlich / Direkt → System-Prompt-Variante, session-pp + Bug fix session-qq |
 | 💡 | Kira-Sprache | `kira.sprache` 🔗 | Deutsch / Englisch / gemischt → System-Prompt |
 | 💡 | Kira Quick-Actions editieren | `kira.quick_actions[]` | Welche 7 Items im Quick Panel |
 | 💡 | Kira im Hintergrund aktiv | `kira.background_hints` | Push wenn Kira Idee hat |
@@ -167,15 +167,15 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 |--------|---------|---------------|-----------|
 | ✅ | Max. Kontext-Items (Zeilen) | `cfg-llm-max-items` / `llm.max_kontext_items` | Number-Input, default 50, session-pp |
 | ✅ | Auto-Wissen extrahieren | `cfg-llm-auto-wissen` / `llm.auto_wissen_extrahieren` | Toggle, default an, session-pp |
-| 💡 | System-Prompt anzeigen/editieren | `kira.system_prompt_custom` 🔗 | Eigenen Prompt-Anteil hinzufügen |
+| ✅ | System-Prompt anzeigen/editieren | `kira.system_prompt_custom` | Freitext-Textarea in Einstellungen, session-pp + Bug fix session-qq |
 | 💡 | Antwort-Länge | `llm.antwort_laenge` 🔗 | Kurz / Normal / Ausführlich |
 | 💡 | LLM-Temperatur | `llm.temperatur` | 0.0–1.0 (Kreativität vs. Präzision) |
 | 💡 | Kira merkt sich Präferenzen | `kira.lernmodus` 🔗 | Aus Feedback Wissensregeln erstellen |
 | 💡 | Kira proaktive Vorschläge | `kira.proaktiv` 🔗 | Kira schlägt Aktionen vor (z.B. Nachfass) |
 | 💡 | Kira als Gesprächspartner | `kira.chitchat_erlaubt` | On/Off für Smalltalk |
-| 💡 | Kira-Context: Offene Aufgaben | `kira.kontext_aufgaben` 🔗 | Immer / Nur wenn relevant / Nie |
-| 💡 | Kira-Context: Aktuelle Mails | `kira.kontext_mails` 🔗 | Immer / Nur wenn relevant / Nie |
-| 💡 | Kira-Context: Rechnungen | `kira.kontext_rechnungen` 🔗 | Immer / Nur wenn relevant / Nie |
+| ✅ | Kira-Context: Offene Aufgaben | `kira.kontext_aufgaben` | Immer / Nur wenn vorhanden / Nie, session-qq |
+| ✅ | Kira-Context: Aktuelle Mails | `kira.kontext_mails` | Immer / Nur wenn vorhanden / Nie, session-qq |
+| ✅ | Kira-Context: Rechnungen | `kira.kontext_rechnungen` | Immer / Nur wenn offen / Nie, session-qq |
 
 ### 6c. Provider-Verwaltung
 | Status | Element | ID / Schlüssel | Anmerkung |
@@ -389,7 +389,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | Prio | Feature | ID | Status |
 |------|---------|-----|--------|
 | ✅ Hoch | Stats-Zeile Dashboard: Klick → Tab + Filter | `stats-zeile-filter-klick` | filterKomm() implementiert, KPI-onclick verbunden |
-| 🔴 Hoch | Wissen-Bibliothek: Zeitstempel erstellt/geändert | `wissen-zeitstempel` | 📋 Geplant |
+| ✅ Hoch | Wissen-Bibliothek: Zeitstempel erstellt/geändert | `wissen-zeitstempel` | geaendert_am-Spalte + UI-Anzeige, session-pp |
 | 🔴 Hoch | Eingangsrechnungen auto-scan + Offene-Posten-DB | `eingangsrechnungen-auto-scan` | 📋 Geplant |
 | 🟡 Mittel | Kira LLM: Datenbanken + Wissen automatisch pflegen | `kira-llm-datenbanken-autopflege` | 📋 Geplant |
 | ✅ Mittel | Konto löschen vollständig verdrahten | `mail-konten-settings-overhaul` | POST /api/mail/konto/loeschen, session-pp |
@@ -414,7 +414,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 7. ✅ Kira-Persönlichkeit → kira_llm.py: direkt/professionell/freundlich, session-pp
 8. ✅ Kira-Name anpassen → kira_llm.py + System-Prompt, session-pp
 9. ✅ System-Prompt-Ergänzung (Freitext-Feld) → kira.system_prompt_custom, session-pp
-10. 🔗 Kontext-Steuerung (Aufgaben/Mails/Rechnungen)
+10. ✅ Kontext-Steuerung (Aufgaben/Mails/Rechnungen) → kira.kontext_*, 3 Selects im LLM-Kontext-Panel, session-qq + Bug fix: kira_cfg aus config.json["kira"] statt llm-Sub-Dict
 11. 🔗 Kira proaktive Vorschläge (Push bei offenen Aufgaben)
 
 ### Phase 3 – Mail & Konten vollständig
