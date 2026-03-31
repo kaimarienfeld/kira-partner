@@ -173,6 +173,8 @@ def _ensure_mail_columns():
     _ensure_geloeschte_protokoll_table()
     # Signaturen-Tabelle sicherstellen
     _ensure_mail_signaturen_table()
+    # Vorlagen-Tabelle sicherstellen
+    _ensure_mail_vorlagen_table()
 
 def _ensure_mail_signaturen_table():
     """Erstellt mail_signaturen-Tabelle in tasks.db (idempotent)."""
@@ -190,6 +192,28 @@ def _ensure_mail_signaturen_table():
             )
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_sig_konto ON mail_signaturen(konto)")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+def _ensure_mail_vorlagen_table():
+    """Erstellt mail_vorlagen-Tabelle in tasks.db (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS mail_vorlagen (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL,
+                betreff     TEXT NOT NULL DEFAULT '',
+                body_plain  TEXT NOT NULL DEFAULT '',
+                kategorie   TEXT NOT NULL DEFAULT 'allgemein',
+                signatur_id INTEGER,
+                kira_aktiv  INTEGER NOT NULL DEFAULT 1,
+                erstellt    TEXT NOT NULL DEFAULT (datetime('now')),
+                geaendert   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         db.commit()
         db.close()
     except Exception:
@@ -6283,6 +6307,7 @@ function esInfoPopup(btn, text) {{
     <button class="es-mail-tab" data-tab="monitor" onclick="esMailTab('monitor',this)">Mail-Monitor</button>
     <button class="es-mail-tab" data-tab="klassifizierung" onclick="esMailTab('klassifizierung',this)">Klassifizierung</button>
     <button class="es-mail-tab" data-tab="signaturen" onclick="esMailTab('signaturen',this)">Signaturen</button>
+    <button class="es-mail-tab" data-tab="vorlagen" onclick="esMailTab('vorlagen',this)">Vorlagen</button>
     <button class="es-mail-tab" data-tab="archiv" onclick="esMailTab('archiv',this)">Archiv</button>
     <button class="es-mail-tab" data-tab="sync" onclick="esMailTab('sync',this)">Sync &amp; Kira-Zugang</button>
   </div>
@@ -6408,6 +6433,20 @@ function esInfoPopup(btn, text) {{
       </div>
     </div>
   </div><!-- /es-mtp-signaturen -->
+
+  <!-- ── TAB: VORLAGEN ── -->
+  <div class="es-mail-panel" id="es-mtp-vorlagen">
+    <div class="es-grp" style="margin-top:0">
+      <div class="es-grp-h">&#x1F4DD; Mail-Vorlagen</div>
+      <div class="es-grp-sub">Erstelle wiederverwendbare E-Mail-Vorlagen. Kira kann aktivierte Vorlagen beim Verfassen von Antworten vorschlagen.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="es-mk-btn" onclick="esVorlagNeu()">+ Neue Vorlage</button>
+      </div>
+      <div class="es-sig-list" id="es-vorlage-list">
+        <div class="es-sig-empty">Vorlagen werden geladen&hellip;</div>
+      </div>
+    </div>
+  </div><!-- /es-mtp-vorlagen -->
 
   <!-- ── TAB: ARCHIV ── -->
   <div class="es-mail-panel" id="es-mtp-archiv">
@@ -7338,6 +7377,7 @@ function esInfoPopup(btn, text) {{
     }}
     // Lazy-load pro Tab
     if(tabId==='signaturen') esLoadSignaturen();
+    if(tabId==='vorlagen') esLoadVorlagen();
     if(tabId==='sync') esLoadMailArchiv();
     if(tabId==='archiv') esLoadMailArchiv();
   }};
@@ -7510,6 +7550,137 @@ function esInfoPopup(btn, text) {{
         showToast('Signatur gespeichert','ok');
         document.getElementById('es-sig-modal')?.remove();
         esLoadSignaturen();
+      }} else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+
+  // ── Vorlagen ────────────────────────────────────────────────────────────────
+  const _VKat = {{allgemein:'Allgemein',angebot:'Angebot',rechnung:'Rechnung',nachfass:'Nachfass',anfrage:'Anfrage'}};
+  let _vorlagEdit = {{id:null,name:'',betreff:'',body_plain:'',kategorie:'allgemein',signatur_id:null,kira_aktiv:1}};
+
+  window.esLoadVorlagen = function() {{
+    fetch('/api/mail/vorlagen').then(r=>r.json()).then(d=>{{
+      const list=document.getElementById('es-vorlage-list');
+      if(!list) return;
+      const vs=d.vorlagen||[];
+      if(!vs.length){{
+        list.innerHTML='<div class="es-sig-empty">Noch keine Vorlagen angelegt.<br>Klicke \u201e+ Neue Vorlage\u201c um zu beginnen.</div>';
+        return;
+      }}
+      const byKat={{}};
+      vs.forEach(v=>{{const k=v.kategorie||'allgemein';if(!byKat[k])byKat[k]=[];byKat[k].push(v);}});
+      let html='';
+      Object.entries(byKat).forEach(([kat,vl])=>{{
+        html+=`<div style="margin-bottom:20px"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${{_VKat[kat]||kat}}</div>`;
+        vl.forEach(v=>{{
+          const kiraTag=v.kira_aktiv?'<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:rgba(124,58,237,.12);color:#7c3aed;border:1px solid rgba(124,58,237,.25)">&#x1F916; Kira</span>':'';
+          html+=`<div class="es-sig-item" id="es-vorlage-item-${{v.id}}">
+            <div style="flex:1;min-width:0">
+              <div class="es-sig-name">${{_esc(v.name||'Ohne Titel')}} ${{kiraTag}}</div>
+              <div class="es-sig-konto" style="color:var(--text-muted)">${{_esc(v.betreff||'(kein Betreff)')}}</div>
+            </div>
+            <div class="es-sig-actions">
+              <button class="es-mk-btn sec" style="font-size:11px;padding:3px 9px" onclick="esVorlagEdit(${{v.id}})">&#x270E; Bearbeiten</button>
+              <button class="es-mk-btn danger" style="font-size:11px;padding:3px 9px" onclick="esVorlagDelete(${{v.id}},'${{(v.name||'').replace(/\\'/g,\\'\\\\\\'\\')}}'  )">&#x1F5D1;</button>
+            </div>
+          </div>`;
+        }});
+        html+='</div>';
+      }});
+      list.innerHTML=html;
+    }}).catch(()=>{{const l=document.getElementById('es-vorlage-list');if(l)l.innerHTML='<div class="es-sig-empty" style="color:#c84444">Fehler beim Laden.</div>';}});
+  }};
+
+  window.esVorlagNeu = function() {{
+    _vorlagEdit={{id:null,name:'',betreff:'',body_plain:'',kategorie:'allgemein',signatur_id:null,kira_aktiv:1}};
+    _esVorlagModalOpen('Neue Vorlage');
+  }};
+  window.esVorlagEdit = function(id) {{
+    fetch('/api/mail/vorlagen').then(r=>r.json()).then(d=>{{
+      const v=(d.vorlagen||[]).find(x=>x.id===id);
+      if(!v){{showToast('Vorlage nicht gefunden','fehler');return;}}
+      _vorlagEdit={{id:v.id,name:v.name,betreff:v.betreff,body_plain:v.body_plain,kategorie:v.kategorie,signatur_id:v.signatur_id,kira_aktiv:v.kira_aktiv}};
+      _esVorlagModalOpen('Vorlage bearbeiten');
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+  window.esVorlagDelete = function(id,name) {{
+    if(!confirm('Vorlage \u201e'+name+'\u201c wirklich l\u00f6schen?')) return;
+    fetch('/api/mail/vorlagen/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id}})}})
+    .then(r=>r.json()).then(d=>{{
+      showToast(d.ok?'Vorlage gel\u00f6scht':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
+      if(d.ok) esLoadVorlagen();
+    }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+
+  function _esVorlagModalOpen(title) {{
+    fetch('/api/mail/signaturen').then(r=>r.json()).then(d=>{{
+      const sigs=d.signaturen||[];
+      const sigOpts='<option value="">Keine Signatur</option>'+sigs.map(s=>`<option value="${{s.id}}" ${{s.id===_vorlagEdit.signatur_id?'selected':''}}>${{_esc(s.konto+' \u00b7 '+s.name)}}</option>`).join('');
+      const katOpts=Object.entries(_VKat).map(([k,l])=>`<option value="${{k}}" ${{k===(_vorlagEdit.kategorie||'allgemein')?'selected':''}}>${{l}}</option>`).join('');
+      const modal=document.createElement('div');
+      modal.className='es-sig-modal-overlay';
+      modal.id='es-vorlage-modal';
+      modal.innerHTML=`
+        <div class="es-sig-modal" style="max-width:680px">
+          <div class="es-sig-modal-head">
+            <span class="es-sig-modal-title">${{title}}</span>
+            <button onclick="document.getElementById('es-vorlage-modal')?.remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1">&times;</button>
+          </div>
+          <div class="es-sig-modal-body">
+            <div class="es-sig-field">
+              <label>Name der Vorlage</label>
+              <input type="text" id="es-vorlage-name" value="${{_esc(_vorlagEdit.name||'')}}" placeholder="z.B. Angebot-Followup, Danke fuer Anfrage">
+            </div>
+            <div style="display:flex;gap:12px">
+              <div class="es-sig-field" style="flex:1">
+                <label>Kategorie</label>
+                <select id="es-vorlage-kat" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);width:100%">${{katOpts}}</select>
+              </div>
+              <div class="es-sig-field" style="flex:1">
+                <label>Signatur</label>
+                <select id="es-vorlage-sig" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);width:100%">${{sigOpts}}</select>
+              </div>
+            </div>
+            <div class="es-sig-field">
+              <label>Betreff</label>
+              <input type="text" id="es-vorlage-betreff" value="${{_esc(_vorlagEdit.betreff||'')}}" placeholder="z.B. Re: Ihr Angebot vom {{DATUM}}">
+            </div>
+            <div class="es-sig-field">
+              <label>Text (Platzhalter: {{DATUM}}, {{NAME}}, {{BETREFF}})</label>
+              <textarea id="es-vorlage-body" rows="10" style="width:100%;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;color:var(--text);font-family:inherit;resize:vertical">${{_esc(_vorlagEdit.body_plain||'')}}</textarea>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="es-vorlage-kira" ${{_vorlagEdit.kira_aktiv?'checked':''}}><div class="es-toggle-vis"></div></label>
+              <span style="font-size:13px;color:var(--text)">&#x1F916; Kira darf diese Vorlage vorschlagen</span>
+            </div>
+          </div>
+          <div class="es-sig-modal-foot">
+            <button class="es-mk-btn sec" onclick="document.getElementById('es-vorlage-modal')?.remove()">Abbrechen</button>
+            <button class="es-mk-btn" onclick="esVorlagSave()">Speichern</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }}).catch(()=>showToast('Fehler beim Laden','fehler'));
+  }}
+
+  window.esVorlagSave = function() {{
+    const name=(document.getElementById('es-vorlage-name')?.value||'').trim();
+    const betreff=(document.getElementById('es-vorlage-betreff')?.value||'').trim();
+    const body_plain=(document.getElementById('es-vorlage-body')?.value||'');
+    const kategorie=document.getElementById('es-vorlage-kat')?.value||'allgemein';
+    const sig_val=document.getElementById('es-vorlage-sig')?.value;
+    const signatur_id=sig_val?parseInt(sig_val):null;
+    const kira_aktiv=document.getElementById('es-vorlage-kira')?.checked?1:0;
+    if(!name){{showToast('Name eingeben','warnung');return;}}
+    fetch('/api/mail/vorlagen/save',{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{id:_vorlagEdit.id,name,betreff,body_plain,kategorie,signatur_id,kira_aktiv}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(d.ok){{
+        showToast('Vorlage gespeichert','ok');
+        document.getElementById('es-vorlage-modal')?.remove();
+        esLoadVorlagen();
       }} else showToast('Fehler: '+(d.error||'?'),'fehler');
     }}).catch(()=>showToast('Fehler','fehler'));
   }};
@@ -13851,6 +14022,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/mail/signaturen':
             self._api_mail_signaturen_get()
 
+        elif self.path == '/api/mail/vorlagen':
+            self._api_mail_vorlagen_get()
+
         elif self.path.startswith('/api/browse/result'):
             self._api_browse_result()
 
@@ -15747,6 +15921,70 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     # ── Ende Signaturen ────────────────────────────────────────────────────────
 
+    # ── Vorlagen ───────────────────────────────────────────────────────────────
+
+    def _api_mail_vorlagen_get(self):
+        """GET /api/mail/vorlagen — Alle Mail-Vorlagen."""
+        _ensure_mail_vorlagen_table()
+        try:
+            db = get_db()
+            rows = db.execute(
+                "SELECT id, name, betreff, body_plain, kategorie, signatur_id, kira_aktiv, erstellt, geaendert "
+                "FROM mail_vorlagen ORDER BY kategorie, name"
+            ).fetchall()
+            db.close()
+            self._json({'ok': True, 'vorlagen': [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_vorlagen_save(self, body):
+        """POST /api/mail/vorlagen/save — Vorlage anlegen oder aktualisieren."""
+        _ensure_mail_vorlagen_table()
+        try:
+            vid        = body.get('id')
+            name       = body.get('name', '').strip()
+            betreff    = body.get('betreff', '').strip()
+            body_plain = body.get('body_plain', '')
+            kategorie  = body.get('kategorie', 'allgemein').strip()
+            signatur_id = body.get('signatur_id')
+            kira_aktiv = 1 if body.get('kira_aktiv') else 0
+            if not name:
+                self._json({'ok': False, 'error': 'name erforderlich'}); return
+            db = get_db()
+            now = datetime.now().isoformat(timespec='seconds')
+            if vid:
+                db.execute(
+                    "UPDATE mail_vorlagen SET name=?,betreff=?,body_plain=?,kategorie=?,signatur_id=?,kira_aktiv=?,geaendert=? WHERE id=?",
+                    (name, betreff, body_plain, kategorie, signatur_id, kira_aktiv, now, int(vid))
+                )
+            else:
+                db.execute(
+                    "INSERT INTO mail_vorlagen (name,betreff,body_plain,kategorie,signatur_id,kira_aktiv,erstellt,geaendert) VALUES (?,?,?,?,?,?,?,?)",
+                    (name, betreff, body_plain, kategorie, signatur_id, kira_aktiv, now, now)
+                )
+            db.commit()
+            db.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_vorlagen_delete(self, body):
+        """POST /api/mail/vorlagen/delete — Vorlage loeschen."""
+        _ensure_mail_vorlagen_table()
+        try:
+            vid = int(body.get('id', 0))
+            if not vid:
+                self._json({'ok': False, 'error': 'id fehlt'}); return
+            db = get_db()
+            db.execute("DELETE FROM mail_vorlagen WHERE id=?", (vid,))
+            db.commit()
+            db.close()
+            self._json({'ok': True})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    # ── Ende Vorlagen ──────────────────────────────────────────────────────────
+
     def _api_mail_konto_stats(self):
         """GET /api/mail/konten/stats?email= — Archiv+Index-Stats für ein Konto."""
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -16421,6 +16659,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/signaturen/default':
             self._api_mail_signaturen_default(body)
+            return
+
+        if self.path == '/api/mail/vorlagen/save':
+            self._api_mail_vorlagen_save(body)
+            return
+
+        if self.path == '/api/mail/vorlagen/delete':
+            self._api_mail_vorlagen_delete(body)
             return
 
         if self.path == '/api/whatsapp/secrets-speichern':
