@@ -6329,6 +6329,7 @@ function esInfoPopup(btn, text) {{
     <button class="es-mail-tab" data-tab="vorlagen" onclick="esMailTab('vorlagen',this)">Vorlagen</button>
     <button class="es-mail-tab" data-tab="archiv" onclick="esMailTab('archiv',this)">Archiv</button>
     <button class="es-mail-tab" data-tab="sync" onclick="esMailTab('sync',this)">Sync &amp; Kira-Zugang</button>
+    <button class="es-mail-tab" data-tab="kiramailkonto" onclick="esMailTab('kiramailkonto',this)">&#x2728; Kira-Postfach</button>
   </div>
 
   <!-- ── TAB: MAILKONTEN ── -->
@@ -6466,6 +6467,42 @@ function esInfoPopup(btn, text) {{
       </div>
     </div>
   </div><!-- /es-mtp-vorlagen -->
+
+  <!-- ── TAB: KIRA-POSTFACH ── -->
+  <div class="es-mail-panel" id="es-mtp-kiramailkonto">
+    <div class="es-grp" style="margin-top:0">
+      <div class="es-grp-h">&#x2728; Kira-Postfach-Konfiguration</div>
+      <div class="es-grp-sub">Welches Konto nutzt Kira zum Senden und fur den Kalender-Zugriff (Microsoft Graph)?</div>
+
+      <!-- Absender-Konto -->
+      <div class="es-row">
+        <div class="es-row-label">
+          <span>Kira sendet von</span>
+          <span class="es-row-hint">Dieses Konto wird fur ausgehende Kira-Mails verwendet</span>
+        </div>
+        <select id="cfg-kira-absender-konto" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text)">
+          <option value="">Lade Konten...</option>
+        </select>
+      </div>
+
+      <!-- Graph / Kalender-Status -->
+      <div class="es-row">
+        <div class="es-row-label">
+          <span>&#x1F4C5; Kalender-Verbindung (Graph)</span>
+          <span class="es-row-hint">Microsoft Graph-Berechtigung fur Kalender-Zugriff</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div id="kira-graph-status" style="font-size:12px;color:var(--muted)">&#x2014;</div>
+          <button class="es-mk-btn sec" style="font-size:11px;padding:4px 12px" onclick="esKiraPruefeGraph(this)">&#x1F50D; Prufen</button>
+        </div>
+      </div>
+
+      <!-- Speichern -->
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="es-mk-btn" onclick="esKiraMailKontoSpeichern(this)">Speichern</button>
+      </div>
+    </div>
+  </div><!-- /es-mtp-kiramailkonto -->
 
   <!-- ── TAB: ARCHIV ── -->
   <div class="es-mail-panel" id="es-mtp-archiv">
@@ -7399,6 +7436,7 @@ function esInfoPopup(btn, text) {{
     if(tabId==='vorlagen') esLoadVorlagen();
     if(tabId==='sync') esLoadMailArchiv();
     if(tabId==='archiv') esLoadMailArchiv();
+    if(tabId==='kiramailkonto') esLoadKiraMailKonto();
   }};
 
   // ── Signaturen ─────────────────────────────────────────────────────────────
@@ -7702,6 +7740,77 @@ function esInfoPopup(btn, text) {{
         esLoadVorlagen();
       }} else showToast('Fehler: '+(d.error||'?'),'fehler');
     }}).catch(()=>showToast('Fehler','fehler'));
+  }};
+
+  // ── Kira-Postfach ──────────────────────────────────────────────────────────
+  window.esLoadKiraMailKonto = function() {{
+    const sel=document.getElementById('cfg-kira-absender-konto');
+    if(!sel) return;
+    // Aktuelle Einstellung laden
+    let currentKonto='';
+    try{{ currentKonto=window._esKiraAbsenderKonto||''; }}catch(e){{}}
+    fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{{
+      currentKonto=(cfg.kira||{{}}).mail_absender_konto||'';
+      window._esKiraAbsenderKonto=currentKonto;
+    }}).catch(()=>{{}});
+    // Kontoliste laden
+    fetch('/api/mail/konten').then(r=>r.json()).then(d=>{{
+      const konten=(d.konten||[]).filter(k=>k.aktiv!==false);
+      let opts='<option value="">– Erstes verfugbares Konto (automatisch) –</option>';
+      konten.forEach(k=>{{
+        const label=k.display_name?k.display_name+' ('+k.email+')':k.email;
+        const tokenOk=k.token_status==='ok';
+        opts+=`<option value="${{k.email}}" ${{currentKonto===k.email?'selected':''}}>
+          ${{tokenOk?'✓':'\u26A0'}} ${{_esc(label)}}
+        </option>`;
+      }});
+      sel.innerHTML=opts;
+      if(currentKonto){{
+        const found=[...sel.options].some(o=>o.value===currentKonto);
+        if(!found){{
+          sel.innerHTML+='<option value="'+_esc(currentKonto)+'" selected>'+_esc(currentKonto)+' (gespeichert)</option>';
+        }}
+      }}
+    }}).catch(()=>{{sel.innerHTML='<option value="">Fehler beim Laden</option>';}});
+  }};
+
+  window.esKiraPruefeGraph = function(btn) {{
+    const konto=(document.getElementById('cfg-kira-absender-konto')?.value)||'';
+    const statusEl=document.getElementById('kira-graph-status');
+    if(statusEl) statusEl.textContent='Pruje...';
+    if(btn) btn.disabled=true;
+    const url='/api/kira/termine?tage=1'+(konto?'&konto='+encodeURIComponent(konto):'');
+    fetch(url).then(r=>r.json()).then(d=>{{
+      if(btn) btn.disabled=false;
+      if(!statusEl) return;
+      if(d.ok){{
+        const n=(d.termine||[]).length;
+        statusEl.innerHTML='<span style="color:var(--success,#1D9E75)">&#x2705; Verbunden</span>'
+          +(d.konto?' <span style="color:var(--muted);font-size:11px">'+_esc(d.konto)+'</span>':'')
+          +' <span style="color:var(--muted);font-size:11px">&mdash; '+n+' Termin'+(n!==1?'e':'')+'</span>';
+      }}else{{
+        const msg=d.error||'Fehler';
+        const isScope=msg.toLowerCase().indexOf('berechtigung')>=0||msg.toLowerCase().indexOf('scope')>=0||msg.toLowerCase().indexOf('token')>=0;
+        statusEl.innerHTML='<span style="color:#E24B4A">&#x26A0; '+(isScope?'Azure Calendars.Read fehlt':_esc(msg))+'</span>';
+      }}
+    }}).catch(()=>{{
+      if(btn) btn.disabled=false;
+      if(statusEl) statusEl.innerHTML='<span style="color:#E24B4A">&#x26A0; Verbindungsfehler</span>';
+    }});
+  }};
+
+  window.esKiraMailKontoSpeichern = function(btn) {{
+    const konto=(document.getElementById('cfg-kira-absender-konto')?.value)||'';
+    if(btn) btn.disabled=true;
+    fetch('/api/einstellungen',{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{kira:{{mail_absender_konto:konto}}}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(btn) btn.disabled=false;
+      showToast(d.ok?'Kira-Postfach gespeichert':'Fehler: '+(d.error||'?'),d.ok?'ok':'fehler');
+      if(d.ok) window._esKiraAbsenderKonto=konto;
+    }}).catch(()=>{{if(btn)btn.disabled=false;showToast('Fehler','fehler');}});
   }};
   </script>
 </div>
@@ -15704,21 +15813,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({"ok": False, "error": str(e), "state": {}})
 
+    def _resolve_graph_konto(self):
+        """Ermittelt das Graph-Konto: kira.mail_absender_konto → standard_konto → erster Archiver-Account."""
+        cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+        # 1. Explizit konfiguriertes Kira-Absender-Konto
+        konto = cfg.get('kira', {}).get('mail_absender_konto', '')
+        if konto:
+            return konto
+        # 2. Standard-Konto aus mail_konten dict
+        mk = cfg.get('mail_konten', {})
+        if isinstance(mk, dict):
+            konto = mk.get('standard_konto', '')
+        if konto:
+            return konto
+        # 3. Erster Account aus raumkult_config.json
+        try:
+            archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
+            if archiver_cfg.exists():
+                ac = json.loads(archiver_cfg.read_text('utf-8'))
+                konten = ac.get('konten', [])
+                if konten:
+                    return konten[0].get('email', '')
+        except Exception:
+            pass
+        return ''
+
     def _api_kira_termine(self):
         """GET /api/kira/termine?tage=7 — Kalender-Termine via Graph-API."""
         try:
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             tage = int(qs.get('tage', ['7'])[0])
             tage = max(1, min(tage, 90))
-            cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
-            konten = cfg.get('mail_konten', [])
-            konto = ""
-            for k in konten:
-                if k.get('provider', '').lower() in ('microsoft', 'exchange', 'ews', 'office365'):
-                    konto = k.get('email', '')
-                    break
-            if not konto and konten:
-                konto = konten[0].get('email', '')
+            konto = self._resolve_graph_konto()
             if not konto:
                 self._json({"ok": False, "error": "Kein Mail-Konto konfiguriert", "termine": []})
                 return
