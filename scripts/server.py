@@ -741,6 +741,35 @@ def build_dashboard(tasks, db):
 </div>'''
     except: biz_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Geschäftsbewegungen</div>'
 
+    # ── Zone C4: Vorgänge Übersicht ──
+    vor_panel = ""
+    try:
+        vor_stats = db.execute("""
+            SELECT typ, COUNT(*) as n FROM vorgaenge
+            WHERE status NOT IN ('abgeschlossen', 'archiviert', 'abgebrochen')
+            GROUP BY typ ORDER BY n DESC LIMIT 8
+        """).fetchall()
+        _VOR_LABEL = {"rechnung":"Rechnungen","angebot":"Angebote","anfrage":"Anfragen",
+                      "lead":"Leads","mahnung":"Mahnungen","kundenvorgang":"Kundenvorg\u00e4nge",
+                      "bestellung":"Bestellungen","projekt":"Projekte"}
+        _VOR_COLOR = {"rechnung":"#1D9E75","angebot":"#EF9F27","anfrage":"#378ADD",
+                      "lead":"#7C3AED","mahnung":"#E24B4A"}
+        vor_items = ""
+        n_vor_total = 0
+        for r in vor_stats:
+            n_vor_total += r['n']
+            col = _VOR_COLOR.get(r['typ'], "#888780")
+            label = esc(_VOR_LABEL.get(r['typ'], (r['typ'] or '').title()))
+            vor_items += f'<div class="dash-vor-item"><span class="dash-vor-dot" style="background:{col}"></span><span class="dash-vor-typ">{label}</span><span class="dash-vor-n">{r["n"]}</span></div>'
+        if not vor_items:
+            vor_items = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine aktiven Vorg&auml;nge</div>'
+        vor_panel = f"""<div class="dash-panel" style="cursor:pointer" onclick="showPanel('geschaeft')">
+      <div class="dash-panel-title">Vorg&auml;nge aktiv</div>
+      <div class="dash-panel-sub">{n_vor_total} offene Vorg&auml;nge &mdash; nach Typ</div>
+      {vor_items}
+    </div>"""
+    except: pass
+
     work_html = f"""<div class="dash-work-grid">
   <div class="dash-panel">
     <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div>
@@ -753,6 +782,7 @@ def build_dashboard(tasks, db):
       <div class="dash-panel-sub">Kommende 7 Tage</div>
       {term_html}
     </div>
+    {vor_panel}
     <div class="dash-panel">
       <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('geschaeft')">Gesch&auml;ft aktuell</div>
       <div class="dash-panel-sub">Letzte Bewegungen</div>
@@ -12442,6 +12472,13 @@ a:hover{text-decoration:underline;}
 .dash-sent-to{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dash-sent-subj{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
 .dash-sent-ts{color:var(--text-muted);font-size:11px;flex-shrink:0;margin-left:4px;}
+
+/* Vorgänge aktiv */
+.dash-vor-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;}
+.dash-vor-item:nth-child(odd){background:var(--bg);}
+.dash-vor-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dash-vor-typ{flex:1;color:var(--text);font-size:12px;}
+.dash-vor-n{font-weight:700;font-size:15px;color:var(--text);flex-shrink:0;}
 
 /* Zone D: Signals */
 .dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
