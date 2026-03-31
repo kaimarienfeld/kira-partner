@@ -2128,6 +2128,23 @@ window.pfToggleFavorite = function(konto, folder, label, btn, e) {
   }).catch(()=>{});
 };
 
+window.pfAddFolderToKira = function(email, folder, btn) {
+  btn.disabled = true; btn.style.opacity = '1'; btn.innerHTML = '&#x23F3;';
+  fetch('/api/mail/archiv/sync-ordner',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({konto:email, ordner:folder, aktiv:true})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      btn.innerHTML = '&#x2713;'; btn.style.color='var(--success)';
+      showToast('Ordner "'+folder+'" wird jetzt von Kira synchronisiert','ok');
+      // Folder-Daten neu laden damit Button verschwindet
+      fetch('/api/mail/folders').then(r=>r.json()).then(data=>{ _pfFolderData=data; pfRenderFolders(data); }).catch(()=>{});
+    } else {
+      btn.disabled=false; btn.innerHTML='&#x2B;'; btn.style.opacity='0.5';
+      showToast('Fehler: '+(d.error||'?'),'fehler');
+    }
+  }).catch(()=>{ btn.disabled=false; btn.innerHTML='&#x2B;'; btn.style.opacity='0.5'; showToast('Verbindungsfehler','fehler'); });
+};
+
 // ── Folder Tree ──────────────────────────────────────────
 let _pfCollapsed = {};
 try { _pfCollapsed = JSON.parse(localStorage.getItem('pf_collapsed')||'{}'); } catch(e){}
@@ -2590,8 +2607,10 @@ function pfRenderFolders(data, onReady) {
       folderWrap.id = 'pf-konto-folders-'+safe;
       tree.appendChild(folderWrap);
 
+      const kiraOrdnerSet = new Set((konto.kira_ordner||[]).map(o=>o.toLowerCase()));
       (konto.ordner||[]).forEach(ord=>{
         const isStarred = _pfFavorites.some(f=>f.konto===konto.email && f.folder===ord.name);
+        const isKiraSync = kiraOrdnerSet.has(ord.name.toLowerCase());
         const item = document.createElement('div');
         item.className = 'pf-folder-item';
         item.id = 'pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
@@ -2617,6 +2636,16 @@ function pfRenderFolders(data, onReady) {
         starBtn.innerHTML = isStarred ? '&#x2605;' : '&#x2606;';
         starBtn.onclick = e => pfToggleFavorite(konto.email, ord.name, ord.label||ord.name, starBtn, e);
         item.appendChild(starBtn);
+        // "Zu Kira hinzufuegen"-Button fuer Ordner die noch nicht von Kira synchronisiert werden
+        if(!isKiraSync) {
+          const kiraBtn = document.createElement('button');
+          kiraBtn.className = 'pf-star-btn';
+          kiraBtn.title = 'Ordner von Kira synchronisieren lassen';
+          kiraBtn.innerHTML = '&#x2B;';
+          kiraBtn.style.cssText = 'font-size:12px;opacity:0.5;';
+          kiraBtn.onclick = e => { e.stopPropagation(); pfAddFolderToKira(konto.email, ord.name, kiraBtn); };
+          item.appendChild(kiraBtn);
+        }
         item.onclick = ()=>pfSelectFolder(konto.email, ord.name, ord.label||ord.name);
         folderWrap.appendChild(item);
       });
@@ -7566,7 +7595,12 @@ function esInfoPopup(btn, text) {{
     const timer=setInterval(()=>{{
       polls++;
       fetch('/api/mail/konto/google-oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
-        if(s.status==='done'){{clearInterval(timer);_wiz.step=6;_wizRender();}}
+        if(s.status==='done'){{
+          clearInterval(timer);
+          fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}}).catch(()=>{{}});
+          setTimeout(()=>{{if(typeof esLoadMailKonten==='function')esLoadMailKonten();}},3000);
+          _wiz.step=6;_wizRender();
+        }}
         else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error||'Google OAuth fehlgeschlagen';_wizRender();}}
         else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
       }}).catch(()=>{{}});

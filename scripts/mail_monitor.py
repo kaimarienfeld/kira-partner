@@ -553,13 +553,10 @@ def run_full_connection_test(email_addr: str) -> dict:
     if result["imap_ok"]:
         smtp_cfg = get_smtp_settings(konto)
         test_subject = f"KIRA Verbindungstest {datetime.utcnow().strftime('%H:%M:%S')}"
+        auth_methode = konto.get("auth_methode", "oauth2")
+        use_password_smtp = auth_methode in ("imap_password", "imap", "password") or \
+                            "password" in auth_methode or smtp_cfg.get("auth") == "password"
         try:
-            token = get_oauth2_token(konto)
-            # XOAUTH2 für SMTP
-            auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01"
-            import base64 as _b64
-            auth_b64 = _b64.b64encode(auth_string.encode()).decode()
-
             msg = MIMEText(f"Dies ist ein automatischer KIRA-Verbindungstest.\nZeitpunkt: {datetime.utcnow().isoformat()}", "plain", "utf-8")
             msg["Subject"] = test_subject
             msg["From"] = email_addr
@@ -569,7 +566,23 @@ def run_full_connection_test(email_addr: str) -> dict:
             smtp.ehlo()
             smtp.starttls()
             smtp.ehlo()
-            smtp.docmd("AUTH", f"XOAUTH2 {auth_b64}")
+
+            if use_password_smtp:
+                # Passwort-Auth fuer SMTP (IMAP-Passwort-Konten: GMX, web.de, custom IMAP etc.)
+                import base64 as _b64
+                passwort = konto.get("passwort", "") or konto.get("password", "")
+                if passwort.startswith("enc:"):
+                    passwort = _b64.b64decode(passwort[4:]).decode("utf-8", errors="ignore")
+                login = konto.get("login", email_addr)
+                smtp.login(login, passwort)
+            else:
+                # XOAUTH2 fuer Microsoft OAuth2 / Google OAuth2
+                token = get_oauth2_token(konto)
+                auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01"
+                import base64 as _b64
+                auth_b64 = _b64.b64encode(auth_string.encode()).decode()
+                smtp.docmd("AUTH", f"XOAUTH2 {auth_b64}")
+
             smtp.sendmail(email_addr, [email_addr], msg.as_string())
             smtp.quit()
             result["smtp_ok"] = True
