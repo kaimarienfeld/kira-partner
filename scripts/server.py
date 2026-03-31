@@ -2410,6 +2410,27 @@ function pfRenderFolders(data, onReady) {
       });
     });
 
+    // ── Kira-Ausgang ────────────────────────────────────────────────────────────
+    const kiraSep = document.createElement('div'); kiraSep.className='pf-fav-sep'; tree.appendChild(kiraSep);
+    const kiraHdr = document.createElement('div');
+    kiraHdr.className='pf-folder-konto'; kiraHdr.id='pf-kira-hdr';
+    kiraHdr.innerHTML='<span style="margin-right:4px">&#x1F916;</span><span style="flex:1">Kira-Ausgang</span><span id="pf-kira-pending-badge" style="display:none;background:#f59e0b;color:#1a1a1a;border-radius:9px;font-size:11px;font-weight:700;padding:1px 7px;flex-shrink:0"></span>';
+    kiraHdr.onclick=()=>pfSelectKiraFolder('pending');
+    tree.appendChild(kiraHdr);
+    const kiraFolders=[
+      {status:'pending', icon:'&#x1F4DD;', label:'Entw\u00fcrfe'},
+      {status:'sent',    icon:'&#x2705;',  label:'Gesendet'},
+      {status:'rejected',icon:'&#x274C;',  label:'Abgelehnt'},
+      {status:'expired', icon:'&#x23F0;',  label:'Abgelaufen'}
+    ];
+    kiraFolders.forEach(kf=>{
+      const ki=document.createElement('div');
+      ki.className='pf-folder-item'; ki.id='pf-kira-folder-'+kf.status;
+      ki.innerHTML='<span style="font-size:14px;min-width:18px;text-align:center">'+kf.icon+'</span><span style="flex:1">'+kf.label+'</span>';
+      ki.onclick=()=>pfSelectKiraFolder(kf.status);
+      tree.appendChild(ki);
+    });
+
     _pfUpdateSidebarBadge();
     if(onReady) onReady();
   });
@@ -2444,10 +2465,36 @@ window.pfSelectFolder = function(email, folder, label, favEl) {
   pfLoadList(true);
 };
 
+// ── Kira-Ausgang: Ordner auswählen ──────────────────────
+var _pfKiraStatus = null;
+window.pfSelectKiraFolder = function(status) {
+  _pfCurrentKonto='_kira_'; _pfCurrentFolder=status; _pfKiraStatus=status; _pfOffset=0; _pfSearch='';
+  const labels={pending:'Entwürfe',sent:'Gesendet',rejected:'Abgelehnt',expired:'Abgelaufen'};
+  _pfCurrentFolderLabel = 'Kira — '+(labels[status]||status);
+  document.getElementById('pf-mid-title').textContent=_pfCurrentFolderLabel;
+  document.getElementById('pf-search').value='';
+  document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
+  const ki=document.getElementById('pf-kira-folder-'+status);
+  if(ki) ki.classList.add('active');
+  pfLoadList(true);
+};
+
+// öffnet Postfach und navigiert direkt zu Kira-Entwürfen (aus Header-Badge)
+window.pfKiraAusgangOpen = function() {
+  showPanel('postfach');
+  setTimeout(()=>pfSelectKiraFolder('pending'), 200);
+};
+
 // ── Load Mail List ───────────────────────────────────────
 function pfLoadList(reset) {
   if(reset) { _pfOffset=0; document.getElementById('pf-list').innerHTML=''; _pfLastGroup=null; }
   if(!_pfCurrentKonto) return;
+
+  // Kira-Ausgang: eigener Datenpfad
+  if(_pfCurrentKonto==='_kira_') {
+    pfLoadKiraList(reset); return;
+  }
+
   let url;
   if(_pfCurrentKonto==='_combined_') {
     url='/api/mail/combined?offset='+_pfOffset+'&limit=50';
@@ -2471,6 +2518,135 @@ function pfLoadList(reset) {
     document.getElementById('pf-load-more').style.display=_pfOffset<_pfTotal?'':'none';
   });
 }
+
+// ── Kira-Queue-Liste laden ────────────────────────────────
+function pfLoadKiraList(reset) {
+  if(reset) { document.getElementById('pf-list').innerHTML=''; _pfLastGroup=null; }
+  const status = _pfKiraStatus || 'pending';
+  fetch('/api/mail/approve/pending?status='+status).then(r=>r.json()).then(data=>{
+    const items = data.pending || [];
+    _pfTotal = items.length;
+    document.getElementById('pf-mid-meta').textContent = items.length + ' Eintr\u00e4ge';
+    const list = document.getElementById('pf-list');
+    if(reset) list.innerHTML='';
+    if(!items.length) {
+      document.getElementById('pf-list-empty').style.display='';
+      document.getElementById('pf-load-more').style.display='none';
+      return;
+    }
+    document.getElementById('pf-list-empty').style.display='none';
+    document.getElementById('pf-load-more').style.display='none';
+    items.forEach(item=>pfRenderKiraMailItem(item, list));
+    // Badge für Entwürfe aktualisieren
+    const badge=document.getElementById('pf-kira-pending-badge');
+    if(badge && status==='pending') {
+      badge.textContent=items.length; badge.style.display=items.length?'':'none';
+    }
+  }).catch(()=>{ document.getElementById('pf-list-empty').style.display=''; });
+}
+
+// ── Kira-Queue-Item rendern ───────────────────────────────
+function pfRenderKiraMailItem(item, list) {
+  const div = document.createElement('div');
+  div.className = 'pf-mail-item';
+  div.dataset.kiraId = item.id;
+  const statusLabels={pending:'ausstehend',sent:'gesendet',rejected:'abgelehnt',expired:'abgelaufen'};
+  const statusColors={pending:'#f59e0b',sent:'#10b981',rejected:'#ef4444',expired:'#64748b'};
+  const st = item.status || 'pending';
+  const timeStr = (item.erstellt_am||'').slice(11,16);
+  div.innerHTML =
+    '<div class="pf-mail-avatar" style="background:#7c3aed;color:#fff;font-size:14px">&#x1F916;</div>'+
+    '<div class="pf-mail-content">'+
+      '<div class="pf-mail-from">'+
+        '<span class="pf-mail-sender">Kira</span>'+
+        '<span class="pf-mail-time">'+timeStr+'</span>'+
+      '</div>'+
+      '<div class="pf-mail-subject">'+(item.betreff||'(kein Betreff)')+'</div>'+
+      '<div class="pf-mail-preview" style="display:flex;align-items:center;gap:6px">'+
+        '<span>An: '+(item.an||'')+'</span>'+
+        '<span style="background:'+statusColors[st]+';color:#fff;border-radius:6px;font-size:10px;padding:1px 6px;font-weight:700">'+statusLabels[st]+'</span>'+
+      '</div>'+
+    '</div>';
+  div.onclick = ()=>pfShowKiraMail(item);
+  list.appendChild(div);
+}
+
+// ── Kira-Mail im Viewer anzeigen ──────────────────────────
+var _pfCurrentKiraItem = null;
+function pfShowKiraMail(item) {
+  _pfCurrentKiraItem = item;
+  _pfCurrentMsgId = null;
+  const viewer = document.getElementById('pf-viewer');
+  if(!viewer) return;
+  const status = item.status || 'pending';
+  const isPending = status === 'pending';
+  const headerBg = isPending ? 'rgba(245,158,11,.15)' : 'rgba(100,116,139,.1)';
+  const headerColor = isPending ? '#f59e0b' : 'var(--text-muted)';
+  const headerText = isPending ? '&#x1F4DD; Kira-Entwurf — wartet auf Freigabe' : {sent:'&#x2705; Gesendet',rejected:'&#x274C; Abgelehnt',expired:'&#x23F0; Abgelaufen'}[status]||status;
+  const bodyText = (item.body_plain||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
+  const reasonHtml = item.notiz_intern ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding:8px;background:var(--bg-raised);border-radius:6px;border-left:3px solid #f59e0b"><b>Kira-Begr&uuml;ndung:</b> '+_esc(item.notiz_intern)+'</div>' : '';
+  viewer.innerHTML =
+    '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
+    '<div style="padding:16px 18px 8px">'+
+      '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
+      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
+      reasonHtml+
+      '<div style="font-size:14px;line-height:1.6;padding:12px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+bodyText+'</div>'+
+    '</div>'+
+    (isPending ?
+      '<div class="kira-viewer-actions" style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
+        '<button class="btn btn-muted btn-sm" onclick="pfKiraMaillAblehnen('+item.id+')">&#x274C; Ablehnen</button>'+
+        '<button class="btn btn-sm" style="background:#1e3a5f;color:#93c5fd;border-color:#2563eb" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
+        '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
+      '</div>'
+    : '');
+  // Viewer anzeigen (falls versteckt)
+  if(viewer.style.display==='none') viewer.style.display='';
+  const placeholder=document.getElementById('pf-viewer-placeholder');
+  if(placeholder) placeholder.style.display='none';
+}
+
+window.pfKiraMailFreigeben = function(id) {
+  if(!confirm('Mail jetzt senden?')) return;
+  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'approve'})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){ showToast(d.message||'Gesendet','ok'); pfLoadKiraList(true); }
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    });
+};
+window.pfKiraMailBearbeiten = function(id) {
+  const item=_pfCurrentKiraItem; if(!item) return;
+  var oldText=item.body_plain||'';
+  var modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML='<div style="background:var(--bg-overlay,#242428);border:1px solid var(--border-strong,#3a3a42);border-radius:16px;padding:24px;width:min(600px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.6)">'
+    +'<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text,#e8e8ee)">&#x270E; Mail bearbeiten</div>'
+    +'<textarea id="kiraEditBody" style="width:100%;min-height:160px;background:var(--bg-raised,#1e1e23);color:var(--text,#e8e8ee);border:1px solid var(--border,#3a3a42);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">'+_esc(oldText)+'</textarea>'
+    +'<div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">'
+    +'<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer">Abbrechen</button>'
+    +'<button onclick="pfKiraMailSendenBearbeitet('+id+',this)" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">Senden</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+};
+window.pfKiraMailSendenBearbeitet = function(id, btn) {
+  var ta=document.getElementById('kiraEditBody');
+  var newBody=ta?ta.value:'';
+  btn.disabled=true; btn.textContent='Sende\u2026';
+  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'edit',body:newBody})})
+    .then(r=>r.json()).then(d=>{
+      btn.parentElement.parentElement.parentElement.parentElement.remove();
+      if(d.ok){ showToast(d.message||'Gesendet','ok'); pfLoadKiraList(true); }
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    });
+};
+window.pfKiraMaillAblehnen = function(id) {
+  if(!confirm('Entwurf ablehnen?')) return;
+  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reject'})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){ showToast('Abgelehnt','ok'); pfLoadKiraList(true); }
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    });
+};
 
 // ── Avatar / Datum Hilfsfunktionen ────────────────────────
 const _AVATAR_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#14b8a6','#f97316','#0ea5e9','#84cc16'];
@@ -4010,6 +4186,19 @@ def build_einstellungen():
     kira_bounce_dist = kira_cfg.get("bounce_dist", 130)
     kira_idle        = kira_cfg.get("idle_mode", True)
     kira_idle_delay  = kira_cfg.get("idle_delay", 10)
+    # Kira 2.0 erweiterte Einstellungen
+    kira_memory_cfg    = kira_cfg.get("memory", {})
+    kira_react_cfg     = kira_cfg.get("react", {})
+    kira_feedback_cfg  = kira_cfg.get("feedback", {})
+    kira_sicherheit_cfg = kira_cfg.get("sicherheit", {})
+    kira_proaktiv_cfg  = config.get("kira_proaktiv", {})
+    # Circuit Breaker Status laden
+    circuit_state = {}
+    try:
+        cb_path = SCRIPTS_DIR / "knowledge" / "llm_circuit_state.json"
+        if cb_path.exists():
+            circuit_state = json.loads(cb_path.read_text('utf-8'))
+    except: pass
     # Runtime-Log Stats
     try:
         _rl_s = rlog_stats()
@@ -4265,6 +4454,19 @@ def build_einstellungen():
 .es-sn.es-plan{{opacity:0.55;}}
 .es-pb{{font-size:8px;background:var(--bg-overlay);color:var(--muted);padding:1px 5px;border-radius:3px;margin-left:auto;}}
 .es-sn-sep{{height:0.5px;background:var(--border);margin:8px 18px;}}
+/* ── Pane 2 — 3-Pane-Layout für Sektionen mit Unter-Menü ──────────────── */
+.es-pane2{{width:176px;min-width:176px;background:var(--bg-raised);border-right:0.5px solid var(--border);padding:10px 0;overflow-y:auto;flex-shrink:0;display:none;}}
+.es-ct.p2vis .es-pane2{{display:block;}}
+.es-p2grp{{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 14px 4px;}}
+.es-p2n{{display:flex;align-items:center;gap:7px;padding:8px 12px 8px 14px;font-size:12.5px;color:var(--text-secondary);cursor:pointer;border-left:2px solid transparent;transition:background .12s;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+.es-p2n:hover{{background:var(--bg-overlay);}}
+.es-p2n.act{{background:var(--accent-bg,rgba(79,125,249,.08));border-left-color:var(--accent,#4f7df9);color:var(--text);font-weight:600;}}
+.es-p2n-ico{{width:16px;text-align:center;font-size:11px;opacity:.5;flex-shrink:0;}}
+.es-p2n.act .es-p2n-ico{{opacity:.85;}}
+.es-p2sep{{height:0.5px;background:var(--border);margin:6px 12px;}}
+/* Hide horizontal tab bars when pane2 is active */
+.es-ct.p2vis .es-mail-tabs{{display:none!important;}}
+.es-ct.p2vis .es-proto-tabs{{display:none!important;}}
 .es-main{{flex:1;overflow-y:auto;padding:24px 28px;background:var(--bg);}}
 .es-sec-panel{{display:none;}}
 .es-sec-panel.es-active{{display:block;}}
@@ -4280,6 +4482,10 @@ def build_einstellungen():
 .es-row-hint{{font-size:11px;color:var(--muted,var(--text-muted));line-height:1.4;}}
 .es-rl{{font-size:var(--fs-sm);color:var(--text);flex:1;min-width:0;}}
 .es-rd{{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;line-height:1.4;}}
+.es-info-btn{{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;vertical-align:middle;transition:color .15s;}}
+.es-info-btn:hover{{color:var(--accent,#1a73e8);}}
+.es-info-popup{{position:absolute;z-index:9999;background:var(--bg-overlay);border:1px solid var(--border-strong);border-radius:8px;padding:10px 14px;max-width:300px;font-size:11px;color:var(--text-secondary);line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.18);}}
+.es-info-popup::after{{content:'';position:absolute;top:-6px;left:14px;width:10px;height:10px;background:var(--bg-overlay);border-left:1px solid var(--border-strong);border-top:1px solid var(--border-strong);transform:rotate(45deg);}}
 .es-toggle-wrap{{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;}}
 .es-toggle-inp{{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}}
 .es-toggle-vis{{display:inline-block;width:38px;height:20px;background:var(--border-strong,#888);border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;}}
@@ -4316,6 +4522,9 @@ def build_einstellungen():
 .es-prev-card .pc-val{{font-size:var(--fs-lg);font-weight:600;color:var(--text);margin-top:2px;}}
 </style>
 <script>
+// Sektionen mit Pane-2 Sub-Navigation
+var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll'}};
+
 function esShowSec(id) {{
   document.querySelectorAll('.es-sec-panel').forEach(function(p){{p.classList.remove('es-active');}});
   document.querySelectorAll('.es-sn').forEach(function(n){{n.classList.remove('act');}});
@@ -4323,8 +4532,48 @@ function esShowSec(id) {{
   if(panel) panel.classList.add('es-active');
   var nav = document.querySelector('.es-sn[data-essec="'+id+'"]');
   if(nav) nav.classList.add('act');
-  if(id==='mail') {{ esLoadMailKonten(); esLoadMailArchiv(); esLoadSignaturen(); }}
+  // Pane 2 togglen
+  var ct = document.querySelector('.es-ct');
+  var p2grpId = _esSectionsWithPane2[id];
+  document.querySelectorAll('[id^="es-p2-"]').forEach(function(d){{d.style.display='none';}});
+  if(p2grpId && ct) {{
+    ct.classList.add('p2vis');
+    var p2div = document.getElementById(p2grpId);
+    if(p2div) p2div.style.display='block';
+  }} else if(ct) {{
+    ct.classList.remove('p2vis');
+  }}
+  // Lazy-loads + Pane-2 Default-Auswahl
+  if(id==='mail') {{
+    esLoadMailKonten(); esLoadMailArchiv(); esLoadSignaturen();
+    // Sicherstellen dass erstes Panel sichtbar
+    if(window.esMailTab) window.esMailTab('mailkonten', null);
+  }}
   if(id==='integrationen') {{ esIntegLoad(); }}
+  if(id==='protokoll') {{ esShowProtoTab('runtime'); }}
+}}
+
+function esP2Select(sec, subId, el) {{
+  // Pane-2-Item aktivieren
+  if(el) {{
+    var grpDiv = el.closest('[id^="es-p2-"]');
+    if(grpDiv) grpDiv.querySelectorAll('.es-p2n').forEach(function(n){{n.classList.remove('act');}});
+    el.classList.add('act');
+  }}
+  // Sub-Sektion anzeigen
+  if(sec === 'mail') {{
+    if(window.esMailTab) window.esMailTab(subId, null);
+  }} else if(sec === 'provider') {{
+    // Scroll to anchor group in .es-main
+    var anchorId = 'llm-grp-' + subId;
+    var el2 = document.getElementById(anchorId);
+    if(el2) {{
+      var mainArea = document.querySelector('.es-main');
+      if(mainArea) mainArea.scrollTop = el2.offsetTop - 12;
+    }}
+  }} else if(sec === 'protokoll') {{
+    if(window.esShowProtoTab) window.esShowProtoTab(subId);
+  }}
 }}
 function esShowProtoTab(id) {{
   document.querySelectorAll('.es-proto-tab-panel').forEach(function(p){{p.classList.remove('act');}});
@@ -4333,6 +4582,31 @@ function esShowProtoTab(id) {{
   if(panel) panel.classList.add('act');
   var tab = document.querySelector('.es-proto-tab[data-ptab="'+id+'"]');
   if(tab) tab.classList.add('act');
+  // Sync Pane-2
+  var p2grp = document.getElementById('es-p2-protokoll');
+  if(p2grp) {{
+    p2grp.querySelectorAll('.es-p2n').forEach(function(n){{n.classList.remove('act');}});
+    var p2n = p2grp.querySelector('.es-p2n[data-p2id="'+id+'"]');
+    if(p2n) p2n.classList.add('act');
+  }}
+}}
+var _esInfoPopupEl = null;
+function esInfoPopup(btn, text) {{
+  if(_esInfoPopupEl) {{ _esInfoPopupEl.remove(); _esInfoPopupEl = null; return; }}
+  var p = document.createElement('div');
+  p.className = 'es-info-popup';
+  p.textContent = text;
+  p.style.position = 'fixed';
+  var r = btn.getBoundingClientRect();
+  p.style.top = (r.bottom + 8) + 'px';
+  p.style.left = Math.max(8, r.left - 8) + 'px';
+  document.body.appendChild(p);
+  _esInfoPopupEl = p;
+  setTimeout(function() {{
+    document.addEventListener('click', function _close(e) {{
+      if(!p.contains(e.target) && e.target !== btn) {{ p.remove(); _esInfoPopupEl = null; document.removeEventListener('click', _close); }}
+    }});
+  }}, 10);
 }}
 </script>
 <div class="es-shell">
@@ -4371,10 +4645,48 @@ function esShowProtoTab(id) {{
   <div class="es-sn" data-essec="provider" onclick="esShowSec('provider')"><span class="es-sico">&#x25C8;</span>Kira / LLM / Provider<span class="es-scnt">{len(providers)}</span></div>
   <div class="es-sn" data-essec="mail" onclick="esShowSec('mail')"><span class="es-sico">&#x2709;</span>Mail &amp; Konten</div>
   <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
-  <div class="es-sn es-plan" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen<span class="es-pb">Geplant</span></div>
+  <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
+  <div class="es-sn" data-essec="sicherheit-audit" onclick="esShowSec('sicherheit-audit')"><span class="es-sico">&#x1F6E1;</span>Sicherheit &amp; Audit</div>
   <div class="es-sn-sep"></div>
   <div class="es-snav-h">Protokoll</div>
   <div class="es-sn" data-essec="protokoll" onclick="esShowSec('protokoll')"><span class="es-sico">&#x2630;</span>Protokoll &amp; Logs<span class="es-scnt">{rl_total}</span></div>
+</div>
+
+<!-- PANE 2 — Sub-Navigation (3-Pane-Layout) -->
+<div class="es-pane2" id="esPaneTwo">
+  <!-- Mail & Konten -->
+  <div id="es-p2-mail" style="display:none">
+    <div class="es-p2grp">Mail &amp; Konten</div>
+    <div class="es-p2n act" data-p2id="mailkonten" onclick="esP2Select('mail','mailkonten',this)"><span class="es-p2n-ico">&#x1F4EC;</span>Mailkonten</div>
+    <div class="es-p2n" data-p2id="monitor" onclick="esP2Select('mail','monitor',this)"><span class="es-p2n-ico">&#x1F50D;</span>Mail-Monitor</div>
+    <div class="es-p2n" data-p2id="klassifizierung" onclick="esP2Select('mail','klassifizierung',this)"><span class="es-p2n-ico">&#x1F3F7;</span>Klassifizierung</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2n" data-p2id="signaturen" onclick="esP2Select('mail','signaturen',this)"><span class="es-p2n-ico">&#x270D;</span>Signaturen</div>
+    <div class="es-p2n" data-p2id="archiv" onclick="esP2Select('mail','archiv',this)"><span class="es-p2n-ico">&#x1F4C2;</span>Archiv</div>
+    <div class="es-p2n" data-p2id="sync" onclick="esP2Select('mail','sync',this)"><span class="es-p2n-ico">&#x21C4;</span>Sync &amp; Kira-Zugang</div>
+  </div>
+  <!-- Kira / LLM / Provider -->
+  <div id="es-p2-provider" style="display:none">
+    <div class="es-p2grp">Kira Assistent</div>
+    <div class="es-p2n act" data-p2id="assistent" onclick="esP2Select('provider','assistent',this)"><span class="es-p2n-ico">&#x1F916;</span>Assistent</div>
+    <div class="es-p2n" data-p2id="provider" onclick="esP2Select('provider','provider',this)"><span class="es-p2n-ico">&#x25C8;</span>KI-Provider</div>
+    <div class="es-p2n" data-p2id="kontext" onclick="esP2Select('provider','kontext',this)"><span class="es-p2n-ico">&#x1F4AC;</span>LLM &amp; Kontext</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2grp">Erweitert</div>
+    <div class="es-p2n" data-p2id="gedaechtnis" onclick="esP2Select('provider','gedaechtnis',this)"><span class="es-p2n-ico">&#x1F9E0;</span>Ged&auml;chtnis</div>
+    <div class="es-p2n" data-p2id="proaktiv" onclick="esP2Select('provider','proaktiv',this)"><span class="es-p2n-ico">&#x27F3;</span>Automatisierung</div>
+    <div class="es-p2n" data-p2id="react" onclick="esP2Select('provider','react',this)"><span class="es-p2n-ico">&#x26A1;</span>ReAct &amp; Multi-Step</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2n" data-p2id="feedback" onclick="esP2Select('provider','feedback',this)"><span class="es-p2n-ico">&#x1F44D;</span>Feedback &amp; Lernen</div>
+    <div class="es-p2n" data-p2id="sicherheit" onclick="esP2Select('provider','sicherheit',this)"><span class="es-p2n-ico">&#x1F6E1;</span>Sicherheit &amp; Limits</div>
+  </div>
+  <!-- Protokoll & Logs -->
+  <div id="es-p2-protokoll" style="display:none">
+    <div class="es-p2grp">Protokoll</div>
+    <div class="es-p2n act" data-p2id="runtime" onclick="esP2Select('protokoll','runtime',this)"><span class="es-p2n-ico">&#x2630;</span>Runtime-Log</div>
+    <div class="es-p2n" data-p2id="changelog" onclick="esP2Select('protokoll','changelog',this)"><span class="es-p2n-ico">&#x1F4DD;</span>&Auml;nderungsverlauf</div>
+    <div class="es-p2n" data-p2id="konfiguration" onclick="esP2Select('protokoll','konfiguration',this)"><span class="es-p2n-ico">&#x2699;</span>Konfiguration</div>
+  </div>
 </div>
 
 <!-- MAIN CONTENT -->
@@ -4877,7 +5189,7 @@ function esShowProtoTab(id) {{
   <div class="es-sec-h">Kira / LLM / Provider</div>
   <div class="es-sec-sub">KI-Provider, Modelle und Kira-Assistent konfigurieren.</div>
 
-  <div class="es-grp">
+  <div class="es-grp" id="llm-grp-assistent">
     <div class="es-grp-h">Kira Assistent</div>
     <div class="es-grp-sub">Erscheinungsbild und Verhalten des Kira-Launchers.</div>
     <div class="es-row">
@@ -4919,7 +5231,7 @@ function esShowProtoTab(id) {{
     </div>
   </div>
 
-  <div class="es-grp">
+  <div class="es-grp" id="llm-grp-provider">
     <div class="es-grp-h">KI-Provider</div>
     <div class="es-grp-sub">Verbundene Sprachmodell-Provider. Der erste aktive Provider mit g&uuml;ltigem API-Key wird verwendet.</div>
     <div id="provider-list">
@@ -4934,7 +5246,7 @@ function esShowProtoTab(id) {{
     </div>
   </div>
 
-  <div class="es-grp">
+  <div class="es-grp" id="llm-grp-kontext">
     <div class="es-grp-h">LLM-Kontext</div>
     <div class="es-grp-sub">Welche Kontextdaten Kira in jede Anfrage einbettet.</div>
     <div class="es-row">
@@ -5002,6 +5314,175 @@ function esShowProtoTab(id) {{
     <div class="es-row">
       <div class="es-rl">Modell-Auswahl<div class="es-rd">Kira w&auml;hlt automatisch das g&uuml;nstigste Modell je Provider-Typ</div></div>
       <span style="font-size:var(--fs-xs);color:var(--muted)">Auto-Budget &mdash; <span style="color:var(--text-secondary)">Admin-Konfiguration folgt mit Rollen-System</span></span>
+    </div>
+  </div>
+
+  <!-- ── Konversations-Gedächtnis ── -->
+  <div class="es-grp" id="llm-grp-gedaechtnis">
+    <div class="es-grp-h">Konversations-Ged&auml;chtnis</div>
+    <div class="es-grp-sub">Kira merkt sich vergangene Gespr&auml;che und wichtige Entscheidungen. &Auml;nderungen wirken ab dem n&auml;chsten Scan-Zyklus.</div>
+    <div class="es-row">
+      <div class="es-rl">Ged&auml;chtnis aktiviert
+        <div class="es-rd">Kira liest vergangene Gespr&auml;che beim Chat-Start ein</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Kira ruft beim jedem Gespr&auml;ch die letzten N Sitzungen zum aktuellen Kunden ab und beachtet wichtige Entscheidungen automatisch. Deaktivieren spart Token, Kira verliert aber das Kurzzeit-Ged&auml;chtnis.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-mem-aktiv" {'checked' if kira_memory_cfg.get('aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Episodische Erinnerungen (letzte N Sessions)
+        <div class="es-rd">Wie viele vergangene Sitzungen Kira einbettet (1–10)</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Mehr Sessions = mehr Kontext, aber auch mehr Token-Verbrauch. Empfehlung: 3')">&#x2139;</button>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-mem-sessions" value="{kira_memory_cfg.get('sessions', 3)}" min="1" max="10">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">T&auml;gliche Zusammenfassung
+        <div class="es-rd">Kira fasst jeden Tag alle Gespr&auml;che zusammen und speichert Schl&uuml;sselentscheidungen</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'L&auml;uft t&auml;glich um ca. 22 Uhr im Hintergrund. Kira kann dadurch auch nach Tagen noch auf wichtige Entscheidungen zur&uuml;ckgreifen.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-mem-summary" {'checked' if kira_memory_cfg.get('summary_aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Max. Token f&uuml;r Ged&auml;chtnis im Kontext
+        <div class="es-rd">Wie viele Token Kira f&uuml;r Erinnerungen reserviert (Standard: 3200)</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-mem-tokens" value="{kira_memory_cfg.get('token_budget', 3200)}" min="500" max="8000" step="100">
+    </div>
+  </div>
+
+  <!-- ── Proaktive Automatisierung ── -->
+  <div class="es-grp" id="llm-grp-proaktiv">
+    <div class="es-grp-h">Proaktive Automatisierung</div>
+    <div class="es-grp-sub">Kira analysiert im Hintergrund Vorg&auml;nge und schl&auml;gt Aktionen vor oder handelt autonom.</div>
+    <div class="es-row">
+      <div class="es-rl">Proaktive Scans aktiviert
+        <div class="es-rd">Kira pr&uuml;ft alle N Minuten selbstst&auml;ndig auf Handlungsbedarf</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Kira schaut regelm&auml;&szlig;ig ob Angebote nachgefasst werden m&uuml;ssen, Mahnungen eskalieren sollen usw. Ohne diese Funktion arbeitet Kira nur auf direkte Anfrage.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-proaktiv-aktiv" {'checked' if kira_proaktiv_cfg.get('aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Scan-Intervall (Minuten)
+        <div class="es-rd">Wie oft Kira im Hintergrund pr&uuml;ft (5–60 Min)</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-proaktiv-intervall" value="{kira_proaktiv_cfg.get('scan_intervall_min', 15)}" min="5" max="60">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Angebot-Followup nach (Tage)
+        <div class="es-rd">Ab wann Kira Nachfass-Mail vorschl&auml;gt</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Liegt ein Angebot l&auml;nger unbeantwortet vor, erstellt Kira automatisch einen Nachfass-Entwurf und legt ihn zur Freigabe vor.')">&#x2139;</button>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-proaktiv-angebot-tage" value="{kira_proaktiv_cfg.get('angebot_followup_tage', 7)}" min="1" max="30">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Mahnung-Eskalation nach (Tage)
+        <div class="es-rd">Ab wann Kira zur Eskalation r&auml;t</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-proaktiv-mahnung-tage" value="{kira_proaktiv_cfg.get('mahnung_eskalation_tage', 14)}" min="3" max="60">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Konfidenz-Schwelle Stufe A &mdash; autonom (%)
+        <div class="es-rd">Ab dieser Sicherheit handelt Kira ohne R&uuml;ckfrage</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Stufe A: Kira ist sehr sicher und handelt direkt (z.B. Task erstellen). Stufe B: Kira zeigt einen Toast und wartet auf deine Best&auml;tigung. Darunter: Kira fragt immer im Chat nach.')">&#x2139;</button>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-proaktiv-konf-a" value="{int(kira_proaktiv_cfg.get('konfidenz_stufe_a', 0.85)*100)}" min="50" max="100">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Konfidenz-Schwelle Stufe B &mdash; Toast (%)
+        <div class="es-rd">Ab dieser Sicherheit zeigt Kira eine Best&auml;tigungs-Anfrage</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-proaktiv-konf-b" value="{int(kira_proaktiv_cfg.get('konfidenz_stufe_b', 0.60)*100)}" min="30" max="95">
+    </div>
+  </div>
+
+  <!-- ── ReAct & Multi-Step ── -->
+  <div class="es-grp" id="llm-grp-react">
+    <div class="es-grp-h">ReAct &amp; Multi-Step</div>
+    <div class="es-grp-sub">Kira kann komplexe Aufgaben in mehreren Schritten l&ouml;sen.</div>
+    <div class="es-row">
+      <div class="es-rl">Mehrstufige Aufgaben erlauben
+        <div class="es-rd">Kira plant und f&uuml;hrt komplexe Aufgaben in Schritten aus</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Im ReAct-Modus kann Kira mehrere Werkzeuge nacheinander aufrufen um eine komplexe Aufgabe zu l&ouml;sen, z.B.: alle &uuml;berf&auml;lligen Rechnungen pr&uuml;fen + Mahnungen vorschlagen. Deaktivieren f&uuml;hrt zu einfacheren, schnelleren Einzelantworten.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-react-aktiv" {'checked' if kira_react_cfg.get('aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Max. Schritte pro Aufgabe
+        <div class="es-rd">Wie viele Einzel-Schritte Kira pro Anfrage ausf&uuml;hren darf (2–10)</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-react-schritte" value="{kira_react_cfg.get('max_schritte', 5)}" min="2" max="10">
+    </div>
+  </div>
+
+  <!-- ── Feedback & Lernen ── -->
+  <div class="es-grp" id="llm-grp-feedback">
+    <div class="es-grp-h">Feedback &amp; Lernen</div>
+    <div class="es-grp-sub">Kira lernt aus deinen R&uuml;ckmeldungen und verbessert sich automatisch.</div>
+    <div class="es-row">
+      <div class="es-rl">Feedback-Buttons anzeigen (&#x1F44D;/&#x1F44E;)
+        <div class="es-rd">Unter jeder Kira-Antwort erscheinen Daumen-Buttons</div>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-fb-buttons" {'checked' if kira_feedback_cfg.get('buttons_aktiv', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Lernregeln aus Feedback
+        <div class="es-rd">Bei &#x1F44E; erstellt Kira automatisch eine neue Wissens-Regel</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Wenn du eine Antwort als schlecht bewertest, analysiert Kira was schiefgelaufen ist und schreibt sich eine Lernregel f&uuml;r zuk&uuml;nftige Gespr&auml;che.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-fb-lernregeln" {'checked' if kira_feedback_cfg.get('auto_lernregeln', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Stil-Lernen aus Mail-Bearbeitungen
+        <div class="es-rd">Wenn du Kiras Entw&uuml;rfe stark &auml;nderst, lernt Kira deinen Schreibstil</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Kira vergleicht ihren Entwurf mit deiner endg&uuml;ltigen Version. Bei gro&szlig;en Unterschieden (>40%) wird automatisch eine Stil-Regel gespeichert.')">&#x2139;</button>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-fb-stillernen" {'checked' if kira_feedback_cfg.get('stil_lernen', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Sicherheit & Limits ── -->
+  <div class="es-grp" id="llm-grp-sicherheit">
+    <div class="es-grp-h">Sicherheit &amp; Limits</div>
+    <div class="es-grp-sub">Schutz vor unkontrollierter API-Nutzung und automatischen Fehler-Schleifen.</div>
+    <div class="es-row">
+      <div class="es-rl">Max. LLM-Anfragen pro Minute
+        <div class="es-rd">Schutzmechanismus gegen endlose Feedback-Schleifen</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-sec-rate" value="{kira_sicherheit_cfg.get('rate_limit_per_minute', 20)}" min="5" max="100">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Circuit Breaker: Fehler bis Sperre
+        <div class="es-rd">Bei N Fehlern in Folge wird der Provider tempor&auml;r gesperrt</div>
+        <button class="es-info-btn" onclick="esInfoPopup(this,'Wenn ein KI-Provider N Mal hintereinander Fehler liefert, unterbricht Kira die Anfragen f&uuml;r einige Minuten. Schutz vor Kosten durch defekte API-Verbindungen.')">&#x2139;</button>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-sec-cb-fehler" value="{kira_sicherheit_cfg.get('circuit_breaker_threshold', 3)}" min="1" max="10">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Sperre-Dauer nach Fehler (Sekunden)
+        <div class="es-rd">Wie lange ein Provider nach Fehler gesperrt bleibt</div>
+      </div>
+      <input class="es-inp-sm" type="number" id="cfg-sec-cb-dauer" value="{kira_sicherheit_cfg.get('circuit_breaker_dauer', 300)}" min="30" max="3600" step="30">
     </div>
   </div>
 
@@ -6143,6 +6624,13 @@ function esShowProtoTab(id) {{
     if(btn) btn.classList.add('act');
     const panel = document.getElementById('es-mtp-'+tabId);
     if(panel) panel.classList.add('act');
+    // Sync Pane-2 active state
+    var p2grp = document.getElementById('es-p2-mail');
+    if(p2grp) {{
+      p2grp.querySelectorAll('.es-p2n').forEach(function(n){{n.classList.remove('act');}});
+      var p2n = p2grp.querySelector('.es-p2n[data-p2id="'+tabId+'"]');
+      if(p2n) p2n.classList.add('act');
+    }}
     // Lazy-load pro Tab
     if(tabId==='signaturen') esLoadSignaturen();
     if(tabId==='sync') esLoadMailArchiv();
@@ -6442,23 +6930,205 @@ function esShowProtoTab(id) {{
 <!-- ── SECTION: AUTOMATIONEN ──────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-automationen">
   <div class="es-sec-h">Automationen</div>
-  <div class="es-sec-sub">Automatische Workflows und regelbasierte Aktionen. Diese Funktion befindet sich in Planung.</div>
+  <div class="es-sec-sub">Aktive Kira-Automatisierungen konfigurieren, steuern und manuell ausl&ouml;sen.</div>
 
   <div class="es-grp">
-    <div class="es-grp-h">Geplante Funktionen</div>
-    <div class="es-row">
-      <div class="es-rl">Automatische Nachfass-Mails<div class="es-rd">Erinnerungen automatisch per Mail versenden</div></div>
-      <span class="es-badge plan">In Planung</span>
-    </div>
-    <div class="es-row">
-      <div class="es-rl">Regelbasierte Aufgaben<div class="es-rd">Aufgaben automatisch nach Regeln erstellen</div></div>
-      <span class="es-badge plan">In Planung</span>
-    </div>
-    <div class="es-row">
-      <div class="es-rl">Zeitgesteuerte Berichte<div class="es-rd">W&ouml;chentliche/monatliche Zusammenfassungen</div></div>
-      <span class="es-badge plan">In Planung</span>
+    <div class="es-grp-h">Aktive Automatisierungs-Regeln</div>
+    <div class="es-grp-sub">Diese Scans laufen im Hintergrund. Intervall und Schwellen einstellbar unter Kira / LLM / Provider.</div>
+    <div id="auto-scan-status">
+      <div style="color:var(--muted);font-size:11px;padding:8px 0">Lade Scan-Status&hellip;</div>
     </div>
   </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Manuelle Aktionen</div>
+    <div class="es-grp-sub">Scans oder Analysen auf Knopfdruck ausf&uuml;hren.</div>
+    <div class="es-row">
+      <div class="es-rl">Proaktiven Scan jetzt ausf&uuml;hren<div class="es-rd">Kira pr&uuml;ft sofort alle Vorg&auml;nge auf Handlungsbedarf</div></div>
+      <button class="es-btn" id="btn-scan-jetzt" onclick="autoRunScan()">&#x25B6; Scan jetzt</button>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">R&uuml;ckwirkend analysieren<div class="es-rd">Kira liest alle historischen Gespr&auml;che und erstellt Zusammenfassungen</div></div>
+      <button class="es-btn" id="btn-backfill" onclick="autoBackfill()" style="background:var(--bg-overlay)">&#x1F504; Analyse starten&hellip;</button>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Memory zur&uuml;cksetzen<div class="es-rd">L&ouml;scht alle gespeicherten Tages-Zusammenfassungen (tages_summary)</div></div>
+      <button class="es-btn" style="background:var(--bg-overlay);color:var(--danger,#c83c3c)" onclick="autoMemoryReset()">&#x1F5D1; Memory l&ouml;schen</button>
+    </div>
+    <div id="auto-action-result" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+  </div>
+
+  <script>
+  (function(){{
+    // Scan-Status laden
+    function loadAutoScanStatus() {{
+      fetch('/api/kira/proaktiv/status').then(r=>r.json()).then(d=>{{
+        const el = document.getElementById('auto-scan-status');
+        if(!el) return;
+        const scans = [
+          {{key:'scan_neue_mails',        label:'Neue Mails verarbeiten',      icon:'&#x2709;'}},
+          {{key:'scan_offene_angebote',   label:'Angebot-Followup pr&uuml;fen',        icon:'&#x1F4CB;'}},
+          {{key:'scan_mahnungen',         label:'Mahnung-Eskalation pr&uuml;fen',      icon:'&#x26A0;'}},
+          {{key:'scan_tagescheck',        label:'T&auml;glicher Status-Check',         icon:'&#x2600;'}},
+          {{key:'scan_autonomy_decision', label:'Kira-Autonomy-Entscheidung',  icon:'&#x1F916;'}},
+          {{key:'scan_memory_summary',    label:'T&auml;gliche Ged&auml;chtnis-Zusammenfassung', icon:'&#x1F4DA;'}},
+        ];
+        const state = d.state || {{}};
+        let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+        scans.forEach(s=>{{
+          const ts  = state['last_'+s.key] || state[s.key] || null;
+          const lbl = ts ? '&#x2705; Zuletzt: '+ts.slice(0,16).replace('T',' ') : '&#x23F3; Noch nicht gelaufen';
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg-raised);border-radius:6px;border:1px solid var(--border)">'
+               +  '<span style="font-size:12px">'+s.icon+' '+s.label+'</span>'
+               +  '<span style="font-size:11px;color:var(--muted)">'+lbl+'</span>'
+               + '</div>';
+        }});
+        html += '</div>';
+        el.innerHTML = html;
+      }}).catch(()=>{{
+        const el=document.getElementById('auto-scan-status');
+        if(el) el.innerHTML='<div style="color:var(--muted);font-size:11px">Status nicht verf&uuml;gbar</div>';
+      }});
+    }}
+    loadAutoScanStatus();
+
+    window.autoRunScan = function(){{
+      const btn=document.getElementById('btn-scan-jetzt');
+      if(btn){{btn.disabled=true; btn.textContent='L\u00e4uft\u2026';}}
+      fetch('/api/kira/proaktiv/run', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          document.getElementById('auto-action-result').textContent = d.ok ? '\u2713 Scan abgeschlossen' : ('\u26A0 '+( d.error||'Fehler'));
+          if(btn){{btn.disabled=false; btn.textContent='\u25B6 Scan jetzt';}}
+          loadAutoScanStatus();
+        }}).catch(()=>{{
+          if(btn){{btn.disabled=false; btn.textContent='\u25B6 Scan jetzt';}}
+          document.getElementById('auto-action-result').textContent='\u26A0 Verbindungsfehler';
+        }});
+    }};
+
+    window.autoBackfill = function(){{
+      if(!confirm('R\u00fcckwirkende Analyse starten? Kira liest alle historischen Sitzungen und erstellt Zusammenfassungen. Das kann einige Minuten dauern.')) return;
+      const btn=document.getElementById('btn-backfill');
+      if(btn){{btn.disabled=true; btn.textContent='Analysiert\u2026';}}
+      fetch('/api/kira/backfill', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          document.getElementById('auto-action-result').textContent = d.ok ? ('\u2713 '+( d.message||'Analyse abgeschlossen')) : ('\u26A0 '+(d.error||'Fehler'));
+          if(btn){{btn.disabled=false; btn.textContent='\u1F504 Analyse starten\u2026';}}
+        }}).catch(()=>{{
+          if(btn){{btn.disabled=false; btn.textContent='\u1F504 Analyse starten\u2026';}}
+          document.getElementById('auto-action-result').textContent='\u26A0 Verbindungsfehler';
+        }});
+    }};
+
+    window.autoMemoryReset = function(){{
+      if(!confirm('Alle t\u00e4glichen Ged\u00e4chtnis-Zusammenfassungen wirklich l\u00f6schen?')) return;
+      fetch('/api/kira/memory/reset', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          document.getElementById('auto-action-result').textContent = d.ok ? '\u2713 Memory zur\u00fcckgesetzt' : ('\u26A0 '+(d.error||'Fehler'));
+        }}).catch(()=>{{ document.getElementById('auto-action-result').textContent='\u26A0 Fehler'; }});
+    }};
+  }})();
+  </script>
+</div>
+
+<!-- ── SECTION: SICHERHEIT & AUDIT ────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-sicherheit-audit">
+  <div class="es-sec-h">Sicherheit &amp; Audit</div>
+  <div class="es-sec-sub">Circuit Breaker Status, Kira-Aktivit&auml;ts-Log und Diagnose-Daten.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">API Circuit Breaker</div>
+    <div class="es-grp-sub">Kira sperrt Provider tempor&auml;r wenn mehrere Fehler auftreten. Status hier einsehen und manuell zur&uuml;cksetzen.</div>
+    <div id="cb-status-list">
+      <div style="color:var(--muted);font-size:11px">Lade Circuit Breaker Status&hellip;</div>
+    </div>
+    <div style="margin-top:10px">
+      <button class="es-btn" onclick="cbReset()">&#x21BA; Circuit Breaker zur&uuml;cksetzen</button>
+      <span id="cb-reset-result" style="margin-left:10px;font-size:11px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Kira-Aktivit&auml;ten Log</div>
+    <div class="es-row">
+      <div class="es-rl">Log aufbewahren (Tage)<div class="es-rd">Kira-Aktionen nach N Tagen automatisch l&ouml;schen</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-audit-log-tage" value="{kira_sicherheit_cfg.get('audit_log_tage', 90)}" min="7" max="365">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Nur best&auml;tigte Aktionen anzeigen<div class="es-rd">Autonome Kira-Aktionen im Log ausblenden</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-audit-nur-bestaetigt" {'checked' if kira_sicherheit_cfg.get('nur_bestaetigt', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-save-bar" style="margin:0 0 12px">
+      <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Audit-Export</div>
+    <div class="es-row">
+      <div class="es-rl">Kira-Aktionen exportieren<div class="es-rd">Alle Kira-Aktionen der letzten 30 Tage als CSV</div></div>
+      <button class="es-btn" onclick="auditExport()">&#x2B07; CSV Export</button>
+    </div>
+    <div id="audit-stats" style="margin-top:10px;font-size:11px;color:var(--muted)">Lade Statistik&hellip;</div>
+  </div>
+
+  <script>
+  (function(){{
+    // Circuit Breaker Status laden
+    function loadCbStatus(){{
+      fetch('/api/kira/circuit_breaker').then(r=>r.json()).then(d=>{{
+        const el=document.getElementById('cb-status-list');
+        if(!el) return;
+        const state = d.state || {{}};
+        if(!Object.keys(state).length){{
+          el.innerHTML='<div style="font-size:11px;color:var(--muted)">Keine Daten &mdash; noch keine Fehler aufgetreten</div>';
+          return;
+        }}
+        let html='<div style="display:flex;flex-direction:column;gap:6px">';
+        Object.entries(state).forEach(([prov, info])=>{{
+          const open = info.open_until && new Date(info.open_until) > new Date();
+          const icon = open ? '&#x1F534;' : '&#x1F7E2;';
+          const status = open ? ('Gesperrt bis '+info.open_until.slice(0,16)) : ('OK &mdash; '+info.failures+' Fehler');
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg-raised);border-radius:6px;border:1px solid var(--border)">'
+               +  '<span style="font-size:12px">'+icon+' <strong>'+prov+'</strong></span>'
+               +  '<span style="font-size:11px;color:var(--muted)">'+status+'</span>'
+               + '</div>';
+        }});
+        html += '</div>';
+        el.innerHTML = html;
+      }}).catch(()=>{{
+        const el=document.getElementById('cb-status-list');
+        if(el) el.innerHTML='<div style="font-size:11px;color:var(--muted)">Circuit Breaker Status nicht verf&uuml;gbar</div>';
+      }});
+    }}
+    loadCbStatus();
+
+    // Audit-Statistik laden
+    fetch('/api/kira/aktivitaeten?seit=30d').then(r=>r.json()).then(d=>{{
+      const el=document.getElementById('audit-stats');
+      if(!el) return;
+      const items = d.eintraege || d.items || [];
+      const autonom = items.filter(i=>i.actor_type==='kira_autonom').length;
+      const vorschlag = items.filter(i=>i.actor_type==='kira_vorschlag').length;
+      el.textContent='Letzte 30 Tage: '+items.length+' Ereignisse \u2014 '+autonom+' autonom, '+vorschlag+' vom User best\u00e4tigt';
+    }}).catch(()=>{{ const el=document.getElementById('audit-stats'); if(el) el.textContent=''; }});
+
+    window.cbReset = function(){{
+      fetch('/api/kira/circuit_breaker/reset', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'}})
+        .then(r=>r.json()).then(d=>{{
+          document.getElementById('cb-reset-result').textContent = d.ok ? '\u2713 Zur\u00fcckgesetzt' : '\u26A0 Fehler';
+          loadCbStatus();
+        }});
+    }};
+
+    window.auditExport = function(){{
+      window.open('/api/kira/aktivitaeten/export?seit=30d', '_blank');
+    }};
+  }})();
+  </script>
 </div>
 
 <!-- ── SECTION: PROTOKOLL & LOGS ──────────────────────────────────────── -->
@@ -7002,8 +7672,9 @@ def generate_html() -> str:
     <div class="header-right">
       <div class="top-chip" onclick="toggleKiraQuick()" title="Kira Quick Actions">&#x26A1; Quick Actions</div>
       {'<div class="top-chip" style="background:#e84545;color:#fff;border-color:#c83030;font-weight:700" title="Urlaubsmodus aktiv — Push-Benachrichtigungen deaktiviert" onclick="esShowSec(\'benachrichtigungen\');showPanel(\'einstellungen\')">&#x1F3D6; Urlaub</div>' if ntfy_urlaub_modus else ''}
+      <div class="top-chip kira-live-chip kira-live--idle" id="kiraLiveChip" onclick="kiraActivityDrawerOpen()" title="Kira-Status — klicken für Aktivitäten"><span id="kiraLiveIcon">&#x2705;</span> <span id="kiraLiveText">Kira bereit</span></div>
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
-      <div class="top-chip" id="mailApproveChip" onclick="openMailApproveModal()" title="Mail wartet auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
+      <div class="top-chip" id="mailApproveChip" onclick="pfKiraAusgangOpen()" title="Kira-Entwürfe warten auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
       <button class="btn btn-muted btn-xs" id="updateBtn" onclick="serverNeustart()" title="Server komplett neu starten (alle Instanzen beenden)" style="border-radius:6px">&#x21BB; Neustart</button>
@@ -7263,6 +7934,19 @@ def generate_html() -> str:
     <input class="kq-input" id="kqInput" type="text" placeholder="Direkt an Kira schreiben&hellip;"
       onkeydown="if(event.key==='Enter')kqDirectSend()">
     <button class="kq-send" onclick="kqDirectSend()">&#x2191;</button>
+  </div>
+</div>
+
+<!-- ── Kira Activity-Drawer (Slide-In von rechts) ─────────────────────── -->
+<div class="kira-drawer-overlay" id="kiraDrawerOverlay" onclick="kiraActivityDrawerClose()"></div>
+<div class="kira-drawer" id="kiraActivityDrawer">
+  <div class="kira-drawer-header">
+    <span class="kira-drawer-icon">&#x1F916;</span>
+    <span class="kira-drawer-title">Kira — Was l&auml;uft gerade?</span>
+    <button class="kira-drawer-close" onclick="kiraActivityDrawerClose()">&times;</button>
+  </div>
+  <div class="kira-drawer-body" id="kiraDrawerBody">
+    <div class="kira-drawer-loading">Lade Aktivit&auml;ten&hellip;</div>
   </div>
 </div>
 
@@ -8614,7 +9298,37 @@ function saveSettings() {{
       prox_radius: parseFloat(document.getElementById('cfg-kira-prox')?.value    || '0.5'),
       bounce_dist: parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
       idle_mode:   document.getElementById('cfg-kira-idle')?.checked              ?? true,
-      idle_delay:  parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10')
+      idle_delay:  parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10'),
+      memory: {{
+        aktiv:         document.getElementById('cfg-mem-aktiv')?.checked    ?? true,
+        sessions:      parseInt(document.getElementById('cfg-mem-sessions')?.value || '3'),
+        summary_aktiv: document.getElementById('cfg-mem-summary')?.checked  ?? true,
+        token_budget:  parseInt(document.getElementById('cfg-mem-tokens')?.value   || '3200')
+      }},
+      react: {{
+        aktiv:       document.getElementById('cfg-react-aktiv')?.checked    ?? true,
+        max_schritte: parseInt(document.getElementById('cfg-react-schritte')?.value || '5')
+      }},
+      feedback: {{
+        buttons_aktiv:  document.getElementById('cfg-fb-buttons')?.checked    ?? true,
+        auto_lernregeln: document.getElementById('cfg-fb-lernregeln')?.checked ?? true,
+        stil_lernen:    document.getElementById('cfg-fb-stillernen')?.checked  ?? true
+      }},
+      sicherheit: {{
+        rate_limit_per_minute:      parseInt(document.getElementById('cfg-sec-rate')?.value     || '20'),
+        circuit_breaker_threshold:  parseInt(document.getElementById('cfg-sec-cb-fehler')?.value || '3'),
+        circuit_breaker_dauer:      parseInt(document.getElementById('cfg-sec-cb-dauer')?.value  || '300'),
+        audit_log_tage:             parseInt(document.getElementById('cfg-audit-log-tage')?.value || '90'),
+        nur_bestaetigt:             document.getElementById('cfg-audit-nur-bestaetigt')?.checked  ?? false
+      }}
+    }},
+    kira_proaktiv: {{
+      aktiv:                  document.getElementById('cfg-proaktiv-aktiv')?.checked        ?? true,
+      scan_intervall_min:     parseInt(document.getElementById('cfg-proaktiv-intervall')?.value    || '15'),
+      angebot_followup_tage:  parseInt(document.getElementById('cfg-proaktiv-angebot-tage')?.value || '7'),
+      mahnung_eskalation_tage: parseInt(document.getElementById('cfg-proaktiv-mahnung-tage')?.value || '14'),
+      konfidenz_stufe_a:      (parseInt(document.getElementById('cfg-proaktiv-konf-a')?.value || '85') / 100),
+      konfidenz_stufe_b:      (parseInt(document.getElementById('cfg-proaktiv-konf-b')?.value || '60') / 100)
     }},
     mail_monitor: {{
       aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
@@ -10305,6 +11019,128 @@ function _pollMailApprove() {{
 
 setTimeout(function(){{ _pollMailApprove(); setInterval(_pollMailApprove, 15000); }}, 3000);
 
+// ── Kira Live-Chip + Activity-Drawer (Phase 4, session-oo) ──────────────
+var _kiraDrawerOpen = false;
+
+window.kiraActivityDrawerOpen = function() {{
+  var overlay = document.getElementById('kiraDrawerOverlay');
+  var drawer  = document.getElementById('kiraActivityDrawer');
+  if(!overlay || !drawer) return;
+  // Force reflow for transition
+  overlay.style.display = 'block';
+  requestAnimationFrame(function() {{
+    overlay.classList.add('open');
+    drawer.classList.add('open');
+  }});
+  _kiraDrawerOpen = true;
+  _kiraDrawerLoad();
+}};
+
+window.kiraActivityDrawerClose = function() {{
+  var overlay = document.getElementById('kiraDrawerOverlay');
+  var drawer  = document.getElementById('kiraActivityDrawer');
+  if(!overlay || !drawer) return;
+  overlay.classList.remove('open');
+  drawer.classList.remove('open');
+  _kiraDrawerOpen = false;
+  setTimeout(function(){{ overlay.style.display='none'; }}, 250);
+}};
+
+function _kiraDrawerLoad() {{
+  var body = document.getElementById('kiraDrawerBody');
+  if(!body) return;
+  body.innerHTML = '<div class="kira-drawer-loading">Lade Aktivit\u00e4ten\u2026</div>';
+  Promise.all([
+    fetch('/api/mail/approve/pending').then(function(r){{return r.json();}}).catch(function(){{return {{pending:[]}}}}),
+    fetch('/api/kira/proaktiv/status').then(function(r){{return r.json();}}).catch(function(){{return {{state:{{}}}}}})
+  ]).then(function(res) {{
+    var approveData = res[0];
+    var proaktivData = res[1];
+    _kiraDrawerRender(body, approveData, proaktivData);
+  }});
+}}
+
+function _kiraDrawerRender(body, approveData, proaktivData) {{
+  var html = '';
+  var pending = approveData.pending || [];
+
+  // Section 1: "Braucht dich" (pending approvals)
+  html += '<div class="kira-drawer-section">';
+  html += '<div class="kira-drawer-section-title">&#x1F4EC; Braucht deine Freigabe</div>';
+  if(pending.length === 0) {{
+    html += '<div class="kira-drawer-empty">Nichts offen &#x2705;</div>';
+  }} else {{
+    pending.slice(0,5).forEach(function(item) {{
+      var grund = item.grund || item.vorgang_id ? ('Vorgang #'+item.vorgang_id) : '';
+      html += '<div class="kira-drawer-item">';
+      html += '<div class="kira-drawer-item-icon">&#x2709;&#xFE0F;</div>';
+      html += '<div class="kira-drawer-item-body">';
+      html += '<div class="kira-drawer-item-title">'+_esc(item.betreff||'Mail-Entwurf')+'</div>';
+      html += '<div class="kira-drawer-item-sub">An: '+_esc(item.an||'')+(grund?(' \u00b7 '+_esc(grund)):'')+'</div>';
+      html += '<span class="kira-drawer-item-action" onclick="kiraActivityDrawerClose();pfKiraAusgangOpen()">Ansehen &rarr;</span>';
+      html += '</div></div>';
+    }});
+    if(pending.length > 5) html += '<div style="text-align:center;font-size:12px;color:var(--muted);padding:4px 0">+ '+(pending.length-5)+' weitere</div>';
+  }}
+  html += '</div>';
+
+  // Section 2: Scan-Status
+  var state = (proaktivData.state) || {{}};
+  var scanNames = {{
+    'angebot_followup':'Angebot-Nachfass','mahnung_eskalation':'Mahnungs-Pr\u00fcfung',
+    'autonomy_decision':'Vorgang-Entscheidung','tages_summary':'Tages-Zusammenfassung',
+    'termin_erkennung':'Termin-Erkennung'
+  }};
+  html += '<div class="kira-drawer-section">';
+  html += '<div class="kira-drawer-section-title">&#x1F504; Automatisierungen</div>';
+  var scanEntries = Object.keys(scanNames);
+  var hasScans = false;
+  scanEntries.forEach(function(key) {{
+    var ts = state['last_'+key] || state[key+'_last'];
+    if(!ts) return;
+    hasScans = true;
+    var d = new Date(ts);
+    var tsStr = isNaN(d)?ts:(d.toLocaleDateString('de-DE',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('de-DE',{{hour:'2-digit',minute:'2-digit'}}));
+    html += '<div class="kira-drawer-item">';
+    html += '<div class="kira-drawer-item-icon">&#x2705;</div>';
+    html += '<div class="kira-drawer-item-body">';
+    html += '<div class="kira-drawer-item-title">'+scanNames[key]+'</div>';
+    html += '<div class="kira-drawer-item-sub">Zuletzt: '+tsStr+'</div>';
+    html += '</div></div>';
+  }});
+  if(!hasScans) html += '<div class="kira-drawer-empty">Noch keine Scans gelaufen</div>';
+  html += '</div>';
+
+  body.innerHTML = html;
+}}
+
+function _pollKiraStatus() {{
+  fetch('/api/kira/proaktiv/status').then(function(r){{return r.json();}}).then(function(d){{
+    var chip = document.getElementById('kiraLiveChip');
+    var icon = document.getElementById('kiraLiveIcon');
+    var text = document.getElementById('kiraLiveText');
+    if(!chip) return;
+    // Count pending
+    var n = parseInt((document.getElementById('mailApproveCount')||{{}}).textContent||'0',10);
+    chip.className = 'top-chip kira-live-chip';
+    if(n > 0) {{
+      chip.classList.add('kira-live--pending');
+      if(icon) icon.innerHTML = '&#x26A1;';
+      if(text) text.textContent = n+' Freigabe'+(n>1?'n':'');
+    }} else if(d.ok && d.proaktiv_aktiv) {{
+      chip.classList.add('kira-live--idle');
+      if(icon) icon.innerHTML = '&#x2705;';
+      if(text) text.textContent = 'Kira bereit';
+    }} else {{
+      chip.classList.add('kira-live--idle');
+      if(icon) icon.innerHTML = '&#x1F916;';
+      if(text) text.textContent = 'Kira';
+    }}
+  }}).catch(function(){{}});
+}}
+
+setTimeout(function(){{ _pollKiraStatus(); setInterval(_pollKiraStatus, 15000); }}, 4000);
+
 function openMailApproveModal() {{
   if(!_mailApproveItems.length) return;
   var item = _mailApproveItems[0];
@@ -10541,6 +11377,41 @@ a:hover{text-decoration:underline;}
 .top-chip.ok{background:#EAF3DE;border-color:#C0DD97;color:#3B6D11;}
 .top-chip.ok:hover{background:#ddeec8;}
 .chip-dot{width:7px;height:7px;background:#639922;border-radius:50%;flex-shrink:0;}
+/* ── Kira Live-Chip ─────────────────────────────────────────────────────── */
+.kira-live-chip{background:var(--bg-raised);border-color:var(--border-strong);color:var(--text-secondary);transition:all .2s;}
+.kira-live-chip:hover{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.4);color:var(--text);}
+.kira-live--idle{}
+.kira-live--scanning{background:rgba(79,125,249,.1)!important;border-color:rgba(79,125,249,.4)!important;color:var(--accent)!important;}
+.kira-live--pending{background:rgba(245,158,11,.12)!important;border-color:#d97706!important;color:#f59e0b!important;font-weight:700;}
+.kira-live--error{background:rgba(220,74,74,.1)!important;border-color:rgba(220,74,74,.4)!important;color:var(--danger)!important;}
+@keyframes kira-spin{to{transform:rotate(360deg)}}
+.kira-spin-icon{display:inline-block;animation:kira-spin 1s linear infinite;}
+/* ── Kira Activity-Drawer ───────────────────────────────────────────────── */
+.kira-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;display:none;opacity:0;transition:opacity .2s;}
+.kira-drawer-overlay.open{display:block;opacity:1;}
+.kira-drawer{position:fixed;top:0;right:0;height:100vh;width:400px;max-width:calc(100vw - 32px);
+  background:var(--bg-overlay);border-left:1px solid var(--border-strong);
+  z-index:9101;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .25s cubic-bezier(.32,.72,0,1);}
+.kira-drawer.open{transform:translateX(0);}
+.kira-drawer-header{display:flex;align-items:center;gap:10px;padding:18px 20px 16px;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.kira-drawer-icon{font-size:20px;}
+.kira-drawer-title{flex:1;font-size:15px;font-weight:700;color:var(--text);}
+.kira-drawer-close{background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;}
+.kira-drawer-close:hover{background:var(--bg-raised);color:var(--text);}
+.kira-drawer-body{flex:1;overflow-y:auto;padding:16px;}
+.kira-drawer-section{margin-bottom:18px;}
+.kira-drawer-section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.kira-drawer-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg-raised);margin-bottom:6px;border:1px solid var(--border);}
+.kira-drawer-item-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.kira-drawer-item-body{flex:1;min-width:0;}
+.kira-drawer-item-title{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kira-drawer-item-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.kira-drawer-item-action{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:5px;padding:2px 10px;}
+.kira-drawer-item-action:hover{background:rgba(79,125,249,.18);}
+.kira-drawer-empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
+.kira-drawer-loading{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
 .header-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent-bg);
   display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
   color:var(--accent);cursor:pointer;flex-shrink:0;border:0.5px solid var(--accent-border);}
@@ -11196,7 +12067,7 @@ a:hover{text-decoration:underline;}
 .kq-send:hover{background:#6358cc;}
 
 /* ═══ Kira Workspace (kw-*) ═══ */
-.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(28,28,26,.45);align-items:center;justify-content:center;padding:16px;}
+.kira-workspace-overlay{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:16px;}
 .kira-workspace-overlay.open{display:flex;}
 .kw-shell{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:14px;
   width:96vw;max-width:1280px;height:88vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.2);overflow:hidden;}
@@ -11548,6 +12419,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/kira/proaktiv/status':
             self._api_kira_proaktiv_status()
 
+        elif self.path == '/api/kira/circuit_breaker':
+            self._api_kira_circuit_breaker_get()
+
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
 
@@ -11641,8 +12515,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({"error": str(e)})
 
-        elif self.path == '/api/mail/approve/pending':
-            self._api_mail_approve_pending()
+        elif self.path.startswith('/api/mail/approve/pending'):
+            from urllib.parse import urlparse, parse_qs
+            _qs = parse_qs(urlparse(self.path).query)
+            _st = (_qs.get('status', ['pending'])[0]).strip()
+            self._api_mail_approve_pending(status=_st)
 
         elif self.path.startswith('/api/kira/task/') and self.path.endswith('/status'):
             # GET /api/kira/task/{id}/status (Paket 5, session-oo)
@@ -13065,22 +13942,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     # ── Mail-Approve-Queue (Paket 2, session-oo) ─────────────────────────────
 
-    def _api_mail_approve_pending(self):
-        """GET /api/mail/approve/pending — offene Mail-Freigaben zurückgeben."""
+    def _api_mail_approve_pending(self, status: str = "pending"):
+        """GET /api/mail/approve/pending[?status=pending|sent|rejected|expired] — Kira-Ausgang-Ansicht."""
+        _valid = {"pending", "sent", "rejected", "expired"}
+        if status not in _valid:
+            status = "pending"
         try:
             db = sqlite3.connect(str(TASKS_DB))
             db.row_factory = sqlite3.Row
             rows = db.execute("""
                 SELECT id, an, betreff, body_plain, konto, in_reply_to,
-                       task_id, vorgang_id, erstellt_von, erstellt_am, ablauf_am
+                       task_id, vorgang_id, erstellt_von, erstellt_am, ablauf_am,
+                       status, entschieden_am, gesendet_am
                 FROM mail_approve_queue
-                WHERE status = 'pending'
+                WHERE status = ?
                 ORDER BY erstellt_am DESC
-                LIMIT 20
-            """).fetchall()
+                LIMIT 50
+            """, (status,)).fetchall()
             db.close()
             items = [dict(r) for r in rows]
-            self._json({"ok": True, "pending": items, "count": len(items)})
+            self._json({"ok": True, "pending": items, "count": len(items), "status_filter": status})
         except Exception as e:
             self._json({"ok": False, "error": str(e), "pending": [], "count": 0})
 
@@ -13178,16 +14059,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": str(e)})
 
     def _api_kira_aktivitaeten(self):
-        """GET /api/kira/aktivitaeten?seit=24h&typ= — Kira autonome Aktionen."""
+        """GET /api/kira/aktivitaeten?seit=24h&typ= — Kira autonome Aktionen.
+           GET /api/kira/aktivitaeten/export?seit=30d — CSV-Export."""
         try:
             qs   = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             seit = qs.get("seit", ["24h"])[0]
             typ  = qs.get("typ",  [""])[0]
+            is_export = "/export" in self.path
             interval_map = {"24h": "-24 hours", "7d": "-7 days", "30d": "-30 days"}
             interval = interval_map.get(seit, "-24 hours")
             db_path = SCRIPTS_DIR.parent / "knowledge" / "runtime_events.db"
             if not db_path.exists():
-                self._json({"ok": True, "eintraege": []})
+                if is_export:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/csv; charset=utf-8')
+                    self.send_header('Content-Disposition', 'attachment; filename="kira_aktionen.csv"')
+                    self.end_headers()
+                    self.wfile.write("ts,action,summary,actor_type\n".encode('utf-8'))
+                    return
+                self._json({"ok": True, "eintraege": [], "items": []})
                 return
             import sqlite3 as _sq
             with _sq.connect(str(db_path)) as con:
@@ -13196,7 +14086,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     rows = con.execute(
                         "SELECT ts, action, summary, actor_type FROM events "
                         "WHERE actor_type=? AND ts > datetime('now', ?) "
-                        "ORDER BY ts DESC LIMIT 50",
+                        "ORDER BY ts DESC LIMIT 200",
                         (typ, interval)
                     ).fetchall()
                 else:
@@ -13204,31 +14094,52 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         "SELECT ts, action, summary, actor_type FROM events "
                         "WHERE actor_type IN ('kira_autonom','kira_vorschlag') "
                         "AND ts > datetime('now', ?) "
-                        "ORDER BY ts DESC LIMIT 50",
+                        "ORDER BY ts DESC LIMIT 200",
                         (interval,)
                     ).fetchall()
-            self._json({"ok": True, "eintraege": [dict(r) for r in rows]})
+            items = [dict(r) for r in rows]
+            if is_export:
+                import csv, io
+                out = io.StringIO()
+                w = csv.DictWriter(out, fieldnames=['ts','action','summary','actor_type'])
+                w.writeheader(); w.writerows(items)
+                data = out.getvalue().encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/csv; charset=utf-8')
+                self.send_header('Content-Disposition', 'attachment; filename="kira_aktionen.csv"')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            self._json({"ok": True, "eintraege": items, "items": items})
         except Exception as e:
-            self._json({"ok": False, "error": str(e), "eintraege": []})
+            self._json({"ok": False, "error": str(e), "eintraege": [], "items": []})
 
     def _api_kira_proaktiv_status(self):
         """GET /api/kira/proaktiv/status — Status des letzten proaktiven Scans."""
         try:
             import kira_proaktiv as _p
             state = _p._load_state()
-            letzter_scan = state.get("letzter_scan", "noch kein Scan")
-            aktionen_heute = {k: v for k, v in state.items()
-                              if k.startswith("proaktiv_") and str(datetime.now().date()) in str(v)}
             self._json({
                 "ok": True,
-                "letzter_scan": letzter_scan,
-                "aktionen_heute": len(aktionen_heute),
+                "state": state,
                 "proaktiv_aktiv": True
             })
         except ImportError:
-            self._json({"ok": False, "error": "kira_proaktiv nicht verfügbar", "proaktiv_aktiv": False})
+            self._json({"ok": False, "error": "kira_proaktiv nicht verfügbar", "proaktiv_aktiv": False, "state": {}})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)})
+            self._json({"ok": False, "error": str(e), "state": {}})
+
+    def _api_kira_circuit_breaker_get(self):
+        """GET /api/kira/circuit_breaker — Circuit Breaker Status."""
+        try:
+            cb_path = SCRIPTS_DIR / "knowledge" / "llm_circuit_state.json"
+            state = {}
+            if cb_path.exists():
+                state = json.loads(cb_path.read_text('utf-8'))
+            self._json({"ok": True, "state": state})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e), "state": {}})
 
     def _api_kira_proaktiv_scan(self):
         """POST /api/kira/proaktiv/scan — Startet proaktiven Scan manuell."""
@@ -14306,8 +15217,39 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         # Kira Proaktiver Scan (manuell auslösen)
-        if self.path == '/api/kira/proaktiv/scan':
+        if self.path in ('/api/kira/proaktiv/scan', '/api/kira/proaktiv/run'):
             self._api_kira_proaktiv_scan()
+            return
+
+        # Circuit Breaker zurücksetzen
+        if self.path == '/api/kira/circuit_breaker/reset':
+            try:
+                cb_path = SCRIPTS_DIR / "knowledge" / "llm_circuit_state.json"
+                cb_path.write_text('{}', 'utf-8')
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Rückwirkende Analyse (Backfill)
+        if self.path == '/api/kira/backfill':
+            try:
+                import kira_proaktiv as _p
+                result = _p.run_memory_summary_force() if hasattr(_p, 'run_memory_summary_force') else None
+                self._json({'ok': True, 'message': 'Analyse gestartet — Ergebnisse erscheinen in Kira-Aktivitäten'})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Memory-Zusammenfassungen löschen
+        if self.path == '/api/kira/memory/reset':
+            try:
+                import sqlite3 as _sl
+                with _sl.connect(str(TASKS_DB)) as _c:
+                    _c.execute("DELETE FROM wissen_regeln WHERE kategorie='tages_summary'")
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
             return
 
         # Kira API Key speichern (Legacy-Compat + neuer Weg)
