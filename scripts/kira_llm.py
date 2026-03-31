@@ -1316,6 +1316,40 @@ def get_tools(config=None):
         }
     })
 
+    # ── Microsoft Graph Kalender (Paket 8, session-oo) ───────────────────────
+    tools.append({
+        "name": "termin_erstellen",
+        "description": (
+            "Erstellt einen Termin im Microsoft Outlook-Kalender via Graph API. "
+            "Nutze dieses Tool wenn Kai einen Kundentermin, Baustellentermin oder Meeting eintragen moechte. "
+            "Stufe B: Kai bestaetigt den Termin-Eintrag vorher. "
+            "Falls die Graph-Berechtigung fehlt, gibt das Tool eine Anleitung zur Einrichtung zurueck."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "betreff":  {"type": "string", "description": "Termin-Titel"},
+                "start":    {"type": "string", "description": "Start ISO-8601 'YYYY-MM-DDTHH:MM:00'"},
+                "end":      {"type": "string", "description": "Ende ISO-8601 (optional, default: +1h)"},
+                "ort":      {"type": "string", "description": "Ort / Adresse (optional)"},
+                "notiz":    {"type": "string", "description": "Beschreibung oder Notiz (optional)"},
+                "konto":    {"type": "string", "description": "E-Mail-Konto fuer den Kalender (optional)"}
+            },
+            "required": ["betreff", "start"]
+        }
+    })
+    tools.append({
+        "name": "termine_anzeigen",
+        "description": "Zeigt Kalender-Termine der naechsten N Tage aus Outlook via Graph API.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tage":  {"type": "integer", "description": "Anzahl Tage voraus (Standard: 7)"},
+                "konto": {"type": "string",  "description": "E-Mail-Konto (optional)"}
+            }
+        }
+    })
+
     # ── Semantische Mail-Suche via FTS5 (Paket 7, session-oo) ────────────────
     if MAIL_INDEX_DB.exists():
         tools.append({
@@ -1445,6 +1479,8 @@ def execute_tool(name, params):
             "mail_lesen": _tool_mail_lesen,
             "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
             "vorgang_status_setzen": _tool_vorgang_status_setzen,
+            "termin_erstellen": _tool_termin_erstellen,
+            "termine_anzeigen": _tool_termine_anzeigen,
             "semantisch_suchen": _tool_semantisch_suchen,
             "vorgang_naechste_aktion_vorschlagen": _tool_vorgang_naechste_aktion_vorschlagen,
             "konversation_suchen": _tool_konversation_suchen,
@@ -2127,6 +2163,63 @@ def _tool_vorgang_status_setzen(p):
             "error": f"Übergang '{v['status']}' → '{neuer_status}' nicht erlaubt",
             "erlaubte_uebergaenge": erlaubt,
         }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_termin_erstellen(p):
+    """Erstellt Kalender-Termin via Microsoft Graph (Paket 8, session-oo)."""
+    betreff = (p.get("betreff") or "").strip()
+    start   = (p.get("start") or "").strip()
+    end     = (p.get("end") or "").strip() or None
+    ort     = (p.get("ort") or "").strip()
+    notiz   = (p.get("notiz") or "").strip()
+    konto   = (p.get("konto") or "").strip()
+
+    if not betreff or not start:
+        return {"error": "betreff und start sind erforderlich"}
+
+    # Standard-Konto aus Config wenn nicht angegeben
+    if not konto:
+        try:
+            cfg = get_config()
+            konten = cfg.get("mail_konten", [])
+            konto = konten[0]["email"] if konten else ""
+        except Exception:
+            pass
+
+    if not konto:
+        return {"error": "Kein E-Mail-Konto konfiguriert fuer Kalender-Zugriff"}
+
+    try:
+        from graph_calendar import erstelle_termin
+        result = erstelle_termin(konto, betreff, start, end=end, ort=ort, notiz=notiz)
+        if result.get("ok"):
+            _elog("kira", "termin_erstellt",
+                  f"Termin '{betreff}' am {start[:10]} via Graph",
+                  source="kira_llm", modul="kira", submodul="tools",
+                  actor_type="kira", status="ok")
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_termine_anzeigen(p):
+    """Listet Outlook-Termine via Microsoft Graph (Paket 8, session-oo)."""
+    tage  = max(1, min(int(p.get("tage") or 7), 30))
+    konto = (p.get("konto") or "").strip()
+    if not konto:
+        try:
+            cfg = get_config()
+            konten = cfg.get("mail_konten", [])
+            konto = konten[0]["email"] if konten else ""
+        except Exception:
+            pass
+    if not konto:
+        return {"error": "Kein E-Mail-Konto konfiguriert"}
+    try:
+        from graph_calendar import liste_termine
+        return liste_termine(konto, tage=tage)
     except Exception as e:
         return {"error": str(e)}
 
