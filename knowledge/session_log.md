@@ -266,3 +266,44 @@ Commit: 66241b0
 
 ## 2026-03-31 — Session-Ende (session-oo)
 **Status:** erledigt
+
+---
+
+## 2026-03-31 — Session-Start (session-rr)
+**Auftrag:** Continuation nach session-qq. Selbst priorisiert: verbleibende KIRA-LLM-Verbindungen schließen + praktische UX-Features.
+**Status:** erledigt
+
+**Erledigt:**
+- Antwort-Länge (build_system_prompt Wiring): kurz/normal/ausführlich beeinflusst jetzt tatsächlich Kiras Stil
+- Kira-Sprache: Deutsch/Englisch/gemischt als Select + Prompt-Override (session-rr)
+- LLM-Temperatur: Range-Slider 0.0–1.0 in Einstellungen + Wiring in _call_anthropic() + _call_openai_compat()
+- Provider Verbindungstest: ⚡ Test-Button pro Provider-Karte + POST /api/kira/provider/test
+- Einstellungen-Suche: Suchfeld über der Navigation filtert Sektionen + Panel-Volltext, ESC zum Reset
+- DB-VACUUM: POST /api/db/vacuum + Button in Protokoll > Konfigurationsbackup
+- Toast-Anzeigedauer: Sekunden-Inputs in Benachrichtigungen-Sektion (Normal/Fehler)
+- Logo-Größe: Select Klein/Mittel/Groß + applyLogoSize() + restoreDesign() Wiring
+- KIRA_SYSTEM_ANALYSE.md: session-qq und session-rr Changelog ergänzt
+- Todo_checkliste.md: alle session-rr Features auf ✅
+
+**Commits:** 5ccb873, c2acf94, ffb1057, 729ff65, c07648d
+**Offen geblieben:** Ribbon-Kira-Gruppe für Kira-Mails, Google OAuth, WhatsApp-Token (Kai-Aktion).
+**Status:** erledigt
+
+---
+
+## 2026-03-31 — Session-Start (session-ss)
+**Auftrag:** Continuation nach session-rr. Selbst priorisiert: praktische Settings/UX-Features + Sicherheitsfix.
+**Status:** erledigt
+
+**Erledigt:**
+- User-Präsenz-Erkennung: visibilitychange API — Kira-Status-Polling pausiert wenn Tab versteckt
+- Kira-Position: Select (unten-rechts/links, oben-rechts/links) + applyKiraPosition() + localStorage-Restore
+- Kira-Chitchat-Toggle: "Smalltalk erlaubt" in Einstellungen → beeinflusst System-Prompt (kira_llm.py build_system_prompt)
+- ntfy Push-Priorität: Select low/default/high/urgent in Einstellungen → kira_proaktiv.py _push() liest config
+- Dashboard-Refresh-Intervall: Select 1/5/15/30/60min oder Deaktiviert → silentRefreshDashboard dynamisch
+- Morgen-Briefing konfigurierbar: Toggle + Uhrzeit-Input → scan_tagesstart_briefing() liest config (3h Fenster ab Startzeit)
+- Sicherheitsfix: hardcoded `bcc:'info@raumkult.eu'` in pfSend() entfernt → BCC-Eingabefeld im Compose-Formular
+
+**Commits:** 9dc60f1, 1632065, b20985e
+**Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Auto-Backup config.json.
+**Status:** erledigt

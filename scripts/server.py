@@ -490,10 +490,13 @@ def build_dashboard(tasks, db):
 
     # LLM-Briefing (falls verfügbar) — voll anzeigen
     llm_block = ""
+    briefing_ts = ""
     try:
         briefing = generate_daily_briefing()
         bz   = (briefing.get("zusammenfassung","") or "").strip()
         prios = briefing.get("prioritaeten") or []
+        _bt = (briefing.get("erstellt_am") or "")
+        if _bt: briefing_ts = _bt[11:16] if len(_bt) >= 16 else _bt[:16]
         if bz:
             prio_html = ""
             if prios:
@@ -509,9 +512,10 @@ def build_dashboard(tasks, db):
     if not briefing_items:
         briefing_items = ['<div class="dash-b-item" style="color:var(--success)"><span class="dash-b-dot" style="background:var(--success)"></span>Alles im gr&uuml;nen Bereich</div>']
 
+    _ts_display = f' <span class="dash-briefing-ts">Stand {briefing_ts}</span>' if briefing_ts else ''
     briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
   <div class="dash-briefing-head">
-    <div class="dash-briefing-title">Tagesbriefing</div>
+    <div class="dash-briefing-title">Tagesbriefing{_ts_display}</div>
     <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
   </div>
   <div class="dash-briefing-items">{"".join(briefing_items)}</div>
@@ -622,6 +626,50 @@ def build_dashboard(tasks, db):
     if not prio_items_html:
         prio_items_html = '<div style="text-align:center;padding:28px 0;color:var(--muted);font-size:13px">&#x2713; Keine priorisierten Aufgaben heute</div>'
 
+    # ── Zone C0: Heute gesendete Mails ──
+    sent_rows = []
+    try:
+        # Kira-Approval-Queue: heute gesendet
+        kira_sent = db.execute(
+            "SELECT an, betreff, gesendet_am FROM mail_approve_queue "
+            "WHERE status='sent' AND gesendet_am LIKE ? ORDER BY gesendet_am DESC LIMIT 8",
+            (today + '%',)
+        ).fetchall()
+        for r in kira_sent:
+            sent_rows.append({'to': r['an'], 'subject': r['betreff'], 'ts': (r['gesendet_am'] or '')[:16], 'via': 'kira'})
+    except: pass
+    try:
+        import sqlite3 as _sq3
+        _rtdb = _sq3.connect(str(KNOWLEDGE_DIR / 'runtime_events.db'))
+        _rtdb.row_factory = _sq3.Row
+        user_sent = _rtdb.execute(
+            "SELECT summary, ts FROM events WHERE action='mail_gesendet' AND ts LIKE ? ORDER BY ts DESC LIMIT 8",
+            (today + '%',)
+        ).fetchall()
+        _rtdb.close()
+        for r in user_sent:
+            # summary format: "Mail an <to> | Betreff: <subj> | Von: <from>"
+            _s = r['summary'] or ''
+            _to = _s.split('|')[0].replace('Mail an ', '').strip() if '|' in _s else _s[:40]
+            _subj = _s.split('Betreff:')[1].split('|')[0].strip() if 'Betreff:' in _s else ''
+            sent_rows.append({'to': _to, 'subject': _subj, 'ts': (r['ts'] or '')[:16], 'via': 'user'})
+    except: pass
+    sent_rows.sort(key=lambda x: x['ts'], reverse=True)
+    sent_html = ""
+    for r in sent_rows[:6]:
+        icon = '&#x1F916;' if r['via'] == 'kira' else '&#x1F464;'
+        ts_display = r['ts'][11:16] if len(r['ts']) >= 16 else r['ts']
+        to_short = esc((r['to'] or '')[:35])
+        subj_short = esc((r['subject'] or '')[:40])
+        sent_html += f'<div class="dash-sent-item"><span class="dash-sent-icon">{icon}</span><div class="dash-sent-body"><div class="dash-sent-to">{to_short}</div><div class="dash-sent-subj">{subj_short}</div></div><span class="dash-sent-ts">{ts_display}</span></div>'
+    if not sent_html:
+        sent_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Noch keine gesendeten Mails heute</div>'
+    sent_today_panel = f"""<div class="dash-panel">
+      <div class="dash-panel-title">Heute gesendet</div>
+      <div class="dash-panel-sub">Ausgegangene Mails — Kira &#x1F916; &amp; manuell &#x1F464;</div>
+      {sent_html}
+    </div>"""
+
     # ── Zone C2: Nächste Termine & Fristen ──
     try:
         org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
@@ -710,6 +758,7 @@ def build_dashboard(tasks, db):
       <div class="dash-panel-sub">Letzte Bewegungen</div>
       {biz_html}
     </div>
+    {sent_today_panel}
   </div>
 </div>"""
 
@@ -12050,7 +12099,8 @@ a:hover{text-decoration:underline;}
   padding:14px 20px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px;
   box-shadow:0 1px 4px rgba(0,0,0,.04);}
 .dash-briefing-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);}
+.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
+.dash-briefing-ts{font-size:11px;font-weight:400;color:var(--text-muted);}
 .dash-briefing-items{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);}
 .dash-b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
@@ -12201,6 +12251,15 @@ a:hover{text-decoration:underline;}
 .dash-biz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .dash-biz-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
 .dash-biz-val{margin-left:auto;font-weight:600;font-size:12px;white-space:nowrap;flex-shrink:0;}
+
+/* Heute gesendet */
+.dash-sent-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;}
+.dash-sent-item:nth-child(odd){background:var(--bg);}
+.dash-sent-icon{font-size:13px;flex-shrink:0;}
+.dash-sent-body{flex:1;min-width:0;}
+.dash-sent-to{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dash-sent-subj{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
+.dash-sent-ts{color:var(--text-muted);font-size:11px;flex-shrink:0;margin-left:4px;}
 
 /* Zone D: Signals */
 .dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
@@ -14500,6 +14559,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 subject=subject, body_plain=body_plain, body_html=body_html,
                 in_reply_to=in_reply_to, references=refs,
             )
+            if result.get('ok'):
+                rlog('server', 'mail_gesendet',
+                     f'Mail an {to[:60]} | Betreff: {subject[:60]} | Von: {from_email}',
+                     modul='server', source='postfach_compose',
+                     actor_type='user', status='ok')
             self._json(result)
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})

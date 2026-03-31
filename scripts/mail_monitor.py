@@ -1156,7 +1156,7 @@ def _index_mail(mail_data: dict, konto_label: str, folder_name: str):
             datetime.now().isoformat(),
             eml_path,
             mail_folder_pfad,
-            0,  # gelesen=0 → neue Mail ist ungelesen
+            1 if any(s in (folder_name or '').lower() for s in ('sent', 'gesendet', 'ausgang', 'gesendete')) else 0,  # gelesen: Gesendete Elemente sind immer gelesen
         ))
         # Falls bereits vorhanden: eml_path + mail_folder_pfad nachfüllen wenn leer
         if eml_path or mail_folder_pfad:

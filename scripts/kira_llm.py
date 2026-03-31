@@ -3042,11 +3042,14 @@ def generate_daily_briefing():
         db = sqlite3.connect(str(TASKS_DB))
         db.row_factory = sqlite3.Row
         cached = db.execute(
-            "SELECT inhalt_json FROM kira_briefings WHERE datum=?", (today,)
+            "SELECT inhalt_json, erstellt_am FROM kira_briefings WHERE datum=?", (today,)
         ).fetchone()
         if cached:
             db.close()
-            return json.loads(cached['inhalt_json'])
+            result_data = json.loads(cached['inhalt_json'])
+            if 'erstellt_am' not in result_data and cached['erstellt_am']:
+                result_data['erstellt_am'] = cached['erstellt_am']
+            return result_data
     except:
         pass
 
@@ -3111,8 +3114,10 @@ Sei direkt, keine Floskeln. Fokus auf Handlung."""
 
     # Cache speichern
     try:
-        db.execute("INSERT OR REPLACE INTO kira_briefings (datum, inhalt_json, provider_used) VALUES (?,?,?)",
-                   (today, json.dumps(briefing, ensure_ascii=False), provider_used))
+        now_ts = datetime.now().isoformat(timespec='seconds')
+        briefing['erstellt_am'] = now_ts
+        db.execute("INSERT OR REPLACE INTO kira_briefings (datum, inhalt_json, provider_used, erstellt_am) VALUES (?,?,?,?)",
+                   (today, json.dumps(briefing, ensure_ascii=False), provider_used, now_ts))
         db.commit()
     except:
         pass

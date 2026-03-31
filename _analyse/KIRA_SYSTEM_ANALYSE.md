@@ -1325,4 +1325,20 @@ Der einzige wirklich proaktive Baustein ist `kira_proaktiv.py` — aber auch der
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Aktualisiert 2026-03-31 (session-nn) | 35+ Module, 8 DBs, 70+ Endpunkte*
+### Changelog session-ss (2026-03-31)
+
+| Feature | Datei | Details |
+|---|---|---|
+| User-Präsenz-Erkennung | server.py | visibilitychange API — _pollKiraStatus stoppt/startet je nach Tab-Sichtbarkeit |
+| Kira-Position | server.py | 4 Ecken via Select + applyKiraPosition() + localStorage |
+| Chitchat-Toggle | server.py + kira_llm.py | "Smalltalk erlaubt" Toggle → build_system_prompt() injiziert Fokus-Anweisung |
+| ntfy Push-Priorität | server.py + kira_proaktiv.py | Select low/default/high/urgent → _push() liest config.kira_proaktiv.ntfy.prioritaet |
+| Dashboard-Refresh-Intervall | server.py | Select 1–60min oder deaktiviert → silentRefreshDashboard configgesteuert |
+| Morgen-Briefing konfigurierbar | server.py + kira_proaktiv.py | Toggle + Uhrzeit-Input → 3h-Fenster ab konfigurierter Startzeit |
+| **Sicherheitsfix BCC** | server.py | hardcoded `bcc:'info@raumkult.eu'` aus pfSend() entfernt → opt. BCC-Feld im Compose |
+
+**Commits:** 9dc60f1, 1632065, b20985e
+
+---
+
+*Analyse erstellt 2026-03-30 (session-jj) | Aktualisiert 2026-03-31 (session-ss) | 35+ Module, 8 DBs, 70+ Endpunkte*
