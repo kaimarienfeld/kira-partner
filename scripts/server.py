@@ -7419,10 +7419,15 @@ def build_wissen(db):
         del_btn = f"""<button class="btn btn-ignore" style="margin-left:4px;font-size:11px;padding:2px 8px;" onclick="wissenAction({rid},'loeschen')">Entfernen</button>""" if editable else ""
         id_attr = f' id="wr-{rid}"' if with_id else ""
         iid_attr = f' id="wi-{rid}"' if with_id else ""
+        erstellt = (r.get('erstellt_am') or '')[:16].replace('T', ' ')
+        geaendert = (r.get('geaendert_am') or '')[:16].replace('T', ' ')
+        ts_html = f'<span class="muted" style="font-size:10px;margin-left:8px;opacity:.6" title="Erstellt: {erstellt}">&#x1F4C5; {erstellt[:10]}</span>'
+        if geaendert:
+            ts_html += f'<span class="muted" style="font-size:10px;margin-left:6px;opacity:.6" title="Ge&auml;ndert: {geaendert}">&#x270F;&#xFE0F; {geaendert[:10]}</span>'
         return f"""<div class="wissen-card"{id_attr}>
           <div class="wissen-titel">{esc(r['titel'])}</div>
           <div class="wissen-inhalt"{iid_attr}>{esc(r['inhalt'])}</div>
-          <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{edit_btn}{del_btn}</div>
+          <div class="wissen-meta"><span class="muted">{esc(r.get('kategorie',''))}</span>{ts_html}{edit_btn}{del_btn}</div>
         </div>"""
 
     def _wissen_card_review(r, kat_key):
@@ -16448,7 +16453,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if not titel or not inhalt:
                     self._json({'ok': False, 'error': 'Titel und Inhalt erforderlich'})
                     return
-                db.execute("UPDATE wissen_regeln SET kategorie=?, titel=?, inhalt=? WHERE id=?",
+                db.execute("UPDATE wissen_regeln SET kategorie=?, titel=?, inhalt=?, geaendert_am=datetime('now') WHERE id=?",
                            (kat, titel, inhalt, regel_id))
             db.commit()
             self._json({'ok': True})

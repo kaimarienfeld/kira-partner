@@ -327,8 +327,8 @@ _Komplett überarbeitet session-y + session-bb (2026-03-29)_
 |--------|---------|---------------|-----------|
 | ✅ | DB-Größe anzeigen | — | Statische Info |
 | ✅ | Runtime-Log-DB-Größe | — | Statische Info |
-| ❌ | Config exportieren | — | Button vorhanden, **Funktion fehlt** (showToast Platzhalter) |
-| ❌ | Config importieren | — | Button vorhanden, **Funktion fehlt** (showToast Platzhalter) |
+| ✅ | Config exportieren | `GET /api/config/export` | JSON-Download als kira_config.json, session-pp |
+| ✅ | Config importieren | `POST /api/config/import` | File-Upload + Backup + Reload, session-pp |
 | ✅ | Zurücksetzen | `resetConfig()` / `POST /api/config/reset` | showKritischModal(ZURÜCKSETZEN) + Backup als config.json.bak + factory defaults, session-t |
 | 💡 | Auto-Backup aktivieren | `backup.aktiv` | Täglich config.json sichern |
 | 💡 | Backup-Pfad | `backup.pfad` | Wohin gesichert wird |
@@ -388,11 +388,11 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 | Prio | Feature | ID | Status |
 |------|---------|-----|--------|
-| 🔴 Hoch | Stats-Zeile Dashboard: Klick → Tab + Filter | `stats-zeile-filter-klick` | 📋 Geplant |
+| ✅ Hoch | Stats-Zeile Dashboard: Klick → Tab + Filter | `stats-zeile-filter-klick` | filterKomm() implementiert, KPI-onclick verbunden |
 | 🔴 Hoch | Wissen-Bibliothek: Zeitstempel erstellt/geändert | `wissen-zeitstempel` | 📋 Geplant |
 | 🔴 Hoch | Eingangsrechnungen auto-scan + Offene-Posten-DB | `eingangsrechnungen-auto-scan` | 📋 Geplant |
 | 🟡 Mittel | Kira LLM: Datenbanken + Wissen automatisch pflegen | `kira-llm-datenbanken-autopflege` | 📋 Geplant |
-| 🟡 Mittel | Konto löschen vollständig verdrahten | `mail-konten-settings-overhaul` | 🔧 Teilweise |
+| ✅ Mittel | Konto löschen vollständig verdrahten | `mail-konten-settings-overhaul` | POST /api/mail/konto/loeschen, session-pp |
 | 🟡 Mittel | WhatsApp-Token eintragen (Kai-Aktion) | — | ⏳ Wartet auf Kai |
 
 ---

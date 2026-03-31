@@ -157,6 +157,8 @@ def rebuild_schema(db):
     except: pass
     try: db.execute("ALTER TABLE wissen_regeln ADD COLUMN quelle TEXT")
     except: pass
+    try: db.execute("ALTER TABLE wissen_regeln ADD COLUMN geaendert_am TEXT")
+    except: pass
     try: db.execute("ALTER TABLE loeschhistorie ADD COLUMN message_id TEXT")
     except: pass
 
