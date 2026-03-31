@@ -10323,9 +10323,9 @@ function openMailApproveModal() {{
     '<div style="margin-top:8px;font-size:11px;color:#666">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
     '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
     '<button onclick="closeMailApproveOverlay()" style="background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\'reject\')" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\'edit\')" style="background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\'approve\')" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'reject\\')" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'edit\\')" style="background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'approve\\')" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
     '</div>' +
     '</div>';
   overlay.style.display = 'flex';
