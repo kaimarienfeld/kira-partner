@@ -527,3 +527,42 @@
 
 **Auftrag:** Alle offenen Posten aus KIRA_SYSTEM_ANALYSE.md Abschnitt 14 systematisch abarbeiten. Prioritaet 1: Kira Live-Chip + Activity-Drawer, Direkte E-Mail-Antwort (bereits done). Prioritaet 2: Mail-Vorlagen, Kalender (Azure-abhaengig), Einstellungen-Erweiterungen, Signale-Panel. Prioritaet 3: Chat Kontext-Sidebar, Wissen Feedback-Loop, Google OAuth.
 **Status:** offen
+
+---
+
+## 2026-03-31 19:06 --- Session-aaa
+
+**Auftrag:** Weitermachen mit offenen Punkten in KIRA_SYSTEM_ANALYSE.md §14. Ausnahmeregel aktiv.
+**Status:** erledigt
+
+### Was erledigt wurde
+
+1. **§13+§14 Roadmap-Update:** Alle session-zz erledigten Items als done markiert:
+   - Kira Live-Chip, Activity-Drawer, Mail-Vorlagen, Kalender-Tab (done)
+   - Direkte E-Mail-Antwort (bereits in session-bb implementiert, in §14 nie markiert)
+   - Kunden-360 (bereits in session-bb implementiert, in §14 nie markiert)
+   - Geschaeft-Signale, Chat-Kontext-Menu, Wissen-Badge, Kira-Postfach-Einstellungen (done)
+
+2. **Google OAuth 2.0 / Gmail:** P3-Feature vollstaendig implementiert
+   - : neues Modul (Authorization Code Flow, Token Exchange, Refresh, XOAUTH2, Job-Tracking)
+   - GET : Redirect-URI-Handler mit HTML-Bestaetigung
+   - POST : Browser-Flow starten
+   - GET : Job-Status pollen
+   - GET : Credentials-Validierung
+   - Wizard Step 5 dynamisch: Label/Hinweis je nach Microsoft/Google Auth
+   -  +  JS-Funktionen
+   - Einstellungen > Integrationen: Google OAuth Gruppe (Client ID, Client Secret, Speichern, Test)
+   -  +  JS-Funktionen
+
+3. **feature_registry.json:** 64 Features, google-oauth-gmail (done), kalender-integration (partial)
+
+4. **Commit:** 4fb0a68
+
+**Offen geblieben:**
+- Kai-Aktion: Azure Calendars.ReadWrite (Kalender-Widget voll aktiv)
+- Kai-Aktion: Google Cloud Console OAuth2 App einrichten
+- Kai-Aktion: WhatsApp Business Token
+- Kai-Aktion: Leni Draft-2 Passwort
+- Belegvorlagen, Lexware, Sprachmodul, Dokument-Export (alle Niedrig)
+
+**Status:** erledigt
