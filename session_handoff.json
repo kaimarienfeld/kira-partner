@@ -1,6 +1,6 @@
 {
-  "last_session": "session-nn",
-  "date": "2026-03-30",
+  "last_session": "session-ww",
+  "date": "2026-03-31 09:30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -32,6 +32,11 @@
     "session-kk (2026-03-30): Postfach Mail-Rendering + Kira-Kontext-Integration. (A1) iframe height fix: min-height:0 + iframe-mode CSS + overflow:hidden — iframe füllt jetzt kompletten Preview-Bereich. (A2) Text-Rendering: HTML-Entities dekodieren + HTML-in-Text als iframe. (B4) GET /api/mail/kira-kontext: EML-Volltext + letzte 5 Absender-Mails + offene Tasks nach Absender-Domain. (B1) Kira-Button prominent lila (gradient #7c3aed), Glow, Kira-Augen-Icon. (B2) pfKiraMailContext(): openKiraWorkspace statt showPanel, Lade-Spinner, Ladetext, Auto-Send mit 5000 Zeichen + Verlauf + Tasks. (B3) kiraSetQuickActions mail-Typ.",
     "session-ll (2026-03-30): Automatisches Modell-Validierungs-System. kira_llm.py: ModelNotFoundError, _MODEL_CACHE/TTL, _send_ntfy_push(), _fetch_provider_models() (24h-Cache, GET /v1/models + /api/tags für alle Provider-Typen), _model_in_list() (Prefix-Match für dated snapshots), _validate_model(), _auto_update_model() (config.json + ntfy Push + elog), validate_all_providers() (state-file). _call_anthropic() + _call_openai_compat() fangen Modell-404/NotFoundError → sofortiger Auto-Update → ModelNotFoundError → Fallback auf nächsten Provider. server.py: Import erweitert, POST /api/kira/provider/check-models Endpoint, 🟡 Status-Icon bei veraltetem Modell, 🔍 Modell-Button pro Provider-Karte, Stale-Infozeile (gelb + reason + empfohlenes Modell), checkProviderModel() JS-Funktion, _model_validation_loop (20s Delay + 24h-Intervall). KIRA_SYSTEM_ANALYSE.md: Aktualisiert mit session-kk+ll Änderungen, neue Sektion 3.5, alle behobenen Bugs markiert, neue Endpunkte, Prioritäts-Matrix.",
     "session-nn (2026-03-30): KIRA Case Engine + Multi-Agent-Architektur komplett implementiert. (1) DB: vorgaenge/vorgang_links/vorgang_status_history/vorgang_signals Tabellen + vorgang_id in tasks/angebote/ausgangsrechnungen. (2) case_engine.py: dict-basierte Statusmaschinen für 10 Vorgangstypen (transitions-kompatibel), vollständige CRUD-API, Entscheidungsstufe A/B/C-Logik, Signal-Queue, Vorgang-Summary für Kira-Kontext. (3) vorgang_router.py: Thin Routing-Layer Mail-Klassifizierung → Vorgang, Kategorie→Typ-Mapping. (4) mail_monitor.py + daily_check.py: Beide Task-INSERT-Stellen mit Router verdrahtet. (5) server.py: 8 neue Vorgang-API-Endpoints + /api/presence + Signal-Polling-JS (Toast Stufe-B, Modal Stufe-C). (6) kira_llm.py: vorgang_kontext_laden + vorgang_status_setzen Tools + System-Prompt Vorgang-Übersicht. (7) presence_detector.py: Windows ctypes GetLastInputInfo (idle detection). (8) activity_window.py: tkinter -topmost Desktop-Overlay + Signal-Watcher-Thread. (9) case_engine_backfill.py: Backfill für Rechnungen/Angebote/Tasks (--dry-run, idempotent)."
+,
+    "session-oo (2026-03-31): KIRA Vollstaendige Aktive Assistenz — alle 9 Plan-Pakete implementiert. P1: Tool-Idempotenz, Circuit Breaker, Rate-Limiting. P2: mail_approve_queue, _tool_mail_senden, Dashboard-Badge. P3: kira_konversationen in System-Prompt, konversation_suchen, tages_memory_summary. P4: scan_angebot_followup_vorgang, scan_mahnung_eskalation, scan_autonomy_decision. P5: chat_react, /api/kira/task. P6: kira_feedback Tabelle, kirafb(), auto-Wissensregel. P7: mail_fts FTS5, semantisch_suchen. P8: termin_erstellen (Graph-API, braucht Azure-Permission). P9: panel-kira-aktivitaeten, /api/kira/aktivitaeten, actor_type kira_autonom/kira_vorschlag.",
+    "session-uu (2026-03-31): UI-Fixes. (1) Stats-Zeile Dashboard springt via filterKomm()+jumpToSeg() zu korrektem Tab. (2) Ignorieren-Lernfrage mit 4 Presets schreibt Wissensregel. (3) Wissensregeln Timestamps in UI.",
+    "session-vv (2026-03-31): UX + Modal-Fix. (1) _pfGlobalBadgeUpdate() — Badge-Polling unabhaengig von aktivem Panel. (2) Spaeter-Dialog: datetime-local Picker, 4 Schnellbuttons, Warum-Lernfrage. (3) Sidebar-Logo: Kira-Orb-SVG. (4) Favicon: Kira-SVG in head. (5) --bg-card Variable definiert, alle Modals auf CSS-Variablen umgestellt. Commit a2c580c.",
+    "session-ww (2026-03-31): Plan-Status-Scan — alle Pakete 1-9 bestaetigt done. session_handoff.json aktualisiert. Backfill (Paket 10) naechster Schritt."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -110,21 +115,40 @@
     "presence-detector-windows-ctypes",
     "activity-window-desktop-overlay",
     "signal-watcher-thread",
-    "case-engine-backfill-script"
+    "case-engine-backfill-script",
+    "paket1-idempotenz-circuit-breaker-rate-limit",
+    "paket2-mail-hitl-approval-queue",
+    "paket3-konversations-gedaechtnis-memory-summary",
+    "paket4-vorgang-automatisierung-autonomy-loop",
+    "paket5-react-schleife-multi-step",
+    "paket6-feedback-lernen-thumbs",
+    "paket7-fts5-semantisch-suchen",
+    "paket8-termin-erstellen-graph-api",
+    "paket9-audit-trail-kira-aktivitaeten",
+    "modal-transparency-bg-card-fix",
+    "sidebar-logo-kira-orb-svg",
+    "favicon-kira-orb-svg",
+    "global-badge-polling-pfGlobalBadgeUpdate",
+    "spaeter-dialog-datetime-picker-lernfrage",
+    "stats-filter-jumpToSeg",
+    "ignorieren-lernfrage-wissensregel"
   ],
   "open_tasks": [
-    "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ können vom User manuell gelöscht werden (aus session-cc)",
-    "server_map.md: Zeilen-Angaben für GET/POST-Endpunkte sind noch ca.-Werte",
+    "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
+    "server_map.md: Zeilen-Angaben fuer GET/POST-Endpunkte sind noch ca.-Werte",
     "Google OAuth noch nicht verdrahtet",
     "Provider-Persistierung nach OAuth-Login fehlt",
     "SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2)",
     "geloeschte_protokoll-Anzeige in Einstellungen-UI fehlt noch",
-    "Zu Kira hinzufügen-Button aus Postfach (Ordner direkt zu sync_ordner hinzufügen)",
+    "Zu Kira hinzufuegen-Button aus Postfach (Ordner direkt zu sync_ordner hinzufuegen)",
     "bereinigung_frist_tage / geloeschte_bereinigung_aktiv noch nicht in Einstellungen-UI",
-    "case_engine_backfill.py noch nicht ausgeführt — erst --dry-run, dann live: python case_engine_backfill.py --dry-run",
-    "Vorgang-Übersicht im Dashboard noch nicht eingebaut (nur API + Kira-Tool vorhanden)"
+    "Outlook-Kalender (Paket 8): Azure App a0591b2d braucht Calendars.ReadWrite Delegated Permission — Kai-Aktion in Entra ID noetig",
+    "Kira-Launcher beiseite rutschen wenn Maus Element dahinter erreichen will",
+    "Mail-Monitor Polling-Intervall: Einstellung in UI (derzeit in Sekunden, sollte Stunden/Minuten sein)",
+    "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
+    "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "Server neu starten → Signal-Watcher + Case Engine testen. Dann: python case_engine_backfill.py --dry-run ausführen um Backfill-Kandidaten zu sehen.",
+  "next_step": "Naechste Features (alle bisherigen Plan-Pakete + Backfill erledigt): Direkte E-Mail-Antwort aus Postfach, Kunden-360-Ansicht, Eingangsrechnungen-Scanner, DATAVERSE-Anbindung. Kleinere offene: 'Zu Kira hinzufuegen'-Button aus Postfach.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

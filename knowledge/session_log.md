@@ -406,3 +406,37 @@
 - Favicon: Kira-Launcher SVG als data-URI im <head> — Tab-Icon und gepinntes App-Icon
 - Kalender-Blocker identifiziert: Azure App braucht Calendars.ReadWrite Permission (Kai-Aktion im Entra Portal)
   **Commit:** c4f68bb
+
+---
+
+## 2026-03-31 16:00 — Session-Start (session-ww)
+
+**Auftrag:** Fortsetzung — Plan-Status-Scan abschliessen, Paket 10 Backfill, dann naechste Features.
+**Status:** offen
+
+**Gefunden (Plan-Status-Scan):**
+- Pakete 1-9: Alle bestaetigt DONE in kira_llm.py + kira_proaktiv.py + server.py (session-oo).
+- Paket 10 (Backfill): Dry-Run zeigt 83 Vorgaenge bereits vorhanden, alle 49 relevanten Tasks uebersprungen (vorgang_id gesetzt). Backfill organisch durch Router-Integration erledigt.
+- Tagesbriefing: Bereits implementiert (Zone A in build_dashboard(), generate_daily_briefing()).
+- session_handoff.json: Aktualisiert auf session-ww.
+
+**Naechste Schritte:** Vorgang-Uebersicht im Dashboard, Mail-Monitor Polling-Einstellung, Kira-Launcher-Ausweichen.
+
+---
+
+## 2026-03-31 16:00 — Session-Ende (session-ww)
+
+**Erledigt:**
+
+- Plan-Status-Scan: Alle Pakete 1-9 in session-oo vollstaendig implementiert bestaetigt
+- Paket 10 Backfill: Dry-Run — 83 Vorgaenge bereits vorhanden, Backfill organisch durch Router erledigt
+- Dashboard: Vorgaenge-Uebersicht Panel (82 Vorgaenge nach Typ: Rechnungen/Angebote/Anfragen/Leads) — Commit d9e7a78
+- Launcher: Drag-to-Move Beiseite-Schieben mit Ecken-Snap + QP-Positionierung (_kiraPositionQP) — Commit ebe0239
+- Einstellungen: Geloeschte-Mails-Protokoll Viewer in Mail & Konten — Commit 22a8b25
+- Tagesstart-Briefing: Bereits vorhanden (Zone A in build_dashboard) — kein Handlungsbedarf
+- Archiv-Bereinigung UI: Bereits vorhanden (bereinigung_aktiv + bereinigung_frist_tage) — kein Handlungsbedarf
+- Mail-Monitor Polling-Intervall: Bereits als Dropdown in Einstellungen vorhanden — kein Handlungsbedarf
+- session_handoff.json + session_log.md aktualisiert
+
+**Offen geblieben:** Direkte E-Mail-Antwort, Kunden-360, Eingangsrechnungen-Scanner, Zu-Kira-Ordner-Button aus Postfach
+**Status:** erledigt
