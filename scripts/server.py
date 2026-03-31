@@ -10025,95 +10025,82 @@ window.onerror = function(msg, src, line, col, err) {{
 }})();
 
 /* ── Vorgang-Signal-Polling (Paket 8, session-nn) ── */
-(function() {
+(function() {{
   'use strict';
 
   // Inject CSS für Toast + Modal
   const _css = document.createElement('style');
-  _css.textContent = `
-#_vg-toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.vg-toast{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#333);border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;min-width:280px;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:all;cursor:pointer;animation:_vgSlideIn .25s ease}
-.vg-toast.stufe-c{border-left-color:#ef4444}
-.vg-toast-title{font-size:12px;font-weight:600;opacity:.65;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
-.vg-toast-body{font-size:13px;line-height:1.4}
-.vg-toast-close{float:right;opacity:.4;cursor:pointer;font-size:16px;line-height:1;margin:-2px -4px 0 8px}
-.vg-toast-close:hover{opacity:.9}
-@keyframes _vgSlideIn{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
-#_vg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center}
-#_vg-modal{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#444);border-top:4px solid #ef4444;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)}
-#_vg-modal h3{margin:0 0 8px;font-size:17px}
-#_vg-modal p{margin:0 0 20px;font-size:14px;opacity:.8;line-height:1.5;white-space:pre-wrap}
-#_vg-modal .modal-btns{display:flex;gap:10px;justify-content:flex-end}
-#_vg-modal button{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600}
-#_vg-modal .btn-ok{background:#ef4444;color:#fff}
-#_vg-modal .btn-snooze{background:var(--btn-bg,#2a2a2a);color:var(--text,#e0e0e0);border:1px solid var(--border,#444)}
-  `;
+  _css.textContent = [
+    '#_vg-toast-container{{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}}',
+    '.vg-toast{{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#333);border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;min-width:280px;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:all;cursor:pointer}}',
+    '.vg-toast.stufe-c{{border-left-color:#ef4444}}',
+    '.vg-toast-title{{font-size:12px;font-weight:600;opacity:.65;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}}',
+    '.vg-toast-body{{font-size:13px;line-height:1.4}}',
+    '.vg-toast-close{{float:right;opacity:.4;cursor:pointer;font-size:16px;line-height:1;margin:-2px -4px 0 8px}}',
+    '.vg-toast-close:hover{{opacity:.9}}',
+    '#_vg-modal-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center}}',
+    '#_vg-modal{{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#444);border-top:4px solid #ef4444;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)}}',
+    '#_vg-modal h3{{margin:0 0 8px;font-size:17px}}',
+    '#_vg-modal p{{margin:0 0 20px;font-size:14px;opacity:.8;line-height:1.5;white-space:pre-wrap}}',
+    '#_vg-modal .modal-btns{{display:flex;gap:10px;justify-content:flex-end}}',
+    '#_vg-modal button{{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600}}',
+    '#_vg-modal .btn-ok{{background:#ef4444;color:#fff}}',
+    '#_vg-modal .btn-snooze{{background:var(--btn-bg,#2a2a2a);color:var(--text,#e0e0e0);border:1px solid var(--border,#444)}}'
+  ].join('\\n');
   document.head.appendChild(_css);
 
-  // Toast Container
   const _tc = document.createElement('div');
   _tc.id = '_vg-toast-container';
   document.body.appendChild(_tc);
 
-  let _shownSignals = new Set();
-  let _modalOpen = false;
+  var _shownSignals = {{}};
+  var _modalOpen = false;
 
-  function _markGelesen(signal_id, aktion) {
-    fetch('/api/vorgang/signal/gelesen', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({signal_id, aktion})
-    }).catch(()=>{});
-  }
+  function _markGelesen(sid, aktion) {{
+    fetch('/api/vorgang/signal/gelesen', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{signal_id:sid,aktion:aktion}})}}).catch(function(){{}});
+  }}
 
-  function _showToast(sig) {
-    const t = document.createElement('div');
+  function _showToast(sig) {{
+    var t = document.createElement('div');
     t.className = 'vg-toast' + (sig.stufe === 'C' ? ' stufe-c' : '');
-    t.innerHTML =
-      '<span class="vg-toast-close" title="Schließen">&#10005;</span>' +
-      '<div class="vg-toast-title">Vorgang ' + (sig.stufe === 'C' ? '&#9888; Aktion erforderlich' : '&#9432; Hinweis') + '</div>' +
-      '<div class="vg-toast-body">' + sig.titel + (sig.nachricht ? '<br><small style="opacity:.7">' + sig.nachricht.split('\\n')[0] + '</small>' : '') + '</div>';
+    t.innerHTML = '<span class="vg-toast-close">&#10005;</span><div class="vg-toast-title">Vorgang ' +
+      (sig.stufe === 'C' ? '&#9888; Aktion' : '&#9432; Hinweis') + '</div><div class="vg-toast-body">' +
+      sig.titel + '</div>';
     _tc.appendChild(t);
-    t.querySelector('.vg-toast-close').onclick = e => { e.stopPropagation(); _markGelesen(sig.id, 'geschlossen'); t.remove(); };
-    t.onclick = () => { _markGelesen(sig.id, 'geklickt'); t.remove(); };
-    setTimeout(() => { if(t.parentNode) { _markGelesen(sig.id, 'auto_timeout'); t.remove(); } }, 12000);
-  }
+    t.querySelector('.vg-toast-close').onclick = function(e) {{ e.stopPropagation(); _markGelesen(sig.id,'geschlossen'); t.remove(); }};
+    t.onclick = function() {{ _markGelesen(sig.id,'geklickt'); t.remove(); }};
+    setTimeout(function() {{ if(t.parentNode) {{ _markGelesen(sig.id,'auto_timeout'); t.remove(); }} }}, 12000);
+  }}
 
-  function _showModal(sig) {
-    if (_modalOpen) return;
+  function _showModal(sig) {{
+    if(_modalOpen) return;
     _modalOpen = true;
-    const ov = document.createElement('div');
+    var ov = document.createElement('div');
     ov.id = '_vg-modal-overlay';
-    ov.innerHTML =
-      '<div id="_vg-modal">' +
-      '<h3>&#9888; ' + sig.titel + '</h3>' +
-      '<p>' + (sig.nachricht || '') + '</p>' +
-      '<div class="modal-btns">' +
-      '<button class="btn-snooze" id="_vgSnooze">Später</button>' +
-      '<button class="btn-ok" id="_vgOk">Verstanden</button>' +
-      '</div></div>';
+    ov.innerHTML = '<div id="_vg-modal"><h3>&#9888; ' + sig.titel + '</h3><p>' +
+      (sig.nachricht||'') + '</p><div class="modal-btns">' +
+      '<button class="btn-snooze" id="_vgSnooze">Sp\u00e4ter</button>' +
+      '<button class="btn-ok" id="_vgOk">Verstanden</button></div></div>';
     document.body.appendChild(ov);
-    ov.querySelector('#_vgOk').onclick = () => { _markGelesen(sig.id, 'bestaetigt'); ov.remove(); _modalOpen = false; };
-    ov.querySelector('#_vgSnooze').onclick = () => { _markGelesen(sig.id, 'snoozed'); ov.remove(); _modalOpen = false; };
-  }
+    ov.querySelector('#_vgOk').onclick = function() {{ _markGelesen(sig.id,'bestaetigt'); ov.remove(); _modalOpen=false; }};
+    ov.querySelector('#_vgSnooze').onclick = function() {{ _markGelesen(sig.id,'snoozed'); ov.remove(); _modalOpen=false; }};
+  }}
 
-  async function _pollSignals() {
-    try {
-      const r = await fetch('/api/vorgang/signals?limit=5');
-      if (!r.ok) return;
-      const d = await r.json();
-      (d.signals || []).forEach(sig => {
-        if (_shownSignals.has(sig.id)) return;
-        _shownSignals.add(sig.id);
-        if (sig.stufe === 'C') _showModal(sig);
-        else _showToast(sig);
-      });
-    } catch(e) {}
-  }
+  function _pollSignals() {{
+    fetch('/api/vorgang/signals?limit=5').then(function(r) {{
+      return r.ok ? r.json() : null;
+    }}).then(function(d) {{
+      if(!d) return;
+      (d.signals||[]).forEach(function(sig) {{
+        if(_shownSignals[sig.id]) return;
+        _shownSignals[sig.id] = true;
+        if(sig.stufe === 'C') _showModal(sig); else _showToast(sig);
+      }});
+    }}).catch(function(){{}});
+  }}
 
-  // Polling: 10s Intervall, erster Check nach 5s
-  setTimeout(() => { _pollSignals(); setInterval(_pollSignals, 10000); }, 5000);
-})();
+  setTimeout(function() {{ _pollSignals(); setInterval(_pollSignals, 10000); }}, 5000);
+}})();
 </script>
 </body>
 </html>"""
@@ -11458,7 +11445,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/vorgaenge' or self.path.startswith('/api/vorgaenge?'):
             self._api_vorgaenge_list()
 
-        elif self.path == '/api/vorgang/signals':
+        elif self.path == '/api/vorgang/signals' or self.path.startswith('/api/vorgang/signals?'):
             self._api_vorgang_signals()
 
         elif self.path.startswith('/api/vorgang/kunde/'):
