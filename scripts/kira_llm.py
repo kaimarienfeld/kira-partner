@@ -2764,6 +2764,64 @@ def classify_direct(prompt: str, max_tokens: int = 512) -> dict:
         return {"error": str(e), "antwort": ""}
 
 
+# ── Auto-Wissen Extraktion ───────────────────────────────────────────────────
+_WISSEN_KEYWORDS = ("zahlung", "bezahlt", "bevorzugt", "immer", "nie", "wichtig",
+                    "deadline", "frist", "mahnung", "angebot", "reklamation",
+                    "lieferant", "partner", "kunde", "muster", "regel")
+
+def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str):
+    """Startet Hintergrund-Thread: extrahiert Geschäftsregeln aus Konversation."""
+    # Nur wenn Antwort business-relevante Schlüsselwörter enthält
+    combined = (user_msg + " " + kira_antwort).lower()
+    if not any(kw in combined for kw in _WISSEN_KEYWORDS):
+        return
+
+    def _extract():
+        try:
+            import threading
+            providers = get_providers()
+            if not providers:
+                return
+            prompt_extract = (
+                "Analysiere das folgende Gespräch und extrahiere bis zu 2 wichtige Geschäftsregeln "
+                "oder Erkenntnisse die für zukünftige Gespräche nützlich sind. "
+                "Nur wirklich neue, nicht-triviale Erkenntnisse. Wenn keine → gib [] zurück.\n"
+                "Format: JSON-Array [{\"titel\": \"...\", \"inhalt\": \"...\"}]\n\n"
+                f"Nutzer: {user_msg[:500]}\n\nKira: {kira_antwort[:500]}"
+            )
+            result = _call_provider(providers[0], [{"role": "user", "content": prompt_extract}],
+                                     system="Du extrahierst Geschäftsregeln als kompaktes JSON.", tools=[])
+            raw = result.get("text", "").strip()
+            # JSON aus Antwort extrahieren
+            start = raw.find("[")
+            end = raw.rfind("]") + 1
+            if start < 0 or end <= start:
+                return
+            entries = json.loads(raw[start:end])
+            if not isinstance(entries, list):
+                return
+            now = datetime.now().isoformat()
+            db = sqlite3.connect(str(TASKS_DB))
+            for e in entries[:2]:
+                titel = (e.get("titel") or "").strip()
+                inhalt = (e.get("inhalt") or "").strip()
+                if not titel or not inhalt or len(inhalt) < 10:
+                    continue
+                existing = db.execute("SELECT id FROM wissen_regeln WHERE titel=?", (titel,)).fetchone()
+                if existing:
+                    continue
+                db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
+                           ('auto_gelernt', titel, inhalt, f'auto_extract:{session_id[:8]}', now))
+            db.commit()
+            db.close()
+        except Exception:
+            pass
+
+    import threading
+    t = threading.Thread(target=_extract, daemon=True)
+    t.start()
+
+
 # ── Haupt-Chat-Funktion ─────────────────────────────────────────────────────
 def chat(user_message, session_id=None, history=None):
     """Chat mit automatischem Provider-Fallback."""
@@ -2870,6 +2928,10 @@ def chat(user_message, session_id=None, history=None):
     # Fallback-Info wenn nicht der erste Provider genutzt wurde
     if tried:
         response["fallback_info"] = tried
+
+    # Auto-Wissen extrahieren (Hintergrund-Thread, wenn aktiviert)
+    if config.get("auto_wissen_extrahieren", True) and final_text:
+        _auto_extract_wissen_async(user_message, final_text, session_id)
 
     return response
 

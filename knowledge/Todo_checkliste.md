@@ -391,7 +391,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ Hoch | Stats-Zeile Dashboard: Klick → Tab + Filter | `stats-zeile-filter-klick` | filterKomm() implementiert, KPI-onclick verbunden |
 | ✅ Hoch | Wissen-Bibliothek: Zeitstempel erstellt/geändert | `wissen-zeitstempel` | geaendert_am-Spalte + UI-Anzeige, session-pp |
 | ✅ Hoch | Eingangsrechnungen auto-scan + Offene-Posten-DB | `eingangsrechnungen-auto-scan` | Tabellen-View mit Filter/Neu/Betrag/Bezahlt, faelligkeit_datum-Spalte, Proaktiv-Scan, session-qq |
-| 🟡 Mittel | Kira LLM: Datenbanken + Wissen automatisch pflegen | `kira-llm-datenbanken-autopflege` | 📋 Geplant |
+| ✅ Mittel | Kira LLM: Datenbanken + Wissen automatisch pflegen | `kira-llm-datenbanken-autopflege` | auto_wissen_extrahieren jetzt tatsächlich verdrahtet: Hintergrund-LLM-Extraktion nach Chat, speichert in wissen_regeln(auto_gelernt), session-qq |
 | ✅ Mittel | Konto löschen vollständig verdrahten | `mail-konten-settings-overhaul` | POST /api/mail/konto/loeschen, session-pp |
 | 🟡 Mittel | WhatsApp-Token eintragen (Kai-Aktion) | — | ⏳ Wartet auf Kai |
 
