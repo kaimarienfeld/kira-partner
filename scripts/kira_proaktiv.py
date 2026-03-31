@@ -730,6 +730,14 @@ def run_proaktiver_scan() -> dict:
     Führt alle Scans durch. Wird von mail_monitor.py alle 15 Min aufgerufen.
     Gibt Zusammenfassung aller ausgelösten Aktionen zurück.
     """
+    # Proaktiven Scan nur ausführen wenn in Einstellungen aktiviert
+    try:
+        _cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        if not _cfg.get("kira_proaktiv", {}).get("aktiv", True):
+            return {"ergebnisse": {}, "skipped": "proaktiv_deaktiviert"}
+    except Exception:
+        pass
+
     try:
         db = sqlite3.connect(str(TASKS_DB))
         db.row_factory = sqlite3.Row

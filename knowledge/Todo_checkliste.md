@@ -415,7 +415,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 8. ✅ Kira-Name anpassen → kira_llm.py + System-Prompt, session-pp
 9. ✅ System-Prompt-Ergänzung (Freitext-Feld) → kira.system_prompt_custom, session-pp
 10. ✅ Kontext-Steuerung (Aufgaben/Mails/Rechnungen) → kira.kontext_*, 3 Selects im LLM-Kontext-Panel, session-qq + Bug fix: kira_cfg aus config.json["kira"] statt llm-Sub-Dict
-11. 🔗 Kira proaktive Vorschläge (Push bei offenen Aufgaben)
+11. ✅ Kira proaktive Vorschläge → Automatisierung-Panel hat aktiv-Toggle (cfg-proaktiv-aktiv), run_proaktiver_scan() prüft jetzt kira_proaktiv.aktiv, session-qq
 
 ### Phase 3 – Mail & Konten vollständig
 12. 📋 IMAP-Zugangsdaten (mit Verbindungstest)
