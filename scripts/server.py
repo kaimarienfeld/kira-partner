@@ -4259,6 +4259,7 @@ def build_einstellungen():
     kira_idle_delay  = kira_cfg.get("idle_delay", 10)
     kira_name_cfg    = kira_cfg.get("name", "Kira")
     kira_pers_cfg    = kira_cfg.get("persoenlichkeit", "direkt")
+    kira_sprache_cfg = kira_cfg.get("sprache", "deutsch")
     kira_prompt_custom = kira_cfg.get("system_prompt_custom", "")
     kira_kontext_aufgaben   = kira_cfg.get("kontext_aufgaben",   "immer")
     kira_kontext_mails      = kira_cfg.get("kontext_mails",      "immer")
@@ -5359,6 +5360,14 @@ function esInfoPopup(btn, text) {{
         <option value="freundlich" {'selected' if kira_pers_cfg=='freundlich' else ''}>Freundlich &mdash; zug&auml;nglich, positiver Ton</option>
       </select>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Antwort-Sprache<div class="es-rd">In welcher Sprache Kira antwortet &mdash; unabh&auml;ngig von der Anfrage-Sprache</div></div>
+      <select class="es-sel" id="cfg-kira-sprache" style="min-width:160px">
+        <option value="deutsch" {'selected' if kira_sprache_cfg=='deutsch' else ''}>Deutsch (Standard)</option>
+        <option value="englisch" {'selected' if kira_sprache_cfg=='englisch' else ''}>Englisch</option>
+        <option value="gemischt" {'selected' if kira_sprache_cfg=='gemischt' else ''}>Gemischt &mdash; wie Anfrage</option>
+      </select>
+    </div>
     <div class="es-row" style="align-items:flex-start">
       <div class="es-rl" style="padding-top:6px">System-Prompt Erg&auml;nzung<div class="es-rd">Zus&auml;tzliche Anweisungen die Kira immer befolgt</div></div>
       <textarea id="cfg-kira-prompt-custom" rows="4" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical;min-height:80px" placeholder="z.B.: Antworte immer auf Englisch wenn ich auf Englisch schreibe.">{esc(kira_prompt_custom)}</textarea>
@@ -5414,6 +5423,23 @@ function esInfoPopup(btn, text) {{
         <input class="es-toggle-inp" type="checkbox" id="cfg-llm-auto-wissen" {'checked' if llm.get('auto_wissen_extrahieren', True) else ''}>
         <div class="es-toggle-vis"></div>
       </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Antwort-L&auml;nge<div class="es-rd">Wie ausf&uuml;hrlich Kira antwortet &mdash; flie&szlig;t in den System-Prompt ein</div></div>
+      <select class="es-sel" id="cfg-llm-antwort-laenge" style="min-width:160px">
+        <option value="kurz" {'selected' if llm.get('antwort_laenge','normal')=='kurz' else ''}>Kurz &mdash; knappe Antworten</option>
+        <option value="normal" {'selected' if llm.get('antwort_laenge','normal')=='normal' else ''}>Normal (Standard)</option>
+        <option value="ausfuehrlich" {'selected' if llm.get('antwort_laenge','normal')=='ausfuehrlich' else ''}>Ausf&uuml;hrlich &mdash; detaillierte Erkl&auml;rungen</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kreativit&auml;t (Temperatur)<div class="es-rd">0.0 = pr&auml;zise &amp; deterministisch, 1.0 = kreativ &amp; variabel (Standard: 0.7)</div></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="range" id="cfg-llm-temperatur" min="0" max="10" step="1" value="{round(llm.get('temperatur',0.7)*10)}"
+               style="width:120px;accent-color:var(--accent)"
+               oninput="document.getElementById('cfg-llm-temp-val').textContent=(this.value/10).toFixed(1)">
+        <span id="cfg-llm-temp-val" style="min-width:28px;font-size:13px;color:var(--text-muted)">{llm.get('temperatur',0.7):.1f}</span>
+      </div>
     </div>
     <div class="es-row">
       <div class="es-rl">Kontext: Aufgaben &amp; Kommunikation<div class="es-rd">Wann Kira Aufgaben und Task-Kategorien in den Prompt einbettet</div></div>
@@ -9564,6 +9590,8 @@ function saveSettings() {{
       konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
       max_kontext_items:        parseInt(document.getElementById('cfg-llm-max-items')?.value || '50', 10),
       auto_wissen_extrahieren:  document.getElementById('cfg-llm-auto-wissen')?.checked ?? true,
+      antwort_laenge:           document.getElementById('cfg-llm-antwort-laenge')?.value || 'normal',
+      temperatur:               parseFloat((parseInt(document.getElementById('cfg-llm-temperatur')?.value||'7')/10).toFixed(1)),
       _provider_updates: providerUpdates
     }},
     protokoll: {{
@@ -9590,6 +9618,7 @@ function saveSettings() {{
       idle_delay:          parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10'),
       name:                (document.getElementById('cfg-kira-name')?.value.trim() || 'Kira'),
       persoenlichkeit:     document.getElementById('cfg-kira-persoenlichkeit')?.value || 'direkt',
+      sprache:             document.getElementById('cfg-kira-sprache')?.value          || 'deutsch',
       system_prompt_custom: (document.getElementById('cfg-kira-prompt-custom')?.value || '').trim(),
       kontext_aufgaben:    document.getElementById('cfg-kira-kontext-aufgaben')?.value   || 'immer',
       kontext_mails:       document.getElementById('cfg-kira-kontext-mails')?.value      || 'immer',

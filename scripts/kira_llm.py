@@ -717,10 +717,29 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
     # Persönlichkeit-Stil-Override (aus Einstellungen)
     if kira_cfg.get("persoenlichkeit", "direkt") != "direkt":
         prompt += f"\n\n\u2501\u2501\u2501 KOMMUNIKATIONSSTIL (angepasst) \u2501\u2501\u2501\n{stil}\n"
+    # Sprache (aus kira-Einstellungen)
+    _sprache = kira_cfg.get("sprache", "deutsch")
+    if _sprache == "englisch":
+        prompt += "\n\n\u2501\u2501\u2501 SPRACHE \u2501\u2501\u2501\nAntworte immer auf Englisch, unabh\u00e4ngig von der Sprache der Anfrage.\n"
+    elif _sprache == "gemischt":
+        prompt += "\n\n\u2501\u2501\u2501 SPRACHE \u2501\u2501\u2501\nAntworte in derselben Sprache wie die Anfrage (Deutsch wenn auf Deutsch gefragt, Englisch wenn auf Englisch).\n"
+    # "deutsch" = Standard, kein Override
     # Benutzerdefinierte System-Prompt-Ergänzung
     custom_prompt = (kira_cfg.get("system_prompt_custom") or "").strip()
     if custom_prompt:
         prompt += f"\n\n\u2501\u2501\u2501 ZUS\u00c4TZLICHE ANWEISUNGEN \u2501\u2501\u2501\n{custom_prompt}\n"
+
+    # Antwort-Länge (aus llm-Einstellungen)
+    try:
+        _llm_cfg = _full_cfg.get("llm", {})
+    except Exception:
+        _llm_cfg = {}
+    _antwort_laenge = _llm_cfg.get("antwort_laenge", "normal")
+    if _antwort_laenge == "kurz":
+        prompt += "\n\n\u2501\u2501\u2501 ANTWORT-STIL \u2501\u2501\u2501\nAntworte immer sehr kurz und knapp \u2014 maximal 3 S\u00e4tze pro Punkt, keine ausschweifenden Erkl\u00e4rungen.\n"
+    elif _antwort_laenge == "ausfuehrlich":
+        prompt += "\n\n\u2501\u2501\u2501 ANTWORT-STIL \u2501\u2501\u2501\nAntworte ausf\u00fchrlich und detailliert \u2014 erkl\u00e4re Zusammenh\u00e4nge, liefere Hintergr\u00fcnde und konkrete Handlungsoptionen.\n"
+    # "normal" = kein Override n\u00f6tig
 
     if config.get("geschaeftsdaten_teilen", True):
         prompt += "\n" + _build_data_context(config, kira_cfg)
@@ -2488,7 +2507,7 @@ def _tool_mail_senden(p):
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────
-def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048):
+def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7):
     """Anthropic Claude API Aufruf mit Tool-Loop, Circuit Breaker und Exponential Backoff (Paket 1, session-oo)."""
     import anthropic
 
@@ -2516,10 +2535,13 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
         last_err = None
         for attempt in range(3):
             try:
-                response = client.messages.create(
+                create_kwargs = dict(
                     model=model, max_tokens=max_tokens,
                     system=system_prompt, tools=tools, messages=messages
                 )
+                if temperature is not None:
+                    create_kwargs["temperature"] = max(0.0, min(1.0, float(temperature)))
+                response = client.messages.create(**create_kwargs)
                 last_err = None
                 break
             except anthropic.AuthenticationError:
@@ -2581,7 +2603,7 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
     }
 
 
-def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens=2048):
+def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7):
     """OpenAI-kompatible API (OpenAI, OpenRouter, Ollama, Custom) mit Tool-Loop."""
     import openai
 
@@ -2625,6 +2647,8 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
                 call_kwargs = {"model": model, "messages": messages, "max_tokens": max_tokens}
                 if oai_tools:
                     call_kwargs["tools"] = oai_tools
+                if temperature is not None:
+                    call_kwargs["temperature"] = max(0.0, min(2.0, float(temperature)))
                 response = client.chat.completions.create(**call_kwargs)
                 last_err = None
                 break
@@ -2834,6 +2858,13 @@ def chat(user_message, session_id=None, history=None):
             "needs_setup": True
         }
 
+    # Temperatur aus LLM-Einstellungen (llm.temperatur, Default 0.7)
+    try:
+        _chat_full_cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        _chat_temperature = float(_chat_full_cfg.get("llm", {}).get("temperatur", 0.7))
+    except Exception:
+        _chat_temperature = 0.7
+
     system_prompt = build_system_prompt(config)
     tools = get_tools(config)
     session_id = session_id or str(uuid.uuid4())
@@ -2859,9 +2890,9 @@ def chat(user_message, session_id=None, history=None):
 
         try:
             if typ == "anthropic":
-                result = _call_anthropic(provider, user_message, system_prompt, tools)
+                result = _call_anthropic(provider, user_message, system_prompt, tools, temperature=_chat_temperature)
             else:
-                result = _call_openai_compat(provider, user_message, system_prompt, tools)
+                result = _call_openai_compat(provider, user_message, system_prompt, tools, temperature=_chat_temperature)
             used_provider = provider
             break
         except ProviderUnavailableError as e:

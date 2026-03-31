@@ -168,8 +168,8 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Max. Kontext-Items (Zeilen) | `cfg-llm-max-items` / `llm.max_kontext_items` | Number-Input, default 50, session-pp |
 | ✅ | Auto-Wissen extrahieren | `cfg-llm-auto-wissen` / `llm.auto_wissen_extrahieren` | Toggle, default an, session-pp |
 | ✅ | System-Prompt anzeigen/editieren | `kira.system_prompt_custom` | Freitext-Textarea in Einstellungen, session-pp + Bug fix session-qq |
-| 💡 | Antwort-Länge | `llm.antwort_laenge` 🔗 | Kurz / Normal / Ausführlich |
-| 💡 | LLM-Temperatur | `llm.temperatur` | 0.0–1.0 (Kreativität vs. Präzision) |
+| ✅ | Antwort-Länge | `llm.antwort_laenge` | UI + Prompt-Wiring, session-rr |
+| ✅ | LLM-Temperatur | `llm.temperatur` | Range 0.0–1.0 + Backend-Wiring, session-rr |
 | 💡 | Kira merkt sich Präferenzen | `kira.lernmodus` 🔗 | Aus Feedback Wissensregeln erstellen |
 | 💡 | Kira proaktive Vorschläge | `kira.proaktiv` 🔗 | Kira schlägt Aktionen vor (z.B. Nachfass) |
 | 💡 | Kira als Gesprächspartner | `kira.chitchat_erlaubt` | On/Off für Smalltalk |
@@ -341,15 +341,15 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 | Prio | Funktion | Config-Key | Was passiert |
 |------|---------|-----------|-------------|
-| 🔴 Hoch | Kira-Name | `kira.name` | Kira nennt sich dann anders im Chat + System-Prompt |
-| 🔴 Hoch | Kira-Persönlichkeit | `kira.persoenlichkeit` | Wählt System-Prompt-Variante in kira_llm.py |
-| 🔴 Hoch | Kontext-Steuerung | `kira.kontext_*` | Was Kira immer / situativ / nie im Kontext hat |
-| 🟡 Mittel | System-Prompt-Ergänzung | `kira.system_prompt_custom` | User-definierter Zusatz-Prompt (Freitext) |
-| 🟡 Mittel | Kira proaktive Vorschläge | `kira.proaktiv` | Kira meldet sich bei offenen Aufgaben |
-| 🟡 Mittel | Auto-Wissen | `llm.auto_wissen_extrahieren` | Nach Kira-Gesprächen Wissensregeln vorschlagen |
-| 🟡 Mittel | Antwort-Länge | `llm.antwort_laenge` | Beeinflusst Prompt-Instruktion |
-| 🟢 Niedrig | Kira-Sprache | `kira.sprache` | Deutsch / Englisch / gemischt |
-| 🟢 Niedrig | LLM-Temperatur | `llm.temperatur` | Kreativität vs. Faktentreue |
+| ✅ Hoch | Kira-Name | `kira.name` | session-pp + Bug fix session-qq (kira_cfg aus Top-Level) |
+| ✅ Hoch | Kira-Persönlichkeit | `kira.persoenlichkeit` | session-pp + Bug fix session-qq |
+| ✅ Hoch | Kontext-Steuerung | `kira.kontext_*` | 3 Selects in LLM-Kontext-Panel, session-qq |
+| ✅ Mittel | System-Prompt-Ergänzung | `kira.system_prompt_custom` | session-pp + Bug fix session-qq |
+| ✅ Mittel | Kira proaktive Vorschläge | `kira.proaktiv` | Automatisierung-Panel + kira_proaktiv.aktiv-Check, session-qq |
+| ✅ Mittel | Auto-Wissen | `llm.auto_wissen_extrahieren` | Hintergrund-LLM nach Chat, session-qq |
+| ✅ Mittel | Antwort-Länge | `llm.antwort_laenge` | UI + saveSettings + build_system_prompt, session-rr |
+| ✅ Niedrig | Kira-Sprache | `kira.sprache` | Deutsch/Englisch/gemischt — Select + build_system_prompt, session-rr |
+| ✅ Niedrig | LLM-Temperatur | `llm.temperatur` | Range-Slider 0.0–1.0 + Wiring in _call_anthropic/_call_openai_compat, session-rr |
 | 🟢 Niedrig | Kira-Chitchat | `kira.chitchat_erlaubt` | Darf Kira Smalltalk machen? |
 
 ---
@@ -380,7 +380,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 | Prio | Bug | ID | Details |
 |------|-----|-----|---------|
-| 🔴 KRITISCH | Task-Löschen funktioniert nicht | `task-loeschen-bug` | Einzeln + Multi: Kira fragt Grund, nach Bestätigung passiert nichts — Einträge werden nicht gelöscht. Kira arbeitet danach nicht mehr. |
+| ✅ | Task-Löschen | `task-loeschen-bug` | Behoben session-pp: sync kira_chat()-Aufruf entfernt |
 
 ---
 
