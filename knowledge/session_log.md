@@ -328,3 +328,19 @@ Commit: 66241b0
 **Commits:** (folgt)
 **Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Mail-Ignorieren-Lernfrage.
 **Status:** erledigt
+
+---
+
+## 2026-03-31 14:00 — Session-Start (session-uu)
+**Auftrag:** Continuation nach session-tt. Server-Neustart + F-01/F-02 testen + Tracking aktualisieren.
+**Status:** erledigt
+
+**Erledigt:**
+- Server-Neustart: 2 Bugs gefunden+gefixt (NameError eingang_offen, f-string backtick-Template in Verbindungstest)
+- F-01 Mail-Ignorieren Lernmodal: ignorierModal mit 5 Preset-Gruenden + Freitextfeld, speichert Wissensregel via /api/wissen/neu. Playwright-getestet (Modal oeffnet, im-tid/im-kat korrekt).
+- F-02 filterKomm-Fix: jumpToSeg() verdrahtet, Playwright-test bestaetigt Segment-Tab "Neue Leads" aktiv.
+- Kais Checkliste: 3 Items als erledigt markiert (Stats-Filter, Ignorieren-Lernfrage, Wissensregeln-Zeitstempel).
+
+**Commits:** 708e37a
+**Offen geblieben:** "Spaeter"-Klick Lernfrage (Reminder-Datum), Google OAuth, WhatsApp-Token (Kai).
+**Status:** erledigt
