@@ -143,7 +143,7 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | 💡 | Kira-Position | `kira.position` | Unten rechts / links / oben |
 | ✅ | Kira-Name anpassen | `kira.name` | Eigener Name statt "Kira" (auch in System-Prompt), session-pp + Bug fix session-qq |
 | ✅ | Kira-Persönlichkeit | `kira.persoenlichkeit` | Professionell / Freundlich / Direkt → System-Prompt-Variante, session-pp + Bug fix session-qq |
-| 💡 | Kira-Sprache | `kira.sprache` 🔗 | Deutsch / Englisch / gemischt → System-Prompt |
+| ✅ | Kira-Sprache | `kira.sprache` | Deutsch/Englisch/gemischt → Prompt-Override, session-rr |
 | 💡 | Kira Quick-Actions editieren | `kira.quick_actions[]` | Welche 7 Items im Quick Panel |
 | 💡 | Kira im Hintergrund aktiv | `kira.background_hints` | Push wenn Kira Idee hat |
 

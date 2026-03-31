@@ -5108,6 +5108,19 @@ function esInfoPopup(btn, text) {{
         <div class="es-toggle-vis"></div>
       </label>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Toast-Anzeigedauer (Sekunden)<div class="es-rd">Wie lange Statusmeldungen eingeblendet bleiben (Standard: 4s normal, 10s Fehler)</div></div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:11px;color:var(--text-muted)">Normal
+          <input type="number" id="cfg-toast-dauer-ok" min="1" max="30" value="4"
+                 style="width:48px;margin-left:4px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:11px"
+                 oninput="localStorage.setItem('kira_toast_dauer_ok',this.value);localStorage.setItem('kira_toast_dauer_info',this.value);">s</label>
+        <label style="font-size:11px;color:var(--text-muted)">Fehler
+          <input type="number" id="cfg-toast-dauer-fehler" min="1" max="60" value="10"
+                 style="width:48px;margin-left:4px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:11px"
+                 oninput="localStorage.setItem('kira_toast_dauer_fehler',this.value);">s</label>
+      </div>
+    </div>
   </div>
 
   <div class="es-grp">
@@ -7553,6 +7566,10 @@ function esInfoPopup(btn, text) {{
         <div class="es-rl">Runtime-Log-DB<div class="es-rd">Gr&ouml;&szlig;e der Runtime-Events-Datenbank</div></div>
         <span style="font-size:12px;color:var(--text);font-weight:600">{rl_db_size}</span>
       </div>
+      <div class="es-row" style="margin-top:8px">
+        <div class="es-rl">Datenbank optimieren<div class="es-rd">VACUUM komprimiert alle SQLite-DBs und gibt ungenutzten Speicherplatz frei</div></div>
+        <button class="es-btn" id="btn-vacuum" onclick="dbVacuum()">&#x267B; Komprimieren</button>
+      </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="es-btn" onclick="configExport()">&#x2197; Config exportieren</button>
         <button class="es-btn" onclick="configImport()">&#x2199; Config importieren</button>
@@ -9962,6 +9979,20 @@ function configImport() {{
     reader.readAsText(f);
   }};
   inp.click();
+}}
+
+function dbVacuum() {{
+  const btn = document.getElementById('btn-vacuum');
+  if(btn){{btn.disabled=true;btn.textContent='L\u00e4uft\u2026';}}
+  fetch('/api/db/vacuum',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn){{btn.disabled=false;btn.textContent='\u267B Komprimieren';}}
+      if(d.ok) showToast('\u2713 Datenbanken optimiert \u2014 '+d.dbs+' DBs, '+d.befreit+' freigegeben','ok');
+      else showToast(d.error||'Fehler beim Optimieren','fehler');
+    }}).catch(()=>{{
+      if(btn){{btn.disabled=false;btn.textContent='\u267B Komprimieren';}}
+      showToast('Verbindungsfehler','fehler');
+    }});
 }}
 
 // Änderungsverlauf laden / toggle
@@ -16454,6 +16485,41 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 rlog('settings', 'config_reset', 'Konfiguration auf Werkseinstellungen zurückgesetzt',
                      source='server', modul='einstellungen', actor_type='user', status='ok')
                 self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # DB VACUUM — Komprimierung aller SQLite-Datenbanken
+        if self.path == '/api/db/vacuum':
+            try:
+                import sqlite3 as _sq
+                dbs_to_vacuum = [
+                    KNOWLEDGE_DIR / "tasks.db",
+                    KNOWLEDGE_DIR / "kunden.db",
+                    KNOWLEDGE_DIR / "mail_index.db",
+                    KNOWLEDGE_DIR / "runtime_events.db",
+                ]
+                done = 0
+                freed_bytes = 0
+                for db_path in dbs_to_vacuum:
+                    if not db_path.exists():
+                        continue
+                    size_before = db_path.stat().st_size
+                    try:
+                        conn = _sq.connect(str(db_path))
+                        conn.execute("VACUUM")
+                        conn.close()
+                        freed_bytes += max(0, size_before - db_path.stat().st_size)
+                        done += 1
+                    except Exception:
+                        pass
+                def _fmt_size(b):
+                    if b > 1024*1024: return f"{b/1024/1024:.1f} MB"
+                    if b > 1024: return f"{b/1024:.0f} KB"
+                    return f"{b} B"
+                rlog('system', 'db_vacuum', f'VACUUM auf {done} DBs, {_fmt_size(freed_bytes)} freigegeben',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
+                self._json({'ok': True, 'dbs': done, 'befreit': _fmt_size(freed_bytes)})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
