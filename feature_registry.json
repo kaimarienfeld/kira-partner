@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-zz",
+  "_updated": "session-aaa",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -340,7 +340,8 @@
       "module": "server.py",
       "status": "partial",
       "last_updated": "2026-03-31",
-      "description": "Google Calendar / Outlook Sync für erkannte Termine, Auto-Erinnerung bei Fristen"
+      "description": "Google Calendar / Outlook Sync für erkannte Termine, Auto-Erinnerung bei Fristen",
+      "notes": "Dashboard-Widget + Org-Tab implementiert. Azure Calendars.ReadWrite fehlt (Kai-Aktion)."
     },
     {
       "id": "dokument-vorlagen",
@@ -782,6 +783,23 @@
       "status": "done",
       "last_updated": "2026-03-31",
       "description": "kiraKontextMenuToggle(), 3 Optionen: Aufgaben/Vorgaenge/Kontext-Bar"
+    },
+    {
+      "id": "google-oauth-gmail",
+      "name": "Google OAuth 2.0 / Gmail",
+      "status": "done",
+      "category": "integration",
+      "last_updated": "2026-03-31",
+      "files": [
+        "scripts/google_oauth.py",
+        "scripts/server.py"
+      ],
+      "notes": "Browser-OAuth-Flow, Wizard-Integration, Einstellungen-Gruppe, Callback-Handler",
+      "leni_visible": false,
+      "leni_name": "Google Mail-Anbindung",
+      "leni_desc": "Gmail-Konten hinzufuegen",
+      "icon": "g"
     }
-  ]
+  ],
+  "_total": 64
 }

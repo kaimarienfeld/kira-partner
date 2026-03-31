@@ -7166,15 +7166,20 @@ function esInfoPopup(btn, text) {{
     _wiz.settings.auth=document.getElementById('wiz-auth').value;
     _wiz.settings.passwort=document.getElementById('wiz-pw')?.value||'';
     if(_wiz.settings.auth==='imap_password') _wizSaveImap();
-    else {{ _wiz.step=5; _wizRender(); }}
+    else if(_wiz.settings.auth==='oauth2_google') {{ _wiz.step=5; _wizRender(); setTimeout(_wizStartGoogleOAuth,300); }}
+    else {{ _wiz.step=5; _wizRender(); setTimeout(_wizStartOAuth,300); }}
   }};
 
   function _wizStep5() {{
+    const isGoogle = _wiz.settings.auth === 'oauth2_google';
+    const provider = isGoogle ? 'Google' : 'Microsoft';
+    const providerColor = isGoogle ? '#4285f4' : '#0078d4';
     return `<div class="kira-wiz-step">
       ${{_wizDots(4)}}
-      <div class="kira-wiz-step-label">Microsoft-Anmeldung</div>
+      <div class="kira-wiz-step-label">${{provider}}-Anmeldung</div>
       <h2 class="kira-wiz-title">Browser-Login wird ge\u00f6ffnet</h2>
       <p class="kira-wiz-sub">Ein Browserfenster \u00f6ffnet sich. Melden Sie sich dort mit <strong style="color:var(--text)">${{_wiz.email}}</strong> an und kehren Sie dann hierher zur\u00fcck.</p>
+      ${{isGoogle?'<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:8px">&#x26A0; Google OAuth erfordert eine konfigurierte App in der Google Cloud Console. Credentials bitte in Einstellungen &gt; Integrationen eintragen.</div>':''}}
       <div class="kira-wiz-loading-area"><div class="kira-wiz-spinner"></div><p style="font-size:13px;color:var(--text-muted)">Warte auf Anmeldung\u2026</p></div>
       ${{_wizBtns(`<button class="kira-wiz-btn-sec" onclick="_wizClose()">Abbrechen</button>`, '')}}
     </div>`;
@@ -7205,6 +7210,36 @@ function esInfoPopup(btn, text) {{
       fetch('/api/mail/konto/oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
         if(s.status==='done'){{clearInterval(timer);fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}}).catch(()=>{{}});_wiz.step=6;_wizRender();}}
         else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error;_wizRender();}}
+        else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
+      }}).catch(()=>{{}});
+    }},2000);
+  }}
+
+  function _wizStartGoogleOAuth() {{
+    // Google OAuth: Konto speichern dann Browser-Flow starten
+    const savePromise = _wiz.isReconnect
+      ? Promise.resolve({{ok:true}})
+      : fetch('/api/mail/konto/hinzufuegen',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+          body:JSON.stringify({{email:_wiz.email,beschreibung:_wiz.name||_wiz.email.split('@')[0],
+            auth_methode:'oauth2_google',imap_server:'imap.gmail.com',
+            imap_port:993,imap_ssl:true}})}}).then(r=>r.json());
+    savePromise.then(saved=>{{
+      if(!saved.ok && !_wiz.isReconnect){{showToast('Fehler: '+(saved.error||'?'),'fehler');return;}}
+      return fetch('/api/mail/konto/google-oauth-start',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}})
+        .then(r=>r.json()).then(d=>{{
+          if(!d.ok){{showToast('Google OAuth-Fehler: '+(d.error||'?'),'fehler');_wizClose();return;}}
+          _wiz.jobId=d.job_id;
+          _wizPollGoogleOAuth();
+        }});
+    }}).catch(e=>{{showToast('Fehler: '+e,'fehler');_wizClose();}});
+  }}
+  function _wizPollGoogleOAuth() {{
+    let polls=0;
+    const timer=setInterval(()=>{{
+      polls++;
+      fetch('/api/mail/konto/google-oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
+        if(s.status==='done'){{clearInterval(timer);_wiz.step=6;_wizRender();}}
+        else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error||'Google OAuth fehlgeschlagen';_wizRender();}}
         else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
       }}).catch(()=>{{}});
     }},2000);
@@ -7905,10 +7940,38 @@ function esInfoPopup(btn, text) {{
     </div>
   </div>
 
+  <!-- Google OAuth App -->
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F4D7; Google OAuth 2.0 (Gmail / Google Workspace)</div>
+    <div class="es-grp-sub">Erm&ouml;glicht das Hinzuf&uuml;gen von Gmail-Konten zu KIRA. Erfordert eine OAuth2-App in der Google Cloud Console.</div>
+    <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">
+      <strong style="color:var(--text)">Einrichtung (einmalig):</strong><br>
+      1. <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console</a> &rarr; APIs &amp; Dienste &rarr; Anmeldedaten<br>
+      2. &bdquo;Anmeldedaten erstellen&ldquo; &rarr; OAuth 2.0-Client-IDs &rarr; Webanwendung<br>
+      3. Authorized redirect URI: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">http://localhost:8765/oauth/google/callback</code><br>
+      4. Gmail API aktivieren &rarr; <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" style="color:var(--accent)">Gmail API</a>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Client ID</span><span class="es-row-hint">Aus Google Cloud Console &gt; OAuth2 Client</span></div>
+      <input type="text" id="cfg-google-client-id" placeholder="12345-xxx.apps.googleusercontent.com" style="width:320px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text)">
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Client Secret</span></div>
+      <input type="password" id="cfg-google-client-secret" placeholder="GOCSPX-..." style="width:220px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text)">
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Status</span></div>
+      <span id="google-oauth-status" style="font-size:13px;color:var(--text-muted)">Nicht gepr&uuml;ft</span>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="es-mk-btn" onclick="esGoogleOAuthSpeichern(this)">Speichern</button>
+      <button class="es-mk-btn sec" onclick="esGoogleOAuthTest(this)">&#x26A1; Verbindung testen</button>
+    </div>
+  </div>
+
   <!-- Andere (In Planung) -->
   <div class="es-grp">
     <div class="es-grp-h">Weitere Integrationen</div>
-    <div class="es-intg"><div class="es-intg-ico">&#x1F4C5;</div><div class="es-intg-body"><div class="es-intg-name">Google Calendar</div><div class="es-intg-sub">Termine synchronisieren</div></div><span class="es-badge plan">In Planung</span></div>
     <div class="es-intg"><div class="es-intg-ico">&#x1F4DD;</div><div class="es-intg-body"><div class="es-intg-name">CRM-Export</div><div class="es-intg-sub">Kundendaten exportieren</div></div><span class="es-badge plan">In Planung</span></div>
     <div class="es-intg"><div class="es-intg-ico">&#x1F517;</div><div class="es-intg-body"><div class="es-intg-name">Webhook</div><div class="es-intg-sub">Ereignisse an externe URLs senden</div></div><span class="es-badge plan">In Planung</span></div>
     <div class="es-intg"><div class="es-intg-ico">&#x1F4C8;</div><div class="es-intg-body"><div class="es-intg-name">Buchhaltungs-Export</div><div class="es-intg-sub">Rechnungsdaten exportieren</div></div><span class="es-badge plan">In Planung</span></div>
@@ -7916,13 +7979,22 @@ function esInfoPopup(btn, text) {{
 
   <script>
   function esIntegLoad() {{
-    // WhatsApp-Einstellungen laden
     fetch('/api/einstellungen').then(r=>r.json()).then(d=>{{
+      // WhatsApp
       const wa=d.whatsapp||{{}};
       const el1=document.getElementById('cfg-wa-verify');
       const el3=document.getElementById('cfg-wa-phone-id');
       if(el1) el1.value=wa.verify_token||'';
       if(el3) el3.value=wa.phone_number_id||'';
+      // Google OAuth
+      const go=d.google_oauth||{{}};
+      const gid=document.getElementById('cfg-google-client-id');
+      if(gid) gid.value=go.client_id||'';
+      const gst=document.getElementById('google-oauth-status');
+      if(gst) {{
+        if(go.client_id) gst.innerHTML='<span style="color:#28c850;font-weight:600">&#x2713; Credentials eingetragen</span>';
+        else gst.textContent='Nicht konfiguriert';
+      }}
     }}).catch(()=>{{}});
   }}
   window.esWaSpeichern = function(btn) {{
@@ -7942,6 +8014,36 @@ function esInfoPopup(btn, text) {{
       if(t==='KIRATEST') showToast('Webhook-Verifizierung erfolgreich ✓','ok');
       else showToast('Webhook antwortet falsch: '+t,'warnung');
     }}).catch(()=>showToast('Fehler beim Test','fehler'));
+  }};
+  window.esGoogleOAuthSpeichern = function(btn) {{
+    const cid=document.getElementById('cfg-google-client-id')?.value.trim()||'';
+    const csec=document.getElementById('cfg-google-client-secret')?.value||'';
+    if(!cid){{showToast('Client ID erforderlich','warnung');return;}}
+    if(btn){{btn.disabled=true;btn.textContent='Speichere\u2026';}}
+    const body={{google_oauth:{{client_id:cid,client_secret:csec||undefined}}}};
+    fetch('/api/einstellungen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn){{btn.disabled=false;btn.textContent='Speichern';}}
+      if(d.ok){{
+        showToast('Google OAuth Credentials gespeichert \u2713','ok');
+        const gst=document.getElementById('google-oauth-status');
+        if(gst) gst.innerHTML='<span style="color:#28c850;font-weight:600">&#x2713; Credentials gespeichert</span>';
+      }} else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='Speichern';}}showToast('Fehler','fehler');}});
+  }};
+  window.esGoogleOAuthTest = function(btn) {{
+    if(btn){{btn.disabled=true;btn.textContent='Teste\u2026';}}
+    fetch('/api/google-oauth/test').then(r=>r.json()).then(d=>{{
+      if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}
+      const gst=document.getElementById('google-oauth-status');
+      if(d.ok){{
+        if(gst) gst.innerHTML='<span style="color:#28c850;font-weight:600">&#x2713; Credentials g\u00fcltig</span>';
+        showToast('Google OAuth Credentials g\u00fcltig \u2713','ok');
+      }} else {{
+        if(gst) gst.innerHTML='<span style="color:#c83c3c;font-weight:600">&#x26A0; '+escH(d.error||'Fehler')+'</span>';
+        showToast('Test fehlgeschlagen: '+(d.error||'?'),'fehler');
+      }}
+    }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}showToast('Fehler','fehler');}});
   }};
   window.esMsAppTest = function(btn) {{
     if(btn){{btn.disabled=true;btn.textContent='Teste\u2026';}}
@@ -14281,6 +14383,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             )
             self._respond(200, 'image/x-icon', ico)
 
+        elif self.path.startswith('/oauth/google/callback'):
+            self._handle_google_oauth_callback()
+
         elif self.path in ('/', '/dashboard', '/index.html'):
             html = generate_html()
             self._html(html)
@@ -14591,6 +14696,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path.startswith('/api/mail/konto/oauth-status'):
             self._api_mail_konto_oauth_status()
+
+        elif self.path.startswith('/api/mail/konto/google-oauth-status'):
+            self._api_mail_konto_google_oauth_status()
+
+        elif self.path.startswith('/api/google-oauth/test'):
+            self._api_google_oauth_test()
 
         elif self.path.startswith('/api/mail/konto/volltest-status'):
             self._api_mail_konto_volltest_status()
@@ -16924,6 +17035,102 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    # ── Google OAuth Backend-Methoden (session-aaa) ───────────────────────────
+
+    def _api_mail_konto_google_oauth_start(self, body):
+        """POST /api/mail/konto/google-oauth-start — Google OAuth Browser-Flow starten."""
+        import uuid, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import google_oauth as _go
+        email = body.get('email', '').strip()
+        if not email:
+            self._json({'ok': False, 'error': 'E-Mail fehlt'})
+            return
+        if not _go.credentials_configured():
+            self._json({'ok': False, 'error': 'Google OAuth Credentials fehlen. Bitte in Einstellungen > Integrationen eintragen.'})
+            return
+        job_id = str(uuid.uuid4())[:8]
+        _go.start_oauth_browser_flow(email, job_id)
+        self._json({'ok': True, 'job_id': job_id, 'email': email})
+
+    def _api_mail_konto_google_oauth_status(self):
+        """GET /api/mail/konto/google-oauth-status?job_id= — Google OAuth Job-Status."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import google_oauth as _go
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            job_id = qs.get('job_id', [''])[0]
+            status = _go.get_oauth_job_status(job_id)
+            self._json({'ok': True, **status})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _handle_google_oauth_callback(self):
+        """GET /oauth/google/callback?code=...&state=... — Google OAuth2 Redirect-URI."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import google_oauth as _go
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            code  = qs.get('code',  [''])[0]
+            state = qs.get('state', [''])[0]
+            error = qs.get('error', [''])[0]
+
+            if error:
+                job_id = state.split(':')[0] if ':' in state else state
+                html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Google OAuth</title>
+<style>body{{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#18181b;color:#f5f5f7}}.box{{background:#232328;padding:32px;border-radius:16px;text-align:center;max-width:400px}}</style></head>
+<body><div class="box"><div style="font-size:48px">&#x26A0;</div><h2>Anmeldung abgebrochen</h2><p style="color:#999">{error}</p><p style="font-size:13px;color:#666;margin-top:16px">Sie koennen dieses Fenster schliessen und es in KIRA erneut versuchen.</p></div></body></html>"""
+                self._html(html)
+                return
+
+            if not code:
+                self._html('<html><body>Kein Code erhalten.</body></html>')
+                return
+
+            result = _go.handle_oauth_callback(code, state)
+            if result.get('ok'):
+                email = result.get('email', '')
+                html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Google OAuth</title>
+<style>body{{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#18181b;color:#f5f5f7}}.box{{background:#232328;padding:32px;border-radius:16px;text-align:center;max-width:400px}}</style></head>
+<body><div class="box"><div style="font-size:48px">&#x2705;</div><h2>Gmail verbunden</h2>
+<p style="color:#ccc">Das Konto <strong style="color:#fff">{email}</strong> wurde erfolgreich autorisiert.</p>
+<p style="font-size:13px;color:#666;margin-top:16px">Sie koennen dieses Fenster jetzt schliessen und zu KIRA zurueckkehren.</p></div></body></html>"""
+                self._html(html)
+            else:
+                err_msg = result.get('error', 'Unbekannter Fehler')
+                html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Google OAuth</title>
+<style>body{{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#18181b;color:#f5f5f7}}.box{{background:#232328;padding:32px;border-radius:16px;text-align:center;max-width:400px}}</style></head>
+<body><div class="box"><div style="font-size:48px">&#x274C;</div><h2>Verbindung fehlgeschlagen</h2>
+<p style="color:#c83c3c">{err_msg}</p>
+<p style="font-size:13px;color:#666;margin-top:16px">Bitte schliessen Sie dieses Fenster und versuchen Sie es in KIRA erneut.</p></div></body></html>"""
+                self._html(html)
+        except Exception as e:
+            self._html(f'<html><body>Fehler: {e}</body></html>')
+
+    def _api_google_oauth_test(self):
+        """GET /api/google-oauth/test — Prueft ob Google Credentials konfiguriert sind."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import google_oauth as _go
+            if not _go.credentials_configured():
+                self._json({'ok': False, 'error': 'Credentials nicht konfiguriert'})
+                return
+            cid, _ = _go.get_google_credentials()
+            # Pruefe ob Client ID valides Format hat (*.apps.googleusercontent.com)
+            if 'apps.googleusercontent.com' not in cid and '.googleusercontent.com' not in cid:
+                self._json({'ok': False, 'error': 'Client ID hat ungueliges Format (erwartet: *.apps.googleusercontent.com)'})
+                return
+            self._json({'ok': True, 'info': f'Credentials konfiguriert. Client ID: {cid[:20]}...'})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_konto_reconnect(self, body):
         """POST /api/mail/konto/reconnect — Bestehendes Konto mit Browser-OAuth neu verbinden."""
         import uuid, sys as _sys
@@ -17262,6 +17469,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/oauth-start':
             self._api_mail_konto_oauth_start(body)
+            return
+
+        if self.path == '/api/mail/konto/google-oauth-start':
+            self._api_mail_konto_google_oauth_start(body)
             return
 
         if self.path == '/api/mail/konto/reconnect':

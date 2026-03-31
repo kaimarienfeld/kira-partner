@@ -652,25 +652,30 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | Modal-Transparenz Fix | ✅ Erledigt | vv | --bg-card Variable |
 | Partner-View Premium | ✅ Erledigt | w | Light Mode, Playfair Display |
 
-### Offen / Geplant (aus allen Plaenen konsolidiert)
+### Erledigt (session-zz, 2026-03-31)
+
+| Feature / Komponente | Status | Session | Hinweis |
+|---|---|---|---|
+| Kira Live-Chip im Header | ✅ Erledigt | zz | Status-Chip: idle/scanning/pending/error |
+| Activity-Drawer (Slide-In) | ✅ Erledigt | zz | 400px, nicht-modal, Kira-Aktivitaeten |
+| Mail-Vorlagen + Editor | ✅ Erledigt | zz | Vorlagen-Typen, Kira-Anbindung, Signatur-Zuordnung |
+| Kalender-Widget Dashboard | ⚠️ Partial | zz | Graph-API verdrahtet, braucht Azure Calendars.ReadWrite |
+| Kalender-Tab Organisation | ✅ Erledigt | zz | Live-Terminliste, Toolbar |
+| Direkte E-Mail-Antwort aus Postfach | ✅ Erledigt | bb | Compose + Reply + pfSend + /api/mail/send + mail_sender.py |
+| Kunden-360-Ansicht | ✅ Erledigt | bb | k360-drawer, 5 Tabs, /api/kunden/360 Backend |
+| Geschaeft: Signale-Panel live | ✅ Erledigt | zz | loadGeschKiraSignale, /api/vorgang/signals?alle=1 |
+| Chat: Kontext-Sidebar (Vorgang/Kunde) | ✅ Erledigt | zz | kiraKontextMenuToggle, 3 Aktionen |
+| Wissen: Feedback-Loop-UI | ✅ Erledigt | oo | Thumbs up/down, auto Lernregeln, "Von Kira gelernt" Badge |
+| Einstellungen: Kira-Postfach Gruppe | ✅ Erledigt | zz | Kira sendet von: Konto, Graph-Pruef-Button |
+| Einstellungen: Graph Kalender | ✅ Erledigt | zz | Scope-Status + Pruef-Button |
+| Google OAuth | ✅ Erledigt | aaa | google_oauth.py, Browser-Flow, Wizard, Einstellungen > Integrationen |
+
+### Offen / Geplant
 
 | Feature / Komponente | Status | Prioritaet | Hinweis |
 |---|---|---|---|
-| Kira Live-Chip im Header | ⏳ Offen | Hoch | Status-Chip: idle/scanning/pending/error |
-| Activity-Drawer (Slide-In) | ⏳ Offen | Hoch | 400px, nicht-modal, "Was macht Kira?" |
-| Mail-Vorlagen + Editor | ⏳ Offen | Mittel | Vorlagen-Typen, Kira-Anbindung, Signatur-Zuordnung |
-| Kalender-Widget Dashboard | ⏳ Offen | Mittel | Graph-API /me/calendarView, Top-5 Termine |
-| Kalender-Tab Organisation | ⏳ Offen | Mittel | Monatsansicht, Termin-Modal |
-| Azure Calendars.ReadWrite | ⏳ Offen (Kai) | Mittel | Entra Portal: Permission hinzufuegen |
-| Google OAuth | ⏳ Offen | Niedrig | Neben Microsoft |
-| Direkte E-Mail-Antwort aus Postfach | ⏳ Offen | Hoch | SMTP compose + send |
-| Kunden-360-Ansicht | ⏳ Offen | Mittel | Timeline pro Kunde |
+| Azure Calendars.ReadWrite | ⏳ Offen (Kai) | Mittel | Entra Portal: Permission hinzufuegen (Kalender-Widget dann voll aktiv) |
 | Belegvorlagen-Modul | ⏳ Offen | Niedrig | Angebots-/Rechnungs-Layouts (wie Lexware) |
-| Geschaeft: Signale-Panel live | ⏳ Offen | Mittel | Kira-Vorschlaege aus vorgaenge.signals |
-| Chat: Kontext-Sidebar (Vorgang/Kunde) | ⏳ Offen | Niedrig | Beim Chat anzeigen |
-| Wissen: Feedback-Loop-UI | ⏳ Offen | Niedrig | Thumbs + "Von Kira gelernt" Badge |
-| Einstellungen: Kira-Postfach Gruppe | ⏳ Offen | Mittel | "Kira sendet von: Konto" |
-| Einstellungen: Graph Kalender | ⏳ Offen | Mittel | Scope-Status + Pruef-Button |
 | Sprachmodul | ⏳ Offen | Niedrig | feature_registry |
 | Dokument-Export | ⏳ Offen | Niedrig | feature_registry |
 | Lexware-Anbindung | ⏳ Offen | Niedrig | feature_registry |
@@ -709,27 +714,56 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ---
 
-### Sofort umsetzbar (naechste Sessions)
+### Implementiert (session-zz + session-aaa, 2026-03-31)
 
-1. **Kira Live-Chip + Activity-Drawer** — Header-Status + Slide-In mit "Was macht Kira?"
-2. **Direkte E-Mail-Antwort** — Compose-Modal im Postfach mit SMTP-Versand
-3. **Mail-Vorlagen** — Editor + Kira-Anbindung + Signatur-Zuordnung
-4. **Kalender-Widget** — Dashboard-Kachel mit naechsten 5 Terminen (Graph API)
+#### F-UI-01 — Kira Live-Chip + Activity-Drawer
+**Status:** 🟢 Implementiert (session-zz)
+**Dateien:** `scripts/server.py` (`#kiraLiveChip`, `kira-activity-drawer`, `kiraActivityDrawerOpen()`, `kiraLiveUpdate()`)
+**Beschreibung:** Header-Status-Chip (idle/scanning/pending/error), 400px Slide-In-Drawer mit letzten Kira-Aktivitaeten aus runtime_events.db.
+
+#### F-UI-02 — Direkte E-Mail-Antwort aus Postfach
+**Status:** 🟢 Implementiert (session-bb)
+**Dateien:** `scripts/server.py` (`#pf-compose`, `pfReply()`, `pfForward()`, `pfSend()`), `scripts/mail_sender.py`, `/api/mail/send`
+**Beschreibung:** Compose-Modal mit Von/An/CC/BCC/Betreff/Body, pfReply() befuellt Antwortformular mit Zitatblock, SMTP XOAUTH2 Versand via mail_sender.py, sofortige Indexierung in mail_index.db.
+
+#### F-UI-03 — Mail-Vorlagen Editor
+**Status:** 🟢 Implementiert (session-zz)
+**Beschreibung:** Vorlagen-Typen, Kira-Anbindung, Signatur-Zuordnung.
+
+#### F-UI-04 — Kalender-Widget Dashboard
+**Status:** ⚠️ Partial (session-zz)
+**Beschreibung:** loadDashKalender() + /api/kira/termine verdrahtet. Braucht Azure Calendars.ReadWrite Permission (Kai-Aktion).
+
+#### F-UI-05 — Kunden-360-Ansicht
+**Status:** 🟢 Implementiert (session-bb)
+**Dateien:** `scripts/server.py` (`#k360-drawer`, `pfOpenKunden360()`, `pfShowKunden360()`, `/api/kunden/360`)
+**Beschreibung:** Slide-In-Drawer im Postfach, 5 Tabs (Mails/Tasks/Vorgaenge/Rechnungen/Angebote), Kunden-Avatar + Chips.
+
+#### F-INT-01 — Google OAuth 2.0 fuer Gmail
+**Status:** 🟢 Implementiert (session-aaa)
+**Dateien:** `scripts/google_oauth.py` (neu), `scripts/server.py` (Wizard-Schritt 5 dynamisch, GET /oauth/google/callback, POST /api/mail/konto/google-oauth-start, Einstellungen > Integrationen)
+**Beschreibung:** Vollstaendiger Google OAuth2-Flow (Authorization Code, Token Exchange, Refresh). Browser-Flow identisch mit Microsoft MSAL. Gmail IMAP XOAUTH2 Support. Callback-Handler mit HTML-Bestaetigung. Einstellungen-Gruppe fuer Client ID/Secret.
+
+**Neue API-Endpunkte (session-aaa):**
+- `GET /oauth/google/callback` — OAuth2 Redirect-URI Handler
+- `POST /api/mail/konto/google-oauth-start` — Browser-Flow starten
+- `GET /api/mail/konto/google-oauth-status?job_id=` — Status abfragen
+- `GET /api/google-oauth/test` — Credentials-Validierung
 
 ### Kai-Aktionen erforderlich
 
-- Azure Entra: Calendars.ReadWrite Permission hinzufuegen
-- WhatsApp Business: Token eintragen
-- Leni Gmail-Draft: Passwort-Platzhalter ersetzen
+- **Azure Entra:** Calendars.ReadWrite Permission hinzufuegen (dann ist Kalender-Widget voll funktional)
+- **WhatsApp Business:** Token eintragen (Einstellungen > Integrationen)
+- **Google OAuth App:** Cloud Console Project erstellen, Client ID/Secret in Einstellungen eintragen
+- **Leni Gmail-Draft:** Draft-2 Passwort-Platzhalter ersetzen
 
 ### Bekannte technische Schulden
 
-- `server.py` hat 17.941 Zeilen → server_map.md vor Arbeit lesen
-- Zeilen-Angaben in server_map.md sind ca.-Werte
-- Provider-Persistierung nach OAuth-Login fehlt noch
-- SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2)
-- "Zu Kira hinzufuegen"-Button aus Postfach fehlt
-- Outlook-Kalender iframe-Embed: nur wenn ohne Entra-Setup bei Endkunde moeglich
+- `server.py` hat jetzt **19.400+ Zeilen** → server_map.md vor groesserer Arbeit lesen
+- Zeilen-Angaben in server_map.md sind veraltete ca.-Werte
+- Gmail-IMAP via google_oauth.py: braucht Gmail API aktiviert in Google Cloud Console
+- SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2 fuer Office365)
+- Outlook-Kalender iframe-Embed: nur sinnvoll ohne Entra-Setup
 
 ---
 
@@ -764,4 +798,4 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | 34 Module, 7 DBs, 96 Endpunkte, 23 Tools, 11 Scans*
+*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-03-31 (session-aaa) | 35 Module, 7 DBs, 100 Endpunkte, 23 Tools, 11 Scans*
