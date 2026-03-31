@@ -6,7 +6,10 @@
 
 ## 1. Pflicht-Ablauf jeder Session
 
+Hat vorang: "C:\Users\kaimr\.claude\CLAUDE.md"
+
 ### Session-Start
+
 1. Diese Datei lesen (Regeln)
 2. `session_handoff.json` lesen (letzter Arbeitsstand, offene Punkte, nächster Schritt)
 3. `feature_registry.json` lesen (Feature-Status aller Module)
@@ -16,7 +19,7 @@
    - `_archiv/feature_list.md` lesen
    - `_archiv/only_kais checkliste.md` lesen
    - `knowledge/Todo_checkliste.md` lesen
-   → Mit `feature_registry.json` abgleichen, alle drei Dateien bei Bedarf aktualisieren
+     → Mit `feature_registry.json` abgleichen, alle drei Dateien bei Bedarf aktualisieren
 
 7. **`change_log.jsonl` aufgabenbezogen prüfen** (PFLICHT bei jeder neuen Aufgabe):
    → Relevante Einträge zum Auftrag sammeln: Was ist bereits eingebaut? Was ist noch offen? Was fehlt ganz?
@@ -24,11 +27,13 @@
    → Siehe Abschnitt 1e für Details
 
 ### Session-Start: Größerer Auftrag kommt rein
+
 1. **Sofort** in `user_briefs.md` festhalten — Original-Wortlaut oder treue Rekonstruktion
 2. **Plan-Agent nutzen** (PFLICHT bei größeren Aufträgen): Vor der Implementierung immer `Plan`-Agenten starten, um die beste Umsetzung zu strukturieren — Schritte, betroffene Dateien, Reihenfolge. Direkt danach implementieren. Verhindert vergessene Arbeitsanweisungen und Fehler durch fehlende Planung.
 3. Dann mit der Arbeit beginnen
 
 ### Session-Ende / Nach jeder Änderung
+
 1. **Git Commit** erstellen (immer nach jeder abgeschlossenen Änderung)
    → **pre-commit Hook läuft automatisch** und schreibt atomare Mikro-Einträge in change_log.jsonl
    → Kein manuelles Schreiben nötig — Hook übernimmt das
@@ -43,12 +48,12 @@
    - `_archiv/feature_list.md` aktualisieren
    - `_archiv/only_kais checkliste.md` aktualisieren
    - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
-   → Alle drei mit `feature_registry.json` abgleichen
-10a. **KIRA 2.0 UI-Umbau-Plan aktuell halten** (PFLICHT bei allen UI/UX-Änderungen):
+     → Alle drei mit `feature_registry.json` abgleichen
+     10a. **KIRA 2.0 UI-Umbau-Plan aktuell halten** (PFLICHT bei allen UI/UX-Änderungen):
    - `_analyse/KIRA_2_0_UI_UMBAU_PLAN.md` — Status-Tabellen aktualisieren (✅ done, 📋 offen, 🔧 in Arbeit)
    - Neue To-dos die beim Bauen auffallen direkt eintragen
    - Ist-Zustand-Beschreibungen nach Umbau aktualisieren
-   → Gilt als Referenz für alle KIRA-Umbau-Sessions — immer lesen bevor neue KIRA-UI-Arbeit beginnt
+     → Gilt als Referenz für alle KIRA-Umbau-Sessions — immer lesen bevor neue KIRA-UI-Arbeit beginnt
 10. **Partner-View generieren + automatisch pushen** (PFLICHT):
     ```
     python scripts/generate_partner_view.py        # immer: lokal aktualisieren
@@ -63,6 +68,8 @@
 
 Nach jeder abgeschlossenen Aufgabe IMMER diese Tabelle im Chat ausgeben — gibt Kai Kontrolle und Gewissheit:
 
+Ausnahmeregel — Fortlaufend-Modus: Wenn Kai sinngemäß sagt "ja bitte weiter, entscheide selbst", dann: Aufgaben nach Priorität und Fokus selbst auswählen, Entscheidung vorher mitteilen, fortlaufend ausführen, session_log.md unaufgefordert schreiben — und die Tabelle erst ganz am Ende, wenn alles erledigt ist, ausgeben.
+
 ```
 ## ✅ Erledigt — [Aufgaben-Titel] · [DATUM] [UHRZEIT]
 
@@ -76,9 +83,10 @@ Nach jeder abgeschlossenen Aufgabe IMMER diese Tabelle im Chat ausgeben — gibt
 | 🔜 Empfohlener nächster Schritt | [Was als nächstes sinnvoll wäre] |
 ```
 
-Regel: Tabelle kommt IMMER — auch bei kleinen Aufgaben (1 Zeile reicht dann). Kai soll nicht nachfragen müssen ob alles gemacht wurde.
+Regel: Tabelle kommt IMMER (außer bei Ausnahmeregel) — auch bei kleinen Aufgaben (1 Zeile reicht dann). Kai soll nicht nachfragen müssen ob alles gemacht wurde.
 
 ### Nach Leni-Feedback (Workflow)
+
 1. Kai gibt Leni-Feedback mit "Alles für Claude kopieren" (Admin-Panel) → fügt in Chat ein
 2. Claude prüft jedes Feedback-Item:
    - Sinnvoll & machbar? → formuliert Update-Vorschlag für Kai
@@ -96,11 +104,12 @@ Regel: Tabelle kommt IMMER — auch bei kleinen Aufgaben (1 Zeile reicht dann). 
 
 ## 1b. Crash-Backup: session_log.md
 
-**Datei:** `knowledge/session_log.md` (append-only, niemals überschreiben)
+**Datei:** `knowledge/session_log.md` (append-only)
 
 **WICHTIG: Alle Einträge IMMER mit Datum UND Uhrzeit** — gilt auch für alle anderen Tracking-Dateien (session_handoff.json, known_issues.json, AGENT.md Protokoll, etc.)
 
 **Format für jeden Eintrag:**
+
 ```
 ## 2026-MM-DD HH:MM — Session-Start
 **Auftrag:** [Kai's vollständiger Prompt / Arbeitsanweisung — Original-Wortlaut]
@@ -118,12 +127,15 @@ Regel: Tabelle kommt IMMER — auch bei kleinen Aufgaben (1 Zeile reicht dann). 
 ```
 
 **Wann eintragen:**
+
 - Session-Start: Kai's erster Prompt → sofort als Eintrag
 - Mid-Session: Jede neue Teilaufgabe von Kai → Eintrag nach Schema
 - Session-Ende: Abschluss-Eintrag mit Status
 
 **Crash-Recovery (kein Nachfragen):**
 Bei Status "offen" oder "crash": session_log.md + App/Git-Zustand prüfen → selbst rekonstruieren was fertig war und was offen → direkt weiterführen. Kai fragt aktiv wenn er Kontext braucht ("Was war die letzte Aufgabe?") — dann: Datei lesen, App prüfen, Bericht + sofort weiterführen.
+
+Keine Rückfrage nötig: session_log.md und session_handoff.json werden IMMER und selbstständig geschrieben — bei Session-Start, mid-Session und Session-Ende. Kein "Darf ich eintragen?", kein "Soll ich aktualisieren?". Diese beiden Dateien sind Pflicht-Protokoll, das läuft automatisch im Hintergrund. Kai muss das nicht bestätigen.
 
 ---
 
@@ -139,12 +151,12 @@ Bei Status "offen" oder "crash": session_log.md + App/Git-Zustand prüfen → se
 
 **Die 3 Listen immer synchron halten:**
 
-| Datei | Zweck |
-|---|---|
-| `knowledge/Todo_checkliste.md` | Detaillierte Status-Checkliste pro Feature-Element |
-| `feature_registry.json` | Maschinenlesbare Feature-Liste (für Partner-View) |
-| `_archiv/feature_list.md` | Technische Übersicht mit Datei:Zeile Referenzen |
-| `_archiv/only_kais checkliste.md` | Kais persönliche Wunschliste + Prioritäten |
+| Datei                             | Zweck                                              |
+| --------------------------------- | -------------------------------------------------- |
+| `knowledge/Todo_checkliste.md`    | Detaillierte Status-Checkliste pro Feature-Element |
+| `feature_registry.json`           | Maschinenlesbare Feature-Liste (für Partner-View)  |
+| `_archiv/feature_list.md`         | Technische Übersicht mit Datei:Zeile Referenzen    |
+| `_archiv/only_kais checkliste.md` | Kais persönliche Wunschliste + Prioritäten         |
 
 ---
 
@@ -154,27 +166,28 @@ Bei Status "offen" oder "crash": session_log.md + App/Git-Zustand prüfen → se
 
 ### KEIN Push — technische/interne Änderungen
 
-| Kategorie | Beispiele |
-|---|---|
-| Regeländerungen | AGENT.md, MEMORY.md, session_log.md, feedback_*.md |
-| Tracking-Dateien | session_handoff.json, known_issues.json, server_map.md, change_log.jsonl |
-| Reparaturen / Bugfixes | Mail-Monitor-Bug, Server-Crashes, Encoding-Fixes, API-404-Fixes |
-| Konfiguration | config.json, secrets.json Änderungen |
-| Interne Infra | runtime_log.py, activity_log.py, diff_to_changelog.py |
+| Kategorie                         | Beispiele                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| Regeländerungen                   | AGENT.md, MEMORY.md, session*log.md, feedback*\*.md                                 |
+| Tracking-Dateien                  | session_handoff.json, known_issues.json, server_map.md, change_log.jsonl            |
+| Reparaturen / Bugfixes            | Mail-Monitor-Bug, Server-Crashes, Encoding-Fixes, API-404-Fixes                     |
+| Konfiguration                     | config.json, secrets.json Änderungen                                                |
+| Interne Infra                     | runtime_log.py, activity_log.py, diff_to_changelog.py                               |
 | feature_registry ohne leni-Effekt | Nur `notes`-Feld oder interne Status-Tags geändert, keine neuen sichtbaren Features |
-| Session-Bookkeeping | Nur Tracking-Commits (chore/fix/docs ohne App-Änderung) |
+| Session-Bookkeeping               | Nur Tracking-Commits (chore/fix/docs ohne App-Änderung)                             |
 
 ### PUSH — Leni-relevante Änderungen
 
-| Kategorie | Beispiele |
-|---|---|
-| Neues Feature eingebaut | Status `planned` → `done` bei leni_visible=true Feature |
-| Neues Feature in Registry | Neues Feature mit `leni_visible=true` hinzugefügt |
-| Leni-Idee umgesetzt | Status `leni_idea` → `leni_done` |
-| Sichtbare UI-Verbesserung | Dashboard-Redesign, neue Ansicht, neue Funktion die Leni kennt |
+| Kategorie                   | Beispiele                                                          |
+| --------------------------- | ------------------------------------------------------------------ |
+| Neues Feature eingebaut     | Status `planned` → `done` bei leni_visible=true Feature            |
+| Neues Feature in Registry   | Neues Feature mit `leni_visible=true` hinzugefügt                  |
+| Leni-Idee umgesetzt         | Status `leni_idea` → `leni_done`                                   |
+| Sichtbare UI-Verbesserung   | Dashboard-Redesign, neue Ansicht, neue Funktion die Leni kennt     |
 | Wichtige Funktion repariert | Wenn die Funktion Leni-sichtbar ist (z.B. Mail-Eingang, Kira-Chat) |
 
 ### Entscheidungs-Check (2 Sekunden)
+
 ```
 Hat sich feature_registry.json geändert UND
   ist mindestens 1 Feature mit leni_visible=true betroffen UND
@@ -185,14 +198,14 @@ Hat sich feature_registry.json geändert UND
 
 ### Einrichtung (2026-03-29 — einmalig erledigt, NICHT nochmal ausführen)
 
-| Was | Wert |
-|-----|------|
-| Lokales Repo-Verzeichnis | `C:/Users/kaimr/kira-partner/` |
-| Geklont von | `https://github.com/kaimarienfeld/kira-partner` |
-| config.json Key | `partner_github_repo_dir` = `C:/Users/kaimr/kira-partner` (Top-Level!) |
-| git user (im Repo) | `Kai Marienfeld` / `kaimrf@rauMKultSichtbeton.onmicrosoft.com` |
-| PAT | in `scripts/secrets.json` → `github_pat` |
-| Leni-URL | **https://kaimarienfeld.github.io/kira-partner/** |
+| Was                      | Wert                                                                   |
+| ------------------------ | ---------------------------------------------------------------------- |
+| Lokales Repo-Verzeichnis | `C:/Users/kaimr/kira-partner/`                                         |
+| Geklont von              | `https://github.com/kaimarienfeld/kira-partner`                        |
+| config.json Key          | `partner_github_repo_dir` = `C:/Users/kaimr/kira-partner` (Top-Level!) |
+| git user (im Repo)       | `Kai Marienfeld` / `kaimrf@rauMKultSichtbeton.onmicrosoft.com`         |
+| PAT                      | in `scripts/secrets.json` → `github_pat`                               |
+| Leni-URL                 | **https://kaimarienfeld.github.io/kira-partner/**                      |
 
 > Wenn das Repo-Verzeichnis fehlt oder beschädigt ist:
 > `git clone https://[PAT]@github.com/kaimarienfeld/kira-partner.git C:/Users/kaimr/kira-partner`
@@ -207,6 +220,7 @@ Hat sich feature_registry.json geändert UND
 **Wann:** Pflicht bei jeder neuen Aufgabe — besonders bei Features, Bugfixes oder Umbauten.
 
 **Wie:**
+
 ```
 API-Aufruf: GET /api/changelog?limit=200&search=[Stichwort]
 oder: python scripts/change_log.py --search "[Stichwort]"
@@ -214,15 +228,16 @@ oder: python scripts/change_log.py --search "[Stichwort]"
 
 **Auswertung — 3 Kategorien:**
 
-| Kategorie | Bedeutung | Konsequenz |
-|---|---|---|
-| ✅ Bereits eingebaut | Eintrag zeigt Feature/Fix existiert | Nur prüfen ob noch aktuell, nicht neu bauen |
-| 🔧 Teilweise / WIP | Mehrere Einträge aber kein abschließender | Fortführen, nicht von Null beginnen |
-| ❌ Nicht enthalten | Kein passender Eintrag | Neu implementieren ohne Rücksicht auf Altlasten |
+| Kategorie            | Bedeutung                                 | Konsequenz                                      |
+| -------------------- | ----------------------------------------- | ----------------------------------------------- |
+| ✅ Bereits eingebaut | Eintrag zeigt Feature/Fix existiert       | Nur prüfen ob noch aktuell, nicht neu bauen     |
+| 🔧 Teilweise / WIP   | Mehrere Einträge aber kein abschließender | Fortführen, nicht von Null beginnen             |
+| ❌ Nicht enthalten   | Kein passender Eintrag                    | Neu implementieren ohne Rücksicht auf Altlasten |
 
 **Suchstrategie:** Auftragsbezogene Schlüsselwörter (Dateiname, Funktion, Feature-ID, Modul) → Ergebnis kurz zusammenfassen → dann erst umsetzen.
 
 **Beispiel:**
+
 > Auftrag: "Mail-Archiv einbauen"
 > → Search: "archiv", "mail_monitor", "eml", "sync_source"
 > → Findet: 12 Einträge für mail_monitor.py, letzter 2026-03-29 — archiv_import sync_source bereits vorhanden
@@ -268,7 +283,8 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 
 ## 4. Kritische technische Regeln
 
-### Kira-Workspace UI (kq-* / kw-*)
+### Kira-Workspace UI (kq-_ / kw-_)
+
 - CSS-Prefix `kq-*` = Quick Panel, `kw-*` = Workspace
 - Workspace: 3 Spalten (kw-ctx-panel 240px | kw-center flex:1 | kw-tools 240px)
 - `kiraSendBtn` muss `<button>` sein (nicht `<div>`) damit `.disabled` funktioniert
@@ -276,6 +292,7 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 - Alte CSS-Klassen `kira-quick-*` und `kira-ws-*` sind vollständig entfernt
 
 ### Runtime-Log (session-h)
+
 - Neues Modul: `scripts/runtime_log.py` + DB: `knowledge/runtime_events.db`
 - 5 Event-Typen: `ui`, `kira`, `llm`, `system`, `settings`
 - `elog()` wirft NIE Exceptions, gibt event_id zurück
@@ -283,11 +300,13 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 - Kira kann Logs via `runtime_log_suchen` Tool lesen (wenn `kira_darf_lesen=True`)
 
 ### Server-Architektur
+
 - ThreadedHTTPServer auf 127.0.0.1:8765
 - `do_GET` / `do_POST` in `DashboardHandler`
 - Alle f-strings in HTML-Strings: JS-Code mit `{{}}` escapen
 
 ### Datenbanken
+
 - `tasks.db`: Aufgaben, corrections, wissen_regeln, kira_konversationen, etc.
 - Niemals DB-Schema ohne Migration ändern
 - `get_db()` gibt Row-Factory-Connection zurück
@@ -310,6 +329,7 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.
 
 **Kurzliste prioritär:**
+
 - [ ] Direkte E-Mail-Antwort aus Dashboard (SMTP)
 - [ ] Kira Tagesstart-Briefing (Morgen-Zusammenfassung)
 - [ ] Kunden-360-Ansicht (Timeline pro Kunde)
@@ -322,10 +342,10 @@ Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.
 
 ## 7. Session-Protokoll (laufend)
 
-| Session | Datum | Was |
-|---------|-------|-----|
-| session-g | 2026-03-27 | Kira-Workspace UI Rebuild (kq-*/kw-*, 3-Spalten, Quick Panel) |
-| session-h | 2026-03-27 | Runtime-Log-System (runtime_log.py, server.py Integration, Einstellungen-UI) |
-| session-i | 2026-03-27 | Memory-System ausgebaut (server_map, ADRs, known_issues, user_briefs, UEBERSICHT aktuell) |
-| session-j | 2026-03-27 | Vollständiges Runtime-Logging: mail_monitor+daily_check+13 JS _rtlog-Calls, Kira nutzt Logs aktiv, reichhaltige Einstellungen-Karte |
-| session-y | 2026-03-29 | Mail-Bug-Fix (_index_mail immer) + WhatsApp Business Cloud API + Mail & Konten Overhaul + Integrationen UI + ISS-015 behoben |
+| Session   | Datum      | Was                                                                                                                                  |
+| --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| session-g | 2026-03-27 | Kira-Workspace UI Rebuild (kq-_/kw-_, 3-Spalten, Quick Panel)                                                                        |
+| session-h | 2026-03-27 | Runtime-Log-System (runtime_log.py, server.py Integration, Einstellungen-UI)                                                         |
+| session-i | 2026-03-27 | Memory-System ausgebaut (server_map, ADRs, known_issues, user_briefs, UEBERSICHT aktuell)                                            |
+| session-j | 2026-03-27 | Vollständiges Runtime-Logging: mail_monitor+daily_check+13 JS \_rtlog-Calls, Kira nutzt Logs aktiv, reichhaltige Einstellungen-Karte |
+| session-y | 2026-03-29 | Mail-Bug-Fix (\_index_mail immer) + WhatsApp Business Cloud API + Mail & Konten Overhaul + Integrationen UI + ISS-015 behoben        |

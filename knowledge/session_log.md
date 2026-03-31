@@ -1,6 +1,6 @@
 # Session-Log — Crash-Backup & Auftrags-Protokoll
 
-> Append-only. Niemals Einträge löschen oder überschreiben.
+> Append-only. Wird automatisch ohne Nachfrage geschrieben.
 > Zweck: Crash-Recovery. Beim Start immer letzten Eintrag prüfen!
 
 ---
@@ -11,16 +11,18 @@
 **Status:** erledigt
 
 ---
+
 **Erledigt:**
-- _process_mail() Bug behoben: _index_mail() wird jetzt immer aufgerufen (auch Newsletter/Ignorieren)
+
+- \_process_mail() Bug behoben: \_index_mail() wird jetzt immer aufgerufen (auch Newsletter/Ignorieren)
 - State-Rollback: alle Konten last_uid -50 für Re-Fetch
 - WhatsApp Business Cloud API vollständig implementiert (GET Hub-Verifizierung, POST HMAC-SHA256)
 - Mail & Konten UI Komplettumbau: Konto-Karten mit echten Stats, Abrufen/Testen/Token-Buttons, Archiv-Panel
 - Integrationen-Sektion: WhatsApp-Konfigurationsformular
 - ISS-015: GET /api/einstellungen 404 behoben
 - Alle Tracking-Dateien aktualisiert (session_handoff, known_issues, feature_registry, server_map, AGENT.md)
-**Offen geblieben:** Konto-Löschen im UI nur Toast (nicht vollständig verdrahtet). WhatsApp-Token muss Kai noch eintragen.
-**Status:** erledigt
+  **Offen geblieben:** Konto-Löschen im UI nur Toast (nicht vollständig verdrahtet). WhatsApp-Token muss Kai noch eintragen.
+  **Status:** erledigt
 
 ---
 
@@ -30,10 +32,12 @@
 **Status:** offen
 
 ### 2026-03-29 22:40 — Neue Teilaufgabe
+
 **Auftrag:** Korrekturen an den 5 Regeln: (1) Alle Dateien immer mit Datum+Uhrzeit. (2) session_log.md auch mid-session befüllen nach Schema. (3) Crash-Recovery ohne Nachfragen — selbst rekonstruieren. (4) Partner-View Regel 3 automatisch (kein Nachfragen).
 **Status:** erledigt
 
 ## 2026-03-29 22:42 — Session-Ende (session-z)
+
 **Erledigt:** AGENT.md vollständig aktualisiert mit 5 neuen Regeln + 4 Korrekturen. session_log.md Datei erstellt. MEMORY.md aktualisiert. Alle committed.
 **Offen geblieben:** —
 **Status:** erledigt
@@ -46,6 +50,7 @@
 **Status:** erledigt
 
 ## 2026-03-29 05:35 — Session-Ende (session-aa)
+
 **Erledigt:** Alle 6 Session-Start-Schritte ausgeführt. session_log.md gelesen (kein Crash). Auftrag eingetragen. feature_registry abgeglichen (42 Features, done=26). Todo_checkliste.md Abschnitt 7+8 aktualisiert (session-y Änderungen eingetragen). Partner-View lokal generiert — kein Push (keine leni_visible Features geändert diese Session).
 **Offen geblieben:** —
 **Status:** erledigt
@@ -58,12 +63,14 @@
 **Status:** erledigt
 
 ---
+
 **Erledigt:**
+
 - AGENT.md: Session-Start Step 7 — change_log.jsonl aufgabenbezogen prüfen (neues Kapitel 1e)
-- MSAL OAuth mit zentraler KIRA Entra App (a0591b2d): _msal_app_kira(), start_oauth_browser_flow(), get_oauth_job_status()
+- MSAL OAuth mit zentraler KIRA Entra App (a0591b2d): \_msal_app_kira(), start_oauth_browser_flow(), get_oauth_job_status()
 - 3-stufige Provider-Erkennung: Stage1 (Domain-Heuristik) → Stage2 (DNS-MX/Autodiscover) → Stage3 (MS OpenID-Probe) — detect_provider_advanced()
 - Mailbird-Stil 6-Schritt-Konto-Assistent: Overlay-Wizard, Anbietererkennung mit Stufen-Fortschritt, Expert-Mode (IMAP/Exchange/EWS/POP3), OAuth-Browser-Flow
-- Exchange/EWS-Protokoll im Expert-Schritt: _wizProtoChange() zeigt EWS-Server-Feld dynamisch
+- Exchange/EWS-Protokoll im Expert-Schritt: \_wizProtoChange() zeigt EWS-Server-Feld dynamisch
 - Echte Verbindungsampel (grün/gelb/rot): run_full_connection_test() IMAP+SMTP+30s Roundtrip, check_account_health() Background-IMAP, Ampel in Einstellungen/Postfach/Sidebar
 - Reconnect-Funktion für bestehende Konten (start_oauth_browser_flow mit existierendem Konto)
 - Microsoft App Test: /api/mail/microsoft-app/test → OIDC-Endpoint Prüfung
@@ -72,9 +79,10 @@
 - info@raumkult.eu korrekt als Microsoft erkannt via DNS-MX-Prüfung (Stage 2)
 - Token/Client-ID-Prinzip aus UI entfernt — nur noch zentrale KIRA App
 - Neue API-Endpunkte: /api/mail/provider-detect, /api/mail/konto/oauth-start, /api/mail/konto/oauth-status, /api/mail/konto/health, /api/mail/konto/health-check, /api/mail/konto/volltest, /api/mail/konto/volltest-status, /api/mail/konto/reconnect, /api/mail/microsoft-app/test
-**Offen geblieben:** Google OAuth noch nicht verdrahtet. Provider nach OAuth-Login nicht persistiert. Import aus anderem Mail-Client: UI-Karte vorbereitet, Logik fehlt. SMTP-Test für IMAP-Password-Konten (Volltest nutzt aktuell nur OAuth/XOAUTH2).
+  **Offen geblieben:** Google OAuth noch nicht verdrahtet. Provider nach OAuth-Login nicht persistiert. Import aus anderem Mail-Client: UI-Karte vorbereitet, Logik fehlt. SMTP-Test für IMAP-Password-Konten (Volltest nutzt aktuell nur OAuth/XOAUTH2).
 
 ## 2026-03-29 — Session-Ende (session-bb)
+
 **Status:** erledigt
 
 ---
@@ -85,15 +93,17 @@
 **Status:** erledigt
 
 **Erledigt:**
+
 - AGENT.md: Neue Regel in "Session-Start: Größerer Auftrag" — Plan-Agent Pflicht vor Implementierung
 - config.json Bug: mail_archiv.pfad war leer ("") → wiederhergestellt auf korrekten Archiv-Pfad. Ursache: war in Arbeitskopie gelöscht, nie committed.
-- mail_monitor.py Bug: _save_to_archive() erhielt label=`anfrage` statt email_addr=`anfrage@raumkult.eu` → Ordner `anfrage/` statt `anfrage_raumkult_eu/` → Fix: email_addr übergeben. Die 12.507 Mails im alten Archiv (anfrage_raumkult_eu etc.) sind vollständig erhalten und intakt.
+- mail_monitor.py Bug: \_save_to_archive() erhielt label=`anfrage` statt email_addr=`anfrage@raumkult.eu` → Ordner `anfrage/` statt `anfrage_raumkult_eu/` → Fix: email_addr übergeben. Die 12.507 Mails im alten Archiv (anfrage_raumkult_eu etc.) sind vollständig erhalten und intakt.
 - Erklärung Doppelordner: Neue Ordner (anfrage/ info/ invoice/ kaimrf/ shop/) entstanden durch falsches Label im mail_monitor — können gelöscht werden.
 - Toast-Kopierbutton: größer (16px, Rahmen, Padding), JS-Fallback via execCommand wenn clipboard API nicht verfügbar
 - session_handoff.json aktualisiert mit offenen Punkten
-**Offen geblieben:** Neue (falsch benannte) Ordner `anfrage/`, `info/`, `invoice/`, `kaimrf/`, `shop/` können vom User manuell gelöscht werden.
+  **Offen geblieben:** Neue (falsch benannte) Ordner `anfrage/`, `info/`, `invoice/`, `kaimrf/`, `shop/` können vom User manuell gelöscht werden.
 
 ## 2026-03-29 — Session-Ende (session-cc)
+
 **Status:** erledigt
 
 ---
@@ -116,9 +126,10 @@
 
 **Diagnose:** mail_monitor war immer korrekt. Dashboard-Problem: geschaeft.typ = Raw-DB-Werte ohne Label-Mapping + organisation-Badge "heute" für vergangene Termine.
 
-**Umsetzung:** build_dashboard() server.py: (1) _TYP_LABELS dict: sonstiger_vorgang→"Vorgang", zahlungserinnerung→"Zahlungserinnerung" etc. (2) Farbprüfung auf raw_typ (zuverlässig). (3) _ORG_TYP dict: termin/frist/rueckruf→Deutsch. (4) Badge "⚠ überfällig" statt "heute" wenn diff < 0. Commit 1e4ca49.
+**Umsetzung:** build_dashboard() server.py: (1) \_TYP_LABELS dict: sonstiger_vorgang→"Vorgang", zahlungserinnerung→"Zahlungserinnerung" etc. (2) Farbprüfung auf raw_typ (zuverlässig). (3) \_ORG_TYP dict: termin/frist/rueckruf→Deutsch. (4) Badge "⚠ überfällig" statt "heute" wenn diff < 0. Commit 1e4ca49.
 
 ## 2026-03-29 — Session-Ende (session-gg)
+
 **Status:** erledigt
 
 ---
@@ -136,7 +147,9 @@
 **Status:** erledigt
 
 ---
+
 **Erledigt:**
+
 - Phase 0: `_ensure_geloeschte_protokoll_table()` + `geloeschte_protokoll`-Tabelle in tasks.db (mit Indizes)
 - Phase 1: `mail_monitor.py` — `_get_sync_ordner()` + `_ordner_erlaubt()` config-basiert. `ORDNER_EINSCHLIESSEN`/`AUSSCHLIESSEN` hardcoded durch config-Logik ersetzt. Entwürfe+Gelöschte Elemente verdrahtet.
 - Phase 2: 3 neue API-Endpunkte: POST `/api/mail/konto/postfach-ordner`, POST `/api/mail/verschieben`, GET `/api/mail/protokoll`
@@ -146,9 +159,10 @@
 - Phase 6: `kira_llm.py _build_data_context()` — GELÖSCHTE MAILS PROTOKOLL Sektion (letzte 20)
 - Phase 7: Tests — UTF-7-Decoding-Bug gefunden+gefixt, ordner-als-Liste-Handling, `_ensure_geloeschte_protokoll_table()` on-demand in Protokoll-Endpoint
 - Bugs: (1) IMAP Modified UTF-7 nicht decodiert → Entwürfe/Gelöschte nicht erkannt. (2) ordner als Array statt String im Handler. (3) Protokoll-Tabelle nur on-demand erstellt.
-**Offen geblieben:** Einstellungen-UI für `bereinigung_frist_tage`. Mail-Verschieben mit echten Mails testen.
+  **Offen geblieben:** Einstellungen-UI für `bereinigung_frist_tage`. Mail-Verschieben mit echten Mails testen.
 
 ## 2026-03-30 — Session-Ende (session-hh)
+
 **Status:** erledigt
 
 ---
@@ -159,14 +173,16 @@
 **Status:** erledigt
 
 ## 2026-03-30 — Session-Ende (session-ll)
+
 **Erledigt:**
+
 - kira_llm.py: `ModelNotFoundError` Klasse, `_MODEL_CACHE`/TTL, `_send_ntfy_push()`, `_fetch_provider_models()` (24h-Cache, alle 4 Provider-Typen), `_model_in_list()`, `_validate_model()`, `_auto_update_model()` (config.json + ntfy), `validate_all_providers()` (schreibt state-file)
 - kira_llm.py: `_call_anthropic()` + `_call_openai_compat()` fangen Modell-404/NotFoundError → Auto-Update + `ModelNotFoundError` → Fallback auf nächsten Provider
 - server.py: Import erweitert, `POST /api/kira/provider/check-models` Endpoint, 🟡 Status-Icon für veraltete Modelle, 🔍 Modell-Button pro Provider-Karte, Stale-Model-Warnung (gelb), `checkProviderModel()` JS-Funktion, `_model_validation_loop` Hintergrund-Thread (20s + 24h)
 - KIRA_SYSTEM_ANALYSE.md: Aktualisiert (session-kk + session-ll Änderungen, alle behobenen Fehler markiert, neue Sektion 3.5 Modell-Validierung, neue Endpunkte, aktualisierte Prioritäts-Matrix)
 - Beide Dateien syntaktisch korrekt (py_compile OK)
-**Offen geblieben:** FEHLER-05 (NULL-Check mail_monitor), FEHLER-07 (State-File Race Condition) — weiterhin offen.
-**Status:** erledigt
+  **Offen geblieben:** FEHLER-05 (NULL-Check mail_monitor), FEHLER-07 (State-File Race Condition) — weiterhin offen.
+  **Status:** erledigt
 
 ---
 
@@ -176,26 +192,29 @@
 **Status:** erledigt
 
 **Erledigt:**
-- Bug: pfBulkDelete/pfBulkMarkRead/pfClearSelection als window.* exponiert (IIFE-Scope-Problem)
+
+- Bug: pfBulkDelete/pfBulkMarkRead/pfClearSelection als window.\* exponiert (IIFE-Scope-Problem)
 - Favoriten: pfSelectFolder bereinigt active von .pf-fav-item + data-konto/data-folder Attribute für Highlight
 - Badge: INBOX=fetter blauer Badge, Entwürfe=grauer Italic-Total-Badge, Snooze-Ordner=gelb, andere=wie gehabt
 - Combined Postfach: "Ungelesene" (folder_type=unread, nur gelesen=0 INBOX-Mails) + "Erinnert mich" (folder_type=snoozed) Sub-Items
 - Aktionsleiste: pf-bulk-bar mit Single-Modus (Antworten/Allen/Weiterleiten/Löschen/Kennzeichnen/Heften/Erinnern/Verschieben) + Bulk-Modus getrennt; pfOpenMail ruft pfUpdateBulkBar auf
 - Snooze: snooze_until Spalte in mails, POST /api/mail/snooze + GET /api/mail/snooze/count, IMAP-Ordner auto-CREATE + in sync_ordner eintragen, Dropdown mit 7 Presets + Freitext-Parser (2h30m / YYYY-MM-DD HH:MM), Snooze-Badge auf Mail-Item, Snooze-Wecker-Thread alle 60s, Inbox filtert snoozed-Mails aus
 - kira_llm.py: SCHLAFENDE MAILS-Sektion ohne Limit (alle aktiven Snooze-Mails)
-**Offen geblieben:** Google OAuth, SMTP-Passwort-Auth, Stats-Zeile klickbar, Wissens-DB auto-pflege
+  **Offen geblieben:** Google OAuth, SMTP-Passwort-Auth, Stats-Zeile klickbar, Wissens-DB auto-pflege
 
 ## 2026-03-30 — Session-Ende (session-ii)
+
 **Status:** erledigt
 
 ---
 
 ## 2026-03-30 — Session-Start (session-jj)
 
-**Auftrag:** Vollständige System-Analyse erstellen (_analyse/KIRA_SYSTEM_ANALYSE.md) + alle gefundenen Fehler direkt beheben: Modell-ID veraltet, hardcoded Pfade, stummes Logging im Daemon-Modus, DB-Verbindungs-Leaks, SyntaxWarnings in server.py.
+**Auftrag:** Vollständige System-Analyse erstellen (\_analyse/KIRA_SYSTEM_ANALYSE.md) + alle gefundenen Fehler direkt beheben: Modell-ID veraltet, hardcoded Pfade, stummes Logging im Daemon-Modus, DB-Verbindungs-Leaks, SyntaxWarnings in server.py.
 **Status:** erledigt
 
 ## 2026-03-30 — Session-Ende (session-jj)
+
 **Erledigt:** System-Analyse + 10 Bugfixes (ISS-003/018/019/020/021). Commit 9103bd6.
 **Offen geblieben:** Keine.
 **Status:** erledigt
@@ -203,25 +222,28 @@
 ---
 
 ## 2026-03-30 10:00 — Session-Start (session-kk)
+
 **Auftrag:** Postfach: (1) Mail-Inhalt Rendering kaputt — bei EML nur kleines Stück sichtbar (iframe height), Text-Mails zeigen JSON/Formatierungs-Elemente. (2) Kira-Button: extrem präsent machen, klick führt ins leere beheben — Kira soll Chatfenster öffnen mit kompletten Mail-Kontext, Auto-Send, lädt Kundenverlauf vor, "stelle gerade Informationen zusammen" Meldung.
 **Status:** erledigt
 
 ## 2026-03-30 10:45 — Session-Ende (session-kk)
-**Erledigt:** 
+
+**Erledigt:**
+
 - A1: iframe height fix — min-height:0 + iframe-mode CSS-Klasse, overflow:hidden
 - A2: Text-Rendering — HTML-Entities dekodieren, HTML-in-Text als iframe
 - B4: GET /api/mail/kira-kontext — volltext EML + letzte 5 Absender-Mails + offene Tasks
 - B1: Kira-Button — prominent lila, Glow, Kira-Icon mit Augen+Lächeln
 - B2: pfKiraMailContext() — openKiraWorkspace (kein showPanel), Lade-Spinner, Auto-Send, 5000 Zeichen + Verlauf + Tasks
 - B3: kiraSetQuickActions 'mail'-Typ
-Commit: 66241b0
-**Offen geblieben:** Keine.
-**Status:** erledigt
+  Commit: 66241b0
+  **Offen geblieben:** Keine.
+  **Status:** erledigt
 
 ---
 
-
 ## 2026-03-30 — Session-Start (session-mm)
+
 **Auftrag:** Postfach / Mail-Arbeitsfläche Komplett-Umbau nach neuen HTML-Vorlagen (02_postfach_action_ribbon_v4.html, 02_postfach_attachment_bar_v1.html, 02_postfach_mail_viewer_states_v1.html, 02_postfach_mail_detail_header_v1.html, 02_postfach_mail_detail_focus_v1.html, 02_postfach_thread_hints_v1.html, 02_postfach_image_gallery_viewer_v1.html). Ziele: (1) Feste Hauptleiste/Ribbon über Postfach (Outlook-Style, Vollmodus/Kompaktmodus mit Pfeil, keine Scrollbalken). (2) Alle Ribbon-Aktionen funktional anbinden. (3) Mail-Kopfbereich neu nach Vorlage (Betreff dekodiert, Avatar, Name/E-Mail, Datum rechts, Aktionen). (4) Mail-Viewer-Zustände (HTML/Text/Blockiert mit State-Chips + Trust-Banner). (5) Thread-Hinweise als Chips (geantwortet/weitergeleitet/Wiedervorlage/Kira/erledigt). (6) Anhang-Leiste: eingeklappt by default, aufklappbar mit Vorschau/Aktionen. (7) Bild-Galerie-Viewer. (8) Kira- und Logging-Anbindung für alle Mail-Aktionen.
 **Status:** erledigt (siehe Commits 4010271, 3571077 — Fluent UI Ribbon + Mail & Konten Tabs + E-Mail-Signaturen)
 
@@ -233,6 +255,7 @@ Commit: 66241b0
 **Status:** erledigt
 
 **Erledigt:**
+
 - Paket 1: rebuild_all.py — 4 neue Tabellen (vorgaenge, vorgang_links, vorgang_status_history, vorgang_signals), vorgang_id + snooze_until in tasks
 - Paket 2: case_engine.py — dict-basierte Statusmaschinen für 10 Vorgangstypen, vollständige CRUD-API, Signal-Queue, transitions-kompatible Signaturen
 - Paket 3: vorgang_router.py — Routing-Layer zwischen Mail-Klassifizierung und Case Engine (Stufe A/B/C)
@@ -242,7 +265,7 @@ Commit: 66241b0
 - Paket 8: server.py — Signal-Polling-JS (10s), Toast für Stufe-B, Modal für Stufe-C, CSS-Injection im Dashboard
 - Paket 9: presence_detector.py (Windows ctypes GetLastInputInfo), activity_window.py (tkinter -topmost Desktop-Overlay), Signal-Watcher-Thread + /api/presence Endpoint
 - Paket 10: case_engine_backfill.py — Backfill für Rechnungen/Angebote/Tasks mit --dry-run Option, idempotent
-**Offen geblieben:** Backfill noch nicht ausgeführt (muss manuell als `python case_engine_backfill.py --dry-run` getestet werden).
+  **Offen geblieben:** Backfill noch nicht ausgeführt (muss manuell als `python case_engine_backfill.py --dry-run` getestet werden).
 
 ---
 
@@ -252,12 +275,13 @@ Commit: 66241b0
 **Status:** erledigt
 
 **Erledigt:**
-- Kira-Live-Chip im Header (idle/scanning/pending/error-States), 15s Polling via _pollKiraStatus()
+
+- Kira-Live-Chip im Header (idle/scanning/pending/error-States), 15s Polling via \_pollKiraStatus()
 - Activity-Drawer (Slide-In von rechts, 400px): zeigt Freigabe-Queue + Proaktiv-Status, non-modal
 - Einstellungen 3-Pane-Layout (Outlook-Style): Mail & Konten, Kira/LLM, Protokoll als Sub-Pane
 - Kira-Ausgang im Postfach: Ordnergruppe mit Entwürfe/Gesendet/Abgelehnt/Abgelaufen
 - /api/mail/approve/pending?status=X unterstützt alle 4 Queue-Ansichten
-- pfKiraMailFreigeben/Bearbeiten/Sendenbearbeitet/Ablehnen korrekt als window.* exponiert
+- pfKiraMailFreigeben/Bearbeiten/Sendenbearbeitet/Ablehnen korrekt als window.\* exponiert
 - Fix: JS SyntaxError durch `'div[style]'` in single-quoted string (parentElement-Traversal als Fix)
 - Fix: pf-load-more korrekt versteckt bei leerer Kira-Liste
 - Commit: fb879cd
@@ -265,18 +289,21 @@ Commit: 66241b0
 **Offen geblieben:** Microsoft Graph Calendar-UI, Ribbon-Kira-Gruppe für Kira-Mails, Partner-View generieren.
 
 ## 2026-03-31 — Session-Ende (session-oo)
+
 **Status:** erledigt
 
 ---
 
 ## 2026-03-31 — Session-Start (session-rr)
+
 **Auftrag:** Continuation nach session-qq. Selbst priorisiert: verbleibende KIRA-LLM-Verbindungen schließen + praktische UX-Features.
 **Status:** erledigt
 
 **Erledigt:**
+
 - Antwort-Länge (build_system_prompt Wiring): kurz/normal/ausführlich beeinflusst jetzt tatsächlich Kiras Stil
 - Kira-Sprache: Deutsch/Englisch/gemischt als Select + Prompt-Override (session-rr)
-- LLM-Temperatur: Range-Slider 0.0–1.0 in Einstellungen + Wiring in _call_anthropic() + _call_openai_compat()
+- LLM-Temperatur: Range-Slider 0.0–1.0 in Einstellungen + Wiring in \_call_anthropic() + \_call_openai_compat()
 - Provider Verbindungstest: ⚡ Test-Button pro Provider-Karte + POST /api/kira/provider/test
 - Einstellungen-Suche: Suchfeld über der Navigation filtert Sektionen + Panel-Volltext, ESC zum Reset
 - DB-VACUUM: POST /api/db/vacuum + Button in Protokoll > Konfigurationsbackup
@@ -292,14 +319,16 @@ Commit: 66241b0
 ---
 
 ## 2026-03-31 — Session-Start (session-ss)
+
 **Auftrag:** Continuation nach session-rr. Selbst priorisiert: praktische Settings/UX-Features + Sicherheitsfix.
 **Status:** erledigt
 
 **Erledigt:**
+
 - User-Präsenz-Erkennung: visibilitychange API — Kira-Status-Polling pausiert wenn Tab versteckt
 - Kira-Position: Select (unten-rechts/links, oben-rechts/links) + applyKiraPosition() + localStorage-Restore
 - Kira-Chitchat-Toggle: "Smalltalk erlaubt" in Einstellungen → beeinflusst System-Prompt (kira_llm.py build_system_prompt)
-- ntfy Push-Priorität: Select low/default/high/urgent in Einstellungen → kira_proaktiv.py _push() liest config
+- ntfy Push-Priorität: Select low/default/high/urgent in Einstellungen → kira_proaktiv.py \_push() liest config
 - Dashboard-Refresh-Intervall: Select 1/5/15/30/60min oder Deaktiviert → silentRefreshDashboard dynamisch
 - Morgen-Briefing konfigurierbar: Toggle + Uhrzeit-Input → scan_tagesstart_briefing() liest config (3h Fenster ab Startzeit)
 - Sicherheitsfix: hardcoded `bcc:'info@raumkult.eu'` in pfSend() entfernt → BCC-Eingabefeld im Compose-Formular
@@ -308,22 +337,23 @@ Commit: 66241b0
 **Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Auto-Backup config.json.
 **Status:** erledigt
 
-
 ---
 
 ## 2026-03-31 — Session-Start (session-tt)
+
 **Auftrag:** Continuation nach session-ss. Selbst priorisiert: Auto-Backup fertigstellen + Dashboard-Features.
 **Status:** erledigt
 
 **Erledigt:**
+
 - Dashboard "Heute gesendet"-Karte (Zone C0): zeigt Kira-gesendete Mails (mail_approve_queue) + User-gesendete Mails (runtime_events.db mail_gesendet)
 - Tagesbriefing Timestamp: "Stand HH:MM" im Briefing-Titel, erstellt_am in kira_briefings gespeichert
-- Sent-Items Ungelesen-Badge Fix: _index_mail() setzt gelesen=1 für Gesendet-Ordner (Ordnernamens-Check)
+- Sent-Items Ungelesen-Badge Fix: \_index_mail() setzt gelesen=1 für Gesendet-Ordner (Ordnernamens-Check)
 - Auto-Backup (server.py): POST /api/backup/jetzt Endpoint, Einstellungen-UI (Toggle/Pfad/Keep-N/Button)
 - Auto-Backup (kira_proaktiv.py): scan_auto_backup() als Scan 11, 23h TTL, SQLite .backup() API
 - backupNow() JS: Button ruft /api/backup/jetzt → Toast mit Ergebnis
 - saveSettings() Backup-Wiring: backup.aktiv/pfad/keep_n in config.json gespeichert
-- Mail-Senden Logging: rlog('user', 'mail_gesendet', ...) in _api_mail_send()
+- Mail-Senden Logging: rlog('user', 'mail_gesendet', ...) in \_api_mail_send()
 
 **Commits:** (folgt)
 **Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Mail-Ignorieren-Lernfrage.
@@ -332,10 +362,12 @@ Commit: 66241b0
 ---
 
 ## 2026-03-31 14:00 — Session-Start (session-uu)
+
 **Auftrag:** Continuation nach session-tt. Server-Neustart + F-01/F-02 testen + Tracking aktualisieren.
 **Status:** erledigt
 
 **Erledigt:**
+
 - Server-Neustart: 2 Bugs gefunden+gefixt (NameError eingang_offen, f-string backtick-Template in Verbindungstest)
 - F-01 Mail-Ignorieren Lernmodal: ignorierModal mit 5 Preset-Gruenden + Freitextfeld, speichert Wissensregel via /api/wissen/neu. Playwright-getestet (Modal oeffnet, im-tid/im-kat korrekt).
 - F-02 filterKomm-Fix: jumpToSeg() verdrahtet, Playwright-test bestaetigt Segment-Tab "Neue Leads" aktiv.
@@ -348,14 +380,17 @@ Commit: 66241b0
 ---
 
 ## 2026-03-31 15:00 — Session-Start (session-vv)
+
 **Auftrag:** Selbst priorisiert nach Scan aller offenen Items.
 **Status:** erledigt
 
 **Verifiziert als bereits fertig:**
+
 - Fenster-Split Position (localStorage pf_pane_w) — in Checkliste markiert
 
 **Erledigt:**
-- Ungelesene Badge Postfach: _pfGlobalBadgeUpdate() sofort + alle 2min (alle Panels). Playwright: Badge=3 auf Start-Panel.
+
+- Ungelesene Badge Postfach: \_pfGlobalBadgeUpdate() sofort + alle 2min (alle Panels). Playwright: Badge=3 auf Start-Panel.
 - Spaeter-Klick Lernfrage: datetime-local Picker + 4 Schnellbuttons + Warum-Frage mit Presets + Wissensregel-Speicherung
 - Sidebar-Logo: K-Text → Kira-Launcher SVG (lila Orb, Augen, applyLogo/applyLogoSize angepasst)
 
@@ -364,8 +399,10 @@ Commit: 66241b0
 **Status:** erledigt
 
 ### 2026-03-31 15:35 — Ergänzung session-vv
+
 **Auftrag:** Klärung was die "offen gebliebenen" Items blockiert + Favicon sofort umsetzen.
 **Erledigt:**
+
 - Favicon: Kira-Launcher SVG als data-URI im <head> — Tab-Icon und gepinntes App-Icon
 - Kalender-Blocker identifiziert: Azure App braucht Calendars.ReadWrite Permission (Kai-Aktion im Entra Portal)
-**Commit:** c4f68bb
+  **Commit:** c4f68bb
