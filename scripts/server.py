@@ -4054,6 +4054,8 @@ def build_geschaeft(db):
       <div class="gesch-tab" onclick="showGeschTab('kalkulation')" style="opacity:.5">Kalkulation <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
       <div class="gesch-tab" onclick="showGeschTab('preispositionen')" style="opacity:.5">Preispositionen <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
       <div class="gesch-tab" onclick="showGeschTab('cashflow')" style="opacity:.5">Cashflow <span class="si-badge planned" style="font-size:9px;padding:0 4px">Geplant</span></div>
+      <div class="gesch-tab" onclick="showGeschTab('belegvorlagen');loadBelegVorlagen()">&#x1F4C4; Belegvorlagen</div>
+      <div class="gesch-tab" onclick="showGeschTab('zeiterfassung');loadZeiterfassung()">&#x23F1; Zeiterfassung</div>
     </div>
     <div id="gesch-uebersicht" class="gesch-panel active">{_build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats)}</div>
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
@@ -4064,7 +4066,130 @@ def build_geschaeft(db):
     <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
     <div id="gesch-kalkulation" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4D0;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Kalkulation</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Projekt- und Leistungskalkulation mit Materialkosten, Arbeitszeit und Gewinnmarge.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
     <div id="gesch-preispositionen" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4CB;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Preispositionen</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Leistungskatalog mit Einzelpreisen, Staffeln und Erfahrungswerten.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
-    <div id="gesch-cashflow" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4B8;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Cashflow</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Liquidit&auml;ts&uuml;bersicht mit Ein- und Auszahlungen, Prognose und Warnungen.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>"""
+    <div id="gesch-cashflow" class="gesch-panel"><div class="planned-shell" style="min-height:200px;padding:40px"><div class="planned-shell-icon" style="font-size:32px">&#x1F4B8;</div><div class="planned-shell-title" style="font-size:var(--fs-lg)">Cashflow</div><div class="planned-shell-desc" style="font-size:var(--fs-sm)">Liquidit&auml;ts&uuml;bersicht mit Ein- und Auszahlungen, Prognose und Warnungen.</div><div class="planned-badge" style="font-size:var(--fs-xs)">&#x1F6A7; In Planung</div></div></div>
+    <div id="gesch-belegvorlagen" class="gesch-panel">
+      <div style="padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">&#x1F4C4; Belegvorlagen</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">HTML-Vorlagen f&uuml;r Angebote, Rechnungen und Briefe. Platzhalter: <code style="font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:3px">{{FIRMA}}</code> <code style="font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:3px">{{DATUM}}</code> <code style="font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:3px">{{POSITIONEN}}</code></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="bvNeuErstellen()">+ Neue Vorlage</button>
+          </div>
+        </div>
+        <div id="bv-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+          <div style="color:var(--text-muted);font-size:13px;padding:20px">Lade Vorlagen&hellip;</div>
+        </div>
+      </div>
+      <!-- Belegvorlage Editor Modal -->
+      <div id="bv-editor-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;align-items:center;justify-content:center">
+        <div style="background:var(--bg-raised);border-radius:16px;width:min(90vw,800px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div style="font-size:15px;font-weight:700;color:var(--text)" id="bv-editor-title">Neue Vorlage</div>
+            <button onclick="bvCloseEditor()" style="background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer;padding:4px 8px;border-radius:5px">&#x2715;</button>
+          </div>
+          <div style="padding:16px 24px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Name</label>
+                <input id="bv-name" type="text" placeholder="z.B. Angebot Standard" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Typ</label>
+                <select id="bv-typ" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+                  <option value="angebot">Angebot</option>
+                  <option value="rechnung">Rechnung</option>
+                  <option value="brief">Allgemeiner Brief</option>
+                  <option value="mahnung">Mahnung</option>
+                  <option value="gutschrift">Gutschrift</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">HTML-Vorlage</label>
+              <textarea id="bv-html" rows="16" placeholder="HTML-Inhalt der Vorlage&hellip; Platzhalter: {{FIRMA}}, {{ANREDE}}, {{DATUM}}, {{POSITIONEN}}, {{BETRAG_NETTO}}, {{MWST}}, {{BETRAG_BRUTTO}}, {{ZAHLUNGSZIEL}}, {{IBAN}}" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;color:var(--text);font-family:monospace;resize:vertical;min-height:220px"></textarea>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Notiz (intern)</label>
+              <input id="bv-notiz" type="text" placeholder="Optionale interne Notiz" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+            </div>
+          </div>
+          <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0">
+            <button class="btn btn-primary btn-sm" onclick="bvSpeichern()">Speichern</button>
+            <button class="btn btn-sec btn-sm" onclick="bvVorschau()">&#x1F441; Vorschau</button>
+            <button class="btn btn-sec btn-sm" onclick="bvKiraErstellen()">&#x1F916; Kira erstellt Vorlage</button>
+            <div style="flex:1"></div>
+            <button class="btn btn-sec btn-sm" id="bv-delete-btn" onclick="bvLoeschen()" style="display:none;color:#c83c3c;border-color:#c83c3c">Vorlage l&ouml;schen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Zeiterfassung Panel -->
+    <div id="gesch-zeiterfassung" class="gesch-panel">
+      <div style="padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">&#x23F1; Zeiterfassung</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Erfasse Arbeitszeit pro Vorgang oder Projekt</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="ze-filter-monat" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text)" onchange="loadZeiterfassung()">
+              <option value="">Diesen Monat</option>
+              <option value="last">Letzten Monat</option>
+              <option value="all">Alle</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="zeNeuerEintrag()">+ Eintrag</button>
+          </div>
+        </div>
+        <!-- Timer -->
+        <div id="ze-timer-box" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div id="ze-timer-display" style="font-size:28px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:90px">00:00:00</div>
+          <input id="ze-timer-beschr" type="text" placeholder="Woran arbeitest du? (optional)" style="flex:1;min-width:160px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)">
+          <button id="ze-timer-btn" class="btn btn-primary btn-sm" onclick="zeTimerToggle()" style="min-width:80px">&#x25B6; Start</button>
+        </div>
+        <!-- Zusammenfassung -->
+        <div id="ze-summary" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+        <!-- Tabelle -->
+        <div id="ze-list" style="overflow-x:auto">
+          <div style="color:var(--text-muted);font-size:13px;padding:20px">Lade Eintraege&hellip;</div>
+        </div>
+      </div>
+      <!-- Neuer Eintrag Modal -->
+      <div id="ze-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;align-items:center;justify-content:center">
+        <div style="background:var(--bg-raised);border-radius:14px;width:min(90vw,480px);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)">
+            <div style="font-size:15px;font-weight:700;color:var(--text)" id="ze-modal-title">Zeiteintrag</div>
+            <button onclick="zeCloseModal()" style="background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer">&#x2715;</button>
+          </div>
+          <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Datum</label>
+                <input id="ze-datum" type="date" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Dauer (Minuten)</label>
+                <input id="ze-dauer" type="number" min="1" max="1440" placeholder="60" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Beschreibung</label>
+              <input id="ze-beschr" type="text" placeholder="Was wurde gemacht?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Projekt / Vorgang</label>
+              <input id="ze-projekt" type="text" placeholder="z.B. Projekt XY, Angebot A-2026-001" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text)">
+            </div>
+          </div>
+          <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px">
+            <button class="btn btn-primary btn-sm" onclick="zeSpeichern()">Speichern</button>
+            <div style="flex:1"></div>
+            <button class="btn btn-sec btn-sm" id="ze-delete-btn" onclick="zeLoeschen()" style="display:none;color:#c83c3c;border-color:#c83c3c">L&ouml;schen</button>
+          </div>
+        </div>
+      </div>
+    </div>"""
     return html
 
 
@@ -5517,6 +5642,21 @@ function esInfoPopup(btn, text) {{
     <div class="es-row">
       <div class="es-rl">Urlaub planen: bis<div class="es-rd">Automatisch deaktivieren am Datum/Uhrzeit</div></div>
       <input class="es-inp-sm" type="datetime-local" id="cfg-urlaub-bis" value="{esc(ntfy.get('urlaub_bis',''))}" style="width:180px">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Antwort aktivieren<div class="es-rd">Kira antwortet eingehenden Mails automatisch mit Abwesenheitsnotiz</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-urlaub-autoreply" {'checked' if ntfy.get('urlaub_autoreply_aktiv', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Antwort Betreff<div class="es-rd">Betreffzeile der Abwesenheitsnotiz</div></div>
+      <input class="es-inp-sm" type="text" id="cfg-urlaub-autoreply-betreff" value="{esc(ntfy.get('urlaub_autoreply_betreff','Abwesenheitsnotiz: Ich bin derzeit im Urlaub'))}" style="width:320px">
+    </div>
+    <div class="es-row" style="align-items:flex-start">
+      <div class="es-rl" style="padding-top:6px">Auto-Antwort Text<div class="es-rd">Inhalt der Abwesenheitsnotiz</div></div>
+      <textarea id="cfg-urlaub-autoreply-text" rows="4" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);resize:vertical">{esc(ntfy.get('urlaub_autoreply_text','Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rueckkehr bei Ihnen melden.'))}</textarea>
     </div>
   </div>
 
@@ -8486,6 +8626,46 @@ function esInfoPopup(btn, text) {{
         <button class="es-btn es-btn-red" onclick="resetConfig()">Zur&uuml;cksetzen</button>
       </div>
     </div>
+
+    <!-- Daten-Export (session-bbb) -->
+    <div class="es-grp">
+      <div class="es-grp-h">&#x1F4E4; Daten-Export</div>
+      <div class="es-grp-sub">KIRA-Daten als CSV oder JSON exportieren (z.B. f&uuml;r Excel, Buchhaltung oder Archiv).</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:4px">&#x1F4CB; Aufgaben</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Tasks aus tasks.db</div>
+          <div style="display:flex;gap:6px">
+            <button class="es-btn" onclick="window.open('/api/export/tasks?format=csv','_blank')">CSV</button>
+            <button class="es-btn" onclick="window.open('/api/export/tasks?format=json','_blank')">JSON</button>
+          </div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:4px">&#x1F465; Kunden</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Kontakte aus kunden.db</div>
+          <div style="display:flex;gap:6px">
+            <button class="es-btn" onclick="window.open('/api/export/kunden?format=csv','_blank')">CSV</button>
+            <button class="es-btn" onclick="window.open('/api/export/kunden?format=json','_blank')">JSON</button>
+          </div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:4px">&#x1F5C2; Vorg&auml;nge</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Angebote, Rechnungen etc.</div>
+          <div style="display:flex;gap:6px">
+            <button class="es-btn" onclick="window.open('/api/export/vorgaenge?format=csv','_blank')">CSV</button>
+            <button class="es-btn" onclick="window.open('/api/export/vorgaenge?format=json','_blank')">JSON</button>
+          </div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:4px">&#x1F4E7; Mail-Index</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Indexierte Mails (5.000 max)</div>
+          <div style="display:flex;gap:6px">
+            <button class="es-btn" onclick="window.open('/api/export/mails?format=csv','_blank')">CSV</button>
+            <button class="es-btn" onclick="window.open('/api/export/mails?format=json','_blank')">JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div><!-- /es-sec-protokoll -->
@@ -9465,6 +9645,7 @@ def generate_html() -> str:
               <div class="kira-ctx-item" onclick="kiraKontextAddVorgaenge()">&#x1F5C2; Aktive Vorg&auml;nge</div>
               <div class="kira-ctx-item" onclick="kiraKontextAddKontextBar()">&#x1F4CC; Aktueller Kontext</div>
             </div>
+            <button class="kw-ia mic" id="kiraMicBtn" onclick="kiraToggleSprache()" title="Spracheingabe (Web Speech API)">&#x1F3A4;</button>
             <div class="kw-mode-sel" onclick="toggleKiraModeMenu()">Modus &#x25BE;</div>
             <button class="kw-ia send" onclick="sendKiraMsg()" id="kiraSendBtn">&#x2191;</button>
           </div>
@@ -10506,6 +10687,304 @@ function geschSignalMarkSeen(id,btn) {{
   if(el)el.style.opacity='.5';
 }}
 
+// ── Belegvorlagen ────────────────────────────────────────────────────────────
+var _bvCurrentId=null;
+var _bvVorlagen=[];
+
+function loadBelegVorlagen() {{
+  fetch('/api/belegvorlagen').then(function(r){{return r.json();}}).then(function(d){{
+    _bvVorlagen=d.vorlagen||[];
+    var el=document.getElementById('bv-list');
+    if(!el)return;
+    if(_bvVorlagen.length===0){{
+      el.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:20px;grid-column:1/-1">Noch keine Vorlagen. Klicke auf \\'+ Neue Vorlage\\' um die erste zu erstellen.</div>';
+      return;
+    }}
+    var typLabels={{angebot:'Angebot',rechnung:'Rechnung',brief:'Brief',mahnung:'Mahnung',gutschrift:'Gutschrift'}};
+    var typColors={{angebot:'#3b82f6',rechnung:'#10b981',brief:'#8b5cf6',mahnung:'#ef4444',gutschrift:'#f59e0b'}};
+    el.innerHTML=_bvVorlagen.map(function(v){{
+      var col=typColors[v.typ]||'#888';
+      var lbl=typLabels[v.typ]||v.typ;
+      return '<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:box-shadow .15s" '
+        +'onmouseenter="this.style.boxShadow=\\'0 2px 12px rgba(0,0,0,.15)\\'" '
+        +'onmouseleave="this.style.boxShadow=\\'none\\'" '
+        +'onclick="bvBearbeiten('+JSON.stringify(v.id)+')">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:'+col+'22;color:'+col+';font-size:11px;font-weight:700">'+lbl+'</span>'
+        +'<div style="flex:1"></div>'
+        +'</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">'+escH(v.name)+'</div>'
+        +(v.notiz?'<div style="font-size:12px;color:var(--text-muted)">'+escH(v.notiz)+'</div>':'')
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:8px">'+escH(v.erstellt_am||'')+'</div>'
+        +'</div>';
+    }}).join('');
+  }}).catch(function(){{
+    var el=document.getElementById('bv-list');
+    if(el)el.innerHTML='<div style="color:var(--danger);font-size:13px;padding:20px">Fehler beim Laden.</div>';
+  }});
+}}
+
+function bvNeuErstellen() {{
+  _bvCurrentId=null;
+  document.getElementById('bv-editor-title').textContent='Neue Vorlage';
+  document.getElementById('bv-name').value='';
+  document.getElementById('bv-typ').value='angebot';
+  document.getElementById('bv-html').value='';
+  document.getElementById('bv-notiz').value='';
+  var dBtn=document.getElementById('bv-delete-btn');
+  if(dBtn)dBtn.style.display='none';
+  var ov=document.getElementById('bv-editor-overlay');
+  if(ov){{ov.style.display='flex';}}
+}}
+
+function bvBearbeiten(id) {{
+  var v=_bvVorlagen.find(function(x){{return x.id===id;}});
+  if(!v)return;
+  _bvCurrentId=id;
+  document.getElementById('bv-editor-title').textContent='Vorlage bearbeiten';
+  document.getElementById('bv-name').value=v.name||'';
+  document.getElementById('bv-typ').value=v.typ||'angebot';
+  document.getElementById('bv-html').value=v.html||'';
+  document.getElementById('bv-notiz').value=v.notiz||'';
+  var dBtn=document.getElementById('bv-delete-btn');
+  if(dBtn)dBtn.style.display='inline-flex';
+  var ov=document.getElementById('bv-editor-overlay');
+  if(ov)ov.style.display='flex';
+}}
+
+function bvCloseEditor() {{
+  var ov=document.getElementById('bv-editor-overlay');
+  if(ov)ov.style.display='none';
+  _bvCurrentId=null;
+}}
+
+function bvSpeichern() {{
+  var name=(document.getElementById('bv-name').value||'').trim();
+  var typ=document.getElementById('bv-typ').value||'angebot';
+  var html=document.getElementById('bv-html').value||'';
+  var notiz=(document.getElementById('bv-notiz').value||'').trim();
+  if(!name){{showToast('Name ist erforderlich','warn');return;}}
+  var payload={{name:name,typ:typ,html:html,notiz:notiz}};
+  if(_bvCurrentId!==null)payload.id=_bvCurrentId;
+  fetch('/api/belegvorlagen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+    .then(function(r){{return r.json();}}).then(function(d){{
+      if(d.ok){{
+        showToast('Vorlage gespeichert','ok');
+        bvCloseEditor();
+        loadBelegVorlagen();
+      }} else {{
+        showToast('Fehler: '+(d.error||'?'),'error');
+      }}
+    }}).catch(function(){{showToast('Netzwerkfehler','error');}});
+}}
+
+function bvVorschau() {{
+  var html=document.getElementById('bv-html').value||'';
+  var name=(document.getElementById('bv-name').value||'Vorschau');
+  if(!html){{showToast('Kein HTML-Inhalt','warn');return;}}
+  var samples={{
+    '{{{{FIRMA}}}}':'Musterfirma GmbH',
+    '{{{{ANREDE}}}}':'Sehr geehrte Damen und Herren',
+    '{{{{DATUM}}}}':new Date().toLocaleDateString('de-DE'),
+    '{{{{POSITIONEN}}}}':'<tr><td>Pos 1</td><td>100,00 \u20ac</td></tr>',
+    '{{{{BETRAG_NETTO}}}}':'100,00 \u20ac',
+    '{{{{MWST}}}}':'19,00 \u20ac',
+    '{{{{BETRAG_BRUTTO}}}}':'119,00 \u20ac',
+    '{{{{ZAHLUNGSZIEL}}}}':'14 Tage',
+    '{{{{IBAN}}}}':'DE89 3704 0044 0532 0130 00'
+  }};
+  var preview=html;
+  for(var k in samples){{preview=preview.split(k).join(samples[k]);}}
+  var win=window.open('','_blank','width=900,height=700');
+  if(win){{win.document.write(preview);win.document.title=name;win.document.close();}}
+  else showToast('Popup blockiert \u2014 bitte erlauben','warn');
+}}
+
+function bvKiraErstellen() {{
+  var typ=document.getElementById('bv-typ').value||'angebot';
+  var typLabels={{angebot:'Angebot',rechnung:'Rechnung',brief:'Allgemeiner Brief',mahnung:'Mahnung',gutschrift:'Gutschrift'}};
+  var lbl=typLabels[typ]||typ;
+  openKiraNaked();
+  showKTab('chat');
+  kiraSetQuickActions('frage');
+  var input=document.getElementById('kiraInput');
+  if(input){{
+    input.value='Erstelle mir eine professionelle HTML-Vorlage fuer ein '+lbl+' fuer ein Betonwerk / Sichtbeton-Unternehmen. '
+      +'Platzhalter: {{FIRMA}}, {{ANREDE}}, {{DATUM}}, {{POSITIONEN}}, {{BETRAG_NETTO}}, {{MWST}}, {{BETRAG_BRUTTO}}, {{ZAHLUNGSZIEL}}, {{IBAN}}. '
+      +'Bitte vollstaendiges HTML zurueckgeben (inline-CSS, kein extern).';
+    input.style.height='auto';
+    input.style.height=Math.min(input.scrollHeight,120)+'px';
+    input.focus();
+  }}
+  bvCloseEditor();
+}}
+
+function bvLoeschen() {{
+  if(_bvCurrentId===null)return;
+  var name=(document.getElementById('bv-name').value||'diese Vorlage');
+  showKritischModal(
+    'Vorlage loeschen',
+    'Vorlage "'+escH(name)+'" endgueltig loeschen?',
+    'LOESCHEN',
+    function(){{
+      fetch('/api/belegvorlagen/loeschen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:_bvCurrentId}})}})
+        .then(function(r){{return r.json();}}).then(function(d){{
+          if(d.ok){{
+            showToast('Vorlage geloescht','ok');
+            bvCloseEditor();
+            loadBelegVorlagen();
+          }} else {{
+            showToast('Fehler: '+(d.error||'?'),'error');
+          }}
+        }}).catch(function(){{showToast('Netzwerkfehler','error');}});
+    }}
+  );
+}}
+
+// ── Zeiterfassung ────────────────────────────────────────────────────────────
+var _zeTimerStart=null, _zeTimerInterval=null, _zeCurrentId=null;
+
+function loadZeiterfassung() {{
+  var monat=document.getElementById('ze-filter-monat')?.value||'';
+  fetch('/api/zeiterfassung?monat='+encodeURIComponent(monat)).then(function(r){{return r.json();}}).then(function(d){{
+    _zeRenderList(d.eintraege||[]);
+    _zeRenderSummary(d.eintraege||[]);
+  }}).catch(function(){{
+    var el=document.getElementById('ze-list');
+    if(el)el.innerHTML='<div style="color:var(--danger);font-size:13px;padding:20px">Fehler beim Laden.</div>';
+  }});
+}}
+
+function _zeRenderList(items) {{
+  var el=document.getElementById('ze-list');
+  if(!el)return;
+  if(!items.length){{el.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:20px">Keine Eintraege fuer diesen Zeitraum.</div>';return;}}
+  var html='<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--border);text-align:left">'
+    +'<th style="padding:8px 10px;color:var(--text-muted);font-weight:600">Datum</th>'
+    +'<th style="padding:8px 10px;color:var(--text-muted);font-weight:600">Beschreibung</th>'
+    +'<th style="padding:8px 10px;color:var(--text-muted);font-weight:600">Projekt</th>'
+    +'<th style="padding:8px 10px;color:var(--text-muted);font-weight:600;text-align:right">Dauer</th>'
+    +'<th style="padding:8px 4px;width:30px"></th>'
+    +'</tr></thead><tbody>';
+  items.forEach(function(e){{
+    var h=Math.floor(e.dauer_min/60), m=e.dauer_min%60;
+    var dauerStr=h>0?(h+'h '+m+'min'):(m+'min');
+    html+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="zeEdit('+JSON.stringify(e)+')">'
+      +'<td style="padding:8px 10px;color:var(--text)">'+(e.datum||'')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--text)">'+escH(e.beschreibung||'')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--text-muted)">'+escH(e.projekt||'')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--text);text-align:right;font-weight:600">'+dauerStr+'</td>'
+      +'<td style="padding:8px 4px"></td>'
+      +'</tr>';
+  }});
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}}
+
+function _zeRenderSummary(items) {{
+  var el=document.getElementById('ze-summary');
+  if(!el)return;
+  var totalMin=items.reduce(function(s,e){{return s+(e.dauer_min||0);}},0);
+  var h=Math.floor(totalMin/60), m=totalMin%60;
+  var totalStr=h>0?(h+'h '+m+'min'):(m+' min');
+  el.innerHTML='<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">'
+    +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Gesamt</div>'
+    +'<div style="font-size:20px;font-weight:700;color:var(--text)">'+totalStr+'</div></div>'
+    +'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">'
+    +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Eintraege</div>'
+    +'<div style="font-size:20px;font-weight:700;color:var(--text)">'+items.length+'</div></div>';
+}}
+
+function zeTimerToggle() {{
+  var btn=document.getElementById('ze-timer-btn');
+  if(_zeTimerStart===null) {{
+    _zeTimerStart=Date.now();
+    _zeTimerInterval=setInterval(function(){{
+      var sec=Math.floor((Date.now()-_zeTimerStart)/1000);
+      var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+      var el=document.getElementById('ze-timer-display');
+      if(el)el.textContent=(h<10?'0'+h:h)+':'+(m<10?'0'+m:m)+':'+(s<10?'0'+s:s);
+    }},1000);
+    if(btn){{btn.textContent='\u25A0 Stop';btn.style.background='var(--danger,#e84545)';btn.style.borderColor='var(--danger,#e84545)';}}
+  }} else {{
+    clearInterval(_zeTimerInterval);
+    var dauer=Math.max(1,Math.round((Date.now()-_zeTimerStart)/60000));
+    _zeTimerStart=null;
+    _zeTimerInterval=null;
+    if(btn){{btn.textContent='\u25B6 Start';btn.style.background='';btn.style.borderColor='';}}
+    document.getElementById('ze-timer-display').textContent='00:00:00';
+    // Modal mit vorausgefuellten Werten oeffnen
+    zeNeuerEintrag(dauer, document.getElementById('ze-timer-beschr')?.value||'');
+  }}
+}}
+
+function zeNeuerEintrag(dauervorgabe, beschrVorgabe) {{
+  _zeCurrentId=null;
+  var today=new Date().toISOString().split('T')[0];
+  document.getElementById('ze-datum').value=today;
+  document.getElementById('ze-dauer').value=dauervorgabe||'';
+  document.getElementById('ze-beschr').value=beschrVorgabe||'';
+  document.getElementById('ze-projekt').value='';
+  document.getElementById('ze-modal-title').textContent='Zeiteintrag';
+  var dBtn=document.getElementById('ze-delete-btn');
+  if(dBtn)dBtn.style.display='none';
+  document.getElementById('ze-modal-overlay').style.display='flex';
+  setTimeout(function(){{document.getElementById('ze-beschr').focus();}},80);
+}}
+
+function zeEdit(e) {{
+  _zeCurrentId=e.id;
+  document.getElementById('ze-datum').value=e.datum||'';
+  document.getElementById('ze-dauer').value=e.dauer_min||'';
+  document.getElementById('ze-beschr').value=e.beschreibung||'';
+  document.getElementById('ze-projekt').value=e.projekt||'';
+  document.getElementById('ze-modal-title').textContent='Eintrag bearbeiten';
+  var dBtn=document.getElementById('ze-delete-btn');
+  if(dBtn)dBtn.style.display='inline-flex';
+  document.getElementById('ze-modal-overlay').style.display='flex';
+}}
+
+function zeCloseModal() {{
+  document.getElementById('ze-modal-overlay').style.display='none';
+  _zeCurrentId=null;
+}}
+
+function zeSpeichern() {{
+  var datum=document.getElementById('ze-datum').value||'';
+  var dauer=parseInt(document.getElementById('ze-dauer').value)||0;
+  var beschr=(document.getElementById('ze-beschr').value||'').trim();
+  var projekt=(document.getElementById('ze-projekt').value||'').trim();
+  if(!datum){{showToast('Datum erforderlich','warn');return;}}
+  if(!dauer||dauer<1){{showToast('Dauer erforderlich (mind. 1 Min)','warn');return;}}
+  var payload={{datum:datum,dauer_min:dauer,beschreibung:beschr,projekt:projekt}};
+  if(_zeCurrentId!==null)payload.id=_zeCurrentId;
+  fetch('/api/zeiterfassung/eintrag',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+    .then(function(r){{return r.json();}}).then(function(d){{
+      if(d.ok){{
+        showToast('Gespeichert','ok');
+        zeCloseModal();
+        loadZeiterfassung();
+      }} else {{
+        showToast('Fehler: '+(d.error||'?'),'error');
+      }}
+    }}).catch(function(){{showToast('Netzwerkfehler','error');}});
+}}
+
+function zeLoeschen() {{
+  if(_zeCurrentId===null)return;
+  fetch('/api/zeiterfassung/loeschen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:_zeCurrentId}})}})
+    .then(function(r){{return r.json();}}).then(function(d){{
+      if(d.ok){{
+        showToast('Geloescht','ok');
+        zeCloseModal();
+        loadZeiterfassung();
+      }} else {{
+        showToast('Fehler: '+(d.error||'?'),'error');
+      }}
+    }}).catch(function(){{showToast('Netzwerkfehler','error');}});
+}}
+
 // Geschäft: Kira mit Datensatz-Kontext öffnen
 function geschKira(typ, nr, partner, betrag) {{
   _rtlog('ui','gesch_kira_opened',typ+' '+nr+' via Kira',{{submodul:'geschaeft',context_type:typ,context_id:String(nr)}});
@@ -10923,7 +11402,10 @@ function saveSettings() {{
       arbeitszeit_bis:    document.getElementById('cfg-ntfy-az-bis')?.value || '18:00',
       urlaub_modus:       document.getElementById('cfg-ntfy-urlaub')?.checked ?? false,
       urlaub_von:         document.getElementById('cfg-urlaub-von')?.value || '',
-      urlaub_bis:         document.getElementById('cfg-urlaub-bis')?.value || ''
+      urlaub_bis:         document.getElementById('cfg-urlaub-bis')?.value || '',
+      urlaub_autoreply_aktiv:    document.getElementById('cfg-urlaub-autoreply')?.checked ?? false,
+      urlaub_autoreply_betreff:  document.getElementById('cfg-urlaub-autoreply-betreff')?.value || '',
+      urlaub_autoreply_text:     document.getElementById('cfg-urlaub-autoreply-text')?.value || ''
     }},
     benachrichtigungen: {{
       inapp_mail:     document.getElementById('cfg-inapp-mail')?.checked ?? true,
@@ -12148,6 +12630,51 @@ function kiraKontextAddKontextBar() {{
 // ── Kira Chat ────────────────────────────────────────────────
 let kiraSessionId = null;
 let kiraSending = false;
+
+// ── Sprachmodul (session-bbb) ─────────────────────────────────────────────
+var _speechRec = null;
+var _speechActive = false;
+window.kiraToggleSprache = function() {{
+  const btn = document.getElementById('kiraMicBtn');
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
+    showToast('Spracheingabe wird von diesem Browser nicht unterst\u00fctzt (Chrome empfohlen)','warnung');
+    return;
+  }}
+  if(_speechActive) {{
+    _speechActive = false;
+    if(_speechRec) _speechRec.stop();
+    if(btn) btn.classList.remove('active');
+    return;
+  }}
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _speechRec = new SR();
+  _speechRec.lang = 'de-DE';
+  _speechRec.continuous = false;
+  _speechRec.interimResults = false;
+  _speechRec.onstart = function() {{
+    _speechActive = true;
+    if(btn) btn.classList.add('active');
+    showToast('\uD83C\uDFA4 H\u00f6re zu\u2026','info');
+  }};
+  _speechRec.onresult = function(e) {{
+    const transcript = e.results[0][0].transcript;
+    const inp = document.getElementById('kiraInput');
+    if(inp) {{
+      inp.value = (inp.value ? inp.value + ' ' : '') + transcript;
+      inp.style.height = 'auto';
+      inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+      inp.focus();
+    }}
+  }};
+  _speechRec.onerror = function(e) {{
+    showToast('Spracheingabe Fehler: ' + e.error,'fehler');
+  }};
+  _speechRec.onend = function() {{
+    _speechActive = false;
+    if(btn) btn.classList.remove('active');
+  }};
+  _speechRec.start();
+}};
 
 function sendKiraMsg() {{
   const input = document.getElementById('kiraInput');
@@ -14262,6 +14789,8 @@ a:hover{text-decoration:underline;}
 .kw-ia:hover{border-color:#534AB7;color:#534AB7;}
 .kw-ia.send{background:#534AB7;border-color:#534AB7;color:#fff;}
 .kw-ia.send:hover{background:#6358cc;border-color:#6358cc;}
+.kw-ia.mic.active{background:#ef4444;border-color:#ef4444;color:#fff;animation:mic-pulse .8s ease-in-out infinite alternate;}
+@keyframes mic-pulse{from{box-shadow:0 0 0 0 rgba(239,68,68,.4)}to{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
 .kw-mode-sel{font-size:10px;padding:5px 10px;border-radius:6px;border:0.5px solid rgba(83,74,183,.3);background:rgba(83,74,183,.07);color:#534AB7;cursor:pointer;}
 /* ═══ Kira Nachrichten ═══ */
 .msg{margin-bottom:16px;max-width:90%;}
@@ -14561,6 +15090,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+
+        elif self.path.startswith('/api/export/'):
+            self._api_dokument_export()
+
+        elif self.path == '/api/belegvorlagen':
+            self._api_belegvorlagen_list()
+
+        elif self.path.startswith('/api/zeiterfassung'):
+            self._api_zeiterfassung_list()
 
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
@@ -16281,6 +16819,254 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": True, "eintraege": items, "items": items})
         except Exception as e:
             self._json({"ok": False, "error": str(e), "eintraege": [], "items": []})
+
+    def _ensure_zeiterfassung_table(self):
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""CREATE TABLE IF NOT EXISTS zeiterfassung (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            datum      TEXT NOT NULL,
+            dauer_min  INTEGER NOT NULL,
+            beschreibung TEXT,
+            projekt    TEXT,
+            erstellt_am TEXT DEFAULT (datetime('now'))
+        )""")
+        db.commit()
+        db.close()
+
+    def _api_zeiterfassung_list(self):
+        """GET /api/zeiterfassung?monat= — Listet Zeiteintraege."""
+        self._ensure_zeiterfassung_table()
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        monat = qs.get('monat', [''])[0]
+        now = datetime.now()
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            if monat == 'last':
+                first = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
+                last  = now.replace(day=1) - timedelta(days=1)
+                rows = db.execute(
+                    "SELECT * FROM zeiterfassung WHERE datum>=? AND datum<=? ORDER BY datum DESC, id DESC",
+                    (first.strftime('%Y-%m-%d'), last.strftime('%Y-%m-%d'))
+                ).fetchall()
+            elif monat == 'all':
+                rows = db.execute("SELECT * FROM zeiterfassung ORDER BY datum DESC, id DESC").fetchall()
+            else:
+                first = now.replace(day=1).strftime('%Y-%m-%d')
+                rows = db.execute(
+                    "SELECT * FROM zeiterfassung WHERE datum>=? ORDER BY datum DESC, id DESC",
+                    (first,)
+                ).fetchall()
+            db.close()
+            self._json({'ok': True, 'eintraege': [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e), 'eintraege': []})
+
+    def _api_zeiterfassung_save(self, body: dict):
+        """POST /api/zeiterfassung/eintrag — Eintrag speichern oder aktualisieren."""
+        self._ensure_zeiterfassung_table()
+        datum  = (body.get('datum') or '').strip()
+        dauer  = int(body.get('dauer_min') or 0)
+        beschr = (body.get('beschreibung') or '').strip()
+        proj   = (body.get('projekt') or '').strip()
+        eid    = body.get('id')
+        if not datum or dauer < 1:
+            self._json({'ok': False, 'error': 'datum und dauer_min erforderlich'})
+            return
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            if eid:
+                db.execute("UPDATE zeiterfassung SET datum=?,dauer_min=?,beschreibung=?,projekt=? WHERE id=?",
+                           (datum, dauer, beschr, proj, eid))
+                db.commit(); db.close()
+                self._json({'ok': True, 'id': eid, 'action': 'updated'})
+            else:
+                cur = db.execute("INSERT INTO zeiterfassung (datum,dauer_min,beschreibung,projekt) VALUES (?,?,?,?)",
+                                 (datum, dauer, beschr, proj))
+                db.commit(); new_id = cur.lastrowid; db.close()
+                self._json({'ok': True, 'id': new_id, 'action': 'created'})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_zeiterfassung_delete(self, body: dict):
+        """POST /api/zeiterfassung/loeschen — Eintrag loeschen."""
+        self._ensure_zeiterfassung_table()
+        eid = body.get('id')
+        if not eid:
+            self._json({'ok': False, 'error': 'id fehlt'})
+            return
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.execute("DELETE FROM zeiterfassung WHERE id=?", (eid,))
+            db.commit(); db.close()
+            self._json({'ok': True, 'deleted': eid})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    def _api_belegvorlagen_list(self):
+        """GET /api/belegvorlagen — Listet alle Belegvorlagen."""
+        bv_dir = KNOWLEDGE_DIR / 'belegvorlagen'
+        bv_dir.mkdir(parents=True, exist_ok=True)
+        vorlagen = []
+        for f in sorted(bv_dir.glob('bv_*.json')):
+            try:
+                v = json.loads(f.read_text('utf-8'))
+                # HTML nicht mit uebertragen (kann gross sein) — nur Metadaten
+                vorlagen.append({
+                    'id':          v.get('id', f.stem),
+                    'name':        v.get('name', ''),
+                    'typ':         v.get('typ', 'angebot'),
+                    'notiz':       v.get('notiz', ''),
+                    'erstellt_am': v.get('erstellt_am', ''),
+                })
+            except Exception:
+                pass
+        self._json({'ok': True, 'vorlagen': vorlagen})
+
+    def _api_belegvorlagen_save(self, body: dict):
+        """POST /api/belegvorlagen — Vorlage erstellen oder aktualisieren."""
+        name  = (body.get('name') or '').strip()
+        typ   = (body.get('typ') or 'angebot').strip()
+        html  = body.get('html', '')
+        notiz = (body.get('notiz') or '').strip()
+        bv_id = body.get('id')
+
+        if not name:
+            self._json({'ok': False, 'error': 'Name ist erforderlich'})
+            return
+
+        bv_dir = KNOWLEDGE_DIR / 'belegvorlagen'
+        bv_dir.mkdir(parents=True, exist_ok=True)
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+        if bv_id:
+            # Update bestehende
+            bv_file = bv_dir / f'bv_{bv_id}.json'
+            if bv_file.exists():
+                try:
+                    existing = json.loads(bv_file.read_text('utf-8'))
+                except Exception:
+                    existing = {}
+                existing.update({'name': name, 'typ': typ, 'html': html, 'notiz': notiz,
+                                 'geaendert_am': now_str})
+                bv_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2), 'utf-8')
+                self._json({'ok': True, 'id': bv_id, 'action': 'updated'})
+                return
+            # Sonst neu anlegen mit uebergebener ID
+        # Neue ID erzeugen
+        import time as _t
+        new_id = str(int(_t.time() * 1000))[-8:]
+        bv_file = bv_dir / f'bv_{new_id}.json'
+        v = {'id': new_id, 'name': name, 'typ': typ, 'html': html, 'notiz': notiz,
+             'erstellt_am': now_str, 'geaendert_am': now_str}
+        bv_file.write_text(json.dumps(v, ensure_ascii=False, indent=2), 'utf-8')
+        self._json({'ok': True, 'id': new_id, 'action': 'created'})
+
+    def _api_belegvorlagen_delete(self, body: dict):
+        """POST /api/belegvorlagen/loeschen — Vorlage loeschen."""
+        bv_id = body.get('id')
+        if not bv_id:
+            self._json({'ok': False, 'error': 'id fehlt'})
+            return
+        bv_dir = KNOWLEDGE_DIR / 'belegvorlagen'
+        bv_file = bv_dir / f'bv_{bv_id}.json'
+        if not bv_file.exists():
+            self._json({'ok': False, 'error': 'Vorlage nicht gefunden'})
+            return
+        bv_file.unlink()
+        self._json({'ok': True, 'deleted': str(bv_id)})
+
+    def _api_dokument_export(self):
+        """GET /api/export/{typ}?format=csv|json — Exportiert Tasks/Kunden/Vorgaenge."""
+        import csv, io
+        path_parts = self.path.split('?')[0].split('/')
+        typ = path_parts[-1] if path_parts else ''
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        fmt = qs.get('format', ['csv'])[0].lower()
+
+        try:
+            rows = []
+            filename = f'kira_{typ}'
+            fields = []
+
+            if typ == 'tasks':
+                db = sqlite3.connect(str(TASKS_DB))
+                db.row_factory = sqlite3.Row
+                raw = db.execute(
+                    "SELECT id,kategorie,status,prioritaet,datum_mail,datum_erstellt,"
+                    "absender,betreff,kira_antwort,deadline,antwort_noetig "
+                    "FROM tasks ORDER BY datum_erstellt DESC LIMIT 2000"
+                ).fetchall()
+                db.close()
+                rows = [dict(r) for r in raw]
+                fields = ['id','kategorie','status','prioritaet','datum_mail','datum_erstellt',
+                          'absender','betreff','kira_antwort','deadline','antwort_noetig']
+
+            elif typ == 'kunden':
+                db = sqlite3.connect(str(KUNDEN_DB))
+                db.row_factory = sqlite3.Row
+                raw = db.execute(
+                    "SELECT id,name,email,telefon,firma,adresse,hauptkanal,erstkontakt,"
+                    "letzter_kontakt,anzahl_mails,notizen "
+                    "FROM kunden ORDER BY letzter_kontakt DESC LIMIT 2000"
+                ).fetchall()
+                db.close()
+                rows = [dict(r) for r in raw]
+                fields = ['id','name','email','telefon','firma','adresse','hauptkanal',
+                          'erstkontakt','letzter_kontakt','anzahl_mails','notizen']
+
+            elif typ == 'vorgaenge':
+                db = sqlite3.connect(str(TASKS_DB))
+                db.row_factory = sqlite3.Row
+                raw = db.execute(
+                    "SELECT id,typ,status,titel,kunde_name,kunde_email,wert_brutto,"
+                    "erstellt_am,aktualisiert_am,notizen "
+                    "FROM vorgaenge ORDER BY aktualisiert_am DESC LIMIT 2000"
+                ).fetchall()
+                db.close()
+                rows = [dict(r) for r in raw]
+                fields = ['id','typ','status','titel','kunde_name','kunde_email','wert_brutto',
+                          'erstellt_am','aktualisiert_am','notizen']
+
+            elif typ == 'mails':
+                db = sqlite3.connect(str(MAIL_INDEX_DB))
+                db.row_factory = sqlite3.Row
+                raw = db.execute(
+                    "SELECT konto,betreff,absender,an,datum,folder,gelesen,kira_verwendet "
+                    "FROM mails ORDER BY datum DESC LIMIT 5000"
+                ).fetchall()
+                db.close()
+                rows = [dict(r) for r in raw]
+                fields = ['konto','betreff','absender','an','datum','folder','gelesen','kira_verwendet']
+
+            else:
+                self._json({'ok': False, 'error': f'Unbekannter Export-Typ: {typ}'})
+                return
+
+            if fmt == 'json':
+                data = json.dumps({'ok': True, 'typ': typ, 'count': len(rows), 'rows': rows},
+                                  ensure_ascii=False, indent=2).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}.json"')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                out = io.StringIO()
+                w = csv.DictWriter(out, fieldnames=fields, extrasaction='ignore')
+                w.writeheader()
+                w.writerows(rows)
+                data = out.getvalue().encode('utf-8-sig')  # BOM fuer Excel
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/csv; charset=utf-8-sig')
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}.csv"')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
 
     def _api_kira_proaktiv_status(self):
         """GET /api/kira/proaktiv/status — Status des letzten proaktiven Scans."""
@@ -18457,6 +19243,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': True, 'gesichert': backed, 'pfad': str(backup_dir), 'ts': ts})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Belegvorlagen speichern / loeschen
+        if self.path == '/api/belegvorlagen':
+            self._api_belegvorlagen_save(body)
+            return
+
+        if self.path == '/api/belegvorlagen/loeschen':
+            self._api_belegvorlagen_delete(body)
+            return
+
+        if self.path == '/api/zeiterfassung/eintrag':
+            self._api_zeiterfassung_save(body)
+            return
+
+        if self.path == '/api/zeiterfassung/loeschen':
+            self._api_zeiterfassung_delete(body)
             return
 
         # Kunden-Alias speichern

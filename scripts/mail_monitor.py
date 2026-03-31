@@ -1013,6 +1013,61 @@ def _process_mail(mail_data, konto_label, folder_name):
     except:
         pass
 
+    # ── Urlaubsmodus Auto-Antwort (session-bbb) ──────────────────────────────
+    if not is_sent and kategorie not in ("Ignorieren", "Newsletter / Werbung"):
+        try:
+            _urlaub_cfg = json.loads(CONFIG_FILE.read_text('utf-8')).get('ntfy', {})
+            if _urlaub_cfg.get('urlaub_modus') and _urlaub_cfg.get('urlaub_autoreply_aktiv'):
+                _ar_log_path = KNOWLEDGE_DIR / 'urlaub_autoreply_log.json'
+                _ar_log = {}
+                if _ar_log_path.exists():
+                    try: _ar_log = json.loads(_ar_log_path.read_text('utf-8'))
+                    except: pass
+                _sender_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
+                _se = _sender_email_m.group(1).lower() if _sender_email_m else absender.strip().lower()
+                # Max 1 Auto-Reply pro Absender pro Urlaubsperiode (basierend auf urlaub_von)
+                _urlaub_von_key = _urlaub_cfg.get('urlaub_von', '')[:10]
+                _ar_key = f"{_se}_{_urlaub_von_key}"
+                if _ar_key not in _ar_log:
+                    from mail_sender import send_mail as _sm_send
+                    _ar_betreff = _urlaub_cfg.get('urlaub_autoreply_betreff',
+                        'Abwesenheitsnotiz: Ich bin derzeit im Urlaub')
+                    _ar_text = _urlaub_cfg.get('urlaub_autoreply_text',
+                        'Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub '
+                        'und werde mich nach meiner Rueckkehr bei Ihnen melden.')
+                    _ar_bis = _urlaub_cfg.get('urlaub_bis', '')
+                    if _ar_bis:
+                        try:
+                            _bis_dt = datetime.fromisoformat(_ar_bis[:16])
+                            _ar_text += f'\n\nIch bin voraussichtlich wieder ab {_bis_dt.strftime("%d.%m.%Y")} erreichbar.'
+                        except: pass
+                    # Absender-Konto bestimmen
+                    _all_konten = json.loads(CONFIG_FILE.read_text('utf-8')).get('konten', [])
+                    _from_email = next(
+                        (k.get('email','') for k in _all_konten if k.get('label','') == konto_label),
+                        ''
+                    )
+                    if _from_email:
+                        _ar_result = _sm_send(
+                            from_email=_from_email,
+                            to=_se,
+                            subject='AW: ' + betreff if not betreff.startswith('AW:') else betreff,
+                            body_plain=_ar_text,
+                            in_reply_to=msg_id,
+                            references=msg_id,
+                            save_to_db=False,
+                        )
+                        if _ar_result.get('ok'):
+                            _ar_log[_ar_key] = datetime.now().isoformat()
+                            _ar_log_path.write_text(json.dumps(_ar_log, ensure_ascii=False, indent=2), 'utf-8')
+                            _elog('system', 'urlaub_autoreply_sent',
+                                  f'Auto-Antwort gesendet an {_se} | {betreff[:60]}',
+                                  source='mail_monitor', modul='urlaub', actor_type='system',
+                                  status='ok', context_id=msg_id)
+        except Exception as _ur_e:
+            _elog('system', 'urlaub_autoreply_fehler', f'Auto-Antwort fehlgeschlagen: {_ur_e}',
+                  source='mail_monitor', modul='urlaub', actor_type='system', status='fehler')
+
     return result
 
 

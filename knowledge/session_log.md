@@ -566,3 +566,37 @@
 - Belegvorlagen, Lexware, Sprachmodul, Dokument-Export (alle Niedrig)
 
 **Status:** erledigt
+
+## 2026-03-31 17:00 — Session-Start (session-aaa)
+
+**Auftrag:** Plan + Implementierung LLM-Budget-Anzeige und Kostenanalyse in Einstellungen.
+**Status:** erledigt
+
+---
+
+## 2026-03-31 17:30 — session-aaa Fortsetzung
+
+**Auftrag:** 2 JS SyntaxErrors beheben die nach Implementierung aufgetaucht sind.
+**Status:** erledigt
+
+### Was erledigt wurde
+
+- JS Fehler 1 (Invalid or unexpected token): esVorlagDelete onclick hatte kaputte Regex-Escaping in JS-Template-Literal. Fix: JSON.stringify(v.name) statt replace-Hack.
+- JS Fehler 2 (Unexpected identifier 'einstellungen'): showPanel() Aufrufe in zwei single-quoted JS-Strings — \' wurde als ' gerendert (Python f-string Bug). Fix: \\' statt \' in Python source.
+- _diag-Warning "JavaScript lauft NICHT" verschwindet jetzt — JS lauft wieder sauber.
+- Commit: 6455ebd
+
+
+## 2026-03-31 20:45 -- session-bbb: Autonome Nacht-Abarbeitung (Fortsetzung)
+**Auftrag:** Alle restlichen offenen Posten aus KIRA_SYSTEM_ANALYSE.md abarbeiten (ausser Lexware und Kai-Aktionen)
+**Status:** erledigt
+
+### Erledigte Features:
+- Belegvorlagen-Modul: Panel HTML (Geschaeft-Tab), JS-Funktionen (loadBelegVorlagen/bvNeuErstellen/bvSpeichern/bvVorschau/bvKiraErstellen/bvLoeschen), Backend-API (GET/POST/DELETE /api/belegvorlagen), Storage in knowledge/belegvorlagen/*.json
+- Zeiterfassung: Neuer Geschaeft-Tab mit Timer (Start/Stop), manuellen Eintraegen, Filtern, SQLite-Tabelle zeiterfassung in tasks.db, GET/POST/DELETE /api/zeiterfassung
+- Urlaubsmodus-Smart: Auto-Reply in mail_monitor.py, Tracking-Log knowledge/urlaub_autoreply_log.json, 3 neue Einstellungs-Felder (Auto-Reply aktiv/Betreff/Text), saveSettings() erweitert
+- Sprachmodul/Dokument-Export/Cloud-Backup (aus session-bbb Anfang, bereits implementiert)
+- feature_registry.json: 13 Features auf done gesetzt
+- KIRA_SYSTEM_ANALYSE.md Sec 13: Neue Erledigt-Tabelle, Offen-Tabelle auf Kai-Aktionen reduziert
+
+---

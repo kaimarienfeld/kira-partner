@@ -670,16 +670,23 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | Einstellungen: Graph Kalender | ✅ Erledigt | zz | Scope-Status + Pruef-Button |
 | Google OAuth | ✅ Erledigt | aaa | google_oauth.py, Browser-Flow, Wizard, Einstellungen > Integrationen |
 
-### Offen / Geplant
+### Erledigt (session-bbb, 2026-03-31)
+
+| Feature / Komponente | Status |
+|---|---|
+| Belegvorlagen-Modul | ✅ Erledigt (session-bbb) — HTML-Editor + JS + Backend + GET/POST/DELETE API |
+| Sprachmodul | ✅ Erledigt (session-bbb) — Web Speech API Mikrofon-Button im Kira-Chat |
+| Dokument-Export | ✅ Erledigt (session-bbb) — CSV/JSON Export fuer Tasks/Kunden/Vorgaenge/Mails |
+| Cloud-Backup | ✅ Erledigt (session-bbb) — daily_check.py Step 7, manuell via /api/backup/jetzt |
+| Urlaubsmodus-Smart | ✅ Erledigt (session-bbb) — Auto-Reply in mail_monitor.py, Einstellungen UI |
+| Zeiterfassung | ✅ Erledigt (session-bbb) — Neuer Geschaeft-Tab: Timer, manuelle Eintraege, SQLite |
+
+### Offen / Kai-Aktionen erforderlich
 
 | Feature / Komponente | Status | Prioritaet | Hinweis |
 |---|---|---|---|
 | Azure Calendars.ReadWrite | ⏳ Offen (Kai) | Mittel | Entra Portal: Permission hinzufuegen (Kalender-Widget dann voll aktiv) |
-| Belegvorlagen-Modul | ⏳ Offen | Niedrig | Angebots-/Rechnungs-Layouts (wie Lexware) |
-| Sprachmodul | ⏳ Offen | Niedrig | feature_registry |
-| Dokument-Export | ⏳ Offen | Niedrig | feature_registry |
-| Lexware-Anbindung | ⏳ Offen | Niedrig | feature_registry |
-| Cloud-Backup | ⏳ Offen | Niedrig | feature_registry |
+| Lexware-Anbindung | ⏳ Offen | — | Eigene Arbeitsanweisung kommt von Kai |
 | WhatsApp-Token | ⏳ Offen (Kai) | Niedrig | Kai muss Token eintragen |
 | Leni Draft-2 Passwort | ⏳ Offen (Kai) | Niedrig | Gmail-Draft Platzhalter ersetzen |
 | Multi-Agent-Architektur | ⏳ Langfristig | — | Spezialisierte Sub-Agenten |

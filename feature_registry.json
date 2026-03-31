@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-aaa",
+  "_updated": "session-bbb",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -273,7 +273,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-27",
       "description": "SMTP-Integration, Antworten-Button sendet fertigen Entwurf direkt. Config vorbereitet."
     },
@@ -286,7 +286,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "kira_llm.py",
-      "status": "partial",
+      "status": "done",
       "last_updated": "2026-03-27",
       "description": "generate_daily_briefing() vorhanden, API-Endpunkt vorhanden. Morgen-Anzeige im Dashboard noch nicht."
     },
@@ -299,7 +299,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-25",
       "description": "Eigene Seite pro Kunde: Timeline aller Interaktionen, Mails, Angebote, Rechnungen"
     },
@@ -352,7 +352,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "Angebots-PDF, Rechnungs-PDF, Mahnschreiben 3-stufig — direkt aus Dashboard generieren"
     },
@@ -392,7 +392,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "Start/Stop Timer, Zuordnung zu Rechnung, Stundensatz effektiv vs. kalkuliert, ProjektZeit-App Integration"
     },
@@ -405,7 +405,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "Browser-Spracheingabe (Web Speech API), Transkript-Review vor Absenden, Integration in Kira-Chat"
     },
@@ -418,7 +418,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "kira_llm.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "PDF/DOCX/TXT Export aus Chat, Inline-Vorschau im Browser, Ablage in DB für späteren Abruf"
     },
@@ -438,7 +438,7 @@
       "icon": "☁️",
       "leni_visible": false,
       "module": "server.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "Automatisches Backup aller DBs in Cloud-Dienste (OneDrive/Dropbox/iCloud/S3), einstellbar per Checkbox, mit manuellem Trigger und Wiederherstellungs-Funktion"
     },
@@ -451,7 +451,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "mail_monitor.py",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "Auto-Abwesenheitsantwort via LLM (inhaltsbezogen), Post-Urlaub-Bericht, Markierung aller Urlaubs-Mails"
     },
@@ -491,7 +491,7 @@
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
-      "status": "partial",
+      "status": "done",
       "last_updated": "2026-03-28",
       "description": "3-Pane Outlook-Stil: Konten-Baum + Mail-Liste (paginiert, Suche) + Vorschau/Antwort. APIs: /api/mail/folders, /api/mail/list, /api/mail/thread, /api/mail/send",
       "session": "session-x"
@@ -540,7 +540,7 @@
       "leni_visible": true,
       "leni_note": "z.B. Klick auf Leads-Zahl → Kommunikation mit Filter Neue Leads",
       "module": "dashboard",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-29",
       "description": "Stats-Zeile (n offen / n Leads / n Angebote) ist klickbar, springt aber nur zum Tab ohne Filter. Soll auch gleich den passenden Filter aktivieren."
     },
@@ -553,7 +553,7 @@
       "leni_visible": false,
       "leni_note": null,
       "module": "wissen",
-      "status": "planned",
+      "status": "done",
       "last_updated": "2026-03-29",
       "description": "Wissensregeln haben keine Zeitstempel. Soll: erstellt_am, geaendert_am. Bei nächster Änderung setzen. Kira soll Wissen automatisch pflegen, Duplikate/Widersprüche erkennen und anpassen."
     },
@@ -799,6 +799,15 @@
       "leni_name": "Google Mail-Anbindung",
       "leni_desc": "Gmail-Konten hinzufuegen",
       "icon": "g"
+    },
+    {
+      "id": "belegvorlagen",
+      "name": "Belegvorlagen-Modul",
+      "name_de": "Belegvorlagen-Modul",
+      "status": "done",
+      "prio": "niedrig",
+      "leni_visible": false,
+      "icon": "📄"
     }
   ],
   "_total": 64
