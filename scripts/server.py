@@ -22,6 +22,26 @@ _BROWSE_RESULTS   = {}   # {job_id: path_or_None}
 DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
 ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
+RUNTIME_EVENTS_DB = KNOWLEDGE_DIR / "runtime_events.db"
+
+# LLM Kostenanalyse — Preistabelle USD pro 1M Token (Stand: 2026-03)
+MODEL_PRICING_USD_PER_1M = {
+    "claude-sonnet-4-6":         {"in": 3.00,  "out": 15.00},
+    "claude-sonnet-4-20250514":  {"in": 3.00,  "out": 15.00},
+    "claude-opus-4-6":           {"in": 15.00, "out": 75.00},
+    "claude-haiku-4-5-20251001": {"in": 0.80,  "out": 4.00},
+    "claude-haiku-3-5":          {"in": 0.80,  "out": 4.00},
+    "gpt-4o":                    {"in": 2.50,  "out": 10.00},
+    "gpt-4o-mini":               {"in": 0.15,  "out": 0.60},
+    "gpt-4.1":                   {"in": 2.00,  "out": 8.00},
+    "gpt-4.1-mini":              {"in": 0.40,  "out": 1.60},
+    "gpt-3.5-turbo":             {"in": 0.50,  "out": 1.50},
+    "default":                   {"in": 1.00,  "out": 3.00},
+    "_ollama":                   {"in": 0.00,  "out": 0.00},
+}
+USD_EUR_RATE = 0.92
+_balance_cache: dict = {}   # {provider_id: {"ts": float, "balance": ..., ...}}
+
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from activity_log import log as alog, get_entries as alog_entries, get_stats as alog_stats
@@ -4859,6 +4879,14 @@ def build_einstellungen():
             else ("color:#5cb85c;font-weight:700" if pstatus["status"] == "ok" else "color:var(--muted)")
         )
 
+        # Balance-Badge je Provider-Typ
+        if ptyp == "ollama":
+            balance_row = '<div style="margin-top:6px;font-size:11px;color:var(--muted)">&#x1F4BB; Lokal &mdash; keine Kosten</div>'
+        elif ptyp == "anthropic":
+            balance_row = '<div style="margin-top:6px;font-size:11px;color:var(--muted)">&#x1F4B3; Guthaben: <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent)">Im Web pr&uuml;fen &#x2197;</a></div>'
+        else:
+            balance_row = f'<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px"><span id="bal-{esc(pid)}" style="color:var(--muted)">&#x1F4B3; Guthaben nicht geladen</span><button style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="loadProviderBalance(\'{js_esc(pid)}\')">&#x21BB;</button></div>'
+
         provider_cards += f'''<div class="provider-card" id="pcard-{esc(pid)}" style="{opacity}border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:8px">
@@ -4881,6 +4909,7 @@ def build_einstellungen():
           {model_row}
           {key_row}
           {base_url_row}
+          {balance_row}
         </div>'''
 
     # Active budget model for classifier display
@@ -5164,6 +5193,7 @@ function esInfoPopup(btn, text) {{
   <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
   <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
   <div class="es-sn" data-essec="sicherheit-audit" onclick="esShowSec('sicherheit-audit')"><span class="es-sico">&#x1F6E1;</span>Sicherheit &amp; Audit</div>
+  <div class="es-sn" data-essec="verbrauch" onclick="esShowSec('verbrauch')"><span class="es-sico">&#x1F4CA;</span>Verbrauch &amp; Kosten</div>
   <div class="es-sn-sep"></div>
   <div class="es-snav-h">Protokoll</div>
   <div class="es-sn" data-essec="protokoll" onclick="esShowSec('protokoll')"><span class="es-sico">&#x2630;</span>Protokoll &amp; Logs<span class="es-scnt">{rl_total}</span></div>
@@ -8357,6 +8387,241 @@ function esInfoPopup(btn, text) {{
   </div>
 
 </div><!-- /es-sec-protokoll -->
+
+<!-- ── SECTION: VERBRAUCH & KOSTEN ────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-verbrauch">
+  <div class="es-sec-h">Verbrauch &amp; Kosten</div>
+  <div class="es-sec-sub">Token-Verbrauch, API-Kosten und Preisanalyse pro Provider und Modell. (Preise Naherungswerte, USD&rarr;EUR Kurs: 0,92)</div>
+
+  <div class="es-proto-tabs">
+    <div class="es-proto-tab act" data-vtab="uebersicht" onclick="esShowVTab('uebersicht')">&#x1F4C8; Ubersicht</div>
+    <div class="es-proto-tab" data-vtab="detail" onclick="esShowVTab('detail')">&#x1F4CB; Detailtabelle</div>
+  </div>
+
+  <div id="vtab-uebersicht">
+    <div style="display:flex;gap:8px;margin:14px 0 16px;flex-wrap:wrap">
+      <button class="es-btn es-btn-pri" onclick="vLoadUebersicht('7d')" id="vbtn-7d">7 Tage</button>
+      <button class="es-btn" onclick="vLoadUebersicht('30d')" id="vbtn-30d">30 Tage</button>
+      <button class="es-btn" onclick="vLoadUebersicht('gesamt')" id="vbtn-gesamt">Gesamt</button>
+    </div>
+    <div id="v-summary-cards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px"></div>
+    <div id="v-tag-table" style="margin-bottom:20px"></div>
+    <div id="v-provider-table"></div>
+  </div>
+
+  <div id="vtab-detail" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 10px;align-items:center">
+      <select id="vd-filter-prov" style="font-size:11px;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onchange="vLoadDetail()">
+        <option value="">Alle Provider</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="ollama">Ollama</option>
+      </select>
+      <input type="date" id="vd-filter-von" style="font-size:11px;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onchange="vLoadDetail()">
+      <input type="date" id="vd-filter-bis" style="font-size:11px;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;" onchange="vLoadDetail()">
+      <input type="text" id="vd-filter-search" placeholder="Suche in Summary..." style="font-size:11px;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;width:160px;" oninput="vLoadDetail()">
+      <button class="es-btn" onclick="vExportCSV()">&#x2B07; CSV</button>
+    </div>
+    <div id="vd-table"></div>
+    <div id="vd-pager" style="display:flex;gap:8px;margin-top:10px;align-items:center;font-size:11px;color:var(--muted)"></div>
+  </div>
+
+  <script>
+  (function(){{
+    var _vPage = 1;
+    var _vzeitraum = '7d';
+
+    function fmtNum(n){{ return (n==null||n===undefined) ? '&mdash;' : Number(n).toLocaleString('de-DE'); }}
+
+    window.esShowVTab = function(tab){{
+      document.getElementById('vtab-uebersicht').style.display = tab==='uebersicht' ? '' : 'none';
+      document.getElementById('vtab-detail').style.display     = tab==='detail'     ? '' : 'none';
+      document.querySelectorAll('.es-proto-tab[data-vtab]').forEach(function(el){{
+        el.classList.toggle('act', el.dataset.vtab===tab);
+      }});
+      if(tab==='detail') vLoadDetail();
+    }};
+
+    window.vLoadUebersicht = function(zeitraum){{
+      _vzeitraum = zeitraum || '7d';
+      ['7d','30d','gesamt'].forEach(function(z){{
+        var b = document.getElementById('vbtn-'+z);
+        if(b) b.className = 'es-btn' + (z===_vzeitraum ? ' es-btn-pri' : '');
+      }});
+      var s = document.getElementById('v-summary-cards');
+      var t = document.getElementById('v-tag-table');
+      var p = document.getElementById('v-provider-table');
+      if(s) s.innerHTML = '<div style="font-size:11px;color:var(--muted)">Lade&hellip;</div>';
+      if(t) t.innerHTML = '';
+      if(p) p.innerHTML = '';
+      fetch('/api/kira/kosten/uebersicht?zeitraum='+_vzeitraum)
+        .then(function(r){{return r.json();}})
+        .then(function(d){{
+          if(d.error){{
+            if(s) s.innerHTML='<div style="font-size:11px;color:var(--muted)">Keine Daten &mdash; '+d.error+'</div>';
+            return;
+          }}
+          if(s) s.innerHTML =
+            _vCard('Token Input',  fmtNum(d.gesamt_token_in),  '#7c3aed') +
+            _vCard('Token Output', fmtNum(d.gesamt_token_out), '#0891b2') +
+            _vCard('Kosten USD',   (d.gesamt_kosten_usd||0).toFixed(4)+' USD', '#059669') +
+            _vCard('Kosten EUR',   (d.gesamt_kosten_eur||0).toFixed(4)+' EUR', '#d97706');
+
+          var maxK = Math.max.apply(null, (d.nach_tag||[]).map(function(x){{return x.kosten_usd||0;}})) || 1;
+          var tHtml = '<div style="font-weight:600;font-size:12px;margin-bottom:8px">Tagesverbrauch</div><div style="display:flex;flex-direction:column;gap:4px">';
+          (d.nach_tag||[]).forEach(function(row){{
+            var pct = Math.round(((row.kosten_usd||0)/maxK)*100);
+            tHtml += '<div style="display:flex;align-items:center;gap:8px;font-size:11px">'
+              + '<span style="min-width:80px;color:var(--muted)">'+(row.datum||'')+'</span>'
+              + '<div style="flex:1;background:var(--bg-raised);border-radius:3px;height:14px;overflow:hidden">'
+              + '<div style="width:'+pct+'%;background:var(--accent,#7c3aed);height:100%;border-radius:3px"></div></div>'
+              + '<span style="min-width:70px;text-align:right">'+(row.kosten_usd||0).toFixed(4)+' USD</span>'
+              + '<span style="min-width:60px;text-align:right;color:var(--muted)">'+fmtNum((row.token_in||0)+(row.token_out||0))+'</span>'
+              + '</div>';
+          }});
+          tHtml += '</div>';
+          if(t) t.innerHTML = tHtml;
+
+          var pHtml = '<div style="font-weight:600;font-size:12px;margin:16px 0 8px">Nach Provider &amp; Modell</div>'
+            + '<table style="width:100%;font-size:11px;border-collapse:collapse">'
+            + '<thead><tr style="border-bottom:1px solid var(--border);color:var(--muted)">'
+            + '<th style="text-align:left;padding:4px 6px">Provider</th>'
+            + '<th style="text-align:left;padding:4px 6px">Modell</th>'
+            + '<th style="text-align:right;padding:4px 6px">Token In</th>'
+            + '<th style="text-align:right;padding:4px 6px">Token Out</th>'
+            + '<th style="text-align:right;padding:4px 6px">Kosten USD</th>'
+            + '</tr></thead><tbody>';
+          (d.nach_provider||[]).forEach(function(row){{
+            pHtml += '<tr style="border-bottom:0.5px solid var(--border)">'
+              + '<td style="padding:4px 6px">'+(row.provider||'')+'</td>'
+              + '<td style="padding:4px 6px;color:var(--muted)">'+(row.model||'')+'</td>'
+              + '<td style="padding:4px 6px;text-align:right">'+fmtNum(row.token_in)+'</td>'
+              + '<td style="padding:4px 6px;text-align:right">'+fmtNum(row.token_out)+'</td>'
+              + '<td style="padding:4px 6px;text-align:right;font-weight:600">'+(row.kosten_usd||0).toFixed(4)+'</td>'
+              + '</tr>';
+          }});
+          pHtml += '</tbody></table>';
+          if(p) p.innerHTML = pHtml;
+        }}).catch(function(err){{
+          if(s) s.innerHTML = '<div style="font-size:11px;color:var(--danger)">Fehler: '+err+'</div>';
+        }});
+    }};
+
+    function _vCard(label, value, color){{
+      return '<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:130px">'
+        + '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+label+'</div>'
+        + '<div style="font-size:15px;font-weight:700;color:'+color+'">'+value+'</div></div>';
+    }}
+
+    window.vLoadDetail = function(){{ _vPage=1; _doLoadDetail(); }};
+
+    function _doLoadDetail(){{
+      var prov   = (document.getElementById('vd-filter-prov')||{{}}).value||'';
+      var von    = (document.getElementById('vd-filter-von')||{{}}).value||'';
+      var bis    = (document.getElementById('vd-filter-bis')||{{}}).value||'';
+      var search = (document.getElementById('vd-filter-search')||{{}}).value||'';
+      var url = '/api/kira/kosten/detail?seite='+_vPage
+        +(prov?'&provider='+encodeURIComponent(prov):'')
+        +(von?'&von='+encodeURIComponent(von):'')
+        +(bis?'&bis='+encodeURIComponent(bis):'')
+        +(search?'&q='+encodeURIComponent(search):'');
+      var el = document.getElementById('vd-table');
+      if(el) el.innerHTML = '<div style="font-size:11px;color:var(--muted)">Lade&hellip;</div>';
+      fetch(url).then(function(r){{return r.json();}}).then(function(d){{
+        var rows = d.zeilen || [];
+        if(!rows.length){{
+          if(el) el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:16px 0">Keine Daten f&uuml;r diesen Filter</div>';
+        }} else {{
+          var html = '<table style="width:100%;font-size:11px;border-collapse:collapse">'
+            + '<thead><tr style="border-bottom:1px solid var(--border);color:var(--muted)">'
+            + '<th style="text-align:left;padding:4px 6px;white-space:nowrap">Zeit</th>'
+            + '<th style="text-align:left;padding:4px 6px">Provider</th>'
+            + '<th style="text-align:left;padding:4px 6px">Modell</th>'
+            + '<th style="text-align:left;padding:4px 6px">Aktion</th>'
+            + '<th style="text-align:right;padding:4px 6px">Tok.In</th>'
+            + '<th style="text-align:right;padding:4px 6px">Tok.Out</th>'
+            + '<th style="text-align:right;padding:4px 6px">EUR</th>'
+            + '<th style="text-align:left;padding:4px 6px;max-width:200px">Summary</th>'
+            + '</tr></thead><tbody>';
+          rows.forEach(function(r){{
+            var summ = (r.summary||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            html += '<tr style="border-bottom:0.5px solid var(--border)">'
+              + '<td style="padding:4px 6px;white-space:nowrap;color:var(--muted)">'+(r.ts||'')+'</td>'
+              + '<td style="padding:4px 6px">'+(r.provider||'')+'</td>'
+              + '<td style="padding:4px 6px;color:var(--muted)">'+(r.model||'')+'</td>'
+              + '<td style="padding:4px 6px">'+(r.action||'')+'</td>'
+              + '<td style="padding:4px 6px;text-align:right">'+fmtNum(r.token_in)+'</td>'
+              + '<td style="padding:4px 6px;text-align:right">'+fmtNum(r.token_out)+'</td>'
+              + '<td style="padding:4px 6px;text-align:right;font-weight:600">'+(r.kosten_eur||0).toFixed(4)+'</td>'
+              + '<td style="padding:4px 6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+summ+'">'+summ.slice(0,70)+'</td>'
+              + '</tr>';
+          }});
+          html += '</tbody></table>';
+          if(el) el.innerHTML = html;
+        }}
+        var total = d.gesamt||0;
+        var pages = Math.ceil(total/50)||1;
+        var pg = document.getElementById('vd-pager');
+        if(pg){{
+          var prev = '<button class="es-btn" style="padding:2px 10px" onclick="window._vPrev()" '+(_vPage<=1?'disabled':'')+'>&larr;</button>';
+          var next = '<button class="es-btn" style="padding:2px 10px" onclick="window._vNext('+pages+')" '+(_vPage>=pages?'disabled':'')+'>&rarr;</button>';
+          pg.innerHTML = (pages>1 ? prev+' Seite '+_vPage+'/'+pages+' '+next : '') + ' &nbsp;<span>'+total+' Eintr&auml;ge</span>';
+        }}
+      }}).catch(function(err){{
+        if(el) el.innerHTML = '<div style="font-size:11px;color:var(--danger)">Fehler: '+err+'</div>';
+      }});
+    }}
+
+    window._vPrev = function(){{ if(_vPage>1){{_vPage--; _doLoadDetail();}} }};
+    window._vNext = function(pages){{ if(_vPage<pages){{_vPage++; _doLoadDetail();}} }};
+
+    window.vExportCSV = function(){{
+      var prov   = (document.getElementById('vd-filter-prov')||{{}}).value||'';
+      var von    = (document.getElementById('vd-filter-von')||{{}}).value||'';
+      var bis    = (document.getElementById('vd-filter-bis')||{{}}).value||'';
+      var search = (document.getElementById('vd-filter-search')||{{}}).value||'';
+      var url = '/api/kira/kosten/detail?format=csv&seite=1&pro_seite=5000'
+        +(prov?'&provider='+encodeURIComponent(prov):'')
+        +(von?'&von='+encodeURIComponent(von):'')
+        +(bis?'&bis='+encodeURIComponent(bis):'')
+        +(search?'&q='+encodeURIComponent(search):'');
+      window.open(url, '_blank');
+    }};
+
+    window.loadProviderBalance = function(pid){{
+      var el = document.getElementById('bal-'+pid);
+      if(el) el.innerHTML = '&#x29D7; Lade&hellip;';
+      fetch('/api/kira/provider/'+encodeURIComponent(pid)+'/balance')
+        .then(function(r){{return r.json();}})
+        .then(function(d){{
+          if(!el) return;
+          if(d.link){{
+            el.innerHTML = '&#x1F4B3; <a href="'+d.link+'" target="_blank" style="color:var(--accent)">Im Web pr&uuml;fen &#x2197;</a>';
+          }} else if(d.balance!=null){{
+            var color = d.balance>1 ? 'var(--success,#3dae6a)' : (d.balance>0.1 ? '#d97706' : 'var(--danger,#dc4a4a)');
+            el.innerHTML = '&#x1F4B3; <span style="color:'+color+';font-weight:600">'+(d.balance_formatted||'')+'</span>';
+          }} else {{
+            el.textContent = d.hinweis || 'Nicht verf\u00fcgbar';
+          }}
+        }}).catch(function(){{ if(el) el.textContent = 'Fehler beim Laden'; }});
+    }};
+
+    // Initial load wenn Sektion aktiv
+    document.addEventListener('DOMContentLoaded', function(){{
+      var sec = document.getElementById('es-sec-verbrauch');
+      if(sec && !sec.classList.contains('es-hidden')) vLoadUebersicht('7d');
+    }});
+    // Laden beim ersten Aufrufen der Sektion
+    var _vLoaded = false;
+    var _vOrig = window.esShowSec;
+    window.esShowSec = function(sec){{
+      if(_vOrig) _vOrig(sec);
+      if(sec==='verbrauch' && !_vLoaded){{ _vLoaded=true; vLoadUebersicht('7d'); }}
+    }};
+  }})();
+  </script>
+</div><!-- /es-sec-verbrauch -->
 
 </div><!-- /es-main -->
 </div><!-- /es-ct -->
@@ -14376,6 +14641,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/kunden/360'):
             self._api_kunden_360()
 
+        elif self.path.startswith('/api/kira/kosten/uebersicht'):
+            self._api_kosten_uebersicht()
+
+        elif self.path.startswith('/api/kira/kosten/detail'):
+            self._api_kosten_detail()
+
+        elif re.match(r'^/api/kira/provider/(.+)/balance$', self.path):
+            _m = re.match(r'^/api/kira/provider/(.+)/balance$', self.path)
+            self._api_provider_balance(_m.group(1) if _m else "")
+
         else:
             self._respond(404, 'text/plain', b'Not found')
 
@@ -18606,6 +18881,251 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception:
             pass
         self._json(result)
+
+    # ── LLM Kosten & Budget ──────────────────────────────────────────────────
+
+    def _api_provider_balance(self, provider_id: str):
+        """GET /api/kira/provider/{id}/balance — Guthaben von Provider-API abfragen."""
+        import time
+        import urllib.request as _ur
+        # Cache prufen (60 Min TTL)
+        cached = _balance_cache.get(provider_id)
+        if cached and (time.time() - cached.get("ts", 0)) < 3600:
+            self._json({k: v for k, v in cached.items() if k != "ts"})
+            return
+        try:
+            providers = get_all_providers()
+            prov = next((p for p in providers if p.get("id") == provider_id), None)
+            if not prov:
+                self._json({"error": "Provider nicht gefunden", "provider_id": provider_id})
+                return
+        except Exception as e:
+            self._json({"error": str(e), "provider_id": provider_id})
+            return
+
+        ptyp = prov.get("typ", "")
+        result = {
+            "provider_id": provider_id, "typ": ptyp,
+            "balance": None, "balance_formatted": None,
+            "link": None, "hinweis": None,
+        }
+
+        if ptyp == "ollama":
+            result["hinweis"] = "Lokal — keine Kosten"
+            result["balance_formatted"] = "Kostenlos (lokal)"
+        elif ptyp == "anthropic":
+            result["link"] = "https://console.anthropic.com/settings/billing"
+            result["hinweis"] = "Anthropic zeigt Guthaben nur im Web-Dashboard"
+        elif ptyp in ("openai", "openai_compat"):
+            try:
+                import kira_llm as _kllm
+                api_key = _kllm._get_provider_key(prov)
+                if api_key:
+                    req = _ur.Request(
+                        "https://api.openai.com/v1/dashboard/billing/credit_grants",
+                        headers={"Authorization": f"Bearer {api_key}"}
+                    )
+                    with _ur.urlopen(req, timeout=8) as resp:
+                        data = json.loads(resp.read())
+                    bal = float(data.get("total_granted", 0) or 0) - float(data.get("total_used", 0) or 0)
+                    result["balance"] = round(bal, 4)
+                    result["balance_formatted"] = f"{bal:.2f} USD"
+                else:
+                    result["hinweis"] = "Kein API-Key hinterlegt"
+            except Exception:
+                result["hinweis"] = "Guthaben-API nicht verfugbar (Standard-Abo / prepaid only)"
+        elif ptyp == "openrouter":
+            try:
+                import kira_llm as _kllm
+                api_key = _kllm._get_provider_key(prov)
+                if api_key:
+                    req = _ur.Request(
+                        "https://openrouter.ai/api/v1/credits",
+                        headers={"Authorization": f"Bearer {api_key}"}
+                    )
+                    with _ur.urlopen(req, timeout=8) as resp:
+                        data = json.loads(resp.read())
+                    cdata = data.get("data", data)
+                    total = float(cdata.get("total_credits", 0) or 0)
+                    used  = float(cdata.get("total_usage",   0) or 0)
+                    bal = round(total - used, 4)
+                    result["balance"] = bal
+                    result["balance_formatted"] = f"{bal:.2f} USD"
+                else:
+                    result["hinweis"] = "Kein API-Key hinterlegt"
+            except Exception:
+                result["hinweis"] = "Guthaben-API nicht verfugbar"
+        else:
+            result["hinweis"] = "Kein Guthaben-API fur diesen Provider-Typ"
+
+        import time as _t
+        _balance_cache[provider_id] = dict(result, ts=_t.time())
+        self._json(result)
+
+    def _cost_for_row(self, model: str, token_in: int, token_out: int, provider_typ: str = "") -> dict:
+        """Berechne USD/EUR Kosten fur eine Zeile."""
+        if provider_typ == "ollama":
+            return {"usd": 0.0, "eur": 0.0}
+        pricing = MODEL_PRICING_USD_PER_1M.get(model or "")
+        if not pricing:
+            for k, v in MODEL_PRICING_USD_PER_1M.items():
+                if k not in ("default", "_ollama") and (model or "").startswith(k):
+                    pricing = v
+                    break
+        if not pricing:
+            pricing = MODEL_PRICING_USD_PER_1M["default"]
+        usd = (int(token_in or 0) / 1_000_000 * pricing["in"]) + \
+              (int(token_out or 0) / 1_000_000 * pricing["out"])
+        return {"usd": round(usd, 6), "eur": round(usd * USD_EUR_RATE, 6)}
+
+    def _api_kosten_uebersicht(self):
+        """GET /api/kira/kosten/uebersicht?zeitraum=7d|30d|gesamt"""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        zeitraum = qs.get("zeitraum", ["7d"])[0]
+        if zeitraum == "7d":
+            since_clause = "AND ts >= datetime('now', '-7 days')"
+        elif zeitraum == "30d":
+            since_clause = "AND ts >= datetime('now', '-30 days')"
+        else:
+            since_clause = ""
+        result = {
+            "zeitraum": zeitraum,
+            "gesamt_token_in": 0, "gesamt_token_out": 0,
+            "gesamt_kosten_usd": 0.0, "gesamt_kosten_eur": 0.0,
+            "nach_tag": [], "nach_provider": [],
+        }
+        try:
+            conn = sqlite3.connect(str(RUNTIME_EVENTS_DB))
+            conn.row_factory = sqlite3.Row
+            where = f"WHERE (token_in IS NOT NULL OR token_out IS NOT NULL) {since_clause}"
+            rows = conn.execute(
+                f"SELECT ts, provider, model, token_in, token_out FROM events {where}"
+            ).fetchall()
+            conn.close()
+            tag_agg  = {}  # datum -> {token_in, token_out, kosten_usd, provider_haupt}
+            prov_agg = {}  # (provider, model) -> {token_in, token_out, kosten_usd}
+            for row in rows:
+                ti    = int(row["token_in"]  or 0)
+                to    = int(row["token_out"] or 0)
+                model = row["model"]    or "unknown"
+                prov  = row["provider"] or "unknown"
+                cost  = self._cost_for_row(model, ti, to, prov)
+                datum = (row["ts"] or "")[:10]
+                if datum not in tag_agg:
+                    tag_agg[datum] = {"token_in": 0, "token_out": 0, "kosten_usd": 0.0, "provider_haupt": prov}
+                tag_agg[datum]["token_in"]   += ti
+                tag_agg[datum]["token_out"]  += to
+                tag_agg[datum]["kosten_usd"] += cost["usd"]
+                key = (prov, model)
+                if key not in prov_agg:
+                    prov_agg[key] = {"token_in": 0, "token_out": 0, "kosten_usd": 0.0}
+                prov_agg[key]["token_in"]   += ti
+                prov_agg[key]["token_out"]  += to
+                prov_agg[key]["kosten_usd"] += cost["usd"]
+                result["gesamt_token_in"]   += ti
+                result["gesamt_token_out"]  += to
+                result["gesamt_kosten_usd"] += cost["usd"]
+            result["gesamt_kosten_usd"] = round(result["gesamt_kosten_usd"], 6)
+            result["gesamt_kosten_eur"] = round(result["gesamt_kosten_usd"] * USD_EUR_RATE, 6)
+            result["nach_tag"] = [
+                {"datum": d, "token_in": v["token_in"], "token_out": v["token_out"],
+                 "kosten_usd": round(v["kosten_usd"], 6), "provider_haupt": v["provider_haupt"]}
+                for d, v in sorted(tag_agg.items(), reverse=True)
+            ]
+            result["nach_provider"] = [
+                {"provider": k[0], "model": k[1],
+                 "token_in": v["token_in"], "token_out": v["token_out"],
+                 "kosten_usd": round(v["kosten_usd"], 6)}
+                for k, v in sorted(prov_agg.items(), key=lambda x: -x[1]["kosten_usd"])
+            ]
+        except Exception as e:
+            result["error"] = str(e)
+        self._json(result)
+
+    def _api_kosten_detail(self):
+        """GET /api/kira/kosten/detail?seite=1&pro_seite=50&provider=&von=&bis=&q=&format=csv"""
+        qs        = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        fmt       = qs.get("format",   ["json"])[0]
+        seite     = max(1, int(qs.get("seite",     ["1"])[0]))
+        pro_seite = min(500, int(qs.get("pro_seite", ["50"])[0]))
+        provider  = qs.get("provider", [""])[0].strip()
+        von       = qs.get("von",      [""])[0].strip()
+        bis       = qs.get("bis",      [""])[0].strip()
+        q         = qs.get("q",        [""])[0].strip()
+
+        conditions = ["(token_in IS NOT NULL OR token_out IS NOT NULL)"]
+        params: list = []
+        if provider:
+            conditions.append("LOWER(provider) = ?")
+            params.append(provider.lower())
+        if von:
+            conditions.append("ts >= ?")
+            params.append(von)
+        if bis:
+            conditions.append("ts <= ?")
+            params.append(bis + " 23:59:59")
+        if q:
+            conditions.append("LOWER(COALESCE(summary,'')) LIKE ?")
+            params.append(f"%{q.lower()}%")
+        where  = "WHERE " + " AND ".join(conditions)
+        offset = (seite - 1) * pro_seite
+        try:
+            conn = sqlite3.connect(str(RUNTIME_EVENTS_DB))
+            conn.row_factory = sqlite3.Row
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM events {where}", params
+            ).fetchone()[0]
+
+            if fmt == "csv":
+                all_rows = conn.execute(
+                    f"SELECT ts, provider, model, action, token_in, token_out, summary "
+                    f"FROM events {where} ORDER BY ts DESC",
+                    params
+                ).fetchall()
+                conn.close()
+                lines = ["Zeit,Provider,Modell,Aktion,Token In,Token Out,Kosten USD,Kosten EUR,Summary"]
+                for row in all_rows:
+                    cost = self._cost_for_row(row["model"] or "", row["token_in"] or 0,
+                                              row["token_out"] or 0, row["provider"] or "")
+                    summ = (row["summary"] or "").replace('"', "'")
+                    lines.append(
+                        f'"{row["ts"]}",{row["provider"] or ""},"{row["model"] or ""}",{row["action"] or ""},'
+                        f'{row["token_in"] or 0},{row["token_out"] or 0},{cost["usd"]},{cost["eur"]},"{summ}"'
+                    )
+                csv_bytes = "\n".join(lines).encode("utf-8-sig")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="kira_kosten.csv"')
+                self.send_header("Content-Length", str(len(csv_bytes)))
+                self.end_headers()
+                self.wfile.write(csv_bytes)
+                return
+
+            rows = conn.execute(
+                f"SELECT ts, provider, model, action, token_in, token_out, summary "
+                f"FROM events {where} ORDER BY ts DESC LIMIT ? OFFSET ?",
+                params + [pro_seite, offset]
+            ).fetchall()
+            conn.close()
+            zeilen = []
+            for row in rows:
+                cost = self._cost_for_row(row["model"] or "", row["token_in"] or 0,
+                                          row["token_out"] or 0, row["provider"] or "")
+                zeilen.append({
+                    "ts":         row["ts"],
+                    "provider":   row["provider"],
+                    "model":      row["model"],
+                    "action":     row["action"],
+                    "token_in":   row["token_in"]  or 0,
+                    "token_out":  row["token_out"] or 0,
+                    "kosten_usd": cost["usd"],
+                    "kosten_eur": cost["eur"],
+                    "summary":    row["summary"],
+                })
+            self._json({"gesamt": total, "seite": seite, "pro_seite": pro_seite, "zeilen": zeilen})
+        except Exception as e:
+            self._json({"error": str(e), "gesamt": 0, "seite": seite,
+                        "pro_seite": pro_seite, "zeilen": []})
 
     def _api_vorgang_signals(self):
         """GET /api/vorgang/signals — B/C-Signale.

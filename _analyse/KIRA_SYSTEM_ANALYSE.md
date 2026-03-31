@@ -685,6 +685,30 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ## 14. Offene Posten & Roadmap
 
+### Implementiert (session-yy, 2026-03-31)
+
+#### F-LLM-01 — Provider-Guthaben-Anzeige
+**Status:** 🟢 Implementiert
+**Dateien:** `scripts/server.py` (`_api_provider_balance`, `_balance_cache`, balance_row in provider cards)
+**Beschreibung:** Balance-Abfrage per Provider-API (OpenAI: `/v1/dashboard/billing/credit_grants`, OpenRouter: `/api/v1/credits`), Fallback-Link fuer Anthropic, "Kostenlos" fuer Ollama. Badge + Refresh-Button in jeder Provider-Karte. 60 Min In-Memory-Cache.
+
+#### F-LLM-02 — Token-Verbrauchshistorie
+**Status:** 🟢 Implementiert
+**Dateien:** `scripts/server.py` (`_api_kosten_uebersicht`, neue Einstellungen-Sektion "Verbrauch & Kosten")
+**Beschreibung:** Tages-/Wochenansicht Tokenverbrauch aus `runtime_events.db`. Zeitraum-Filter: 7d/30d/Gesamt. Summary-Cards, CSS-only Balkendiagramm, Provider-Aufschluss-Tabelle.
+
+#### F-LLM-03 — Kostenanalyse Detailtabelle
+**Status:** 🟢 Implementiert
+**Dateien:** `scripts/server.py` (`_api_kosten_detail`, `_cost_for_row`, `MODEL_PRICING_USD_PER_1M`)
+**Beschreibung:** Gefilterte Rohdaten-Tabelle (Provider/Datum/Summary-Filter, Paginierung 50/Seite). Preisberechnung mit `MODEL_PRICING_USD_PER_1M` Dict (Exakt- + Prefix-Match). CSV-Export. Neue Einstellungen-Sektion mit 2 Sub-Tabs.
+
+**Neue API-Endpunkte:**
+- `GET /api/kira/provider/{id}/balance`
+- `GET /api/kira/kosten/uebersicht?zeitraum=7d|30d|gesamt`
+- `GET /api/kira/kosten/detail?seite=&pro_seite=&provider=&von=&bis=&q=&format=csv`
+
+---
+
 ### Sofort umsetzbar (naechste Sessions)
 
 1. **Kira Live-Chip + Activity-Drawer** — Header-Status + Slide-In mit "Was macht Kira?"
