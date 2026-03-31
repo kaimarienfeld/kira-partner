@@ -362,3 +362,10 @@ Commit: 66241b0
 **Commits:** ac0c057 + c845669
 **Offen geblieben:** Plan Paket 1-A (Tool-Idempotenz kira_llm.py), Kalender-Eintrag für Spaeter (wartet auf Graph API), App-Icon-Verknüpfung.
 **Status:** erledigt
+
+### 2026-03-31 15:35 — Ergänzung session-vv
+**Auftrag:** Klärung was die "offen gebliebenen" Items blockiert + Favicon sofort umsetzen.
+**Erledigt:**
+- Favicon: Kira-Launcher SVG als data-URI im <head> — Tab-Icon und gepinntes App-Icon
+- Kalender-Blocker identifiziert: Azure App braucht Calendars.ReadWrite Permission (Kai-Aktion im Entra Portal)
+**Commit:** c4f68bb
