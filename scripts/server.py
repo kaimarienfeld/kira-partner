@@ -1115,6 +1115,24 @@ def build_postfach():
           </div>
           <div class="pf-rbn-label">KI &amp; Kira</div>
         </div>
+        <div class="pf-rbn-sep" id="pf-rbn-kira-sep" style="display:none"></div>
+        <div class="pf-rbn-group" id="pf-rbn-kira-group" style="display:none">
+          <div class="pf-rbn-actions">
+            <button class="pf-rbn-tool" id="pf-rb-kira-approve" onclick="pfKiraMailFreigeben(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf freigeben und senden" style="color:#10b981">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Freigeben</span>
+            </button>
+            <button class="pf-rbn-tool" id="pf-rb-kira-edit" onclick="pfKiraMailBearbeiten(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf bearbeiten" style="color:#93c5fd">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <span>Bearbeiten</span>
+            </button>
+            <button class="pf-rbn-tool" id="pf-rb-kira-reject" onclick="pfKiraMaillAblehnen(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf ablehnen" style="color:#ef4444">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>Ablehnen</span>
+            </button>
+          </div>
+          <div class="pf-rbn-label">Kira-Entwurf</div>
+        </div>
       </div>
     </div>
     <button class="pf-rbn-edge pf-rbn-next" id="pf-rbn-next" onclick="pfRibbonScroll(1)" title="Weiter" style="display:none">&#x203A;</button>
@@ -2450,6 +2468,7 @@ window.pfSelectFolder = function(email, folder, label, favEl) {
   _pfCurrentKonto=email; _pfCurrentFolder=folder; _pfOffset=0; _pfSearch='';
   _pfCurrentFolderLabel = label;
   document.getElementById('pf-mid-title').textContent=label;
+  const emptyDiv2=document.getElementById('pf-list-empty'); if(emptyDiv2){const t2=emptyDiv2.querySelector('div:last-child');if(t2)t2.textContent='Keine Mails vorhanden';}
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
   const id='pf-fi-'+email.replace(/[@.]/g,'_')+'_'+folder.replace(/[^a-z0-9]/gi,'_');
@@ -2472,6 +2491,7 @@ window.pfSelectKiraFolder = function(status) {
   const labels={pending:'Entwürfe',sent:'Gesendet',rejected:'Abgelehnt',expired:'Abgelaufen'};
   _pfCurrentFolderLabel = 'Kira — '+(labels[status]||status);
   document.getElementById('pf-mid-title').textContent=_pfCurrentFolderLabel;
+  const emptyDiv=document.getElementById('pf-list-empty'); if(emptyDiv){const t=emptyDiv.querySelector('div:last-child');if(t)t.textContent='Keine Eintr\u00e4ge vorhanden';}
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
   const ki=document.getElementById('pf-kira-folder-'+status);
@@ -2575,35 +2595,43 @@ function pfRenderKiraMailItem(item, list) {
 var _pfCurrentKiraItem = null;
 function pfShowKiraMail(item) {
   _pfCurrentKiraItem = item;
+  _pfCurrentMail = null;
   _pfCurrentMsgId = null;
-  const viewer = document.getElementById('pf-viewer');
-  if(!viewer) return;
+  pfRibbonUpdateState(true);
+  // Richtige Viewer-Elemente (pf-preview + pf-prev-body)
+  const preview = document.getElementById('pf-preview');
+  const body = document.getElementById('pf-prev-body');
+  const empty = document.getElementById('pf-preview-empty');
+  if(!preview || !body) return;
+  // Leere den Mail-Kopf, blende preview-empty aus, zeige preview
+  const mailHead = document.getElementById('pf-mail-head');
+  if(mailHead) mailHead.innerHTML = '';
+  if(empty) empty.style.display = 'none';
+  preview.style.display = '';
+  // Thread + Toolbar verstecken
+  const tw = document.getElementById('pf-thread-wrap'); if(tw) tw.style.display='none';
+  const vtb = document.getElementById('pf-viewer-toolbar'); if(vtb) vtb.style.display='none';
   const status = item.status || 'pending';
   const isPending = status === 'pending';
   const headerBg = isPending ? 'rgba(245,158,11,.15)' : 'rgba(100,116,139,.1)';
   const headerColor = isPending ? '#f59e0b' : 'var(--text-muted)';
-  const headerText = isPending ? '&#x1F4DD; Kira-Entwurf — wartet auf Freigabe' : {sent:'&#x2705; Gesendet',rejected:'&#x274C; Abgelehnt',expired:'&#x23F0; Abgelaufen'}[status]||status;
+  const headerText = isPending ? '&#x1F4DD; Kira-Entwurf \u2014 wartet auf Freigabe' : ({sent:'&#x2705; Gesendet',rejected:'&#x274C; Abgelehnt',expired:'&#x23F0; Abgelaufen'}[status]||status);
   const bodyText = (item.body_plain||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
-  const reasonHtml = item.notiz_intern ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding:8px;background:var(--bg-raised);border-radius:6px;border-left:3px solid #f59e0b"><b>Kira-Begr&uuml;ndung:</b> '+_esc(item.notiz_intern)+'</div>' : '';
-  viewer.innerHTML =
-    '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
-    '<div style="padding:16px 18px 8px">'+
-      '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
-      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
-      reasonHtml+
-      '<div style="font-size:14px;line-height:1.6;padding:12px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+bodyText+'</div>'+
-    '</div>'+
+  const reasonHtml = item.notiz_intern ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding:8px;background:var(--bg-raised);border-radius:6px;border-left:3px solid #f59e0b"><b>Kira-Begr\u00fcndung:</b> '+_esc(item.notiz_intern)+'</div>' : '';
+  body.className = 'pf-prev-body';
+  body.innerHTML =
+    '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border);margin:-20px -20px 16px">'+headerText+'</div>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
+    reasonHtml+
+    '<div style="font-size:14px;line-height:1.6;padding:12px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+bodyText+'</div>'+
     (isPending ?
-      '<div class="kira-viewer-actions" style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
+      '<div style="padding:14px 0 4px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
         '<button class="btn btn-muted btn-sm" onclick="pfKiraMaillAblehnen('+item.id+')">&#x274C; Ablehnen</button>'+
         '<button class="btn btn-sm" style="background:#1e3a5f;color:#93c5fd;border-color:#2563eb" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
         '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
       '</div>'
     : '');
-  // Viewer anzeigen (falls versteckt)
-  if(viewer.style.display==='none') viewer.style.display='';
-  const placeholder=document.getElementById('pf-viewer-placeholder');
-  if(placeholder) placeholder.style.display='none';
 }
 
 window.pfKiraMailFreigeben = function(id) {
@@ -2866,9 +2894,16 @@ function pfRibbonCheckEdges() {
 }
 
 window.pfRibbonUpdateState = function(mailSelected) {
+  var isKiraMail = mailSelected && !!_pfCurrentKiraItem;
+  // Normal mail actions: disabled when no regular mail OR when Kira-mail is active
   document.querySelectorAll('.pf-rbn-mail-dep').forEach(btn => {
-    btn.classList.toggle('disabled', !mailSelected);
+    btn.classList.toggle('disabled', !mailSelected || isKiraMail);
   });
+  // Kira-Entwurf Ribbon-Gruppe nur bei Kira-Mail einblenden
+  var kg = document.getElementById('pf-rbn-kira-group');
+  var ks = document.getElementById('pf-rbn-kira-sep');
+  if(kg) kg.style.display = isKiraMail ? '' : 'none';
+  if(ks) ks.style.display = isKiraMail ? '' : 'none';
 };
 
 window.pfToastVorbereitung = function(name) {
@@ -3032,6 +3067,7 @@ window.pfOpenMail = function(m, el) {
   _pfActiveItem = el; if(el) el.classList.add('active');
   _pfCurrentMail = m;
   _pfCurrentMsgId = m.message_id || null;
+  _pfCurrentKiraItem = null;
   pfUpdateBulkBar();
   pfRibbonUpdateState(true);
   document.getElementById('pf-preview-empty').style.display = 'none';

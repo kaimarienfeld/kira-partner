@@ -44,6 +44,11 @@
    - `_archiv/only_kais checkliste.md` aktualisieren
    - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
    → Alle drei mit `feature_registry.json` abgleichen
+10a. **KIRA 2.0 UI-Umbau-Plan aktuell halten** (PFLICHT bei allen UI/UX-Änderungen):
+   - `_analyse/KIRA_2_0_UI_UMBAU_PLAN.md` — Status-Tabellen aktualisieren (✅ done, 📋 offen, 🔧 in Arbeit)
+   - Neue To-dos die beim Bauen auffallen direkt eintragen
+   - Ist-Zustand-Beschreibungen nach Umbau aktualisieren
+   → Gilt als Referenz für alle KIRA-Umbau-Sessions — immer lesen bevor neue KIRA-UI-Arbeit beginnt
 10. **Partner-View generieren + automatisch pushen** (PFLICHT):
     ```
     python scripts/generate_partner_view.py        # immer: lokal aktualisieren
