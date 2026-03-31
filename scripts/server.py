@@ -4604,6 +4604,34 @@ def build_einstellungen():
 // Sektionen mit Pane-2 Sub-Navigation
 var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll'}};
 
+function esFilterSuche(q) {{
+  q = (q||'').trim().toLowerCase();
+  var navItems = document.querySelectorAll('.es-sn[data-essec]');
+  var navHeaders = document.querySelectorAll('.es-snav-h, .es-sn-sep');
+  if(!q) {{
+    // Alle anzeigen, Gruppen-Header wieder einblenden
+    navItems.forEach(function(n){{n.style.display='';}});
+    navHeaders.forEach(function(h){{h.style.display='';}});
+    // Aktives Panel beibehalten
+    return;
+  }}
+  var firstMatch = null;
+  navItems.forEach(function(n){{
+    var label = n.textContent.toLowerCase();
+    var secId = n.getAttribute('data-essec') || '';
+    // Auch in Gruppen-Beschriftungen suchen
+    var panel = document.getElementById('es-sec-'+secId);
+    var panelText = panel ? panel.textContent.toLowerCase() : '';
+    var match = label.indexOf(q)>=0 || panelText.indexOf(q)>=0;
+    n.style.display = match ? '' : 'none';
+    if(match && !firstMatch) firstMatch = secId;
+  }});
+  // Gruppen-Header verstecken wenn alle darunter versteckt
+  navHeaders.forEach(function(h){{h.style.display='';}});
+  // Erstes Ergebnis direkt anzeigen
+  if(firstMatch) esShowSec(firstMatch);
+}}
+
 function esShowSec(id) {{
   document.querySelectorAll('.es-sec-panel').forEach(function(p){{p.classList.remove('es-active');}});
   document.querySelectorAll('.es-sn').forEach(function(n){{n.classList.remove('act');}});
@@ -4713,6 +4741,13 @@ function esInfoPopup(btn, text) {{
 
 <!-- SECONDARY NAV -->
 <div class="es-snav">
+  <div style="padding:8px 10px 4px">
+    <input type="search" id="es-suche" placeholder="&#x1F50D; Suche&hellip;"
+           style="width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg-raised));color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;outline:none"
+           oninput="esFilterSuche(this.value)"
+           onkeydown="if(event.key==='Escape'){{this.value='';esFilterSuche('');this.blur();}}"
+           autocomplete="off">
+  </div>
   <div class="es-snav-h">Konfiguration</div>
   <div class="es-sn act" data-essec="design" onclick="esShowSec('design')"><span class="es-sico">&#x25D0;</span>Design</div>
   <div class="es-sn" data-essec="benachrichtigungen" onclick="esShowSec('benachrichtigungen')"><span class="es-sico">&#x1F514;</span>Benachrichtigungen</div>

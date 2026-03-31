@@ -435,7 +435,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 22. 💡 Auto-Backup
 
 ### Phase 6 – UX-Verbesserungen
-23. 💡 Einstellungen-Suche (Suchfeld filtert Sektionen/Felder)
+23. ✅ Einstellungen-Suche — Suchfeld über Navigation filtert Sektionen + Panel-Inhalt, ESC zum Reset, session-rr
 24. ✅ Toast-Position konfigurierbar — session-s
 25. 💡 Dashboard-Kacheln konfigurieren
 26. ✅ Schriftfamilie wählen — session-s
