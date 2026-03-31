@@ -3731,7 +3731,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
     s = stats or {}
     n_ar_offen = len(ar_offen)
     n_ang_offen = len(ang_offen)
-    n_eingang = len(eingang_offen)
+    n_eingang = len(eingang)
     n_gemahnt = len(ar_gemahnt)
     ar_bez_eur = s.get("ar_bezahlt_eur", 0)
     ang_ges = s.get("ang_total", 0)
@@ -8537,6 +8537,31 @@ def generate_html() -> str:
   </div>
 </div>
 
+<!-- Ignorieren + Kira lernt Modal -->
+<div class="modal-ov" id="ignorierModal">
+  <div class="modal" style="max-width:420px">
+    <h3 style="margin:0 0 4px;color:#7c3aed">&#x1F914; Warum ignorieren?</h3>
+    <input type="hidden" id="im-tid">
+    <input type="hidden" id="im-kat">
+    <div id="im-titel" style="font-size:12px;color:var(--muted);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+    <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px">Kira lernt aus deiner Entscheidung und verbessert zuk&uuml;nftige Zuordnungen.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="ignorier-grund-btn" onclick="setIgnorierGrund(this,'Systemmail / automatisch')">Systemmail</button>
+      <button class="ignorier-grund-btn" onclick="setIgnorierGrund(this,'Kein Handlungsbedarf')">Kein Handlungsbedarf</button>
+      <button class="ignorier-grund-btn" onclick="setIgnorierGrund(this,'Newsletter / Werbung')">Newsletter</button>
+      <button class="ignorier-grund-btn" onclick="setIgnorierGrund(this,'Falsches Konto')">Falsches Konto</button>
+      <button class="ignorier-grund-btn" onclick="setIgnorierGrund(this,'Bereits bearbeitet')">Bereits bearbeitet</button>
+    </div>
+    <input type="text" id="im-grund" placeholder="Eigener Grund (optional)&hellip;"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')saveIgnorieren()">
+    <div class="modal-actions">
+      <button class="btn btn-ignore" id="im-save-btn" onclick="saveIgnorieren()">Ignorieren &amp; Kira lernt</button>
+      <button class="btn" onclick="closeIgnorierModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Löschen + Kira lernt Modal -->
 <div class="modal-ov" id="loeschModal">
   <div class="modal" style="max-width:460px">
@@ -8983,15 +9008,8 @@ function restoreDesign() {{
 // KPI click -> jump to Kommunikation with filter
 function filterKomm(kat) {{
   showPanel('kommunikation');
-  // Highlight matching sections
-  document.querySelectorAll('#panel-kommunikation .section').forEach(sec => {{
-    const title = sec.querySelector('.section-title')?.textContent || '';
-    if (kat === 'Antwort erforderlich' && title.includes('Antwort erforderlich')) sec.classList.remove('collapsed');
-    else if (kat === 'Neue Lead-Anfrage' && title.includes('Neue Leads')) sec.classList.remove('collapsed');
-    else if (kat === 'Angebotsrückmeldung' && title.includes('Angebotsrückmeldung')) sec.classList.remove('collapsed');
-    else if (kat === 'Rechnung / Beleg' && title.includes('Rechnungen')) sec.classList.remove('collapsed');
-    else sec.classList.add('collapsed');
-  }});
+  // Segment-Tab aktivieren (kurze Verzögerung damit Panel gerendert ist)
+  setTimeout(()=>jumpToSeg(kat), 120);
 }}
 
 // Kommunikation v2 — Segment Tabs
@@ -9208,15 +9226,66 @@ function setStatus(id, status) {{
 
 // Status setzen + KI-Lern-Eintrag speichern (einzeln, nicht bulk)
 function setStatusLernen(id, status, kat) {{
+  if(status === 'ignorieren') {{ confirmIgnorieren(id, kat); return; }}
   fetch('/api/task/'+id+'/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify({{status, kat}})}}).then(r=>r.json()).then(d=>{{
     if(d.ok){{
       const el = document.getElementById('task-'+id);
       if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),320);}}
-      const label = {{erledigt:'Erledigt ✓',zur_kenntnis:'Zur Kenntnis ✓',ignorieren:'Ignoriert ✓'}}[status]||'Gespeichert';
+      const label = {{erledigt:'Erledigt ✓',zur_kenntnis:'Zur Kenntnis ✓'}}[status]||'Gespeichert';
       showToast(label+' — KI lernt');
     }}
   }}).catch(()=>showToast('Fehler'));
+}}
+function confirmIgnorieren(tid, kat) {{
+  const card = document.getElementById('task-'+tid);
+  document.getElementById('im-tid').value = tid;
+  document.getElementById('im-kat').value = kat || '';
+  document.getElementById('im-titel').textContent = card ? (card.querySelector('.task-title,.wi-titel')||{{}}).textContent||'' : '';
+  document.getElementById('im-grund').value = '';
+  document.querySelectorAll('.ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('im-save-btn').textContent = 'Ignorieren \u0026 Kira lernt';
+  document.getElementById('im-save-btn').disabled = false;
+  document.getElementById('ignorierModal').classList.add('open');
+  setTimeout(()=>document.getElementById('im-grund').focus(), 80);
+}}
+function setIgnorierGrund(btn, text) {{
+  document.querySelectorAll('.ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('im-grund').value = text;
+}}
+function closeIgnorierModal() {{ document.getElementById('ignorierModal').classList.remove('open'); }}
+async function saveIgnorieren() {{
+  const tid   = document.getElementById('im-tid').value;
+  const kat   = document.getElementById('im-kat').value;
+  const grund = document.getElementById('im-grund').value.trim() || 'Kein Grund angegeben';
+  const btn   = document.getElementById('im-save-btn');
+  btn.textContent = 'Wird gespeichert\u2026'; btn.disabled = true;
+  try {{
+    const r = await fetch('/api/task/'+tid+'/status', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{status:'ignorieren', kat}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      // Lernregel speichern
+      fetch('/api/wissen/neu', {{method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{kategorie:'gelernt',
+          titel: 'Ignoriert: '+grund.slice(0,60),
+          inhalt: 'Aufgabe '+tid+' ignoriert. Grund: "'+grund+'". Kategorie: '+kat+'. Zuk\u00fcnftige \u00e4hnliche Mails entsprechend einordnen.'
+        }})}}).catch(()=>{{}});
+      const el = document.getElementById('task-'+tid);
+      if(el){{ el.style.opacity='0.2'; setTimeout(()=>el.remove(),320); }}
+      closeIgnorierModal();
+      showToast('Ignoriert \u2014 Kira hat daraus gelernt');
+    }} else {{
+      showToast('Fehler: '+(d.error||'Unbekannt'));
+      btn.textContent='Ignorieren \u0026 Kira lernt'; btn.disabled=false;
+    }}
+  }} catch(e) {{
+    showToast('Netzwerkfehler');
+    btn.textContent='Ignorieren \u0026 Kira lernt'; btn.disabled=false;
+  }}
 }}
 
 // Multi-Select
@@ -10424,7 +10493,7 @@ function testProvider(pid) {{
     btn.disabled = false;
     btn.textContent = '⚡ Test';
     if(d.ok) {{
-      showToast(`✓ Verbindung OK — ${d.antwort||''} (${ms}ms)`,'ok');
+      showToast('\u2713 Verbindung OK \u2014 '+(d.antwort||'')+' ('+ms+'ms)','ok');
     }} else {{
       showToast('✗ Test fehlgeschlagen: '+(d.error||'Unbekannt'),'fehler');
     }}
@@ -11533,6 +11602,7 @@ document.addEventListener('keydown',e=>{{
     else if(document.getElementById('geschBewertModal').classList.contains('open')) closeGeschBewertung();
     else if(document.getElementById('editRegelModal').classList.contains('open')) closeEditRegel();
     else if(document.getElementById('korrModal').classList.contains('open')) closeKorrModal();
+    else if(document.getElementById('ignorierModal').classList.contains('open')) closeIgnorierModal();
     else if(document.getElementById('loeschModal').classList.contains('open')) closeLoeschModal();
     else if(document.getElementById('spaeterModal').classList.contains('open')) closeSpaeterDialog();
     else if(document.getElementById('kiraWorkspace').classList.contains('open')) closeKiraWorkspace();
@@ -12534,6 +12604,8 @@ a:hover{text-decoration:underline;}
 .btn-loeschen:hover{background:rgba(220,74,74,.18);}
 .loeschen-grund-btn{padding:4px 10px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;transition:all .15s;}
 .loeschen-grund-btn:hover,.loeschen-grund-btn.active{background:rgba(220,74,74,.12);border-color:rgba(220,74,74,.35);color:#d06060;}
+.ignorier-grund-btn{padding:4px 10px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;transition:all .15s;}
+.ignorier-grund-btn:hover,.ignorier-grund-btn.active{background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.35);color:#7c3aed;}
 /* Multi-select */
 .tc-check{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity .15s;cursor:pointer;display:flex;align-items:center;}
 .tc-check input[type=checkbox]{width:24px;height:24px;cursor:pointer;accent-color:var(--accent);border-radius:5px;}
