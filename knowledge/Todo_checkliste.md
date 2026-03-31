@@ -444,6 +444,55 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 ---
 
+---
+
+## SESSION-oo KIRA 2.0 UMBAU (2026-03-31)
+
+### Kira Live-Chip & Activity-Drawer
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | Kira-Live-Chip im Header | idle/scanning/pending/error-States, session-oo |
+| ✅ | 15s Polling via _pollKiraStatus() | fetcht /api/kira/proaktiv/status + /api/mail/approve/pending |
+| ✅ | Activity-Drawer (Slide-In rechts 400px) | kiraActivityDrawerOpen/Close(), nicht-modal, session-oo |
+| ✅ | Drawer: Freigabe-Queue Sektion | zeigt pending Kira-Mails mit Freigabe/Ablehnen-Buttons |
+| ✅ | Drawer: Proaktiv-Status Sektion | zeigt aktive Scan-Infos |
+| ✅ | CSS: .kira-live-chip alle 4 States | @keyframes kira-spin, session-oo |
+| 📋 | Drawer: Laufende Scans mit Fortschritt | Noch nicht implementiert |
+| 📋 | User-Präsenz-Erkennung für Drawer | document.visibilityState / window focus |
+
+### Einstellungen 3-Pane Layout
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | 3-Pane: Mail & Konten | Mailkonten/Monitor/Klassifizierung/Signaturen/Archiv/Sync, session-oo |
+| ✅ | 3-Pane: Kira/LLM/Provider | Assistent/Provider/Kontext/Gedächtnis/Proaktiv/ReAct/Feedback/Sicherheit, session-oo |
+| ✅ | 3-Pane: Protokoll & Logs | Runtime/Changelog/Konfiguration, session-oo |
+| ✅ | esP2Select() Scroll-Ankerfunktion | scrollt zu Untergruppen-ID, session-oo |
+| ✅ | CSS .es-pane2, .es-ct.p2vis | Pane 2 erscheint bei p2vis-Klasse, session-oo |
+| ✅ | Neue Einstellungs-Gruppen Kira/LLM | Gedächtnis, Proaktiv, ReAct, Feedback, Sicherheit (IDs für Scroll-Anker), session-oo |
+| ✅ | Sicherheit & Audit — neue Sektion | Circuit Breaker Status, Audit-Export, Aktivitäten-Einstellungen, session-oo |
+
+### Kira-Ausgang im Postfach
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | Ordnergruppe "KIRA-AUSGANG" in Postfach-Sidebar | am Ende der Folder-Tree, session-oo |
+| ✅ | 4 Ordner: Entwürfe/Gesendet/Abgelehnt/Abgelaufen | pfSelectKiraFolder(status), session-oo |
+| ✅ | pfLoadKiraList() mit Status-Filter | fetcht /api/mail/approve/pending?status=X, session-oo |
+| ✅ | pfRenderKiraMailItem() Kira-Mail-Item | Kira-Avatar (🤖), Status-Badge, Betreff, session-oo |
+| ✅ | pfShowKiraMail() Mail-Viewer | Header-Banner je Status, Body, Aktions-Buttons, session-oo |
+| ✅ | pfKiraMailFreigeben/Bearbeiten/Ablehnen | als window.* exponiert (IIFE-Scope), session-oo |
+| ✅ | Bearbeiten-Modal | Textarea + Senden, parentElement-Traversal statt closest(), session-oo |
+| ✅ | Badge pf-kira-pending-badge | gelb, zeigt Anzahl Entwürfe, session-oo |
+| ✅ | pfKiraAusgangOpen() | öffnet Postfach + navigiert zu Entwürfe (aus Header-Badge), session-oo |
+| 📋 | Ribbon-Kira-Gruppe für Kira-Mails | [✅ Freigeben][❌ Ablehnen][✎ Bearbeiten] bei Kira-Mail-Auswahl |
+
+### API-Erweiterungen (session-oo)
+| Status | Endpoint | Anmerkung |
+|--------|---------|-----------|
+| ✅ | GET /api/mail/approve/pending?status=X | pending/sent/rejected/expired, session-oo |
+| ✅ | GET /api/kira/proaktiv/status | für Drawer + Chip-Polling, session-oo |
+
+---
+
 ## TECHNISCHE NOTIZEN
 
 - **saveSettings()** liest Element-IDs aus dem DOM → neue Felder brauchen neue IDs + Eintrag in saveSettings()

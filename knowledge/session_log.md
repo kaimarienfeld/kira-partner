@@ -243,3 +243,26 @@ Commit: 66241b0
 - Paket 9: presence_detector.py (Windows ctypes GetLastInputInfo), activity_window.py (tkinter -topmost Desktop-Overlay), Signal-Watcher-Thread + /api/presence Endpoint
 - Paket 10: case_engine_backfill.py — Backfill für Rechnungen/Angebote/Tasks mit --dry-run Option, idempotent
 **Offen geblieben:** Backfill noch nicht ausgeführt (muss manuell als `python case_engine_backfill.py --dry-run` getestet werden).
+
+---
+
+## 2026-03-31 07:00 — Session-Start (session-oo)
+
+**Auftrag:** Kira 2.0 Umbau-Plan: (1) Browser-Screenshots aller UI-Panels erstellen. (2) UX-Recherche durchführen. (3) Vollständigen UI/UX-Umbauplan als `_analyse/KIRA_2_0_UI_UMBAU_PLAN.md` erstellen. (4) Phase 2 Einstellungen erweitert (Kira/LLM neue Gruppen: Memory, Proaktiv, ReAct, Feedback, Sicherheit; Automationen aktiviert; Sicherheit & Audit neu). (5) Plan-Freigabe durch Kai. (6) Phase 3 (Kira-Postfach) + Phase 4 (Live-Chip + Activity-Drawer) implementieren. Zusatz: Farben für Hell+Dunkel-Modus, Einstellungen als 3-Pane-Ansicht (Outlook-Referenz).
+**Status:** erledigt
+
+**Erledigt:**
+- Kira-Live-Chip im Header (idle/scanning/pending/error-States), 15s Polling via _pollKiraStatus()
+- Activity-Drawer (Slide-In von rechts, 400px): zeigt Freigabe-Queue + Proaktiv-Status, non-modal
+- Einstellungen 3-Pane-Layout (Outlook-Style): Mail & Konten, Kira/LLM, Protokoll als Sub-Pane
+- Kira-Ausgang im Postfach: Ordnergruppe mit Entwürfe/Gesendet/Abgelehnt/Abgelaufen
+- /api/mail/approve/pending?status=X unterstützt alle 4 Queue-Ansichten
+- pfKiraMailFreigeben/Bearbeiten/Sendenbearbeitet/Ablehnen korrekt als window.* exponiert
+- Fix: JS SyntaxError durch `'div[style]'` in single-quoted string (parentElement-Traversal als Fix)
+- Fix: pf-load-more korrekt versteckt bei leerer Kira-Liste
+- Commit: fb879cd
+
+**Offen geblieben:** Microsoft Graph Calendar-UI, Ribbon-Kira-Gruppe für Kira-Mails, Partner-View generieren.
+
+## 2026-03-31 — Session-Ende (session-oo)
+**Status:** erledigt
