@@ -10669,7 +10669,11 @@ function toggleKiraQuick() {{
   const qp = document.getElementById('kiraQuick');
   const fab = document.getElementById('kiraFab');
   if(qp.classList.contains('open')) closeKiraQuick();
-  else {{ qp.classList.add('open'); kiraOpen=true; if(fab) fab.classList.add('kira-fab-active'); }}
+  else {{
+    qp.classList.add('open'); kiraOpen=true;
+    if(fab) fab.classList.add('kira-fab-active');
+    if(window._kiraPositionQP) window._kiraPositionQP();
+  }}
 }}
 function closeKiraQuick() {{
   const fab = document.getElementById('kiraFab');
@@ -10677,6 +10681,93 @@ function closeKiraQuick() {{
   kiraOpen=false;
   if(fab) fab.classList.remove('kira-fab-active');
 }}
+
+// ── Kira-FAB Drag-to-Move (beiseite schieben) ─────────────────────────────────
+(function() {{
+  function _kiraPositionQP() {{
+    var qp = document.getElementById('kiraQuick');
+    var fab = document.getElementById('kiraFab');
+    if(!qp || !fab) return;
+    var r = fab.getBoundingClientRect();
+    var qpW = 340, qpH = qp.offsetHeight || 420;
+    var fabCX = r.left + r.width / 2;
+    var qpL = Math.max(10, Math.min(window.innerWidth - qpW - 10, fabCX - qpW / 2));
+    var qpT = r.top - qpH - 10 > 10 ? r.top - qpH - 10 : r.bottom + 10;
+    qp.style.right = 'auto'; qp.style.bottom = 'auto';
+    qp.style.left = qpL + 'px'; qp.style.top = qpT + 'px';
+  }}
+  window._kiraPositionQP = _kiraPositionQP;
+
+  var fab = document.getElementById('kiraFab');
+  if(!fab) return;
+
+  // Restore saved position from localStorage
+  var sx = localStorage.getItem('kira_fab_x'), sy = localStorage.getItem('kira_fab_y');
+  if(sx !== null && sy !== null) {{
+    fab.style.right = 'auto'; fab.style.bottom = 'auto';
+    fab.style.left = (+sx) + 'px'; fab.style.top = (+sy) + 'px';
+  }}
+
+  var _drag = false, _offX = 0, _offY = 0, _moved = false;
+
+  fab.addEventListener('mousedown', function(e) {{
+    if(e.button !== 0) return;
+    _drag = true; _moved = false;
+    var r = fab.getBoundingClientRect();
+    if(!fab.style.left || fab.style.left === 'auto') {{
+      fab.style.right = 'auto'; fab.style.bottom = 'auto';
+      fab.style.left = r.left + 'px'; fab.style.top = r.top + 'px';
+    }}
+    _offX = e.clientX - r.left; _offY = e.clientY - r.top;
+    fab.style.transition = 'none';
+    e.preventDefault();
+  }});
+
+  document.addEventListener('mousemove', function(e) {{
+    if(!_drag) return;
+    _moved = true;
+    var nl = Math.max(0, Math.min(window.innerWidth - fab.offsetWidth, e.clientX - _offX));
+    var nt = Math.max(0, Math.min(window.innerHeight - fab.offsetHeight, e.clientY - _offY));
+    fab.style.left = nl + 'px'; fab.style.top = nt + 'px';
+  }});
+
+  document.addEventListener('mouseup', function() {{
+    if(!_drag) return;
+    _drag = false;
+    fab.style.transition = '';
+    if(_moved) {{
+      // Snap to nearest corner with smooth animation
+      var r = fab.getBoundingClientRect();
+      var ww = window.innerWidth, wh = window.innerHeight;
+      var snapL = r.left + r.width / 2 < ww / 2 ? 20 : ww - fab.offsetWidth - 20;
+      var snapT = r.top + r.height / 2 < wh / 2 ? 20 : wh - fab.offsetHeight - 20;
+      fab.style.transition = 'left .2s ease, top .2s ease';
+      fab.style.left = snapL + 'px'; fab.style.top = snapT + 'px';
+      localStorage.setItem('kira_fab_x', snapL);
+      localStorage.setItem('kira_fab_y', snapT);
+      setTimeout(function() {{ fab.style.transition = ''; }}, 230);
+      fab.dataset.dragged = '1';
+    }}
+  }});
+
+  // Suppress click after drag
+  fab.addEventListener('click', function(e) {{
+    if(fab.dataset.dragged === '1') {{
+      fab.dataset.dragged = '0';
+      e.stopImmediatePropagation(); e.preventDefault();
+    }}
+  }}, true);
+
+  // Clamp position on resize
+  window.addEventListener('resize', function() {{
+    var cx = localStorage.getItem('kira_fab_x'), cy = localStorage.getItem('kira_fab_y');
+    if(cx === null) return;
+    var maxL = window.innerWidth - fab.offsetWidth - 20;
+    var maxT = window.innerHeight - fab.offsetHeight - 20;
+    fab.style.left = Math.max(20, Math.min(+cx, maxL)) + 'px';
+    fab.style.top  = Math.max(20, Math.min(+cy, maxT)) + 'px';
+  }});
+}})();
 function openKiraWorkspace(context) {{
   closeKiraQuick();
   document.getElementById('kiraWorkspace').classList.add('open');
