@@ -719,8 +719,50 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
         from case_engine import get_vorgang_summary_for_kira
         vs = get_vorgang_summary_for_kira(limit=8)
         if vs and vs.strip():
-            prompt += f"\n\nOFFENE VORGÄNGE (Case Engine):\n{vs}\n"
-            prompt += "\nNutze vorgang_kontext_laden für den vollständigen Kontext eines Vorgangs.\n"
+            prompt += f"\n\nOFFENE VORGAENGE (Case Engine):\n{vs}\n"
+            prompt += "\nNutze vorgang_kontext_laden fuer den vollstaendigen Kontext eines Vorgangs.\n"
+    except Exception:
+        pass
+
+    # Episodisches Gedaechtnis (Paket 3, session-oo)
+    # Letzte 3 abgeschlossene Konversationen als Gespraechsfaden-Kontext
+    try:
+        mem_db = sqlite3.connect(str(TASKS_DB))
+        mem_db.row_factory = sqlite3.Row
+        recent_sessions = mem_db.execute("""
+            SELECT session_id, MIN(erstellt_am) as ts_start, COUNT(*) as n_msgs
+            FROM kira_konversationen
+            GROUP BY session_id
+            HAVING n_msgs >= 2
+            ORDER BY ts_start DESC
+            LIMIT 3
+        """).fetchall()
+        if recent_sessions:
+            mem_lines = []
+            for sess in recent_sessions:
+                sid = sess["session_id"]
+                ts  = (sess["ts_start"] or "")[:16]
+                u_row = mem_db.execute(
+                    "SELECT nachricht FROM kira_konversationen WHERE session_id=? AND rolle='user' ORDER BY id LIMIT 1",
+                    (sid,)
+                ).fetchone()
+                k_row = mem_db.execute(
+                    "SELECT nachricht FROM kira_konversationen WHERE session_id=? AND rolle='assistant' ORDER BY id LIMIT 1",
+                    (sid,)
+                ).fetchone()
+                u_text = ((u_row["nachricht"] if u_row else "") or "")[:120].replace('\n', ' ')
+                k_text = ((k_row["nachricht"] if k_row else "") or "")[:150].replace('\n', ' ')
+                mem_lines.append(f"  [{ts}] Kai: {u_text}")
+                if k_text:
+                    mem_lines.append(f"         Kira: {k_text}...")
+            if mem_lines:
+                # Token-Budget: max ~800 Token = ~3200 Zeichen
+                mem_block = "\n".join(mem_lines)
+                if len(mem_block) > 3200:
+                    mem_block = mem_block[:3200] + "..."
+                prompt += f"\n\nLETZTE GESPRAECHE (Gedaechtnis):\n{mem_block}\n"
+                prompt += "(Fuer tiefere Suche: konversation_suchen nutzen)\n"
+        mem_db.close()
     except Exception:
         pass
 
@@ -1274,6 +1316,25 @@ def get_tools(config=None):
         }
     })
 
+    # ── Konversations-Gedaechtnis Tool (Paket 3, session-oo) ─────────────────
+    tools.append({
+        "name": "konversation_suchen",
+        "description": (
+            "Sucht in frueheren Kira-Gespraechen nach einem Begriff, Kunden oder Thema. "
+            "Nutze dieses Tool wenn Kai fragt 'haben wir damals ueber X gesprochen?' oder "
+            "wenn du Kontext aus frueheren Gespraechen brauchst. "
+            "Gibt die relevantesten Gespraechs-Ausschnitte zurueck (max 5 Sessions)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Suchbegriff — in Gespraechen suchen (Name, Thema, Stichwort)"},
+                "seit_tagen": {"type": "integer", "description": "Nur Gespraeche der letzten N Tage (optional, Standard: alle)", "default": 0}
+            },
+            "required": ["query"]
+        }
+    })
+
     # ── Mail-Senden Tool (Paket 2, session-oo) ────────────────────────────────
     tools.append({
         "name": "mail_senden",
@@ -1346,6 +1407,7 @@ def execute_tool(name, params):
             "mail_lesen": _tool_mail_lesen,
             "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
             "vorgang_status_setzen": _tool_vorgang_status_setzen,
+            "konversation_suchen": _tool_konversation_suchen,
             "mail_senden": _tool_mail_senden,
         }
         handler = handlers.get(name)
@@ -2026,6 +2088,71 @@ def _tool_vorgang_status_setzen(p):
             "erlaubte_uebergaenge": erlaubt,
         }
     except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_konversation_suchen(p):
+    """Durchsucht kira_konversationen nach einem Suchbegriff (Paket 3, session-oo)."""
+    query     = (p.get("query") or "").strip()
+    seit_tage = int(p.get("seit_tagen") or 0)
+    if not query:
+        return {"error": "query erforderlich"}
+
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    try:
+        sql_args = [f"%{query}%"]
+        date_filter = ""
+        if seit_tage > 0:
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(days=seit_tage)).isoformat()
+            date_filter = "AND erstellt_am >= ?"
+            sql_args.append(cutoff)
+
+        # Sessions mit Match finden
+        sessions = db.execute(f"""
+            SELECT DISTINCT session_id, MIN(erstellt_am) as ts
+            FROM kira_konversationen
+            WHERE nachricht LIKE ? {date_filter}
+            ORDER BY ts DESC
+            LIMIT 5
+        """, sql_args).fetchall()
+
+        if not sessions:
+            db.close()
+            return {"ok": True, "treffer": 0, "ergebnisse": [],
+                    "message": f"Keine Gespraeche zu '{query}' gefunden."}
+
+        results = []
+        for sess in sessions:
+            sid = sess["session_id"]
+            ts  = (sess["ts"] or "")[:16]
+            # Alle Nachrichten dieser Session die den Suchbegriff enthalten
+            msgs = db.execute("""
+                SELECT rolle, nachricht, erstellt_am FROM kira_konversationen
+                WHERE session_id=? AND nachricht LIKE ?
+                ORDER BY id
+                LIMIT 3
+            """, (sid, f"%{query}%")).fetchall()
+            snippets = []
+            for m in msgs:
+                text = (m["nachricht"] or "")[:200].replace('\n', ' ')
+                snippets.append(f"[{m['rolle']}] {text}")
+            results.append({
+                "session_id": sid[:8] + "...",
+                "datum": ts,
+                "treffer": len(msgs),
+                "ausschnitte": snippets,
+            })
+        db.close()
+        return {
+            "ok": True,
+            "query": query,
+            "treffer": len(results),
+            "ergebnisse": results,
+        }
+    except Exception as e:
+        db.close()
         return {"error": str(e)}
 
 

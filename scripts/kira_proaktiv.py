@@ -430,6 +430,66 @@ def scan_neue_kunden_erkennen(db, state: dict) -> list:
     return aktionen
 
 
+def scan_tages_memory_summary(db, state: dict) -> dict:
+    """
+    Taegliche Memory-Summary (Paket 3, session-oo).
+    Fasst alle Kira-Konversationen des Tages zusammen, speichert in wissen_regeln.
+    TTL: 23h — laeuft hoechstens einmal pro Tag.
+    """
+    state_key = "tages_summary"
+    if _already_done(state, state_key, ttl_hours=23):
+        return {}
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    try:
+        rows = db.execute(
+            "SELECT rolle, nachricht FROM kira_konversationen "
+            "WHERE erstellt_am >= ? ORDER BY id",
+            (today_str + "T00:00:00",)
+        ).fetchall()
+    except Exception:
+        return {}
+
+    if len(rows) < 4:
+        return {}
+
+    conv_text = ""
+    for r in rows:
+        rolle   = "Kai" if r["rolle"] == "user" else "Kira"
+        snippet = (r["nachricht"] or "")[:200].replace('\n', ' ')
+        conv_text += f"{rolle}: {snippet}\n"
+        if len(conv_text) > 3000:
+            conv_text = conv_text[:3000] + "..."
+            break
+
+    try:
+        from kira_llm import chat as _kira_chat
+        prompt = (
+            f"Fasse die 3 wichtigsten Entscheidungen und offenen Punkte aus diesen "
+            f"Gespraechen vom {today_str} zusammen (max 3 Stichpunkte, je max 80 Zeichen):\n\n"
+            f"{conv_text}\n\nFormat: - Punkt 1\n- Punkt 2\n- Punkt 3"
+        )
+        result = _kira_chat(prompt)
+        summary_text = (result.get("text") or "").strip()
+        if not summary_text:
+            return {}
+    except Exception:
+        return {}
+
+    try:
+        db.execute("""
+            INSERT INTO wissen_regeln (titel, inhalt, kategorie, erstellt_am, quelle)
+            VALUES (?, ?, 'tages_summary', ?, 'kira_proaktiv')
+        """, (f"Tages-Summary {today_str}", summary_text, datetime.now().isoformat()))
+        db.commit()
+        _mark_done(state, state_key)
+        _elog('system', 'tages_summary_erstellt', f"Memory-Summary {today_str} gespeichert",
+              source='kira_proaktiv', modul='kira_proaktiv', actor_type='system', status='ok')
+        return {"datum": today_str, "summary": summary_text[:100]}
+    except Exception:
+        return {}
+
+
 # ── Haupt-Scan ────────────────────────────────────────────────────────────────
 def run_proaktiver_scan() -> dict:
     """
@@ -465,6 +525,11 @@ def run_proaktiver_scan() -> dict:
         neue_kunden = scan_neue_kunden_erkennen(db, state)
         if neue_kunden:
             ergebnisse['neue_kunden'] = neue_kunden
+
+        # Scan 6: Taegliche Memory-Summary (Paket 3, session-oo)
+        mem_summary = scan_tages_memory_summary(db, state)
+        if mem_summary:
+            ergebnisse['tages_memory_summary'] = mem_summary
 
         db.close()
         _save_state(state)
