@@ -71,13 +71,13 @@ _Stand: 2026-03-29 · session-bb · Analyse-Basis: config.json, server.py (~9250
 ### 2b. E-Mail-Benachrichtigungen
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
-| ❌ | E-Mail-Benachrichtigung aktiv | `cfg-email-aktiv` / `email_notification.aktiv` | In config.json vorhanden, **keine UI** |
-| ❌ | SMTP-Server | `cfg-smtp-server` / `email_notification.smtp_server` | **keine UI** |
-| ❌ | SMTP-Port | `cfg-smtp-port` / `email_notification.smtp_port` | **keine UI** |
-| ❌ | Absender-E-Mail | `cfg-smtp-from` / `email_notification.absender_email` | **keine UI** |
-| ❌ | Absender-Passwort | `cfg-smtp-pw` / `email_notification.absender_passwort` | Sensitiv → secrets.json |
-| ❌ | Empfänger-E-Mail | `cfg-smtp-to` / `email_notification.empfaenger_email` | **keine UI** |
-| ❌ | Test-E-Mail senden | Button | Backend-Funktion noch nicht vorhanden |
+| ✅ | E-Mail-Benachrichtigung aktiv | `cfg-email-aktiv` / `email_notification.aktiv` | Toggle, session-pp |
+| ✅ | SMTP-Server | `cfg-smtp-server` / `email_notification.smtp_server` | Text-Input, session-pp |
+| ✅ | SMTP-Port | `cfg-smtp-port` / `email_notification.smtp_port` | Number-Input, session-pp |
+| ✅ | Absender-E-Mail | `cfg-smtp-from` / `email_notification.absender_email` | Email-Input, session-pp |
+| ✅ | Absender-Passwort | `cfg-smtp-pw` / `email_notification.absender_passwort` | Password-Input, session-pp |
+| ✅ | Empfänger-E-Mail | `cfg-smtp-to` / `email_notification.empfaenger_email` | Email-Input, session-pp |
+| ✅ | Test-E-Mail senden | `POST /api/email-notification/test` | smtplib STARTTLS/SSL, session-pp |
 | 💡 | E-Mail-Templates | `email_notification.templates` | Betreff-Vorlagen für Benachrichtigungen |
 
 ---

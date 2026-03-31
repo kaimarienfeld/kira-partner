@@ -4212,6 +4212,7 @@ def build_einstellungen():
     srv   = config.get("server", {})
     nf    = config.get("nachfass", {})
     benachrichtigungen = config.get("benachrichtigungen", {})
+    email_notification = config.get("email_notification", {})
     llm   = get_llm_config()
     proto = config.get("protokoll", {})
     rtlog_cfg = config.get("runtime_log", {})
@@ -5029,6 +5030,42 @@ function esInfoPopup(btn, text) {{
         <input class="es-toggle-inp" type="checkbox" id="cfg-inapp-fehler" {'checked' if benachrichtigungen.get('inapp_fehler', True) else ''}>
         <div class="es-toggle-vis"></div>
       </label>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">E-Mail-Benachrichtigungen (SMTP)</div>
+    <div class="es-grp-sub">Systembenachrichtigungen per E-Mail senden (z.B. bei Fehlern oder t&auml;glichen Reports). F&uuml;r Gmail: App-Passwort unter myaccount.google.com/security verwenden.</div>
+    <div class="es-row">
+      <div class="es-rl">E-Mail-Benachrichtigungen aktiv<div class="es-rd">Systembenachrichtigungen per SMTP senden</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-email-aktiv" {'checked' if email_notification.get('aktiv', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">SMTP-Server<div class="es-rd">z.B. smtp.gmail.com oder smtp.office365.com</div></div>
+      <input class="es-inp" type="text" id="cfg-smtp-server" value="{esc(email_notification.get('smtp_server',''))}" placeholder="smtp.gmail.com">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">SMTP-Port<div class="es-rd">587 (STARTTLS) oder 465 (SSL)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-smtp-port" value="{email_notification.get('smtp_port', 587)}" min="1" max="65535" style="width:80px">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Absender-E-Mail<div class="es-rd">Konto das die Mails sendet</div></div>
+      <input class="es-inp" type="email" id="cfg-smtp-from" value="{esc(email_notification.get('absender_email',''))}" placeholder="kira@beispiel.de">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Absender-Passwort<div class="es-rd">App-Passwort empfohlen (nicht das normale Konto-Passwort)</div></div>
+      <input class="es-inp" type="password" id="cfg-smtp-pw" value="{esc(email_notification.get('absender_passwort',''))}" placeholder="App-Passwort">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Empf&auml;nger-E-Mail<div class="es-rd">Wer soll die Benachrichtigungen erhalten?</div></div>
+      <input class="es-inp" type="email" id="cfg-smtp-to" value="{esc(email_notification.get('empfaenger_email',''))}" placeholder="kai@beispiel.de">
+    </div>
+    <div style="margin-top:12px">
+      <button class="es-btn" onclick="testSmtpEmail()">&#x2709; Test-E-Mail senden</button>
+      <span id="smtp-test-status" style="margin-left:10px;font-size:12px;color:var(--text-muted)"></span>
     </div>
   </div>
 
@@ -9308,6 +9345,14 @@ function saveSettings() {{
       inapp_bg:       document.getElementById('cfg-inapp-bg')?.checked ?? false,
       inapp_fehler:   document.getElementById('cfg-inapp-fehler')?.checked ?? true
     }},
+    email_notification: {{
+      aktiv:             document.getElementById('cfg-email-aktiv')?.checked ?? false,
+      smtp_server:       document.getElementById('cfg-smtp-server')?.value.trim() || '',
+      smtp_port:         parseInt(document.getElementById('cfg-smtp-port')?.value || '587', 10),
+      absender_email:    document.getElementById('cfg-smtp-from')?.value.trim() || '',
+      absender_passwort: document.getElementById('cfg-smtp-pw')?.value || '',
+      empfaenger_email:  document.getElementById('cfg-smtp-to')?.value.trim() || ''
+    }},
     aufgaben: {{
       erinnerung_intervall_stunden: parseInt(document.getElementById('cfg-erinnerung-h')?.value)||24,
       unanswered_check_days:        parseInt(document.getElementById('cfg-unanswered-days')?.value)||3,
@@ -9591,6 +9636,27 @@ function resetConfig() {{
     }},
     'Ein Backup der aktuellen Konfiguration wird als config.json.bak gespeichert.'
   );
+}}
+
+// SMTP Test-E-Mail
+function testSmtpEmail() {{
+  const statusEl = document.getElementById('smtp-test-status');
+  if(statusEl) statusEl.textContent = 'Sende\u2026';
+  const cfg = {{
+    smtp_server:       document.getElementById('cfg-smtp-server')?.value.trim() || '',
+    smtp_port:         parseInt(document.getElementById('cfg-smtp-port')?.value || '587', 10),
+    absender_email:    document.getElementById('cfg-smtp-from')?.value.trim() || '',
+    absender_passwort: document.getElementById('cfg-smtp-pw')?.value || '',
+    empfaenger_email:  document.getElementById('cfg-smtp-to')?.value.trim() || ''
+  }};
+  if(!cfg.smtp_server || !cfg.absender_email || !cfg.empfaenger_email) {{
+    if(statusEl) statusEl.textContent = '\u26a0 Bitte alle Felder ausf\u00fcllen';
+    return;
+  }}
+  fetch('/api/email-notification/test', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify(cfg)}})
+    .then(r=>r.json()).then(d=>{{
+      if(statusEl) statusEl.textContent = d.ok ? '\u2705 Test-Mail gesendet' : '\u274c ' + (d.error||'Fehler');
+    }}).catch(()=>{{ if(statusEl) statusEl.textContent = '\u274c Verbindungsfehler'; }});
 }}
 
 // Config Export / Import
@@ -15949,6 +16015,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     s.login(absender, pw_smtp)
                     s.sendmail(absender, to_addr, msg.as_string())
                 self._json({'ok': True, 'type': mail_type, 'to': to_addr})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # SMTP Test-E-Mail
+        if self.path == '/api/email-notification/test':
+            try:
+                import smtplib, ssl
+                from email.mime.text import MIMEText
+                srv  = body.get('smtp_server', '').strip()
+                port = int(body.get('smtp_port', 587))
+                frm  = body.get('absender_email', '').strip()
+                pw   = body.get('absender_passwort', '')
+                to   = body.get('empfaenger_email', '').strip()
+                if not srv or not frm or not to:
+                    self._json({'ok': False, 'error': 'SMTP-Server, Absender und Empfänger sind erforderlich'})
+                    return
+                msg = MIMEText('Diese Test-E-Mail wurde von KIRA gesendet um die SMTP-Konfiguration zu prüfen.', 'plain', 'utf-8')
+                msg['Subject'] = 'KIRA — SMTP-Test erfolgreich'
+                msg['From']    = frm
+                msg['To']      = to
+                ctx = ssl.create_default_context()
+                with smtplib.SMTP(srv, port, timeout=15) as server:
+                    server.ehlo()
+                    if port != 465:
+                        server.starttls(context=ctx)
+                    if pw:
+                        server.login(frm, pw)
+                    server.sendmail(frm, [to], msg.as_string())
+                rlog('settings', 'smtp_test_ok', f'Test-E-Mail an {to} gesendet',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
+                self._json({'ok': True})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
