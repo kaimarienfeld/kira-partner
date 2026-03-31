@@ -7996,7 +7996,8 @@ def generate_html() -> str:
 <html lang="de" data-theme="light">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kira – Assistenz</title>
+<title>Kira ✓ – Assistenz</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='bg' cx='38%25' cy='28%25' r='72%25'%3E%3Cstop offset='0%25' stop-color='%23a78bfa'/%3E%3Cstop offset='55%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%234c1d95'/%3E%3C/radialGradient%3E%3CradialGradient id='sp' cx='35%25' cy='22%25' r='40%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,255,255,.5)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,255,255,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23bg)'/%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23sp)'/%3E%3Cellipse cx='11.5' cy='15' rx='2.4' ry='2.7' fill='%23fff' opacity='.93'/%3E%3Cellipse cx='20.5' cy='15' rx='2.4' ry='2.7' fill='%23fff' opacity='.93'/%3E%3Cellipse cx='12' cy='15.4' rx='1' ry='1.2' fill='%234c1d95' opacity='.8'/%3E%3Cellipse cx='21' cy='15.4' rx='1' ry='1.2' fill='%234c1d95' opacity='.8'/%3E%3Cpath d='M11.5 21 Q16 23.5 20.5 21' stroke='rgba(255,255,255,.6)' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
 {CSS}
 </style>
