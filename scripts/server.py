@@ -7706,7 +7706,7 @@ function esInfoPopup(btn, text) {{
             </div>
             <div class="es-sig-actions">
               <button class="es-mk-btn sec" style="font-size:11px;padding:3px 9px" onclick="esVorlagEdit(${{v.id}})">&#x270E; Bearbeiten</button>
-              <button class="es-mk-btn danger" style="font-size:11px;padding:3px 9px" onclick="esVorlagDelete(${{v.id}},'${{(v.name||'').replace(/\\'/g,\\'\\\\\\'\\')}}'  )">&#x1F5D1;</button>
+              <button class="es-mk-btn danger" style="font-size:11px;padding:3px 9px" onclick="esVorlagDelete(${{v.id}},${{JSON.stringify(v.name||'')}})">&#x1F5D1;</button>
             </div>
           </div>`;
         }});
@@ -12346,7 +12346,7 @@ function loadDashKalender() {{
     if(!d.ok){{
       const msg=d.error||'';
       if(msg.toLowerCase().indexOf('berechtigung')>=0||msg.toLowerCase().indexOf('scope')>=0||msg.toLowerCase().indexOf('token')>=0){{
-        list.innerHTML='<div style="font-size:11px;color:var(--muted)">&#x26A0; Azure-Berechtigung fehlt &mdash; <a onclick="showPanel(\'einstellungen\');setTimeout(()=>esNavTo(\'mail\'),100)" style="cursor:pointer;color:var(--accent)">Kira-Postfach einrichten</a></div>';
+        list.innerHTML='<div style="font-size:11px;color:var(--muted)">&#x26A0; Azure-Berechtigung fehlt &mdash; <a onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esNavTo(\\'mail\\'),100)" style="cursor:pointer;color:var(--accent)">Kira-Postfach einrichten</a></div>';
       }}else{{
         list.innerHTML='<span style="font-size:11px;color:var(--muted)">Kalender nicht verfugbar</span>';
       }}
@@ -12373,7 +12373,7 @@ function loadOrgKalender() {{
         errHtml+='<div style="font-size:24px">&#x26A0;</div>'
           +'<div style="font-weight:600;margin:8px 0">Azure-Berechtigung erforderlich</div>'
           +'<div style="font-size:12px">Fur den Kalender-Zugriff muss die Berechtigung<br><code>Calendars.Read</code> in der Azure-App aktiviert sein.</div>'
-          +'<div style="margin-top:12px"><button onclick="showPanel(\'einstellungen\');setTimeout(()=>esNavTo(\'mail\'),100)" style="font-size:12px;padding:5px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer">Kira-Postfach-Einstellungen</button></div>';
+          +'<div style="margin-top:12px"><button onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esNavTo(\\'mail\\'),100)" style="font-size:12px;padding:5px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer">Kira-Postfach-Einstellungen</button></div>';
       }}else{{
         errHtml+='<div style="font-size:20px">&#x1F4C5;</div><div style="margin-top:8px;font-size:13px">'+escH(msg||'Kalender nicht verfugbar')+'</div>';
       }}
