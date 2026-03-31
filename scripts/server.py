@@ -2700,9 +2700,9 @@ window.pfKiraMailBearbeiten = function(id) {
   var oldText=item.body_plain||'';
   var modal=document.createElement('div');
   modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;';
-  modal.innerHTML='<div style="background:var(--bg-overlay,#242428);border:1px solid var(--border-strong,#3a3a42);border-radius:16px;padding:24px;width:min(600px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.6)">'
-    +'<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text,#e8e8ee)">&#x270E; Mail bearbeiten</div>'
-    +'<textarea id="kiraEditBody" style="width:100%;min-height:160px;background:var(--bg-raised,#1e1e23);color:var(--text,#e8e8ee);border:1px solid var(--border,#3a3a42);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">'+_esc(oldText)+'</textarea>'
+  modal.innerHTML='<div style="background:var(--bg-modal,#fff);border:1px solid var(--border-strong);border-radius:16px;padding:24px;width:min(600px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.35)">'
+    +'<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text)">&#x270E; Mail bearbeiten</div>'
+    +'<textarea id="kiraEditBody" style="width:100%;min-height:160px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">'+_esc(oldText)+'</textarea>'
     +'<div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">'
     +'<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer">Abbrechen</button>'
     +'<button onclick="pfKiraMailSendenBearbeitet('+id+',this)" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">Senden</button>'
@@ -5959,7 +5959,7 @@ function esInfoPopup(btn, text) {{
   .es-mk-total-info strong{{color:var(--text)}}
   /* ── Dialog ── */
   .es-mk-dialog-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center}}
-  .es-mk-dialog{{background:var(--bg-card);border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}}
+  .es-mk-dialog{{background:var(--bg-modal,var(--bg-card,#fff));border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)}}
   .es-mk-dialog h3{{margin:0 0 16px;font-size:15px}}
   .es-mk-dialog-row{{margin-bottom:12px}}
   .es-mk-dialog-row label{{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px}}
@@ -5981,7 +5981,7 @@ function esInfoPopup(btn, text) {{
   .es-sig-empty{{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;background:var(--bg-raised);border-radius:8px;border:1px dashed var(--border)}}
   /* Signatur-Editor-Modal */
   .es-sig-modal-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}}
-  .es-sig-modal{{background:var(--bg-card);border-radius:14px;width:760px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 80px rgba(0,0,0,.45);border:1px solid var(--border)}}
+  .es-sig-modal{{background:var(--bg-modal,var(--bg-card,#fff));border-radius:14px;width:760px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 80px rgba(0,0,0,.35);border:1px solid var(--border)}}
   .es-sig-modal-head{{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--border)}}
   .es-sig-modal-title{{font-size:15px;font-weight:700;color:var(--text)}}
   .es-sig-modal-body{{flex:1;overflow-y:auto;padding:16px 22px}}
@@ -7996,7 +7996,7 @@ def generate_html() -> str:
 <html lang="de" data-theme="light">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kira ✓ – Assistenz</title>
+<title>Kira – Assistenz</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='bg' cx='38%25' cy='28%25' r='72%25'%3E%3Cstop offset='0%25' stop-color='%23a78bfa'/%3E%3Cstop offset='55%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%234c1d95'/%3E%3C/radialGradient%3E%3CradialGradient id='sp' cx='35%25' cy='22%25' r='40%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,255,255,.5)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,255,255,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23bg)'/%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23sp)'/%3E%3Cellipse cx='11.5' cy='15' rx='2.4' ry='2.7' fill='%23fff' opacity='.93'/%3E%3Cellipse cx='20.5' cy='15' rx='2.4' ry='2.7' fill='%23fff' opacity='.93'/%3E%3Cellipse cx='12' cy='15.4' rx='1' ry='1.2' fill='%234c1d95' opacity='.8'/%3E%3Cellipse cx='21' cy='15.4' rx='1' ry='1.2' fill='%234c1d95' opacity='.8'/%3E%3Cpath d='M11.5 21 Q16 23.5 20.5 21' stroke='rgba(255,255,255,.6)' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
 {CSS}
@@ -11986,17 +11986,17 @@ function openMailApproveModal() {{
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
     document.body.appendChild(overlay);
   }}
-  overlay.innerHTML = '<div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:28px;max-width:560px;width:100%;color:#e0e0e0;font-family:Segoe UI,sans-serif;">' +
-    '<div style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:8px">&#x2709; Mail wartet auf Freigabe</div>' +
-    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">An: <span style="color:#93c5fd">' + _esc(item.an) + '</span></div>' +
-    '<div style="font-size:14px;color:#aaa;margin-bottom:12px">Betreff: ' + _esc(item.betreff) + '</div>' +
-    '<textarea id="mailApproveBody" style="width:100%;min-height:120px;background:#111;color:#e0e0e0;border:1px solid #333;border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">' + _esc(item.body_plain || '') + '</textarea>' +
-    '<div style="margin-top:8px;font-size:11px;color:#666">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
+  overlay.innerHTML = '<div style="background:var(--bg-modal,#fff);border:1px solid var(--border-strong);border-radius:14px;padding:28px;max-width:560px;width:100%;color:var(--text);font-family:Segoe UI,sans-serif;box-shadow:0 8px 40px rgba(0,0,0,.35);">' +
+    '<div style="font-size:13px;color:#d97706;font-weight:700;margin-bottom:8px">&#x2709; Mail wartet auf Freigabe</div>' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text)">An: <span style="color:var(--accent)">' + _esc(item.an) + '</span></div>' +
+    '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">Betreff: ' + _esc(item.betreff) + '</div>' +
+    '<textarea id="mailApproveBody" style="width:100%;min-height:120px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">' + _esc(item.body_plain || '') + '</textarea>' +
+    '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
     '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
-    '<button onclick="closeMailApproveOverlay()" style="background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'reject\\')" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'edit\\')" style="background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'approve\\')" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
+    '<button onclick="closeMailApproveOverlay()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'reject\\')" style="background:rgba(220,74,74,.12);color:#dc4a4a;border:1px solid rgba(220,74,74,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'edit\\')" style="background:rgba(79,125,249,.1);color:var(--accent);border:1px solid rgba(79,125,249,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\\'approve\\')" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
     '</div>' +
     '</div>';
   overlay.style.display = 'flex';
@@ -12045,7 +12045,7 @@ CSS = """
   /* Semantic */
   --danger:#dc4a4a;--success:#3dae6a;--warn:#d4933e;--info:#4f7df9;
   /* Surfaces — Dark mode default */
-  --bg:#0e0e10;--bg-raised:#161618;--bg-overlay:#1c1c1f;--card:#161618;
+  --bg:#0e0e10;--bg-raised:#161618;--bg-overlay:#1c1c1f;--card:#161618;--bg-card:#1e1e22;--bg-modal:#1e1e22;
   --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.14);
   /* Text */
   --text:#e4e4e7;--text-secondary:rgba(255,255,255,.58);--muted:rgba(255,255,255,.42);
@@ -12061,7 +12061,7 @@ CSS = """
 }
 /* Light mode */
 [data-theme="light"]{
-  --bg:#f5f5f7;--bg-raised:#fff;--bg-overlay:#f0f0f3;--card:#fff;
+  --bg:#f5f5f7;--bg-raised:#fff;--bg-overlay:#f0f0f3;--card:#fff;--bg-card:#fff;--bg-modal:#fff;
   --border:rgba(0,0,0,.08);--border-strong:rgba(0,0,0,.14);
   --text:#1a1a1e;--text-secondary:rgba(0,0,0,.58);--muted:rgba(0,0,0,.42);
   --accent-bg:rgba(79,125,249,.06);--accent-border:rgba(79,125,249,.2);
@@ -13055,7 +13055,7 @@ a:hover{text-decoration:underline;}
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:center;justify-content:center;padding:20px;}
 [data-theme="light"] .modal-ov{background:rgba(0,0,0,.4);}
 .modal-ov.open{display:flex;}
-.modal{background:var(--bg-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:20px;width:100%;max-width:460px;
+.modal{background:var(--bg-modal,var(--bg-raised,#fff));border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:20px;width:100%;max-width:460px;
   box-shadow:0 8px 40px rgba(0,0,0,.3);}
 .modal h3{color:var(--accent);font-size:var(--fs-md);margin-bottom:12px;}
 .modal select,.modal textarea,.modal input[type=text]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);
