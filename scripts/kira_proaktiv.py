@@ -831,6 +831,57 @@ def scan_offene_eingangsrechnungen(db, state: dict) -> list:
     return ergebnisse
 
 
+def scan_auto_backup(state: dict) -> dict:
+    """Tägliches Auto-Backup von config.json + tasks.db + mail_index.db (session-tt)."""
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        backup_cfg = cfg.get('backup', {})
+        if not backup_cfg.get('aktiv', False):
+            return {}
+    except Exception:
+        return {}
+
+    if _already_done(state, "auto_backup", ttl_hours=23):
+        return {}
+
+    try:
+        import shutil as _sh, sqlite3 as _sq_bk
+        backup_dir = Path(backup_cfg.get('pfad', '') or '') if backup_cfg.get('pfad') else KNOWLEDGE_DIR / 'backups'
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+        backed = []
+        # config.json
+        if (SCRIPTS_DIR / 'config.json').exists():
+            _sh.copy2(str(SCRIPTS_DIR / 'config.json'), str(backup_dir / f'{ts}_config.json'))
+            backed.append('config.json')
+        # SQLite DBs via .backup() API
+        for _db_name in ['tasks.db', 'mail_index.db']:
+            _src = KNOWLEDGE_DIR / _db_name
+            if not _src.exists(): continue
+            _dst = backup_dir / f'{ts}_{_db_name}'
+            try:
+                sc = _sq_bk.connect(str(_src))
+                dc = _sq_bk.connect(str(_dst))
+                sc.backup(dc)
+                sc.close(); dc.close()
+                backed.append(_db_name)
+            except Exception: pass
+        # Alte Backups aufräumen
+        keep_n = int(backup_cfg.get('keep_n', 7))
+        for suffix in ['_config.json', '_tasks.db', '_mail_index.db']:
+            files = sorted(f for f in backup_dir.iterdir() if f.is_file() and f.name.endswith(suffix))
+            for old in files[:-keep_n]:
+                try: old.unlink()
+                except: pass
+        _elog('system', 'backup_erstellt', f'Auto-Backup: {", ".join(backed)} → {backup_dir.name}/',
+              source='kira_proaktiv', modul='kira_proaktiv', actor_type='system', status='ok')
+        _mark_done(state, "auto_backup")
+        return {'gesichert': backed, 'pfad': str(backup_dir), 'ts': ts}
+    except Exception as e:
+        _elog('system', 'backup_fehler', str(e), source='kira_proaktiv', status='fehler')
+        return {}
+
+
 # ── Haupt-Scan ────────────────────────────────────────────────────────────────
 def run_proaktiver_scan() -> dict:
     """
@@ -899,6 +950,11 @@ def run_proaktiver_scan() -> dict:
         eingang_offen = scan_offene_eingangsrechnungen(db, state)
         if eingang_offen:
             ergebnisse['eingangsrechnungen_offen'] = eingang_offen
+
+        # Scan 11: Auto-Backup (session-tt)
+        backup_result = scan_auto_backup(state)
+        if backup_result:
+            ergebnisse['auto_backup'] = backup_result
 
         db.close()
         _save_state(state)

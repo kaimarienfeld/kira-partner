@@ -307,3 +307,24 @@ Commit: 66241b0
 **Commits:** 9dc60f1, 1632065, b20985e
 **Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Auto-Backup config.json.
 **Status:** erledigt
+
+
+---
+
+## 2026-03-31 — Session-Start (session-tt)
+**Auftrag:** Continuation nach session-ss. Selbst priorisiert: Auto-Backup fertigstellen + Dashboard-Features.
+**Status:** erledigt
+
+**Erledigt:**
+- Dashboard "Heute gesendet"-Karte (Zone C0): zeigt Kira-gesendete Mails (mail_approve_queue) + User-gesendete Mails (runtime_events.db mail_gesendet)
+- Tagesbriefing Timestamp: "Stand HH:MM" im Briefing-Titel, erstellt_am in kira_briefings gespeichert
+- Sent-Items Ungelesen-Badge Fix: _index_mail() setzt gelesen=1 für Gesendet-Ordner (Ordnernamens-Check)
+- Auto-Backup (server.py): POST /api/backup/jetzt Endpoint, Einstellungen-UI (Toggle/Pfad/Keep-N/Button)
+- Auto-Backup (kira_proaktiv.py): scan_auto_backup() als Scan 11, 23h TTL, SQLite .backup() API
+- backupNow() JS: Button ruft /api/backup/jetzt → Toast mit Ergebnis
+- saveSettings() Backup-Wiring: backup.aktiv/pfad/keep_n in config.json gespeichert
+- Mail-Senden Logging: rlog('user', 'mail_gesendet', ...) in _api_mail_send()
+
+**Commits:** (folgt)
+**Offen geblieben:** Google OAuth, WhatsApp-Token (Kai-Aktion), Mail-Ignorieren-Lernfrage.
+**Status:** erledigt

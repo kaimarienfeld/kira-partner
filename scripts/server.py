@@ -4326,6 +4326,7 @@ def build_einstellungen():
     kira_feedback_cfg  = kira_cfg.get("feedback", {})
     kira_sicherheit_cfg = kira_cfg.get("sicherheit", {})
     kira_proaktiv_cfg  = config.get("kira_proaktiv", {})
+    backup_cfg_es      = config.get("backup", {})
     # Circuit Breaker Status laden
     circuit_state = {}
     try:
@@ -7673,7 +7674,28 @@ function esInfoPopup(btn, text) {{
   <!-- TAB: KONFIGURATION -->
   <div class="es-proto-tab-panel" id="es-ptab-konfiguration">
     <div class="es-grp">
-      <div class="es-grp-h">Konfigurationsbackup</div>
+      <div class="es-grp-h">Auto-Backup</div>
+      <div class="es-grp-sub">T&auml;gliche Sicherung von config.json, tasks.db und mail_index.db</div>
+      <div class="es-row">
+        <div class="es-rl">Auto-Backup aktiv<div class="es-rd">Kira sichert t&auml;glich alle wichtigen Dateien automatisch</div></div>
+        <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-backup-aktiv" {'checked' if backup_cfg_es.get('aktiv', False) else ''}><div class="es-toggle-vis"></div></label>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Backup-Pfad<div class="es-rd">Zielordner (leer = knowledge/backups/)</div></div>
+        <input class="es-inp-md" type="text" id="cfg-backup-pfad" value="{esc(backup_cfg_es.get('pfad',''))}" placeholder="knowledge/backups/">
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Versionen aufbewahren<div class="es-rd">Anzahl der Backup-Dateien die behalten werden</div></div>
+        <select id="cfg-backup-keep" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text)">
+          {''.join(f'<option value="{n}" {"selected" if backup_cfg_es.get("keep_n",7)==n else ""}>{n} Versionen</option>' for n in [3,5,7,14,30])}
+        </select>
+      </div>
+      <div class="es-row">
+        <div class="es-rl">Jetzt sichern<div class="es-rd">Sofortiges Backup erstellen</div></div>
+        <button class="es-btn" id="btn-backup-now" onclick="backupNow()">&#x1F4BE; Backup erstellen</button>
+      </div>
+
+      <div class="es-grp-h" style="margin-top:20px">Konfigurationsbackup</div>
       <div class="es-grp-sub">Exportiere oder importiere die gesamte Systemkonfiguration.</div>
       <div class="es-row">
         <div class="es-rl">Datenbank-Gr&ouml;&szlig;e<div class="es-rd">Aktuelle Gr&ouml;&szlig;e der Aufgaben-Datenbank</div></div>
@@ -9879,6 +9901,11 @@ function saveSettings() {{
       neue_mails_archivieren:       document.getElementById('cfg-archiv-aktiv')?.checked ?? true,
       geloeschte_bereinigung_aktiv: document.getElementById('cfg-archiv-bereinigung-aktiv')?.checked ?? true,
       bereinigung_frist_tage:       parseInt(document.getElementById('cfg-archiv-bereinigung-frist')?.value || '90', 10)
+    }},
+    backup: {{
+      aktiv:  document.getElementById('cfg-backup-aktiv')?.checked ?? false,
+      pfad:   document.getElementById('cfg-backup-pfad')?.value.trim() || '',
+      keep_n: parseInt(document.getElementById('cfg-backup-keep')?.value || '7', 10)
     }}
   }};
   fetch('/api/einstellungen',{{
@@ -9899,6 +9926,20 @@ function testPush() {{
       if(d.ok) showToast('\u2713 Test-Push gesendet! Check dein Ger\u00e4t.');
       else showToast('Fehler: '+(d.error||'Unbekannt'));
     }}).catch(()=>showToast('Fehler beim Senden'));
+}}
+
+function backupNow() {{
+  const btn = document.getElementById('btn-backup-now');
+  if(btn) {{ btn.disabled = true; btn.textContent = '⏳ Backup läuft…'; }}
+  fetch('/api/backup/jetzt', {{method:'POST', headers:{{'Content-Type':'application/json'}}}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn) {{ btn.disabled = false; btn.innerHTML = '&#x1F4BE; Backup erstellen'; }}
+      if(d.ok) showToast('✅ Backup erstellt: ' + (d.gesichert||[]).join(', ') + ' → ' + (d.pfad||''));
+      else showToast('Backup-Fehler: ' + (d.error||'Unbekannt'), 'fehler');
+    }}).catch(()=>{{
+      if(btn) {{ btn.disabled = false; btn.innerHTML = '&#x1F4BE; Backup erstellen'; }}
+      showToast('Backup fehlgeschlagen', 'fehler');
+    }});
 }}
 
 // Runtime-Log: fire-and-forget helper (JS -> POST /api/runtime/event)
@@ -16708,6 +16749,52 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 rlog('system', 'db_vacuum', f'VACUUM auf {done} DBs, {_fmt_size(freed_bytes)} freigegeben',
                      source='server', modul='einstellungen', actor_type='user', status='ok')
                 self._json({'ok': True, 'dbs': done, 'befreit': _fmt_size(freed_bytes)})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Auto-Backup jetzt starten
+        if self.path == '/api/backup/jetzt':
+            try:
+                import shutil as _sh, sqlite3 as _sq_b
+                cfg_b = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                backup_cfg = cfg_b.get('backup', {})
+                backup_dir = Path(backup_cfg.get('pfad', '') or '') if backup_cfg.get('pfad') else KNOWLEDGE_DIR / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+                backed = []
+                # config.json
+                _src_cfg = SCRIPTS_DIR / 'config.json'
+                if _src_cfg.exists():
+                    _sh.copy2(str(_src_cfg), str(backup_dir / f'{ts}_config.json'))
+                    backed.append('config.json')
+                # tasks.db (SQLite safe-copy via backup API)
+                for _db_name in ['tasks.db', 'mail_index.db']:
+                    _src_db = KNOWLEDGE_DIR / _db_name
+                    if not _src_db.exists(): continue
+                    _dst_db = backup_dir / f'{ts}_{_db_name}'
+                    try:
+                        src_conn = _sq_b.connect(str(_src_db))
+                        dst_conn = _sq_b.connect(str(_dst_db))
+                        src_conn.backup(dst_conn)
+                        src_conn.close(); dst_conn.close()
+                        backed.append(_db_name)
+                    except Exception: pass
+                # Alte Backups aufräumen (behalte letzte N)
+                keep_n = int(backup_cfg.get('keep_n', 7))
+                groups = {}
+                for f in sorted(backup_dir.iterdir()):
+                    if not f.is_file(): continue
+                    for suffix in ['_config.json', '_tasks.db', '_mail_index.db']:
+                        if f.name.endswith(suffix):
+                            groups.setdefault(suffix, []).append(f)
+                for suffix, files in groups.items():
+                    for old_f in files[:-keep_n]:
+                        try: old_f.unlink()
+                        except: pass
+                rlog('system', 'backup_erstellt', f'Backup: {", ".join(backed)} → {backup_dir.name}/',
+                     source='server', modul='backup', actor_type='user', status='ok')
+                self._json({'ok': True, 'gesichert': backed, 'pfad': str(backup_dir), 'ts': ts})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
