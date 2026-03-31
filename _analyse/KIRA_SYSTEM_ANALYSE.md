@@ -1,5 +1,5 @@
 # KIRA — Vollständige System-Analyse
-**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-31 (session-pp)
+**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-31 (session-rr)
 **Analysiert:** 35+ Python-Module, 8 SQLite-Datenbanken, 70+ API-Endpunkte
 **Projektpfad:** `memory/` (Git-Repo)
 
@@ -10,6 +10,8 @@
 > - session-nn: Case Engine (Vorgänge), 5 neue Tools (17 total), Desktop-Overlay, Presence-Detection, Backfill-Skript, GAP-Analyse + Roadmap ergänzt.
 > - session-oo: **VOLLSTÄNDIGE AKTIVE ASSISTENZ** — Alle 10 Pakete implementiert: Idempotenz, Circuit Breaker, Rate-Limiting, Mail-Senden HITL, Konversations-Gedächtnis, Vorgang-Scans, Autonomy-Loop, ReAct, Feedback-Lernen, FTS5-Suche, MS-Graph-Kalender, Audit-Trail, Live-Migration (83 Vorgänge).
 > - session-pp: Bug-Fixes B-04 (NULL-Check mail_monitor), B-05 (Race Condition proaktiv_state.json), Task-Löschen Server-Blockade. Alle GAPs geschlossen.
+> - session-qq: kira_cfg Bug-Fix (Top-Level statt llm-Sub-Dict), Kontext-Steuerung (3 Selects), Auto-Wissen-Extraktion verdrahtet, Eingangsrechnungen Tabellen-View + Proaktiv-Scan, Kira-Proaktiv aktiv-Check.
+> - session-rr: Antwort-Länge/Sprache/Temperatur vollständig verdrahtet, Provider Verbindungstest, Einstellungen-Suche, DB-VACUUM, Toast-Anzeigedauer. Alle KIRA-LLM-Verbindungen abgeschlossen.
 
 ---
 

@@ -4944,6 +4944,14 @@ function esInfoPopup(btn, text) {{
         </div>
       </div>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Logo-Gr&ouml;&szlig;e<div class="es-rd">Gr&ouml;&szlig;e des Logos in der Sidebar</div></div>
+      <select class="es-sel" id="cfg-logo-size" onchange="applyLogoSize(this.value)">
+        <option value="">Klein (Standard — 30&times;30px)</option>
+        <option value="medium">Mittel (40&times;40px)</option>
+        <option value="large">Gro&szlig; (52&times;52px)</option>
+      </select>
+    </div>
   </div>
 
   <div class="es-grp">
@@ -8672,6 +8680,17 @@ function applyLogo(val) {{
   }}
   localStorage.setItem('kira_logo', val);
 }}
+function applyLogoSize(val) {{
+  const el = document.getElementById('sidebarLogo');
+  const sizeMap = {{medium:'40px',large:'52px'}};
+  const px = sizeMap[val] || '30px';
+  if(el) {{
+    el.style.width = px; el.style.height = px;
+    const img = el.querySelector('img');
+    if(img) {{ img.style.width=px; img.style.height=px; }}
+  }}
+  localStorage.setItem('kira_logo_size', val||'');
+}}
 function applyCardRadius(val) {{
   if(val) document.documentElement.style.setProperty('--card-radius', val);
   else document.documentElement.style.removeProperty('--card-radius');
@@ -8759,6 +8778,8 @@ function restoreDesign() {{
   if(cn) {{ applyCompanyName(cn); const inp=document.getElementById('cfg-company-name'); if(inp) inp.value=cn; }}
   const logo = localStorage.getItem('kira_logo');
   if(logo) {{ applyLogo(logo); updateLogoPreview(logo); const inp=document.getElementById('cfg-logo'); if(inp) inp.value=logo; }}
+  const logoSz = localStorage.getItem('kira_logo_size') || '';
+  if(logoSz) {{ applyLogoSize(logoSz); const sel=document.getElementById('cfg-logo-size'); if(sel) sel.value=logoSz; }}
   // Card radius
   const cr = localStorage.getItem('kira_card_radius') || '';
   if(cr) {{ applyCardRadius(cr); const sel=document.getElementById('cfg-card-radius'); if(sel) sel.value=cr; }}
