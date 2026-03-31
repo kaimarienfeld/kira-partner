@@ -1310,6 +1310,7 @@ def build_postfach():
           <button class="pf-ha-icon" id="pf-tb-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
           <div class="pf-ha-sep"></div>
           <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
+          <button class="pf-ha-btn pf-360-btn" id="pf-tb-360" title="Kunden-360 Profil" onclick="pfOpenKunden360()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></svg>360\u00b0</button>
         </div>
       </div>
     </div>
@@ -1397,6 +1398,28 @@ def build_postfach():
       <button class="btn btn-sec btn-sm" onclick="pfKiraDraft()">&#x1F916; Kira formuliert</button>
     </div>
   </div>
+  <!-- ── KUNDEN-360 DRAWER ────────────────────────────────── -->
+  <div id="k360-drawer" class="k360-drawer" style="display:none">
+    <div class="k360-hdr">
+      <div class="k360-avatar" id="k360-avatar">?</div>
+      <div class="k360-ident">
+        <div class="k360-name" id="k360-name">Laden...</div>
+        <div class="k360-email" id="k360-email"></div>
+      </div>
+      <div class="k360-chips" id="k360-chips"></div>
+      <button class="k360-close-btn" onclick="pfCloseKunden360()" title="Schlie\u00dfen">&#x2715;</button>
+    </div>
+    <div class="k360-tabs">
+      <button class="k360-tab active" onclick="k360Tab('mails')" id="k360-tab-mails">&#x1F4E7; Mails</button>
+      <button class="k360-tab" onclick="k360Tab('tasks')" id="k360-tab-tasks">&#x1F4CB; Tasks</button>
+      <button class="k360-tab" onclick="k360Tab('vorgaenge')" id="k360-tab-vorgaenge">&#x1F5C2; Vorg\u00e4nge</button>
+      <button class="k360-tab" onclick="k360Tab('rechnungen')" id="k360-tab-rechnungen">&#x1F9FE; Rechnungen</button>
+      <button class="k360-tab" onclick="k360Tab('angebote')" id="k360-tab-angebote">&#x1F4DD; Angebote</button>
+    </div>
+    <div class="k360-body" id="k360-body">
+      <div class="k360-loading">Laden\u2026</div>
+    </div>
+  </div>
 </div>
 
 </div>
@@ -1482,7 +1505,7 @@ def build_postfach():
 .pf-item-att svg{width:16px;height:16px}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
 /* RIGHT PREVIEW */
-.pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative}
 .pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
 .pf-prev-hdr{padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-prev-betreff{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3}
@@ -1533,6 +1556,39 @@ def build_postfach():
 [data-theme="light"] .pf-left{background:#ffffff}
 [data-theme="light"] .pf-mid{background:#ffffff}
 [data-theme="light"] .pf-right{background:#ffffff}
+/* ── KUNDEN-360 DRAWER ──────────────────────────────────── */
+.pf-360-btn{background:linear-gradient(135deg,#0ea5e9,#6366f1)!important;color:#fff!important;border-color:transparent!important}
+.pf-360-btn:hover{opacity:.9;filter:brightness(1.1)}
+.k360-drawer{position:absolute;inset:0;background:var(--bg);z-index:10;display:flex;flex-direction:column;overflow:hidden}
+.k360-hdr{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg-raised)}
+.k360-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.k360-ident{flex:1;min-width:0}
+.k360-name{font-weight:700;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k360-email{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k360-chips{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.k360-chip{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap}
+.k360-close-btn{background:none;border:none;cursor:pointer;font-size:17px;color:var(--text-muted);padding:4px 8px;border-radius:5px;transition:.15s;flex-shrink:0}
+.k360-close-btn:hover{background:var(--bg-hover);color:var(--text)}
+.k360-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.k360-tab{padding:9px 14px;font-size:12px;font-weight:600;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:.15s;white-space:nowrap;margin-bottom:-1px;flex-shrink:0}
+.k360-tab:hover{color:var(--text)}
+.k360-tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.k360-body{flex:1;overflow-y:auto}
+.k360-empty{text-align:center;padding:32px 20px;color:var(--text-muted);font-size:13px}
+.k360-loading{text-align:center;padding:32px 20px;color:var(--text-muted);font-size:13px}
+.k360-item{display:flex;flex-direction:column;gap:3px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background .1s}
+.k360-item.clickable{cursor:pointer}
+.k360-item.clickable:hover{background:var(--bg-hover)}
+.k360-item-title{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.k360-item-meta{font-size:11px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
+.k360-badge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;flex-shrink:0}
+.k360-badge-ok{background:#d1fae5;color:#065f46}
+.k360-badge-warn{background:#fef3c7;color:#92400e}
+.k360-badge-err{background:#fee2e2;color:#991b1b}
+.k360-badge-neu{background:#dbeafe;color:#1e40af}
+.k360-notiz-box{margin:12px 16px 4px;padding:10px;background:var(--bg-raised);border:1px solid var(--border);border-radius:7px;font-size:12px}
+.k360-notiz-lbl{font-size:10px;color:var(--text-muted);margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.k360-notiz-text{color:var(--text);line-height:1.5}
 [data-theme="light"] .pf-mid-hdr{background:#ffffff}
 [data-theme="light"] .pf-mail-item{background:#ffffff}
 [data-theme="light"] .pf-mail-item:hover{background:#f3f4f6}
@@ -3526,6 +3582,192 @@ function pfStartAutoRefresh() {
   }, 60000);
 }
 pfStartAutoRefresh();
+
+// ── KUNDEN-360 ──────────────────────────────────────────────────────────
+let _k360Data = null;
+let _k360Email = null;
+let _k360ActiveTab = 'mails';
+
+window.pfOpenKunden360 = function() {
+  if (!_pfCurrentMail) return;
+  const absenderRaw = _pfCurrentMail.absender || document.getElementById('pf-prev-absender').textContent.replace('Von: ','');
+  const emailMatch = absenderRaw.match(/<([^>]+@[^>]+)>/);
+  const email = emailMatch ? emailMatch[1].toLowerCase() : absenderRaw.trim().toLowerCase();
+  if (!email) { showToast('Kein Absender erkannt','warnung'); return; }
+  pfShowKunden360(email);
+};
+
+window.pfShowKunden360 = function(email) {
+  _k360Email = email;
+  _k360Data = null;
+  _k360ActiveTab = 'mails';
+  const nameEl = document.getElementById('k360-name');
+  const emailEl = document.getElementById('k360-email');
+  const chipsEl = document.getElementById('k360-chips');
+  const bodyEl = document.getElementById('k360-body');
+  const av = document.getElementById('k360-avatar');
+  if(nameEl) nameEl.textContent = email;
+  if(emailEl) emailEl.textContent = '';
+  if(chipsEl) chipsEl.innerHTML = '';
+  if(bodyEl) bodyEl.innerHTML = '<div class="k360-loading">Lade Kundenprofil\u2026</div>';
+  if(av) { av.textContent = (email[0]||'?').toUpperCase(); av.style.background = pfAvatarColor(email); }
+  document.querySelectorAll('.k360-tab').forEach(t=>t.classList.remove('active'));
+  const ft = document.getElementById('k360-tab-mails');
+  if(ft) ft.classList.add('active');
+  document.getElementById('k360-drawer').style.display = 'flex';
+  document.getElementById('pf-preview').style.display = 'none';
+  document.getElementById('pf-preview-empty').style.display = 'none';
+  document.getElementById('pf-compose').style.display = 'none';
+  fetch('/api/kunden/360?email='+encodeURIComponent(email))
+    .then(r=>r.json())
+    .then(d => {
+      _k360Data = d;
+      _k360RenderHeader(d);
+      _k360RenderTab('mails');
+    })
+    .catch(() => {
+      if(bodyEl) bodyEl.innerHTML = '<div class="k360-empty">Fehler beim Laden</div>';
+    });
+};
+
+window.pfCloseKunden360 = function() {
+  document.getElementById('k360-drawer').style.display = 'none';
+  if(_pfCurrentMail) {
+    document.getElementById('pf-preview').style.display = 'grid';
+    document.getElementById('pf-preview-empty').style.display = 'none';
+  } else {
+    document.getElementById('pf-preview-empty').style.display = 'flex';
+  }
+};
+
+window.k360Tab = function(tab) {
+  _k360ActiveTab = tab;
+  document.querySelectorAll('.k360-tab').forEach(t=>t.classList.remove('active'));
+  const btn = document.getElementById('k360-tab-'+tab);
+  if(btn) btn.classList.add('active');
+  _k360RenderTab(tab);
+};
+
+function _k360RenderHeader(d) {
+  const k = d.kunde || {};
+  const name = k.name || _k360Email || '?';
+  const av = document.getElementById('k360-avatar');
+  const initials = name.split(/\\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+  if(av) { av.textContent = initials; av.style.background = pfAvatarColor(name); }
+  const nameEl = document.getElementById('k360-name');
+  if(nameEl) nameEl.textContent = name !== _k360Email ? name : _k360Email;
+  const emailEl = document.getElementById('k360-email');
+  if(emailEl) emailEl.textContent = _k360Email;
+  const chips = document.getElementById('k360-chips');
+  if(chips) {
+    const parts = [];
+    if(k.anzahl_mails) parts.push('<span class="k360-chip">'+k.anzahl_mails+' Mails</span>');
+    if(k.hauptkanal) parts.push('<span class="k360-chip">'+escH(k.hauptkanal)+'</span>');
+    if(k.erstkontakt) parts.push('<span class="k360-chip">Erstkontakt: '+escH(String(k.erstkontakt).slice(0,10))+'</span>');
+    chips.innerHTML = parts.join('');
+  }
+  // Tab-Badges
+  [
+    {id:'mails',     count:(d.mails||[]).length},
+    {id:'tasks',     count:(d.tasks||[]).length},
+    {id:'vorgaenge', count:(d.vorgaenge||[]).length},
+    {id:'rechnungen',count:(d.rechnungen||[]).length},
+    {id:'angebote',  count:(d.angebote||[]).length},
+  ].forEach(t => {
+    const el = document.getElementById('k360-tab-'+t.id);
+    if(el && t.count > 0) {
+      // append badge (keep text, add span)
+      const spanTag = ' <span style="background:rgba(59,130,246,.18);color:#3b82f6;border-radius:8px;padding:1px 5px;font-size:10px;font-weight:700">'+t.count+'</span>';
+      if(!el.querySelector('span')) el.innerHTML += spanTag;
+    }
+  });
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _k360RenderTab(tab) {
+  const body = document.getElementById('k360-body');
+  if(!_k360Data) { body.innerHTML='<div class="k360-loading">Lade\u2026</div>'; return; }
+  const d = _k360Data;
+  let html = '';
+
+  if(tab === 'mails') {
+    const mails = d.mails || [];
+    if((d.kunde||{}).notiz) {
+      html += '<div class="k360-notiz-box"><div class="k360-notiz-lbl">Notiz</div><div class="k360-notiz-text">'+escH(d.kunde.notiz)+'</div></div>';
+    }
+    if(!mails.length) { body.innerHTML = html+'<div class="k360-empty">Keine Mails gefunden</div>'; return; }
+    mails.forEach(m => {
+      // data-k360-msgid stores the message_id; click handler uses dataset (HTML-entity safe)
+      html += '<div class="k360-item clickable" data-k360-msgid="'+escH(m.message_id||'')+'">'+
+        '<div class="k360-item-title">'+escH(m.betreff||'(kein Betreff)')+'</div>'+
+        '<div class="k360-item-meta"><span>'+escH(m.datum||'')+'</span><span>'+escH(m.konto_label||m.konto||'')+'</span><span>'+escH(m.folder||'')+'</span></div>'+
+      '</div>';
+    });
+  } else if(tab === 'tasks') {
+    const tasks = d.tasks || [];
+    if(!tasks.length) { body.innerHTML='<div class="k360-empty">Keine Aufgaben</div>'; return; }
+    tasks.forEach(t => {
+      const badge = t.status==='offen'?'<span class="k360-badge k360-badge-warn">offen</span>':
+                    t.status==='erledigt'?'<span class="k360-badge k360-badge-ok">erledigt</span>':
+                    '<span class="k360-badge">'+escH(t.status||'')+'</span>';
+      html += '<div class="k360-item">'+
+        '<div class="k360-item-title">'+badge+' '+escH(t.titel||'')+'</div>'+
+        '<div class="k360-item-meta"><span>'+escH(t.kategorie||'')+'</span><span>'+escH(t.datum_mail||'').slice(0,10)+'</span><span>Prio: '+escH(t.prioritaet||'')+'</span></div>'+
+      '</div>';
+    });
+  } else if(tab === 'vorgaenge') {
+    const vorgaenge = d.vorgaenge || [];
+    if(!vorgaenge.length) { body.innerHTML='<div class="k360-empty">Keine Vorg\u00e4nge</div>'; return; }
+    vorgaenge.forEach(v => {
+      const betrag = v.betrag ? parseFloat(v.betrag).toFixed(2)+' '+(v.betrag_waehrung||'EUR') : '';
+      html += '<div class="k360-item">'+
+        '<div class="k360-item-title"><span class="k360-badge k360-badge-neu">'+escH(v.typ||'')+'</span> '+escH(v.vorgang_nr||'')+' &mdash; '+escH(v.titel||'')+'</div>'+
+        '<div class="k360-item-meta"><span>'+escH(v.status||'')+'</span>'+(betrag?'<span>'+betrag+'</span>':'')+'<span>'+escH(String(v.erstellt_am||'').slice(0,10))+'</span></div>'+
+      '</div>';
+    });
+  } else if(tab === 'rechnungen') {
+    const rechnungen = d.rechnungen || [];
+    if(!rechnungen.length) { body.innerHTML='<div class="k360-empty">Keine Rechnungen</div>'; return; }
+    rechnungen.forEach(r => {
+      const badge = r.status==='bezahlt'?'<span class="k360-badge k360-badge-ok">bezahlt</span>':
+                    r.status==='offen'?'<span class="k360-badge k360-badge-warn">offen</span>':
+                    '<span class="k360-badge">'+escH(r.status||'')+'</span>';
+      html += '<div class="k360-item">'+
+        '<div class="k360-item-title">'+badge+' '+escH(r.re_nummer||'')+'</div>'+
+        '<div class="k360-item-meta"><span>'+escH(r.datum||'').slice(0,10)+'</span>'+(r.betrag_brutto?'<span>'+parseFloat(r.betrag_brutto).toFixed(2)+' EUR</span>':'')+'<span>'+escH(r.betreff||'')+'</span></div>'+
+      '</div>';
+    });
+  } else if(tab === 'angebote') {
+    const angebote = d.angebote || [];
+    if(!angebote.length) { body.innerHTML='<div class="k360-empty">Keine Angebote</div>'; return; }
+    angebote.forEach(a => {
+      const badge = a.status==='angenommen'?'<span class="k360-badge k360-badge-ok">angenommen</span>':
+                    a.status==='abgelehnt'?'<span class="k360-badge k360-badge-err">abgelehnt</span>':
+                    '<span class="k360-badge k360-badge-warn">'+escH(a.status||'offen')+'</span>';
+      html += '<div class="k360-item">'+
+        '<div class="k360-item-title">'+badge+' '+escH(a.a_nummer||'')+'</div>'+
+        '<div class="k360-item-meta"><span>'+escH(a.datum||'').slice(0,10)+'</span>'+(a.betrag_geschaetzt?'<span>ca. '+parseFloat(a.betrag_geschaetzt).toFixed(2)+' EUR</span>':'')+'<span>'+escH(a.betreff||'')+'</span></div>'+
+      '</div>';
+    });
+  }
+  body.innerHTML = html || '<div class="k360-empty">Keine Eintr\u00e4ge</div>';
+  // Bind click handler for mail items (avoids inline onclick with special chars in message_id)
+  body.querySelectorAll('[data-k360-msgid]').forEach(el => {
+    el.addEventListener('click', () => {
+      const mid = el.dataset.k360Msgid;
+      pfCloseKunden360();
+      setTimeout(() => pfSearchByMsgId(mid), 200);
+    });
+  });
+}
+
+window.pfSearchByMsgId = function(msgId) {
+  if(!msgId) return;
+  const el = document.querySelector('[data-msgid="'+msgId+'"]');
+  if(el) { el.scrollIntoView({block:'center'}); el.click(); return; }
+  showToast('Mail nicht im aktuellen Ordner — bitte Ordner wechseln','info');
+};
 
 // ── Globales Ungelesen-Badge-Polling (alle Panels, alle 2 min) ───────────
 function _pfGlobalBadgeUpdate() {
@@ -13637,6 +13879,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif re.match(r'^/api/vorgang/\d+$', self.path):
             self._api_vorgang_detail()
 
+        elif self.path.startswith('/api/kunden/360'):
+            self._api_kunden_360()
+
         else:
             self._respond(404, 'text/plain', b'Not found')
 
@@ -17678,6 +17923,79 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": True, "email": email, "vorgaenge": vorgaenge})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
+
+    def _api_kunden_360(self):
+        """GET /api/kunden/360?email=... — 360-Grad-Kundenprofil."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        email = (qs.get('email', [''])[0]).strip().lower()
+        if not email:
+            self._json({'error': 'email fehlt'})
+            return
+        result = {
+            'email': email,
+            'kunde': {},
+            'mails': [],
+            'tasks': [],
+            'vorgaenge': [],
+            'rechnungen': [],
+            'angebote': [],
+        }
+        # 1. Kunden-Profil + letzte 20 Interaktionen aus kunden.db
+        try:
+            kdb = sqlite3.connect(str(KUNDEN_DB))
+            kdb.row_factory = sqlite3.Row
+            k = kdb.execute(
+                "SELECT * FROM kunden WHERE LOWER(email)=? LIMIT 1", (email,)
+            ).fetchone()
+            if k:
+                result['kunde'] = dict(k)
+            mails = kdb.execute("""
+                SELECT konto_label, betreff, absender, datum, datum_iso,
+                       message_id, folder, konto_label AS konto
+                FROM interaktionen WHERE LOWER(kunden_email)=?
+                ORDER BY datum_iso DESC LIMIT 20
+            """, (email,)).fetchall()
+            result['mails'] = [dict(m) for m in mails]
+            kdb.close()
+        except Exception:
+            pass
+        # 2. Tasks / Vorgaenge / Rechnungen / Angebote aus tasks.db
+        try:
+            db = get_db()
+            tasks = db.execute("""
+                SELECT id, kategorie, titel, datum_mail, status, prioritaet, kunden_email
+                FROM tasks WHERE LOWER(kunden_email) LIKE ?
+                ORDER BY datum_mail DESC LIMIT 15
+            """, (f'%{email}%',)).fetchall()
+            result['tasks'] = [dict(t) for t in tasks]
+
+            vorgaenge = db.execute("""
+                SELECT id, vorgang_nr, typ, status, titel, betrag, betrag_waehrung,
+                       erstellt_am, kunden_email
+                FROM vorgaenge WHERE LOWER(kunden_email) LIKE ?
+                ORDER BY erstellt_am DESC LIMIT 20
+            """, (f'%{email}%',)).fetchall()
+            result['vorgaenge'] = [dict(v) for v in vorgaenge]
+
+            rechnungen = db.execute("""
+                SELECT id, re_nummer, datum, betrag_netto, betrag_brutto,
+                       betreff, status, bezahlt_am
+                FROM ausgangsrechnungen WHERE LOWER(kunde_email) LIKE ?
+                ORDER BY datum DESC LIMIT 15
+            """, (f'%{email}%',)).fetchall()
+            result['rechnungen'] = [dict(r) for r in rechnungen]
+
+            angebote = db.execute("""
+                SELECT id, a_nummer, datum, betrag_geschaetzt, betreff,
+                       status, nachfass_count, letzter_nachfass
+                FROM angebote WHERE LOWER(kunde_email) LIKE ?
+                ORDER BY datum DESC LIMIT 15
+            """, (f'%{email}%',)).fetchall()
+            result['angebote'] = [dict(a) for a in angebote]
+            db.close()
+        except Exception:
+            pass
+        self._json(result)
 
     def _api_vorgang_signals(self):
         """GET /api/vorgang/signals — Ausstehende B/C-Signale (für Toast/Modal)."""
