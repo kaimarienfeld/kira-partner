@@ -1205,13 +1205,15 @@ def _auto_angebot_aktion(result: dict, kunden_email: str, betreff: str, msg_id: 
             return {}
 
         ang_id = ang["id"]
-        ang_nr = ang["a_nummer"]
-        kunde = ang["kunde_name"] or kunden_email
+        ang_nr = ang["a_nummer"] or ""
+        kunde  = (ang["kunde_name"] or "").strip() or kunden_email or "Unbekannt"
+        safe_msg_id = (msg_id or "")[:40]
+        safe_betreff = (betreff or "")
 
         if angebot_aktion == "angenommen":
             db.execute(
                 "UPDATE angebote SET status='angenommen', grund_angenommen=? WHERE id=?",
-                (f"Mail: {betreff[:200]}", ang_id)
+                (f"Mail: {safe_betreff[:200]}", ang_id)
             )
             # Folge-Task: Rechnung schreiben
             db.execute("""
@@ -1226,9 +1228,9 @@ def _auto_angebot_aktion(result: dict, kunden_email: str, betreff: str, msg_id: 
                 f"Angebot {ang_nr} von {kunde} wurde angenommen.",
                 f"Angebot {ang_nr} wurde angenommen. Rechnung erstellen und senden.",
                 kunden_email, "Rechnung erstellen und an Kunden senden",
-                betreff[:200], "auto",
+                safe_betreff[:200], "auto",
                 "offen", "hoch", 0,
-                f"auto-annahme-{msg_id[:40]}"
+                f"auto-annahme-{safe_msg_id}"
             ))
             _alog("Angebot", f"Angenommen: {ang_nr}",
                   f"{kunde} | Angebot angenommen → Rechnung-Task erstellt", "ok")

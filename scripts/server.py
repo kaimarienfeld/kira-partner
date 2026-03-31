@@ -16253,34 +16253,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
                 db.commit()
 
-                # Kira analysiert und lernt
-                kira_antwort = ''
+                # Lernregel sofort speichern (kein synchroner LLM-Call — würde Server blockieren)
+                kira_antwort = f'Gelöscht. Grund: {grund}'
                 regel_gespeichert = False
                 if analysiere:
                     try:
-                        preview = text_raw[:600].replace('\n',' ')
-                        kira_prompt = (
-                            f'Aufgabe #{task_id} wurde vom Nutzer gelöscht.\n'
-                            f'Grund: "{grund}"\n'
-                            f'Betreff: "{betr}"\n'
-                            f'Konto: {konto} | Absender: {absnd} | Kategorie: {kat}\n'
-                            f'Mailinhalt (Ausschnitt): {preview}\n\n'
-                            f'Analysiere kurz (2-3 Sätze): Was ist das für ein Mailtyp, warum wurde er gelöscht, '
-                            f'und welche EINE konkrete Erkennungsregel solltest du daraus ableiten? '
-                            f'Antworte auf Deutsch. Formuliere die Regel als klaren Satz für dein Regelwerk.')
-                        kira_result = kira_chat(kira_prompt)
-                        kira_antwort = kira_result.get('antwort', '')
-                        if kira_antwort:
-                            # Als Lernregel in wissen_regeln speichern
-                            regel_titel  = f'Lernregel: {grund[:60]}'
-                            regel_inhalt = f'Kontext: Betreff "{betr[:80]}", Konto {konto}. {kira_antwort}'
-                            db2 = get_db()
-                            db2.execute(
-                                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, status) VALUES (?,?,?,?)",
-                                ('gelernt', regel_titel, regel_inhalt, 'aktiv'))
-                            db2.commit()
-                            db2.close()
-                            regel_gespeichert = True
+                        regel_titel  = f'Lernregel Löschung: {grund[:60]}'
+                        regel_inhalt = (
+                            f'Nutzer hat Task #{task_id} gelöscht. '
+                            f'Grund: "{grund}". '
+                            f'Betreff: "{betr[:80]}". '
+                            f'Konto: {konto}. Kategorie: {kat}.'
+                        )
+                        db2 = get_db()
+                        db2.execute(
+                            "INSERT INTO wissen_regeln (kategorie, titel, inhalt, status) VALUES (?,?,?,?)",
+                            ('gelernt', regel_titel, regel_inhalt, 'aktiv'))
+                        db2.commit()
+                        db2.close()
+                        regel_gespeichert = True
                     except Exception:
                         pass
 
