@@ -2198,7 +2198,7 @@ def _tool_termin_erstellen(p):
             _elog("kira", "termin_erstellt",
                   f"Termin '{betreff}' am {start[:10]} via Graph",
                   source="kira_llm", modul="kira", submodul="tools",
-                  actor_type="kira", status="ok")
+                  actor_type="kira_vorschlag", status="ok")
         return result
     except Exception as e:
         return {"error": str(e)}
@@ -2426,7 +2426,7 @@ def _tool_mail_senden(p):
 
     _elog("kira", "mail_entwurf_erstellt",
           f"Mail-Entwurf #{queue_id} für {an}: {betreff[:60]}",
-          modul="kira_llm", source="kira_llm", actor_type="kira", status="ok",
+          modul="kira_llm", source="kira_llm", actor_type="kira_autonom", status="ok",
           entity_snapshot={"queue_id": queue_id, "an": an, "betreff": betreff})
 
     # Signal (Stufe B) — Toast im Dashboard

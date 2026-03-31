@@ -6979,6 +6979,9 @@ def generate_html() -> str:
     </div>
   </nav>
   <div class="sidebar-bottom">
+    <div class="sidebar-item" id="nav-kira-aktivitaeten" onclick="showPanel('kira-aktivitaeten');loadKiraAktivitaeten()" data-label="Kira-Aktivitaeten">
+      <span class="si-icon">&#x1F916;</span><span class="si-label">Kira-Log</span>
+    </div>
     <div class="sidebar-item" id="nav-protokoll" onclick="showPanel('protokoll');loadProtokoll()" data-label="Protokoll">
       <span class="si-icon">&#x1F4CB;</span><span class="si-label">Protokoll</span>
       <span class="si-badge" id="proto-fehler-badge" style="display:none;background:rgba(220,74,74,.12);color:var(--danger);border-color:rgba(220,74,74,.25)"></span>
@@ -7014,6 +7017,25 @@ def generate_html() -> str:
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
+  <div class="panel" id="panel-kira-aktivitaeten">
+    <div class="page-header">
+      <h1 class="page-title">&#x1F916; Kira-Aktivit&auml;ten</h1>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="kira-akt-seit" class="proto-filter" onchange="loadKiraAktivitaeten()">
+          <option value="24h">Letzte 24 Stunden</option>
+          <option value="7d">Letzte 7 Tage</option>
+          <option value="30d">Letzte 30 Tage</option>
+        </select>
+        <select id="kira-akt-typ" class="proto-filter" onchange="loadKiraAktivitaeten()">
+          <option value="">Alle Aktionen</option>
+          <option value="kira_autonom">&#x1F916; Autonom</option>
+          <option value="kira_vorschlag">&#x1F464; Best&auml;tigt</option>
+        </select>
+        <button class="btn btn-sec btn-xs" onclick="loadKiraAktivitaeten()">&#x21BB; Aktualisieren</button>
+      </div>
+    </div>
+    <div id="kira-akt-list" style="margin-top:12px"></div>
+  </div>
   <div class="panel" id="panel-protokoll">
     <div class="page-header">
       <h1 class="page-title">&#x1F4CB; Aktivit&auml;tsprotokoll</h1>
@@ -9591,6 +9613,38 @@ function refreshBriefing() {{
 }}
 
 // Monitor-Status prüfen (alle 30s) — aktualisiert Header-Chip
+// ── Kira-Aktivitäten ─────────────────────────────────────────────────────────
+function loadKiraAktivitaeten() {{
+  const seit = document.getElementById('kira-akt-seit')?.value || '24h';
+  const typ  = document.getElementById('kira-akt-typ')?.value  || '';
+  const list = document.getElementById('kira-akt-list');
+  if(!list) return;
+  list.innerHTML = '<div style="color:#888;padding:20px 0">Lade…</div>';
+  fetch(`/api/kira/aktivitaeten?seit=${{seit}}&typ=${{encodeURIComponent(typ)}}`)
+    .then(r=>r.json()).then(data=>{{
+      if(!data.eintraege || !data.eintraege.length) {{
+        list.innerHTML = '<div style="color:#888;padding:20px 0">Keine Kira-Aktivitäten im gewählten Zeitraum.</div>';
+        return;
+      }}
+      list.innerHTML = data.eintraege.map(e=>{{
+        const icon = e.actor_type === 'kira_autonom' ? '🤖' : '👤';
+        const badge = e.actor_type === 'kira_autonom'
+          ? '<span style="background:#2563eb22;color:#2563eb;border-radius:4px;padding:1px 7px;font-size:11px;margin-left:6px">autonom</span>'
+          : '<span style="background:#16a34a22;color:#16a34a;border-radius:4px;padding:1px 7px;font-size:11px;margin-left:6px">bestätigt</span>';
+        return `<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border-soft)">
+          <div style="font-size:20px;line-height:1.4">${{icon}}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text-main)">${{e.action || '—'}}${{badge}}</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:2px;white-space:pre-wrap;word-break:break-word">${{e.summary || ''}}</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-faint);white-space:nowrap">${{e.ts ? e.ts.slice(0,16).replace('T',' ') : ''}}</div>
+        </div>`;
+      }}).join('');
+    }}).catch(err=>{{
+      list.innerHTML = `<div style="color:#e11d48;padding:16px 0">Fehler: ${{err.message}}</div>`;
+    }});
+}}
+
 // ── Aktivitätsprotokoll ──────────────────────────────────────────────────────
 let _protoOffset = 0;
 function loadProtokoll(append) {{
@@ -11482,6 +11536,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/kira/insights':
             self._api_kira_insights()
 
+        elif self.path.startswith('/api/kira/aktivitaeten'):
+            self._api_kira_aktivitaeten()
+
         elif self.path == '/api/kira/proaktiv/status':
             self._api_kira_proaktiv_status()
 
@@ -13067,9 +13124,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         (now, now, queue_id)
                     )
                     db.commit()
+                    # kira_vorschlag wenn Mail von Kira-Entwurf stammte, sonst user
+                    _at = "kira_vorschlag" if row.get("erstellt_von") == "kira" else "user"
                     rlog("server", "mail_gesendet",
                          f"Mail #{queue_id} an {row['an']} gesendet ({action})",
-                         modul="server", source="server", actor_type="user",
+                         modul="server", source="server", actor_type=_at,
                          status="ok", entity_snapshot={"queue_id": queue_id, "an": row["an"]})
 
                     # Stil-Lernen: wenn User stark editiert hat (Paket 6-C)
@@ -13111,6 +13170,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(e)})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
+
+    def _api_kira_aktivitaeten(self):
+        """GET /api/kira/aktivitaeten?seit=24h&typ= — Kira autonome Aktionen."""
+        try:
+            qs   = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            seit = qs.get("seit", ["24h"])[0]
+            typ  = qs.get("typ",  [""])[0]
+            interval_map = {"24h": "-24 hours", "7d": "-7 days", "30d": "-30 days"}
+            interval = interval_map.get(seit, "-24 hours")
+            db_path = SCRIPTS_DIR.parent / "knowledge" / "runtime_events.db"
+            if not db_path.exists():
+                self._json({"ok": True, "eintraege": []})
+                return
+            import sqlite3 as _sq
+            with _sq.connect(str(db_path)) as con:
+                con.row_factory = _sq.Row
+                if typ:
+                    rows = con.execute(
+                        "SELECT ts, action, summary, actor_type FROM events "
+                        "WHERE actor_type=? AND ts > datetime('now', ?) "
+                        "ORDER BY ts DESC LIMIT 50",
+                        (typ, interval)
+                    ).fetchall()
+                else:
+                    rows = con.execute(
+                        "SELECT ts, action, summary, actor_type FROM events "
+                        "WHERE actor_type IN ('kira_autonom','kira_vorschlag') "
+                        "AND ts > datetime('now', ?) "
+                        "ORDER BY ts DESC LIMIT 50",
+                        (interval,)
+                    ).fetchall()
+            self._json({"ok": True, "eintraege": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e), "eintraege": []})
 
     def _api_kira_proaktiv_status(self):
         """GET /api/kira/proaktiv/status — Status des letzten proaktiven Scans."""
