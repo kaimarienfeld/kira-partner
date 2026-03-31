@@ -1,12 +1,13 @@
 # KIRA — Vollständige System-Analyse
-**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-30 (session-ll)
-**Analysiert:** 30+ Python-Module, 8 SQLite-Datenbanken, 60+ API-Endpunkte
+**Erstellt:** 2026-03-30 | **Zuletzt aktualisiert:** 2026-03-31 (session-nn)
+**Analysiert:** 35+ Python-Module, 8 SQLite-Datenbanken, 70+ API-Endpunkte
 **Projektpfad:** `memory/` (Git-Repo)
 
 > **Changelog dieser Datei:**
 > - session-jj: Erstellt. 10 Bugs identifiziert, 7 sofort behoben.
 > - session-kk: Postfach Mail-Rendering + Kira-Button Redesign (commit 66241b0).
 > - session-ll: Automatisches Modell-Validierungssystem implementiert.
+> - session-nn: Case Engine (Vorgänge), 5 neue Tools (17 total), Desktop-Overlay, Presence-Detection, Backfill-Skript, GAP-Analyse + Roadmap ergänzt.
 
 ---
 
@@ -22,6 +23,9 @@
 8. [Konfiguration & Secrets](#8-konfiguration--secrets)
 9. [Partner-View (Leni)](#9-partner-view-leni)
 10. [Fehler & Irregularitäten — mit Behebungsvorschlägen](#10-fehler--irregularitäten--mit-behebungsvorschlägen)
+11. [Case Engine — Vorgang-Layer (session-nn)](#11-case-engine--vorgang-layer-session-nn)
+12. [GAP-Analyse: Vollständige Aktive Assistenz](#12-gap-analyse-vollständige-aktive-assistenz)
+13. [Verbesserungs-Roadmap](#13-verbesserungs-roadmap)
 
 ---
 
@@ -135,6 +139,17 @@ Kira kann über Chat:
 - **Snooze-Wecker** — alle 60 Sekunden, weckt abgelaufene Snooze-Mails auf
 - **Modell-Validierung** — 20s nach Start + alle 24h, prüft alle Provider-Modelle automatisch (session-ll)
 - **Tagesstart-Briefing** — morgens 6–10 Uhr, generiert von LLM
+- **Signal-Watcher** — alle 15 Sekunden, zeigt Desktop-Overlay für Stufe-C-Signale (session-nn, activity_window.py)
+- **Signal-Polling-JS** — Browser-seitig alle 10 Sekunden, zeigt Toast (Stufe B) oder Modal (Stufe C) (session-nn)
+
+### 2.4 Case Engine — Vorgang-Tracking (session-nn)
+- **Vorgänge**: Strukturierte Geschäftsprozesse oberhalb der Task-/Mail-Ebene
+- **10 Vorgang-Typen**: lead, angebot, rechnung, mahnung, support, projekt, partner, lieferant, intern, sonstige
+- **Entscheidungsstufen**: A (automatisch, stumm), B (SSE-Toast im Browser), C (Modal + Desktop-Overlay)
+- **State Machines**: Typ-spezifische Übergänge, ungültige Transitionen werden abgelehnt
+- **Verknüpfungen**: Jeder Vorgang kann mit Tasks, Mails, Rechnungen, Angeboten verlinkt sein
+- **Browser-API**: 8 neue Endpunkte (`/api/vorgaenge`, `/api/vorgang/{id}`, `/api/vorgang/signals` u.a.)
+- **Presence-Detection**: `presence_detector.py` — Windows `GetLastInputInfo()`, kein Popup wenn >5 Min inaktiv
 
 ---
 
@@ -189,24 +204,29 @@ User-Eingabe
     → elog() in runtime_events.db
 ```
 
-### 3.3 Die 12 Kira-Tools (kira_llm.py, Zeile ~572)
+### 3.3 Die 17 Kira-Tools (kira_llm.py)
 
 Alle Tools sind im Anthropic-Format definiert und werden automatisch in OpenAI-Format konvertiert für nicht-Anthropic-Provider:
 
-| Tool | Aktion | Datenbank |
-|---|---|---|
-| `rechnung_bezahlt` | Ausgangsrechnung → status='bezahlt' | tasks.db / ausgangsrechnungen |
-| `angebot_status` | Angebot → angenommen/abgelehnt/keine_antwort | tasks.db / angebote |
-| `eingangsrechnung_erledigt` | Eingangsrechnung → erledigt | tasks.db |
-| `kunde_nachschlagen` | Kunden-Infos + Mail-Historie | kunden.db + mail_index.db |
-| `nachfass_email_entwerfen` | LLM-Entwurf generieren | kein DB-Schreiben |
-| `wissen_speichern` | Neue Regel → wissen_regeln | tasks.db |
-| `rechnungsdetails_abrufen` | PDF-extrahierte Details | rechnungen_detail.db |
-| `web_recherche` | Google-Suche via urllib | extern |
-| `runtime_log_suchen` | Events suchen | runtime_events.db |
-| `angebot_pruefen` | Angebot-Details + ähnliche Anfragen | tasks.db + mail_index.db |
-| `task_erledigen` | Task → status='erledigt' | tasks.db |
-| `tasks_loeschen` | Mehrere Tasks löschen | tasks.db |
+| Tool | Aktion | Datenbank | Seit |
+|---|---|---|---|
+| `rechnung_bezahlt` | Ausgangsrechnung → status='bezahlt' | tasks.db / ausgangsrechnungen | session-jj |
+| `angebot_status` | Angebot → angenommen/abgelehnt/keine_antwort | tasks.db / angebote | session-jj |
+| `eingangsrechnung_erledigt` | Eingangsrechnung → erledigt | tasks.db | session-jj |
+| `kunde_nachschlagen` | Kunden-Infos + Mail-Historie | kunden.db + mail_index.db | session-jj |
+| `nachfass_email_entwerfen` | LLM-Entwurf generieren | kein DB-Schreiben | session-jj |
+| `wissen_speichern` | Neue Regel → wissen_regeln | tasks.db | session-jj |
+| `rechnungsdetails_abrufen` | PDF-extrahierte Details | rechnungen_detail.db | session-jj |
+| `web_recherche` | Google-Suche via urllib | extern | session-jj |
+| `runtime_log_suchen` | Events suchen | runtime_events.db | session-jj |
+| `angebot_pruefen` | Angebot-Details + ähnliche Anfragen | tasks.db + mail_index.db | session-jj |
+| `task_erledigen` | Task → status='erledigt' | tasks.db | session-jj |
+| `tasks_loeschen` | Mehrere Tasks löschen | tasks.db | session-jj |
+| `duplikate_suchen` | Doppelte Tasks/Mails finden | tasks.db + mail_index.db | session-mm |
+| `mail_suchen` | Mail-Index durchsuchen | mail_index.db | session-mm |
+| `mail_lesen` | Mail-Volltext aus Archiv laden | mail_index.db + Archiv | session-mm |
+| `vorgang_kontext_laden` | Vorgang-Details + History laden | tasks.db (vorgaenge) | **session-nn** |
+| `vorgang_status_setzen` | Vorgang-Status via State-Machine ändern | tasks.db (vorgaenge) | **session-nn** |
 
 ### 3.4 Mail-Klassifizierung — 3-stufig
 
@@ -277,6 +297,19 @@ validate_all_providers()              → Alle aktiven Provider prüfen + state-
 - Einstellungen/LLM-Provider: 🟡 Status-Icon wenn Modell veraltet (statt 🟢)
 - Gelb hinterlegter Warn-Text mit Grund + empfohlenem Ersatzmodell
 - 🔍 Modell-Button per Provider für manuellen Check
+
+### 3.6 Case Engine Context im System-Prompt (session-nn)
+
+`build_system_prompt()` injiziert jetzt zusätzlich offene Vorgänge:
+```python
+from case_engine import get_vorgang_summary_for_kira
+vs = get_vorgang_summary_for_kira(limit=8)
+if vs:
+    prompt += f"\n\nOFFENE VORGÄNGE (Case Engine):\n{vs}\n"
+```
+
+Die Summary enthält die 8 aktuellsten offenen Vorgänge mit Status, Typ und Titel.
+Kira kann dann direkt die Tools `vorgang_kontext_laden` und `vorgang_status_setzen` nutzen.
 
 ### 3.7 Antwort-Entwürfe (llm_response_gen.py)
 5 Situationstypen mit LLM-generierten Entwürfen:
@@ -894,4 +927,346 @@ Die 15 bekannten Issues ISS-001 bis ISS-015 sind laut Projektdokumentation alle 
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Aktualisiert 2026-03-30 (session-ll) | 30+ Module, 8 DBs, 60+ Endpunkte*
+### Neu implementiert (session-nn)
+| Feature | Datei | Beschreibung |
+|---|---|---|
+| `case_engine.py` | scripts/ | Kern-Modul: create_vorgang, update_status, link_entity, get_pending_signals, mark_signal_shown, get_vorgang_summary_for_kira |
+| `vorgang_router.py` | scripts/ | Routing: Mail-Klassifizierung → Vorgang-Typ, Konfidenz-basierte Entscheidungsstufe |
+| `presence_detector.py` | scripts/ | Windows-Idle-Detection via ctypes.windll.user32.GetLastInputInfo() |
+| `activity_window.py` | scripts/ | Desktop-Overlay (tkinter -topmost), Signal-Watcher-Thread 15s |
+| `case_engine_backfill.py` | scripts/ | Einmalige Migration: Bestandsdaten → Vorgänge |
+| Vorgang-Router-Integration | mail_monitor.py + daily_check.py | Nach jedem Task-INSERT: route_classified_mail() aufrufen |
+| 8 neue API-Endpunkte | server.py | GET/POST /api/vorgaenge, /api/vorgang/{id}, /api/vorgang/signals, /api/vorgang/neu, /api/vorgang/{id}/status, /api/vorgang/{id}/link, /api/vorgang/signal/gelesen, /api/presence |
+| Signal-Polling-JS | server.py | Browser-seitig: Toast (Stufe B), Modal (Stufe C), 10s Intervall |
+| Desktop-Signal-Watcher | server.py + activity_window.py | Startet beim Server-Start |
+| 2 neue LLM-Tools | kira_llm.py | `vorgang_kontext_laden`, `vorgang_status_setzen` |
+| System-Prompt Vorgänge | kira_llm.py | Offene Vorgänge (limit=8) im Kira-Kontext |
+| State-Machine-Validierung | case_engine.py | Ungültige Übergänge werden abgelehnt (HTTP 400 mit erlaubten Übergängen) |
+| Query-String Routing-Fix | server.py | `/api/vorgang/signals?limit=5` → `startswith()` statt `==` |
+| f-String Escaping-Fix | server.py | Alle `{}`/`{{}}` in eingebetteten JS-Blöcken korrekt gedoppelt |
+
+---
+
+## 11. Case Engine — Vorgang-Layer (session-nn)
+
+### 11.1 Konzept
+
+Die **Case Engine** ist ein Vorgang-Layer (engl. "Case") oberhalb von Tasks und Mails. Ein Vorgang repräsentiert einen vollständigen Geschäftsprozess — von der ersten Anfrage bis zum Abschluss. Er verknüpft mehrere Tasks, Mails, Rechnungen und Angebote unter einem gemeinsamen Kontext.
+
+```
+Mail eingeht
+  → Klassifizierung (FastPath oder LLM)
+  → Task erstellt (tasks.db)
+  → Vorgang-Router (vorgang_router.py)
+      → Existiert Vorgang für diesen Kunden? → Link
+      → Neuer Vorgang? → create_vorgang() → Entscheidungsstufe bestimmen
+          → Stufe A: stumm gespeichert
+          → Stufe B: Signal in vorgang_signals → Browser-Toast
+          → Stufe C: Signal + Desktop-Overlay (tkinter)
+```
+
+### 11.2 Datenbank-Tabellen (tasks.db)
+
+**vorgaenge**
+```
+id, typ, kunden_email, kunden_name, titel, status, konto,
+quelle, konfidenz, entscheidungsstufe,
+erstellt_am, aktualisiert_am, abgeschlossen_am
+```
+
+**vorgang_history**
+```
+id, vorgang_id, von_status, nach_status, grund, actor, ts
+```
+
+**vorgang_entities**
+```
+id, vorgang_id, entity_typ, entity_id, rolle, erstellt_am
+```
+Entity-Typen: `task`, `mail`, `ausgangsrechnung`, `angebot`, `eingangsrechnung`
+
+**vorgang_signals**
+```
+id, vorgang_id, stufe, titel, nachricht, angezeigt, angezeigt_am,
+angezeigt_wie, erstellt_am
+```
+
+### 11.3 Vorgang-Typen und State Machines
+
+10 Typen mit jeweils eigener Zustands-Maschine:
+
+| Typ | Wichtige Status | Endstatus |
+|---|---|---|
+| `lead` | neu_eingang → qualifiziert → angebot_gesendet → ... | angenommen, abgelehnt, archiviert |
+| `angebot` | neu_eingang → angebot_versendet → angenommen / abgelehnt | abgeschlossen |
+| `rechnung` | rechnung_gestellt → bezahlt / überfällig → mahnung | abgeschlossen |
+| `mahnung` | mahnung_versandt → mahnung_2 → mahnung_3 → inkasso | abgeschlossen |
+| `support` | offen → in_bearbeitung → wartend_auf_kunde → gelöst | abgeschlossen |
+| `projekt` | planung → in_umsetzung → abnahme_ausstehend | abgeschlossen |
+| `partner` | kontaktiert → in_verhandlung → aktiv | beendet |
+| `lieferant` | anfrage → angebot_erhalten → bestellt | abgeschlossen |
+| `intern` | offen → in_bearbeitung | erledigt |
+| `sonstige` | offen → in_bearbeitung | erledigt |
+
+Ungültige Übergänge werden von `update_status()` abgelehnt → HTTP 400 mit `erlaubte_uebergaenge`.
+
+### 11.4 Vorgang-Router (vorgang_router.py)
+
+**KATEGORIE_ZU_VORGANG_TYP** — Mapping:
+```python
+"Neue Lead-Anfrage"         → "lead"
+"Angebotsrueckmeldung"      → "angebot"
+"Zahlungseingang"           → "rechnung"
+"Beschwerden/Reklamationen" → "support"
+"Projektanfrage"            → "projekt"
+"Partner-Anfrage"           → "partner"
+"Lieferanten-Kommunikation" → "lieferant"
+"Interne Kommunikation"     → "intern"
+# Newsletter, Spam, System → kein Vorgang
+```
+
+**Konfidenz → Entscheidungsstufe:**
+- ≥ 0.85 (hoch) → Stufe A (automatisch, stumm)
+- 0.60–0.84 (mittel) → Stufe B (SSE-Toast im Browser)
+- < 0.60 (niedrig) → Stufe C (Modal + Desktop-Overlay)
+
+### 11.5 Entscheidungsstufen im Detail
+
+**Stufe A — Automatisch:**
+- Vorgang wird angelegt, kein User-Feedback nötig
+- kira_proaktiv.py und mail_monitor.py laufen durch ohne Interrupt
+
+**Stufe B — Browser-Toast:**
+- Signal in `vorgang_signals` gespeichert
+- JavaScript-Polling alle 10s: `GET /api/vorgang/signals?limit=5`
+- Gelber/lila Toast erscheint oben rechts im Dashboard
+- Nutzer klickt "OK" → `POST /api/vorgang/signal/gelesen`
+
+**Stufe C — Desktop-Modal + Overlay:**
+- Signal-Polling erkennt `stufe == "C"` → Fullscreen-Modal im Browser
+- Parallel: `activity_window.py` Signal-Watcher (15s) → tkinter -topmost Fenster
+- Desktop-Overlay erscheint auch wenn Browser-Tab nicht aktiv ist
+- Presence-Check: kein Popup wenn Nutzer > 5 Min inaktiv
+
+### 11.6 Backfill (case_engine_backfill.py)
+
+Migration bestehender Daten in das Vorgang-System:
+```bash
+python scripts/case_engine_backfill.py --dry-run  # Vorschau
+python scripts/case_engine_backfill.py            # Live
+```
+Idempotent: bereits migrierte Datensätze (vorgang_id ≠ NULL) werden übersprungen.
+
+---
+
+## 12. GAP-Analyse: Vollständige Aktive Assistenz
+
+### 12.1 Was KIRA heute ist (Code-Realität)
+
+KIRA ist kein wirklich autonomer Agent — sie ist ein **reaktives Expertensystem mit LLM-Verstärkung**:
+
+| Dimension | Aktueller Stand | Bewertung |
+|---|---|---|
+| Mail-Verarbeitung | Automatisch, ohne Eingriff | ✅ Vollständig |
+| Klassifizierung | 3-stufig, ~95% Accuracy | ✅ Sehr gut |
+| Task-Erstellung | Automatisch bei antwort_noetig=1 | ✅ Vollständig |
+| Vorgang-Tracking | State Machine, 10 Typen (session-nn) | ✅ Implementiert |
+| Kira-Chat | Reaktiv auf User-Anfragen | ✅ Funktional |
+| LLM-Aufruf | Anthropic primary, 3 Fallbacks | ✅ Robust |
+| Proaktive Scans | kira_proaktiv.py (5 Scans, 15 Min) | ⚠️ Begrenzt |
+| Autonomes Handeln | Keine eigenständigen Aktionen | ❌ Fehlt |
+| Email-Senden | Nur Entwürfe, kein Send | ❌ Fehlt |
+| Lernen aus Feedback | Wissen-Regeln manuell | ⚠️ Halbautomatisch |
+| Kalender-Integration | Keine | ❌ Fehlt |
+| Multi-Step-Planung | Keine (kein Agent-Loop) | ❌ Fehlt |
+
+### 12.2 Der entscheidende Unterschied: Reaktiv vs. Proaktiv
+
+**Kira heute (reaktiv):**
+```
+Nutzer fragt → Kira antwortet → Nutzer handelt → fertig
+```
+
+**Vollständige Aktive Assistenz (proaktiv):**
+```
+Ereignis tritt auf → Kira erkennt → Kira plant → Kira handelt (mit/ohne Bestätigung)
+→ Kira beobachtet Ergebnis → Kira lernt
+```
+
+Der einzige wirklich proaktive Baustein ist `kira_proaktiv.py` — aber auch der erstellt nur Tasks/Notifications, handelt nie direkt.
+
+### 12.3 Kritische Lücken (priorisiert)
+
+**GAP-1: Kein Autonomy Loop / Agentic Loop**
+- Kira kann nicht mehrstufig planen: "Überprüfe RE-Status, wenn überfällig → erstelle Mahnung, wenn keine Antwort in 3 Tagen → eskaliere"
+- Fehlt: ReAct-Schleife (Reason → Act → Observe → Repeat) und der grundlegende **Autonomy Loop**:
+  ```
+  background-timer → context collect → LLM invoke → decide action → execute (mit HITL gate) → log → sleep → repeat
+  ```
+- kira_proaktiv.py hat einen Timer, aber keinen LLM-Entscheidungsschritt darin — nur feste Regellogik
+
+**GAP-2: Kein Mail-Senden**
+- Alle Antwort-Entwürfe müssen manuell kopiert und versendet werden
+- Nutzer muss Mail-Client öffnen, einfügen, absenden
+- Wichtigstes fehlendes Feature für echte Assistenz
+
+**GAP-3: Keine Kalender-Integration**
+- Termine werden aus Mails erkannt aber nicht in Kalender eingetragen
+- Keine Erinnerungen aus Kalender → Kira
+- Microsoft Graph API wäre der Weg (MSAL bereits vorhanden)
+
+**GAP-4: Kein strukturiertes Feedback-Lernen**
+- Wissen_regeln können gespeichert werden, aber nur wenn Nutzer explizit sagt "merke dir das"
+- Kein automatisches Lernen aus: "Kira hat einen Entwurf erstellt → Nutzer hat ihn stark verändert → Kira lernt den Stil"
+
+**GAP-5: Vorgang-Automatisierung fehlt (Case Engine ist Struktur ohne Automation)**
+- Case Engine hat State Machines, aber kein automatisches Fortschreiten
+- Beispiel: Angebot versendet → Kira könnte nach 7 Tagen automatisch Nachfass-Draft erstellen + Nutzer bestätigen lassen
+- Derzeit: kira_proaktiv.py erstellt nur einen Task, Nutzer muss selbst handeln
+
+**GAP-6: Kein strukturiertes Kontext-Gedächtnis**
+- Kira-Konversationen werden gespeichert, aber nicht in den nächsten Chat-Kontext geladen
+- Nutzer muss Kira immer wieder denselben Kontext geben
+- kira_konversationen-Tabelle existiert aber wird nicht als "Memory" verwendet
+- Forschungsstand 2025: Drei Gedächtnis-Ebenen gelten als Best Practice:
+  1. **Working Memory** — aktueller LLM-Context (existiert)
+  2. **Episodic Memory** — SQLite: was lief heute (runtime_events.db, teilweise genutzt)
+  3. **Semantic Memory** — Wissensbasis: Kunden, Regeln, Muster (wissen_regeln, teilweise)
+
+**GAP-7: Context-Window-Degradierung**
+- Kira injiziert immer mehr Kontext (Vorgänge, Runtime-Log, Mails, Wissen) in den System-Prompt
+- Arxiv 2025: Recall-Qualität sinkt bei Modellen ab ca. 16–32k Token — auch wenn technisches Maximum größer ist
+- Risiko: Kira "übersieht" wichtige Information die tief im System-Prompt steckt
+- Lösung: Dynamischen Kontext kürzen + SQLite FTS5 als lokales RAG
+
+---
+
+## 13. Verbesserungs-Roadmap
+
+*Basiert auf Code-Analyse + Internet-Recherche zu Agentic AI Patterns 2025*
+
+### Tier 1 — Sofort umsetzbar (hoher Impact, wenig Aufwand)
+
+#### T1-A: Mail-Versand via SMTP mit HITL-Gate
+- SMTP ist bereits konfiguriert (mail_monitor hat IMAP-Auth)
+- Industrie-Standard-Pattern: **Human-in-the-Loop (HITL) Approval Gate**
+  ```
+  Kira erstellt Entwurf → speichert in DB (status="pending_review")
+  → benachrichtigt Nutzer ("Mail fertig, bitte prüfen")
+  → Nutzer genehmigt/lehnt ab/bearbeitet → Kira sendet
+  ```
+- Neues Tool `mail_senden(an, betreff, text, task_id)` mit `needs_approval=True`
+- Sicherheitsprinzip: Kira sendet **nie ohne Bestätigung** (Stufe A niemals für Senden)
+- Wann autonomes Senden ggf. akzeptabel: rein informationell + templatisiert + mit 30s Cancel-Fenster
+- Protokollierung in sent_mails.db + elog()
+
+#### T1-B: Vorgang-Automatisierung (Trigger-basiert)
+- Erweitere kira_proaktiv.py um vorgang-basierte Scans:
+  - Angebot in Status `angebot_versendet` seit > 7 Tagen → automatisch Nachfass-Draft erstellen
+  - Vorgang in Status `mahnung_versendet` seit > 14 Tagen → Stufe-2-Mahnung vorschlagen
+- Kira-Tool `vorgang_naechste_aktion_vorschlagen` → LLM schlägt nächsten Schritt vor
+
+#### T1-C: Kira-Konversations-Gedächtnis
+- Beim Chat-Start: letzte 3 relevante Konversationen zum Kunden laden (`kira_konversationen WHERE kunden_email = ?`)
+- Tool `konversation_suchen` → Kira kann explizit in vergangenen Gesprächen suchen
+- Memory-Summary: täglich 1 LLM-Aufruf der Konversationen des Tages zu 3 Kernpunkten zusammenfasst
+
+#### T1-D: Tool-Reliability + Circuit Breaker
+- **Tool-Fehler-Klassifikation** (wichtiger als die Retry-Logik selbst):
+  - `TransientError` — Timeout, Rate Limit → exponentieller Backoff mit Jitter (`base * 2^attempt + random(0,1)`) und nochmal versuchen
+  - `PermanentError` — Auth-Fehler, ungültige Parameter → nicht retrien, eskalieren
+  - `LogicError` — LLM halluziniert Tool-Parameter → JSON-Schema-Validierung vor Aufruf
+- Exponentieller Backoff: `wait = 2**attempt + random.random()` (Jitter verhindert Thundering Herd)
+- Circuit Breaker: nach 3 TransientErrors in 60s → Provider für 5 Minuten sperren
+- State in `knowledge/llm_circuit_state.json`
+- Jeden Tool-Call mit Input/Output/Fehler in runtime_events.db loggen (bereits möglich via elog())
+
+### Tier 2 — Mittelfristig (höherer Aufwand, hoher strategischer Wert)
+
+#### T2-A: Microsoft Graph Calendar Integration
+- MSAL (`msal` library) ist bereits für IMAP-Auth vorhanden
+- Scope: `Calendars.ReadWrite`
+- Neues Tool: `termin_erstellen(titel, datum, dauer_min, teilnehmer)`
+- Aus Mails erkannte Termine → Kira fragt "Soll ich das in den Kalender eintragen?"
+- Erinnerungen rückwärts: Kalender-Events → ntfy-Push 24h vorher
+
+#### T2-B: ReAct-Schleife für Kira
+- Aktuell: 1 LLM-Aufruf → optional 1 Tool → Antwort (flach)
+- Verbesserung: `while tool_calls_pending: aufruf → tools → neuer aufruf` (bis zu 5 Runden)
+- Aktiviert echte Mehrschritt-Aktionen: "Schaue nach ob RE offen → wenn ja, was ist das Datum → erstelle Erinnerung"
+- Sicherheit: Max-Iterations-Limit + User-Interrupt-Möglichkeit
+
+#### T2-C: Strukturiertes Feedback-Lernen (RLHF-light)
+- Nach jedem Kira-Tool-Aufruf: Nutzer kann 👍/👎 geben
+- 👎 → automatisch "Korrektur"-Wissensregel erstellen, die beim nächsten ähnlichen Fall injiziert wird
+- Mails die Kira als "Entwurf" erstellt + Nutzer stark verändert hat → Diff-Analyse → Stil-Anpassung
+
+#### T2-D: Semantische Suche mit SQLite FTS5 (lokales RAG)
+- Aktuell: nur SQLite LIKE-Suche, keine Ähnlichkeits-Suche
+- Empfehlung Forschung 2025: SQLite FTS5 ist für < 100k Datensätze absolut ausreichend als Vektor-Datenbank-Ersatz — kein ChromaDB/Qdrant nötig
+- Implementierung: `CREATE VIRTUAL TABLE mail_fts USING fts5(betreff, text_plain, content=mails)`
+- Tool `semantisch_suchen` → findet ähnliche Anfragen/Mails via FTS5-Ranking, nicht nur LIKE
+- **Context-Strategie**: Statt alles in System-Prompt zu laden, bei Bedarf gezielt abfragen:
+  ```python
+  def get_relevant_context(query, db):
+      customers = db.execute("SELECT * FROM mails WHERE mails MATCH ?", [query])
+      return format_context(customers)  # < 2000 Token, nicht 10000
+  ```
+- Arxiv 2025: Effektive Recall-Qualität sinkt ab ~16-32k Token — System-Prompt klein halten gewinnt
+
+### Tier 3 — Langfristig (Architektur-Änderungen)
+
+#### T3-A: Multi-Agent-Architektur
+- Aktuell: Kira ist ein einzelner Agent
+- Ziel: Spezialisierte Sub-Agenten:
+  - **Mail-Agent**: Klassifizierung, Entwurf, Versand
+  - **Rechnungs-Agent**: RE-Tracking, Mahnwesen, Zahlungsabgleich
+  - **Kunden-Agent**: CRM, Kommunikationshistorie, Potenzial-Bewertung
+  - **Orchestrator-Agent** (Kira): koordiniert die Spezialisten
+- Vorteil: Kleinere Kontextfenster, weniger Token-Kosten, spezialisiertes Wissen
+
+#### T3-B: Persistente Agent-Planung
+- Kira kann komplexe Tasks planen: "Bereite die Jahresabschluss-Kommunikation vor"
+  1. Alle offenen REs prüfen
+  2. Danke-Mails an Stammkunden entwerfen
+  3. Angebote mit Status "keine_antwort" archivieren
+  4. Reporting für Kai generieren
+- Plan wird gespeichert, stückweise ausgeführt, Fortschritt getrackt
+
+#### T3-C: Lokales LLM für Datenschutz-kritische Operationen
+- Kundendaten (RE, persönliche Infos) nur zu lokalem Ollama senden
+- Anthropic/OpenAI nur für nicht-personenbezogene Anfragen
+- Routing-Logik: `kira_llm.py` → prüft ob Prompt personenbezogene Daten enthält
+
+### ROI-Ranking: Was lohnt sich wirklich (aus Internet-Recherche 2025)
+
+| Automatisierung | Aufwand | Nutzen | Lokal realisierbar |
+|---|---|---|---|
+| Follow-up-Erinnerungen (kein Feedback seit X Tagen) | sehr niedrig | sehr hoch | ✅ ja (kira_proaktiv.py) |
+| Mail-Klassifikation + Priorität | niedrig | hoch | ✅ ja (vorhanden) |
+| Eingangsrechnung-Extraktion (PDF → SQLite) | niedrig | hoch | ✅ ja (LLM + pdfplumber) |
+| Angebots-Entwurf aus CRM-Daten | mittel | sehr hoch | ✅ ja (kira_llm.py) |
+| Wöchentlicher Reporting-Summary | niedrig | mittel | ✅ ja (kira_proaktiv.py) |
+| Automatische Rechnungsstellung | hoch | mittel | ⚠️ nur mit HITL |
+| Autonomes Mail-Senden | hoch | hoch | ⚠️ nur mit HITL-Gate |
+
+**Fazit der Recherche:** Der größte Hebel ist der **Autonomy Loop mit Event-Driven Triggers + HITL-Gate**, nicht die KI-Intelligenz selbst. KIRA hat bereits alle Rohdaten — was fehlt ist der Loop der sie zu Entscheidungen verdichtet.
+
+### Tier 4 — Sicherheit & Compliance   /////////////  Hierzu sinvoll Einstellungen in den einstellungen als zusätzlichen Tap mit einstellmöglichkeiten und diagnose daten -z.b. wenn möglich kosten aktuel filter nach zeiten
+
+#### T4-A: Tool-Idempotenz sicherstellen
+- Jedes schreibende Tool (rechnung_bezahlt, etc.) prüft vor Aktion ob bereits ausgeführt
+- Idempotenz-Key: `tool_name + entity_id + hash(params)` in runtime_events.db
+- Verhindert Doppel-Buchungen bei LLM-Retry
+
+#### T4-B: Audit-Trail für alle autonomen Aktionen
+- Jede Aktion die Kira ohne explizite User-Bestätigung ausführt → elog() mit `actor_type='kira_autonom'`
+- Dashboard-Ansicht: "Was hat Kira heute autonom getan?" (filtert actor_type='kira_autonom')
+
+#### T4-C: Rate-Limiting für API-Calls
+- Schutz vor LLM-Kosten-Explosion wenn Feedback-Schleife hängt
+- Max N API-Aufrufe pro Minute, danach Queue
+
+---
+
+*Analyse erstellt 2026-03-30 (session-jj) | Aktualisiert 2026-03-31 (session-nn) | 35+ Module, 8 DBs, 70+ Endpunkte*

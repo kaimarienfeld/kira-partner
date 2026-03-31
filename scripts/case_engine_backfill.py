@@ -48,7 +48,7 @@ def backfill_ausgangsrechnungen(dry_run: bool = True) -> dict:
     try:
         rows = db.execute("""
             SELECT id, re_nummer, kunde_name, kunde_email, datum,
-                   betrag_brutto, status, konto
+                   betrag_brutto, status
             FROM ausgangsrechnungen
             WHERE vorgang_id IS NULL OR vorgang_id = 0
             ORDER BY datum ASC
@@ -87,7 +87,7 @@ def backfill_ausgangsrechnungen(dry_run: bool = True) -> dict:
                 titel=titel[:120],
                 quelle="backfill",
                 konfidenz=1.0,
-                konto=r["konto"],
+                konto=None,
                 entscheidungsstufe="A",
             )
             # Status direkt setzen (force, da Backfill)
@@ -122,7 +122,7 @@ def backfill_angebote(dry_run: bool = True) -> dict:
 
     try:
         rows = db.execute("""
-            SELECT id, a_nummer, kunde_name, kunde_email, datum, status, konto
+            SELECT id, a_nummer, kunde_name, kunde_email, datum, status
             FROM angebote
             WHERE vorgang_id IS NULL OR vorgang_id = 0
             ORDER BY datum ASC
@@ -163,7 +163,7 @@ def backfill_angebote(dry_run: bool = True) -> dict:
                 titel=titel[:120],
                 quelle="backfill",
                 konfidenz=1.0,
-                konto=r["konto"],
+                konto=None,
                 entscheidungsstufe="A",
             )
             from case_engine import update_status
@@ -278,24 +278,24 @@ def run_backfill(dry_run: bool = True):
 
     print("1/3 Ausgangsrechnungen ...")
     s1 = backfill_ausgangsrechnungen(dry_run)
-    print(f"    → geprüft={s1['geprüft']}, erstellt={s1['erstellt']}, fehler={s1['fehler']}\n")
+    print(f"    -> geprueft={s1['geprüft']}, erstellt={s1['erstellt']}, fehler={s1['fehler']}\n")
 
     print("2/3 Angebote ...")
     s2 = backfill_angebote(dry_run)
-    print(f"    → geprüft={s2['geprüft']}, erstellt={s2['erstellt']}, fehler={s2['fehler']}\n")
+    print(f"    -> geprueft={s2['geprüft']}, erstellt={s2['erstellt']}, fehler={s2['fehler']}\n")
 
     print("3/3 Tasks (nur vorgangsrelevante Kategorien) ...")
     s3 = backfill_tasks(dry_run)
-    print(f"    → geprüft={s3['geprüft']}, erstellt={s3['erstellt']}, "
-          f"übersprungen={s3['übersprungen']}, fehler={s3['fehler']}\n")
+    print(f"    -> geprueft={s3['geprüft']}, erstellt={s3['erstellt']}, "
+          f"uebersprungen={s3['übersprungen']}, fehler={s3['fehler']}\n")
 
     total = s1['erstellt'] + s2['erstellt'] + s3['erstellt']
     fehler = s1['fehler'] + s2['fehler'] + s3['fehler']
     print(f"{'='*60}")
-    print(f"  GESAMT: {total} Vorgänge {'würden erstellt' if dry_run else 'erstellt'}, {fehler} Fehler")
+    print(f"  GESAMT: {total} Vorgaenge {'wuerden erstellt' if dry_run else 'erstellt'}, {fehler} Fehler")
     if dry_run:
-        print(f"\n  ⚠ DRY-RUN — keine Änderungen gespeichert.")
-        print(f"  Für Live-Migration: python case_engine_backfill.py")
+        print(f"\n  DRY-RUN -- keine Aenderungen gespeichert.")
+        print(f"  Fuer Live-Migration: python case_engine_backfill.py")
     print(f"{'='*60}\n")
 
 

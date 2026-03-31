@@ -6,7 +6,7 @@ Unterstützt: Anthropic, OpenAI, OpenRouter, Ollama, Custom (OpenAI-kompatibel).
 Automatischer Fallback bei Ausfall oder leerem Guthaben.
 Einheitlicher System-Prompt mit allen rauMKult-Geschäftsdaten für JEDES Modell.
 """
-import json, sqlite3, os, uuid, time
+import json, sqlite3, os, uuid, time, threading, random
 from pathlib import Path
 from datetime import datetime, date
 try:
@@ -107,6 +107,70 @@ class ModelNotFoundError(ProviderUnavailableError):
 
 _MODEL_CACHE: dict = {}      # {provider_id: (timestamp_float, [model_id_strings])}
 _MODEL_CACHE_TTL = 86400     # 24 Stunden
+
+# ── Circuit Breaker (Paket 1, session-oo) ─────────────────────────────────────
+_CIRCUIT_BREAKER: dict = {}  # {provider_id: {"failures": int, "open_until": float|None, "last_failure": float|None}}
+_CB_FAILURE_THRESHOLD = 3    # nach N Fehlern in _CB_FAILURE_WINDOW → Circuit öffnet
+_CB_FAILURE_WINDOW    = 60   # Sekunden — ältere Fehler zählen nicht
+_CB_OPEN_DURATION     = 300  # Sekunden — Circuit bleibt offen (5 Min)
+_CB_LOCK              = threading.Lock()
+
+# ── Rate Limiter (Paket 1, session-oo) ────────────────────────────────────────
+_RATE_TIMESTAMPS: list = []  # Rolling-Window der letzten API-Calls (Timestamps)
+_RATE_LOCK        = threading.Lock()
+_RATE_MAX_DEFAULT = 20       # Max Calls pro 60s (überschreibbar via config.json llm_rate_limit_per_minute)
+
+
+def _cb_is_open(provider_id: str) -> bool:
+    """True wenn Circuit Breaker für diesen Provider gesperrt ist."""
+    with _CB_LOCK:
+        cb = _CIRCUIT_BREAKER.get(provider_id)
+        if not cb:
+            return False
+        if cb.get("open_until") and time.time() < cb["open_until"]:
+            return True
+        if cb.get("open_until"):
+            _CIRCUIT_BREAKER[provider_id] = {"failures": 0, "open_until": None, "last_failure": None}
+        return False
+
+
+def _cb_record_failure(provider_id: str) -> None:
+    """Registriert einen Fehler — öffnet Circuit nach Schwellwert."""
+    now = time.time()
+    with _CB_LOCK:
+        if provider_id not in _CIRCUIT_BREAKER:
+            _CIRCUIT_BREAKER[provider_id] = {"failures": 0, "open_until": None, "last_failure": None}
+        cb = _CIRCUIT_BREAKER[provider_id]
+        if cb.get("last_failure") and now - cb["last_failure"] > _CB_FAILURE_WINDOW:
+            cb["failures"] = 0
+        cb["failures"] += 1
+        cb["last_failure"] = now
+        if cb["failures"] >= _CB_FAILURE_THRESHOLD:
+            cb["open_until"] = now + _CB_OPEN_DURATION
+            try:
+                _elog("llm", "circuit_breaker_open",
+                      f"Circuit Breaker {provider_id}: {cb['failures']} Fehler → gesperrt für {_CB_OPEN_DURATION}s",
+                      modul="kira_llm", source="circuit_breaker", status="warnung")
+            except Exception:
+                pass
+
+
+def _rate_check_and_record() -> bool:
+    """Prüft Rate Limit. Gibt False zurück wenn über Limit — True wenn OK und Call registriert."""
+    now = time.time()
+    with _RATE_LOCK:
+        global _RATE_TIMESTAMPS
+        _RATE_TIMESTAMPS = [t for t in _RATE_TIMESTAMPS if now - t < 60]
+        max_calls = _RATE_MAX_DEFAULT
+        try:
+            cfg = get_config()
+            max_calls = cfg.get("llm_rate_limit_per_minute", _RATE_MAX_DEFAULT)
+        except Exception:
+            pass
+        if len(_RATE_TIMESTAMPS) >= max_calls:
+            return False
+        _RATE_TIMESTAMPS.append(now)
+        return True
 
 
 # ── Config & Secrets ──────────────────────────────────────────────────────────
@@ -1310,6 +1374,12 @@ def _tool_rechnung_bezahlt(p):
     re_nr = row['re_nummer']
     kunde = row['kunde_name'] or row['kunde_email'] or 'Unbekannt'
     betrag_orig = row['betrag_brutto'] or 0
+    # Idempotenz-Check (Paket 1, session-oo)
+    if row['status'] == 'bezahlt':
+        db.close()
+        _elog("kira", "tool_idempotent_skip", f"rechnung_bezahlt: RE {re_nr} war bereits bezahlt",
+              modul="kira_llm", source="kira_llm", actor_type="kira", status="ok")
+        return {"ok": True, "message": f"Rechnung {re_nr} war bereits als bezahlt markiert.", "idempotent": True}
     db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=?, notiz=? WHERE id=?",
                (p["bezahlt_am"], p.get("notiz", ""), rid))
     tage = None
@@ -1350,6 +1420,12 @@ def _tool_angebot_status(p):
     a_nr = row['a_nummer']
     kunde = row['kunde_name'] or row['kunde_email'] or 'Unbekannt'
     new_status = p["status"]
+    # Idempotenz-Check (Paket 1, session-oo)
+    if row['status'] == new_status:
+        db.close()
+        _elog("kira", "tool_idempotent_skip", f"angebot_status: Angebot {a_nr} war bereits '{new_status}'",
+              modul="kira_llm", source="kira_llm", actor_type="kira", status="ok")
+        return {"ok": True, "message": f"Angebot {a_nr} war bereits als '{new_status}' markiert.", "idempotent": True}
     db.execute("UPDATE angebote SET status=? WHERE id=?", (new_status, aid))
     if new_status == 'abgelehnt' and p.get("grund"):
         db.execute("UPDATE angebote SET grund_abgelehnt=? WHERE id=?", (p["grund"], aid))
@@ -1378,6 +1454,12 @@ def _tool_eingangsrechnung_erledigt(p):
         db.close()
         return {"error": f"Geschäftsvorgang #{gid} nicht gefunden"}
     partner = row['gegenpartei'] or row['gegenpartei_email'] or 'Unbekannt'
+    # Idempotenz-Check (Paket 1, session-oo)
+    if row['bewertung'] == 'erledigt':
+        db.close()
+        _elog("kira", "tool_idempotent_skip", f"eingangsrechnung_erledigt: Vorgang #{gid} war bereits erledigt",
+              modul="kira_llm", source="kira_llm", actor_type="kira", status="ok")
+        return {"ok": True, "message": f"Eingangsrechnung von {partner} war bereits als erledigt markiert.", "idempotent": True}
     db.execute("UPDATE geschaeft SET bewertung='erledigt', bewertung_grund=? WHERE id=?",
                (f"bezahlt am {p['bezahlt_am']}. {p.get('notiz','')}".strip(), gid))
     daten = {**p, "zeitstempel": now, "partner": partner}
@@ -1628,9 +1710,13 @@ def _tool_task_erledigen(p):
     fehler = []
     try:
         for tid in task_ids:
-            row = db.execute("SELECT id, betreff, kategorie FROM tasks WHERE id=?", (tid,)).fetchone()
+            row = db.execute("SELECT id, betreff, kategorie, status FROM tasks WHERE id=?", (tid,)).fetchone()
             if not row:
                 fehler.append(f"#{tid}: nicht gefunden")
+                continue
+            # Idempotenz-Check (Paket 1, session-oo)
+            if row["status"] == status:
+                erledigt.append({"id": tid, "betreff": (row["betreff"] or "")[:60], "idempotent": True})
                 continue
             db.execute("UPDATE tasks SET status=? WHERE id=?", (status, tid))
             erledigt.append({"id": tid, "betreff": (row["betreff"] or "")[:60]})
@@ -1920,8 +2006,18 @@ def _tool_vorgang_status_setzen(p):
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────
 def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048):
-    """Anthropic Claude API Aufruf mit Tool-Loop."""
+    """Anthropic Claude API Aufruf mit Tool-Loop, Circuit Breaker und Exponential Backoff (Paket 1, session-oo)."""
     import anthropic
+
+    provider_id = provider.get("id", "anthropic")
+
+    # Circuit Breaker prüfen
+    if _cb_is_open(provider_id):
+        raise ProviderUnavailableError(f"Circuit Breaker offen für {provider_id} — warte auf Reset")
+
+    # Rate Limit prüfen
+    if not _rate_check_and_record():
+        raise ProviderUnavailableError("Rate Limit erreicht (intern) — zu viele LLM-Calls pro Minute")
 
     key = _get_provider_key(provider)
     client = anthropic.Anthropic(api_key=key)
@@ -1933,27 +2029,45 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
     response = None
 
     for _ in range(5):
-        try:
-            response = client.messages.create(
-                model=model, max_tokens=max_tokens,
-                system=system_prompt, tools=tools, messages=messages
-            )
-        except anthropic.AuthenticationError:
-            raise ProviderUnavailableError("API Key ungültig")
-        except anthropic.RateLimitError:
-            raise ProviderUnavailableError("Rate Limit / Guthaben leer")
-        except anthropic.APIStatusError as e:
-            if e.status_code in (502, 503, 529):
-                raise ProviderUnavailableError(f"Server überlastet ({e.status_code})")
-            if e.status_code == 404 and "not_found_error" in str(e).lower():
-                _MODEL_CACHE.pop(provider.get("id", ""), None)  # Cache leeren
-                _auto_update_model(provider)
-                raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
-            raise
-        except Exception as e:
-            if any(x in str(e).lower() for x in ("overloaded", "timeout", "connection")):
-                raise ProviderUnavailableError(str(e))
-            raise
+        # Exponential Backoff bei transienten Fehlern (max 3 Versuche: 0s, ~1s, ~3s)
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = client.messages.create(
+                    model=model, max_tokens=max_tokens,
+                    system=system_prompt, tools=tools, messages=messages
+                )
+                last_err = None
+                break
+            except anthropic.AuthenticationError:
+                _cb_record_failure(provider_id)
+                raise ProviderUnavailableError("API Key ungültig")
+            except anthropic.RateLimitError:
+                _cb_record_failure(provider_id)
+                raise ProviderUnavailableError("Rate Limit / Guthaben leer")
+            except anthropic.APIStatusError as e:
+                if e.status_code in (502, 503, 529):
+                    last_err = ProviderUnavailableError(f"Server überlastet ({e.status_code})")
+                    if attempt < 2:
+                        time.sleep((2 ** attempt) + random.random())
+                        continue
+                    break
+                if e.status_code == 404 and "not_found_error" in str(e).lower():
+                    _MODEL_CACHE.pop(provider.get("id", ""), None)
+                    _auto_update_model(provider)
+                    raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
+                raise
+            except Exception as e:
+                if any(x in str(e).lower() for x in ("overloaded", "timeout", "connection")):
+                    last_err = ProviderUnavailableError(str(e))
+                    if attempt < 2:
+                        time.sleep((2 ** attempt) + random.random())
+                        continue
+                    break
+                raise
+        if last_err:
+            _cb_record_failure(provider_id)
+            raise last_err
 
         has_tool_use = any(b.type == "tool_use" for b in response.content)
         for b in response.content:
@@ -1988,6 +2102,12 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
     """OpenAI-kompatible API (OpenAI, OpenRouter, Ollama, Custom) mit Tool-Loop."""
     import openai
 
+    provider_id = provider.get("id", provider.get("typ", "openai"))
+    if _cb_is_open(provider_id):
+        raise ProviderUnavailableError(f"Circuit Breaker offen fuer {provider_id} — warte kurz")
+    if not _rate_check_and_record():
+        raise ProviderUnavailableError("Rate Limit erreicht (max LLM-Calls/Min) — bitte warten")
+
     key = _get_provider_key(provider)
     typ = provider.get("typ", "openai")
     ptype = PROVIDER_TYPES.get(typ, {})
@@ -2016,31 +2136,42 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
     response = None
 
     for _ in range(5):
-        try:
-            call_kwargs = {"model": model, "messages": messages, "max_tokens": max_tokens}
-            if oai_tools:
-                call_kwargs["tools"] = oai_tools
-            response = client.chat.completions.create(**call_kwargs)
-        except openai.AuthenticationError:
-            raise ProviderUnavailableError("API Key ungültig")
-        except openai.RateLimitError:
-            raise ProviderUnavailableError("Rate Limit / Guthaben leer")
-        except openai.NotFoundError:
-            _MODEL_CACHE.pop(provider.get("id", ""), None)
-            _auto_update_model(provider)
-            raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
-        except openai.BadRequestError as e:
-            err = str(e).lower()
-            if any(x in err for x in ("model_not_found", "does not exist", "unknown model", "invalid model")):
+        last_err = None
+        for attempt in range(3):
+            try:
+                call_kwargs = {"model": model, "messages": messages, "max_tokens": max_tokens}
+                if oai_tools:
+                    call_kwargs["tools"] = oai_tools
+                response = client.chat.completions.create(**call_kwargs)
+                last_err = None
+                break
+            except openai.AuthenticationError:
+                raise ProviderUnavailableError("API Key ungültig")
+            except openai.RateLimitError:
+                raise ProviderUnavailableError("Rate Limit / Guthaben leer")
+            except openai.NotFoundError:
                 _MODEL_CACHE.pop(provider.get("id", ""), None)
                 _auto_update_model(provider)
-                raise ModelNotFoundError(f"Modell '{model}' ungültig — Auto-Update versucht")
-            raise
-        except Exception as e:
-            err = str(e).lower()
-            if any(x in err for x in ("overloaded", "503", "502", "timeout", "connection", "refused")):
-                raise ProviderUnavailableError(str(e))
-            raise
+                raise ModelNotFoundError(f"Modell '{model}' nicht gefunden — Auto-Update versucht")
+            except openai.BadRequestError as e:
+                err = str(e).lower()
+                if any(x in err for x in ("model_not_found", "does not exist", "unknown model", "invalid model")):
+                    _MODEL_CACHE.pop(provider.get("id", ""), None)
+                    _auto_update_model(provider)
+                    raise ModelNotFoundError(f"Modell '{model}' ungültig — Auto-Update versucht")
+                raise
+            except Exception as e:
+                err = str(e).lower()
+                if any(x in err for x in ("overloaded", "503", "502", "timeout", "connection", "refused")):
+                    last_err = ProviderUnavailableError(str(e))
+                    if attempt < 2:
+                        time.sleep((2 ** attempt) + random.random())
+                        continue
+                    break
+                raise
+        if last_err:
+            _cb_record_failure(provider_id)
+            raise last_err
 
         choice = response.choices[0]
         msg = choice.message
