@@ -1274,6 +1274,30 @@ def get_tools(config=None):
         }
     })
 
+    # ── Mail-Senden Tool (Paket 2, session-oo) ────────────────────────────────
+    tools.append({
+        "name": "mail_senden",
+        "description": (
+            "Erstellt einen Mail-Entwurf und legt ihn zur Freigabe vor (HITL-Gate). "
+            "Die Mail wird NICHT sofort gesendet — Kai muss sie im Dashboard bestätigen. "
+            "Nutze dieses Tool wenn du eine Antwort, Nachfass-Mail oder Mahnung verfassen sollst. "
+            "Gibt eine Vorschau des Entwurfs zurück."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "an": {"type": "string", "description": "Empfänger E-Mail-Adresse"},
+                "betreff": {"type": "string", "description": "E-Mail Betreff"},
+                "text": {"type": "string", "description": "Mail-Text (Plain-Text)"},
+                "konto": {"type": "string", "description": "Absender-Konto (z.B. 'info@raumkult.eu') — optional, Standard-Konto wird verwendet"},
+                "in_antwort_auf_message_id": {"type": "string", "description": "Message-ID der Mail auf die geantwortet wird (optional)"},
+                "task_id": {"type": "integer", "description": "Verknüpfter Task (optional)"},
+                "vorgang_id": {"type": "integer", "description": "Verknüpfter Vorgang (optional)"}
+            },
+            "required": ["an", "betreff", "text"]
+        }
+    })
+
     return tools
 
 
@@ -1322,6 +1346,7 @@ def execute_tool(name, params):
             "mail_lesen": _tool_mail_lesen,
             "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
             "vorgang_status_setzen": _tool_vorgang_status_setzen,
+            "mail_senden": _tool_mail_senden,
         }
         handler = handlers.get(name)
         if not handler:
@@ -2002,6 +2027,66 @@ def _tool_vorgang_status_setzen(p):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+def _tool_mail_senden(p):
+    """
+    Erstellt einen Mail-Entwurf in mail_approve_queue (HITL-Gate, Paket 2 session-oo).
+    Die Mail wird NICHT sofort gesendet — Kai muss im Dashboard bestätigen.
+    """
+    an      = (p.get("an") or "").strip()
+    betreff = (p.get("betreff") or "").strip()
+    text    = (p.get("text") or "").strip()
+    konto   = (p.get("konto") or "").strip() or None
+    reply_id = (p.get("in_antwort_auf_message_id") or "").strip() or None
+    task_id  = p.get("task_id")
+    vorgang_id = p.get("vorgang_id")
+
+    if not an or not betreff or not text:
+        return {"error": "an, betreff und text sind erforderlich"}
+
+    from datetime import datetime, timedelta
+    ablauf = (datetime.now() + timedelta(days=3)).isoformat()
+
+    db = sqlite3.connect(str(TASKS_DB))
+    try:
+        cur = db.execute("""
+            INSERT INTO mail_approve_queue
+                (an, betreff, body_plain, konto, in_reply_to, task_id, vorgang_id,
+                 erstellt_von, status, ablauf_am)
+            VALUES (?,?,?,?,?,?,?,'kira','pending',?)
+        """, (an, betreff, text, konto, reply_id, task_id, vorgang_id, ablauf))
+        db.commit()
+        queue_id = cur.lastrowid
+    except Exception as e:
+        db.close()
+        return {"error": f"DB-Fehler: {e}"}
+    db.close()
+
+    _elog("kira", "mail_entwurf_erstellt",
+          f"Mail-Entwurf #{queue_id} für {an}: {betreff[:60]}",
+          modul="kira_llm", source="kira_llm", actor_type="kira", status="ok",
+          entity_snapshot={"queue_id": queue_id, "an": an, "betreff": betreff})
+
+    # Signal (Stufe B) — Toast im Dashboard
+    try:
+        from case_engine import create_signal
+        create_signal(
+            titel=f"Mail wartet auf Freigabe",
+            nachricht=f"An: {an}\nBetreff: {betreff}",
+            stufe="B",
+            quelle="kira_tool",
+            meta={"queue_id": queue_id},
+        )
+    except Exception:
+        pass  # Signal optional — HITL-Queue ist die Hauptsache
+
+    return {
+        "ok": True,
+        "queue_id": queue_id,
+        "message": f"Mail-Entwurf #{queue_id} erstellt und wartet auf Freigabe im Dashboard.",
+        "vorschau": {"an": an, "betreff": betreff, "text_preview": text[:200]},
+    }
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────

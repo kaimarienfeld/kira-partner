@@ -47,6 +47,33 @@ try:
 except Exception:
     pass
 
+# Paket 2 (session-oo): mail_approve_queue — HITL-Gate für Mail-Senden durch Kira
+try:
+    _db = sqlite3.connect(str(TASKS_DB))
+    _db.execute("""
+        CREATE TABLE IF NOT EXISTS mail_approve_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            an TEXT NOT NULL,
+            betreff TEXT NOT NULL,
+            body_plain TEXT,
+            body_html TEXT,
+            konto TEXT,
+            in_reply_to TEXT,
+            task_id INTEGER,
+            vorgang_id INTEGER,
+            erstellt_von TEXT DEFAULT 'kira',
+            status TEXT DEFAULT 'pending',
+            erstellt_am TEXT DEFAULT CURRENT_TIMESTAMP,
+            entschieden_am TEXT,
+            gesendet_am TEXT,
+            ablauf_am TEXT
+        )
+    """)
+    _db.commit()
+    _db.close()
+except Exception:
+    pass
+
 # ── Mail-Index Column Guard ───────────────────────────────────────────────────
 _MAIL_COLS_ENSURED = False
 
@@ -6909,6 +6936,7 @@ def generate_html() -> str:
       <div class="top-chip" onclick="toggleKiraQuick()" title="Kira Quick Actions">&#x26A1; Quick Actions</div>
       {'<div class="top-chip" style="background:#e84545;color:#fff;border-color:#c83030;font-weight:700" title="Urlaubsmodus aktiv — Push-Benachrichtigungen deaktiviert" onclick="esShowSec(\'benachrichtigungen\');showPanel(\'einstellungen\')">&#x1F3D6; Urlaub</div>' if ntfy_urlaub_modus else ''}
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
+      <div class="top-chip" id="mailApproveChip" onclick="openMailApproveModal()" title="Mail wartet auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
       <button class="btn btn-muted btn-xs" id="updateBtn" onclick="serverNeustart()" title="Server komplett neu starten (alle Instanzen beenden)" style="border-radius:6px">&#x21BB; Neustart</button>
@@ -10101,6 +10129,76 @@ window.onerror = function(msg, src, line, col, err) {{
 
   setTimeout(function() {{ _pollSignals(); setInterval(_pollSignals, 10000); }}, 5000);
 }})();
+
+// ── Mail-Freigabe (Paket 2, session-oo) ──────────────────────────────────────
+var _mailApproveItems = [];
+
+function _pollMailApprove() {{
+  fetch('/api/mail/approve/pending').then(function(r){{return r.json();}}).then(function(d){{
+    _mailApproveItems = d.pending || [];
+    var n = d.count || 0;
+    var chip = document.getElementById('mailApproveChip');
+    var cnt  = document.getElementById('mailApproveCount');
+    if(chip) chip.style.display = n > 0 ? '' : 'none';
+    if(cnt)  cnt.textContent = n;
+  }}).catch(function(){{}});
+}}
+
+setTimeout(function(){{ _pollMailApprove(); setInterval(_pollMailApprove, 15000); }}, 3000);
+
+function openMailApproveModal() {{
+  if(!_mailApproveItems.length) return;
+  var item = _mailApproveItems[0];
+  var overlay = document.getElementById('mailApproveOverlay');
+  if(!overlay) {{
+    overlay = document.createElement('div');
+    overlay.id = 'mailApproveOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(overlay);
+  }}
+  overlay.innerHTML = '<div style="background:#1a1a1a;border:1px solid #333;border-radius:14px;padding:28px;max-width:560px;width:100%;color:#e0e0e0;font-family:Segoe UI,sans-serif;">' +
+    '<div style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:8px">&#x2709; Mail wartet auf Freigabe</div>' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">An: <span style="color:#93c5fd">' + _esc(item.an) + '</span></div>' +
+    '<div style="font-size:14px;color:#aaa;margin-bottom:12px">Betreff: ' + _esc(item.betreff) + '</div>' +
+    '<textarea id="mailApproveBody" style="width:100%;min-height:120px;background:#111;color:#e0e0e0;border:1px solid #333;border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">' + _esc(item.body_plain || '') + '</textarea>' +
+    '<div style="margin-top:8px;font-size:11px;color:#666">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
+    '<button onclick="closeMailApproveOverlay()" style="background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\'reject\')" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\'edit\')" style="background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
+    '<button onclick="mailApproveAction(' + item.id + ',\'approve\')" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
+    '</div>' +
+    '</div>';
+  overlay.style.display = 'flex';
+}}
+
+function closeMailApproveOverlay() {{
+  var o = document.getElementById('mailApproveOverlay');
+  if(o) o.style.display = 'none';
+}}
+
+function mailApproveAction(id, action) {{
+  var body = document.getElementById('mailApproveBody');
+  var payload = {{action: action}};
+  if(action === 'edit' && body) payload.body = body.value;
+  fetch('/api/mail/approve/' + id, {{
+    method: 'POST',
+    headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify(payload)
+  }}).then(function(r){{return r.json();}}).then(function(d){{
+    closeMailApproveOverlay();
+    if(d.ok) {{
+      showToast(d.message || 'Mail gesendet', 'ok');
+      _pollMailApprove();
+    }} else {{
+      showToast('Fehler: ' + (d.error||'?'), 'fehler');
+    }}
+  }}).catch(function(e){{ showToast('Netzwerkfehler', 'fehler'); }});
+}}
+
+function _esc(s) {{
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}}
 </script>
 </body>
 </html>"""
@@ -11380,6 +11478,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json(briefing)
             except Exception as e:
                 self._json({"error": str(e)})
+
+        elif self.path == '/api/mail/approve/pending':
+            self._api_mail_approve_pending()
 
         elif self.path == '/api/kira/conversations':
             self._json(kira_get_conversations())
@@ -12740,6 +12841,88 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    # ── Mail-Approve-Queue (Paket 2, session-oo) ─────────────────────────────
+
+    def _api_mail_approve_pending(self):
+        """GET /api/mail/approve/pending — offene Mail-Freigaben zurückgeben."""
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            rows = db.execute("""
+                SELECT id, an, betreff, body_plain, konto, in_reply_to,
+                       task_id, vorgang_id, erstellt_von, erstellt_am, ablauf_am
+                FROM mail_approve_queue
+                WHERE status = 'pending'
+                ORDER BY erstellt_am DESC
+                LIMIT 20
+            """).fetchall()
+            db.close()
+            items = [dict(r) for r in rows]
+            self._json({"ok": True, "pending": items, "count": len(items)})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e), "pending": [], "count": 0})
+
+    def _api_mail_approve_action(self, queue_id: int, body: dict):
+        """POST /api/mail/approve/{id} — approve/reject/edit."""
+        action    = body.get("action", "").strip()   # approve | reject | edit
+        new_body  = body.get("body", "").strip()      # wenn edit: neuer Text
+        now       = datetime.now().isoformat()
+
+        if action not in ("approve", "reject", "edit"):
+            self._json({"ok": False, "error": "action muss approve | reject | edit sein"})
+            return
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT * FROM mail_approve_queue WHERE id=? AND status='pending'", (queue_id,)
+            ).fetchone()
+            if not row:
+                db.close()
+                self._json({"ok": False, "error": f"Queue-Eintrag {queue_id} nicht gefunden oder nicht pending"})
+                return
+
+            if action == "reject":
+                db.execute("UPDATE mail_approve_queue SET status='rejected', entschieden_am=? WHERE id=?",
+                           (now, queue_id))
+                db.commit()
+                db.close()
+                self._json({"ok": True, "message": f"Mail #{queue_id} abgelehnt."})
+                return
+
+            # approve oder edit (edit → body übernehmen, dann senden)
+            body_plain = new_body if (action == "edit" and new_body) else (row["body_plain"] or "")
+            from_email = row["konto"] or "info@raumkult.eu"
+            try:
+                from mail_sender import send_mail
+                result = send_mail(
+                    from_email=from_email,
+                    to=row["an"],
+                    subject=row["betreff"],
+                    body_plain=body_plain,
+                    in_reply_to=row["in_reply_to"] or "",
+                )
+                if result.get("ok"):
+                    db.execute(
+                        "UPDATE mail_approve_queue SET status='sent', entschieden_am=?, gesendet_am=? WHERE id=?",
+                        (now, now, queue_id)
+                    )
+                    db.commit()
+                    db.close()
+                    rlog("server", "mail_gesendet",
+                         f"Mail #{queue_id} an {row['an']} gesendet ({action})",
+                         modul="server", source="server", actor_type="user",
+                         status="ok", entity_snapshot={"queue_id": queue_id, "an": row["an"]})
+                    self._json({"ok": True, "message": f"Mail an {row['an']} gesendet."})
+                else:
+                    db.close()
+                    self._json({"ok": False, "error": result.get("error", "Sendefehler")})
+            except Exception as e:
+                db.close()
+                self._json({"ok": False, "error": str(e)})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _api_kira_proaktiv_status(self):
         """GET /api/kira/proaktiv/status — Status des letzten proaktiven Scans."""
         try:
@@ -13609,6 +13792,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/send':
             self._api_mail_send(body)
+            return
+
+        # Mail-HITL-Approve-Queue (Paket 2, session-oo)
+        if self.path.startswith('/api/mail/approve/') and self.path != '/api/mail/approve/pending':
+            parts = self.path.split('/')
+            try:
+                queue_id = int(parts[-1])
+            except (ValueError, IndexError):
+                self._json({'ok': False, 'error': 'Ungültige Queue-ID'})
+                return
+            self._api_mail_approve_action(queue_id, body)
             return
 
         if self.path == '/api/mail/konto/imap-test':
