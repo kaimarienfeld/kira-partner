@@ -287,7 +287,7 @@ _Komplett überarbeitet session-y + session-bb (2026-03-29)_
 | 📋 | Wöchentliche Berichte | – | Geplant |
 | 💡 | Daily-Check-Zeitplan | `automationen.daily_check_uhrzeit` | Wann läuft der Check? |
 | 💡 | Wochenbericht an E-Mail | `automationen.wochenbericht_email` | Freitags Zusammenfassung |
-| 💡 | Kira Morgen-Briefing | `automationen.morgen_briefing` 🔗 | Push mit Tages-Zusammenfassung |
+| ✅ | Kira Morgen-Briefing | `kira_proaktiv.morgen_briefing_aktiv/uhrzeit` | Toggle + Uhrzeit-Input + scan_tagesstart_briefing() konfigurierbar, session-ss |
 | 💡 | Backup-Automatisierung | `automationen.backup_intervall` | DB täglich sichern |
 | 💡 | Kira-Erinnerung bei Inaktivität | `automationen.inaktivitaet_push` | Nach X Tagen Push |
 
@@ -432,7 +432,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 
 ### Phase 5 – Automationen
 20. 💡 Daily-Check-Zeitplan
-21. 💡 Morgen-Briefing (Kira Push)
+21. ✅ Morgen-Briefing (Kira Push) — session-ss
 22. 💡 Auto-Backup
 
 ### Phase 6 – UX-Verbesserungen

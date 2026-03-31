@@ -337,14 +337,26 @@ def scan_tagesstart_briefing(db, state: dict) -> dict:
     """
     Generiert morgens ein kompaktes Briefing für KIRA.
     Wird als Runtime-Log Event gespeichert damit KIRA es im Kontext hat.
+    Zeitfenster + aktiv-Toggle aus kira_proaktiv-Einstellungen.
     """
+    try:
+        _cfg_b = json.loads(CONFIG_FILE.read_text('utf-8')).get("kira_proaktiv", {})
+        if not _cfg_b.get("morgen_briefing_aktiv", True):
+            return {}
+        _brief_uhr = _cfg_b.get("morgen_briefing_uhrzeit", "07:00")
+        _brief_h, _brief_m = (int(x) for x in _brief_uhr.split(":"))
+    except Exception:
+        _brief_h, _brief_m = 7, 0
+
     now = datetime.now()
     briefing_key = f"tagesstart-{now.strftime('%Y-%m-%d')}"
     if _already_done(state, briefing_key, ttl_hours=20):
         return {}
 
-    # Nur morgens zwischen 06:00 und 10:00
-    if not (6 <= now.hour <= 10):
+    # Zeitfenster: ab konfigurierter Uhrzeit, 3h Zeitraum
+    start_min = _brief_h * 60 + _brief_m
+    now_min = now.hour * 60 + now.minute
+    if not (start_min <= now_min <= start_min + 180):
         return {}
 
     today_str = date.today().isoformat()
@@ -386,6 +398,16 @@ def scan_tagesstart_briefing(db, state: dict) -> dict:
             if neue_mails:
                 briefing_teile.append(f"Neue Mails seit gestern: {neue_mails}")
 
+    except Exception:
+        pass
+
+    try:
+        # Kira-Entwürfe zur Freigabe
+        pending_mails = db.execute(
+            "SELECT COUNT(*) FROM mail_approve_queue WHERE status='pending'"
+        ).fetchone()[0]
+        if pending_mails:
+            briefing_teile.append(f"Kira-Entwürfe zur Freigabe: {pending_mails}")
     except Exception:
         pass
 

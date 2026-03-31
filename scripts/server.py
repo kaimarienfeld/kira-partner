@@ -5696,6 +5696,19 @@ function esInfoPopup(btn, text) {{
       </div>
       <input class="es-inp-sm" type="number" id="cfg-proaktiv-konf-b" value="{int(kira_proaktiv_cfg.get('konfidenz_stufe_b', 0.60)*100)}" min="30" max="95">
     </div>
+    <div class="es-row">
+      <div class="es-rl">Morgen-Briefing Push
+        <div class="es-rd">Kira sendet jeden Morgen eine kurze Tages&uuml;bersicht per ntfy</div>
+      </div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-proaktiv-briefing-aktiv" {'checked' if kira_proaktiv_cfg.get('morgen_briefing_aktiv', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Briefing-Uhrzeit<div class="es-rd">Ab wann das Morgen-Briefing gesendet wird</div></div>
+      <input class="es-inp-sm" type="time" id="cfg-proaktiv-briefing-uhr" value="{kira_proaktiv_cfg.get('morgen_briefing_uhrzeit','07:00')}" style="max-width:100px">
+    </div>
   </div>
 
   <!-- ── ReAct & Multi-Step ── -->
@@ -9790,7 +9803,9 @@ function saveSettings() {{
       angebot_followup_tage:  parseInt(document.getElementById('cfg-proaktiv-angebot-tage')?.value || '7'),
       mahnung_eskalation_tage: parseInt(document.getElementById('cfg-proaktiv-mahnung-tage')?.value || '14'),
       konfidenz_stufe_a:      (parseInt(document.getElementById('cfg-proaktiv-konf-a')?.value || '85') / 100),
-      konfidenz_stufe_b:      (parseInt(document.getElementById('cfg-proaktiv-konf-b')?.value || '60') / 100)
+      konfidenz_stufe_b:      (parseInt(document.getElementById('cfg-proaktiv-konf-b')?.value || '60') / 100),
+      morgen_briefing_aktiv:  document.getElementById('cfg-proaktiv-briefing-aktiv')?.checked ?? false,
+      morgen_briefing_uhrzeit: document.getElementById('cfg-proaktiv-briefing-uhr')?.value || '07:00'
     }},
     mail_monitor: {{
       aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
