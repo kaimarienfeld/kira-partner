@@ -400,20 +400,20 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 ## PRIORISIERTE ARBEITSREIHENFOLGE
 
 ### Phase 0 – Bugs (sofort)
-0. 🔴 Task-Löschen reparieren (einzeln + multi) → `task-loeschen-bug`
+0. ✅ Task-Löschen reparieren (einzeln + multi) → server.py: sync kira_chat() entfernt, session-pp
 
 ### Phase 1 – Lücken schließen (bestehende config.json-Keys ohne UI)
-1. ❌ E-Mail-Benachrichtigungen (SMTP) → Sektion Benachrichtigungen erweitern
+1. ✅ E-Mail-Benachrichtigungen (SMTP) → implementiert session-pp
 2. ✅ Mail-Monitor-Intervall → erledigt session-y
 3. ✅ Mail-Monitor aktiv/inaktiv → erledigt session-y
-4. ❌ `llm.max_kontext_items` → Sektion Dashboard/LLM
-5. ❌ `llm.auto_wissen_extrahieren` → Sektion LLM
-6. ❌ Config-Export/Import echte Implementierung → Sektion Konfiguration
+4. ✅ `llm.max_kontext_items` → Number-Input, session-pp
+5. ✅ `llm.auto_wissen_extrahieren` → Toggle, session-pp
+6. ✅ Config-Export/Import → GET /api/config/export + POST /api/config/import, session-pp
 
 ### Phase 2 – Kira-LLM-Verbindungen herstellen
-7. 🔗 Kira-Persönlichkeit → kira_llm.py System-Prompt-Varianten
-8. 🔗 Kira-Name anpassen → kira_llm.py + System-Prompt
-9. 🔗 System-Prompt-Ergänzung (Freitext-Feld)
+7. ✅ Kira-Persönlichkeit → kira_llm.py: direkt/professionell/freundlich, session-pp
+8. ✅ Kira-Name anpassen → kira_llm.py + System-Prompt, session-pp
+9. ✅ System-Prompt-Ergänzung (Freitext-Feld) → kira.system_prompt_custom, session-pp
 10. 🔗 Kontext-Steuerung (Aufgaben/Mails/Rechnungen)
 11. 🔗 Kira proaktive Vorschläge (Push bei offenen Aufgaben)
 
