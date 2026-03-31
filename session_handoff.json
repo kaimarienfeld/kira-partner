@@ -1,6 +1,6 @@
 {
-  "last_session": "session-zz",
-  "date": "2026-03-31 23:59",
+  "last_session": "session-aaa",
+  "date": "2026-03-31 19:05",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -39,7 +39,8 @@
     "session-xx (2026-03-31): Antwort-Zitat (Reply Quoting) in Postfach: pfReply() mit quoted body + in_reply_to threading. Commit ecec464.",
     "session-xx-docs (2026-03-31): Dokumentations-Konsolidierung 5 Phasen. KIRA_SYSTEM_ANALYSE.md komplett neu geschrieben (15 Sektionen, 23 Tools, 96 Endpoints, 46 DB-Tabellen, konsolidierte Status-Tabelle). 9 Referenzen in AGENT.md + 6 Agent-Definitionen + README auf Masterdatei umgestellt. 7 alte Planungsdokumente geloescht (~120 KB): KIRA_2_0_UMBAU_PLAN.md, KIRA_2_0_UI_UMBAU_PLAN.md, AGENT_TEAM_PLAYBOOK.md, Implementierungsplan.md, Zusatz v Kai.md, arbeitsanweisung_case_engine.md, Kontext_engen_GPT.txt.",
     "session-xx-docs (2026-03-31): Dokumentation-Konsolidierung Phase 4+5. Alle Referenzen auf 7 alte Planungsdokumente in AGENT.md, 6 Agent-Dateien und README durch _analyse/KIRA_SYSTEM_ANALYSE.md ersetzt. 7 veraltete Dateien geloescht. Commit 0f3762a.",
-    "session-zz (2026-03-31 Nacht): Nacht-Abarbeitung §14 Offene Posten. (1) P1: Kira Live-Chip + Activity-Drawer bereits vorhanden — verifiziert, kein Doppelbau. (2) P2: Mail-Vorlagen Editor komplett: DB-Tabelle mail_vorlagen, GET/POST/DELETE Endpoints, Tab in Einstellungen > Mail > Vorlagen, Modal-Editor mit Kategorien/Signatur/Kira-Aktiv. (3) P2: Kalender-Widget Dashboard + Tab: GET /api/kira/termine (graph_calendar.liste_terme), cal_panel in Dashboard (rechte Spalte), Organisation Kalender-Tab ersetzt In-Planung durch echten Kalender mit Tage-Filter, loadDashKalender()/loadOrgKalender() AJAX. (4) P2: Kira-Postfach Einstellungen: neuer Tab Einstellungen > Mail > Kira-Postfach, Absender-Konto Dropdown, Graph-Verbindung Pruefen-Button, _resolve_graph_konto() Resolver-Kette. (5) P2: Geschaeft Signale-Panel live: loadGeschKiraSignale() laedt /api/vorgang/signals?alle=1, #gesch-kira-signals Container in Signale & Warnungen Zone, OK-Button markiert Signale. (6) P3: Wissen Von-Kira-gelernt Badge: _wissen_card() zeigt Badge bei quelle=auto_gelernt/mail_stil_diff. (7) P3: Chat Kontext-Menu: + Button oeffnet Dropdown (Offene Aufgaben/Aktive Vorgaenge/Aktueller Kontext) → in Chat-Input einfuegen. Commits: 2710a60, 2695819, 7491163, fdd194f."
+    "session-zz (2026-03-31 Nacht): Nacht-Abarbeitung §14 Offene Posten. (1) P1: Kira Live-Chip + Activity-Drawer bereits vorhanden — verifiziert, kein Doppelbau. (2) P2: Mail-Vorlagen Editor komplett: DB-Tabelle mail_vorlagen, GET/POST/DELETE Endpoints, Tab in Einstellungen > Mail > Vorlagen, Modal-Editor mit Kategorien/Signatur/Kira-Aktiv. (3) P2: Kalender-Widget Dashboard + Tab: GET /api/kira/termine (graph_calendar.liste_terme), cal_panel in Dashboard (rechte Spalte), Organisation Kalender-Tab ersetzt In-Planung durch echten Kalender mit Tage-Filter, loadDashKalender()/loadOrgKalender() AJAX. (4) P2: Kira-Postfach Einstellungen: neuer Tab Einstellungen > Mail > Kira-Postfach, Absender-Konto Dropdown, Graph-Verbindung Pruefen-Button, _resolve_graph_konto() Resolver-Kette. (5) P2: Geschaeft Signale-Panel live: loadGeschKiraSignale() laedt /api/vorgang/signals?alle=1, #gesch-kira-signals Container in Signale & Warnungen Zone, OK-Button markiert Signale. (6) P3: Wissen Von-Kira-gelernt Badge: _wissen_card() zeigt Badge bei quelle=auto_gelernt/mail_stil_diff. (7) P3: Chat Kontext-Menu: + Button oeffnet Dropdown (Offene Aufgaben/Aktive Vorgaenge/Aktueller Kontext) → in Chat-Input einfuegen. Commits: 2710a60, 2695819, 7491163, fdd194f.",
+    "session-aaa (2026-03-31): Google OAuth 2.0 fuer Gmail vollstaendig implementiert. (1) google_oauth.py: neues Modul - Authorization Code Flow, Token Exchange, Refresh, XOAUTH2 fuer IMAP, In-Memory Job-Tracking. (2) server.py: GET /oauth/google/callback (HTML-Bestaetigung), POST /api/mail/konto/google-oauth-start, GET google-oauth-status, GET /api/google-oauth/test. (3) Wizard Step 5 dynamisch (Google vs Microsoft Label + Hinweis). _wizStep4Next -> _wizStartGoogleOAuth + _wizPollGoogleOAuth. (4) Einstellungen > Integrationen: Google OAuth Credentials-Gruppe (Client ID/Secret, Speichern, Test). (5) KIRA_SYSTEM_ANALYSE.md §13+14 vollstaendig aktualisiert: alle session-zz done markiert, session-aaa Google OAuth als done. (6) feature_registry.json: 64 Features, google-oauth-gmail (done). Commit 4fb0a68."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -151,7 +152,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "generate_partner_view.py ausfuehren (neue Features in Registry eintragen), KIRA_SYSTEM_ANALYSE.md §14 aktualisieren. Kai-Aktionen offen: Azure Calendars.Read Scope, WhatsApp-Token, Leni-Draft-Passwort ersetzen.",
+  "next_step": "Google Cloud Console App einrichten (Kai), dann Gmail-Konto testen. Alternativ: Belegvorlagen-Modul oder Lexware-Anbindung.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
@@ -189,8 +190,9 @@
     "einstellungen_checkliste": "knowledge/einstellungen_checkliste.md — vollständige Einstellungs-Checkliste mit Session-s-Update"
   },
   "open_issues": [
-    "Kai-Aktion: Azure Entra App Calendars.Read Scope aktivieren (fuer Graph Kalender)",
-    "Kai-Aktion: WhatsApp Business API Token hinterlegen",
-    "Kai-Aktion: Gmail-Draft r1565559517660587330 — [PASSWORT] durch echtes Passwort ersetzen und senden"
+    "Kai-Aktion: Azure Calendars.ReadWrite hinzufuegen (fuer Kalender-Widget)",
+    "Kai-Aktion: Google Cloud Console OAuth2 App + Client ID/Secret in Einstellungen eintragen",
+    "Kai-Aktion: WhatsApp Business Token eintragen",
+    "Kai-Aktion: Leni Gmail-Draft-2 Passwort-Platzhalter ersetzen"
   ]
 }
