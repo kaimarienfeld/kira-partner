@@ -344,3 +344,21 @@ Commit: 66241b0
 **Commits:** 708e37a
 **Offen geblieben:** "Spaeter"-Klick Lernfrage (Reminder-Datum), Google OAuth, WhatsApp-Token (Kai).
 **Status:** erledigt
+
+---
+
+## 2026-03-31 15:00 — Session-Start (session-vv)
+**Auftrag:** Selbst priorisiert nach Scan aller offenen Items.
+**Status:** erledigt
+
+**Verifiziert als bereits fertig:**
+- Fenster-Split Position (localStorage pf_pane_w) — in Checkliste markiert
+
+**Erledigt:**
+- Ungelesene Badge Postfach: _pfGlobalBadgeUpdate() sofort + alle 2min (alle Panels). Playwright: Badge=3 auf Start-Panel.
+- Spaeter-Klick Lernfrage: datetime-local Picker + 4 Schnellbuttons + Warum-Frage mit Presets + Wissensregel-Speicherung
+- Sidebar-Logo: K-Text → Kira-Launcher SVG (lila Orb, Augen, applyLogo/applyLogoSize angepasst)
+
+**Commits:** ac0c057 + c845669
+**Offen geblieben:** Plan Paket 1-A (Tool-Idempotenz kira_llm.py), Kalender-Eintrag für Spaeter (wartet auf Graph API), App-Icon-Verknüpfung.
+**Status:** erledigt

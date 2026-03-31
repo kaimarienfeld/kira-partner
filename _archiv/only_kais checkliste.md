@@ -134,9 +134,9 @@ Bitte alle codes prüfen und ggfls. reparieren. die funktionen 00 -04 funktionie
 
 
 
-\### Logo upload ist da, aber keine sinnvollen einstellungen dazu. z.b logo größe. ich habe jetzt eins hinzugefügt, der blaue hintergrund vom K symbohl ist noch zu sehen. das nur anzeigen wenn kein logo gesetzt. bzw. nicht das blaue k logo, sondern eine version von kira launcher.
+### ✅ ERLEDIGT (session-vv) — Logo Sidebar: K-Placeholder ersetzt durch Kira-Launcher SVG (lila Orb mit Augen, passend zu Variante B). applyLogo() restauriert SVG bei Reset/leer. applyLogoSize() skaliert auch SVG. Wenn eigenes Logo gesetzt: Logo erscheint, SVG verschwindet.
 
-### bitte als bild von der kira verknüfung auch ein bild von kiralauncher in grösst möglicher form als bild setzen
+### 🔍 Muss Kai Live prüfen — App-Icon/Verknuepfung als Kira-Launcher: erfordert .ico-Datei oder Electron-Aenderung — kein direkter Eingriff moeglich ohne App-Build-System.
 
 
 
@@ -230,7 +230,9 @@ Wie wird der Nachfass gemeldet -  ist Aufgabe erstellen.. KIRA LLM tatsächlich 
 
 
 
-\-- bei später klick auf mail bearbeiten -- hier auch lernede frage von kira ki aktive, warum? damit sie weiss warum und bei Zuordnung und Wiedervorlagen anderer ähnlicher mail, aufgaben, etc muster erkennt und die Benachrichtigung oder todos beser einordnen kann. ausserdem wäre hier die angabe von Datum und Uhrzeit gut, wann soll ich dich erneut erinnern oder die mail vorlegen? Das dann aber auch machen und in einen Kalender eintragen. wichtig, nicht das sie dann weg ist, weil die funkt noch nicht da ist und ich dann nicht mehr erinnert werde
+### ✅ ERLEDIGT (session-vv) — Spaeter-Klick Lernfrage + Datum-Picker: spaeterModal hat datetime-local Picker + 4 Schnell-Buttons (+2h/Morgen/Uebermorgen/Nae.Woche) + Lernfrage Warum mit 4 Preset-Gruenden + Wissensregel wird via /api/wissen/neu gespeichert. Aufgabe bleibt offen mit naechste_erinnerung gesetzt (task_manager.py prueft und erinnert).
+
+### ⚠️ Kalender-Eintrag: Erinnerung als Outlook-Termin — noch nicht implementiert (wartet auf Paket 8 Microsoft Graph Calendar)
 
 
 
@@ -288,7 +290,7 @@ Funktioniert?
 
 
 
-&#x20;### Die Anzahl der Ungelesene Nachrichten im Batch Symbol Der Haupt Sidebar Vom Postfach Stimmt nicht. bitte Alle Posteingänge Von allen Postfächern Einbeziehen "D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-30 050052.png"
+### ✅ ERLEDIGT (session-vv) — Ungelesene Badge Postfach: _pfGlobalBadgeUpdate() laeuft sofort beim Seitenload + alle 2 Minuten — zeigt Ungelesen-Count aus allen Posteingang-Ordnern auf jedem Panel. Playwright-Test: Badge zeigte "3" auf Start-Panel.
 
 
 
