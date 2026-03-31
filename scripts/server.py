@@ -33,7 +33,8 @@ from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversat
                        get_api_key as kira_get_api_key, get_config as get_llm_config,
                        get_all_providers, save_provider_key, check_provider_status,
                        PROVIDER_TYPES, generate_daily_briefing,
-                       _validate_model, _auto_update_model, validate_all_providers)
+                       _validate_model, _auto_update_model, validate_all_providers,
+                       start_react_task, get_react_task_status, cancel_react_task)
 from mail_monitor import start_monitor_thread, get_monitor_status, stop_monitor
 
 PORT = 8765
@@ -11482,6 +11483,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/mail/approve/pending':
             self._api_mail_approve_pending()
 
+        elif self.path.startswith('/api/kira/task/') and self.path.endswith('/status'):
+            # GET /api/kira/task/{id}/status (Paket 5, session-oo)
+            parts = self.path.split('/')
+            task_id = parts[4] if len(parts) >= 5 else ''
+            self._json(get_react_task_status(task_id) if task_id else {'error': 'Keine Task-ID'})
+
         elif self.path == '/api/kira/conversations':
             self._json(kira_get_conversations())
 
@@ -13971,6 +13978,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': True})
             except Exception as ex:
                 self._json({'ok': False, 'error': str(ex)})
+            return
+
+        # ReAct-Task starten (Paket 5, session-oo)
+        if self.path == '/api/kira/task':
+            aufgabe = body.get('aufgabe', '').strip()
+            max_rounds = int(body.get('max_rounds', 5))
+            if not aufgabe:
+                self._json({'error': 'aufgabe erforderlich'})
+                return
+            try:
+                task_id = start_react_task(aufgabe, max_rounds=max_rounds)
+                self._json({'ok': True, 'task_id': task_id, 'status': 'running'})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
+        # ReAct-Task abbrechen
+        if self.path.startswith('/api/kira/task/') and self.path.endswith('/cancel'):
+            parts = self.path.split('/')
+            task_id = parts[4] if len(parts) >= 5 else ''
+            try:
+                ok = cancel_react_task(task_id) if task_id else False
+                self._json({'ok': ok})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
             return
 
         # Kira Chat (LLM)

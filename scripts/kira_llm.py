@@ -2884,5 +2884,145 @@ def _build_stats_briefing(stats):
     }
 
 
+# ── ReAct-Schleife + Hintergrund-Tasks (Paket 5, session-oo) ─────────────────
+# Background-Task Registry: {task_id: {status, steps, result, error, abgebrochen}}
+_REACT_TASKS: dict = {}
+_REACT_TASKS_LOCK = threading.Lock()
+
+_REACT_CONTINUE_SIGNALS = ("[WEITER]", "[CONTINUE]", "[MEHR]", "[NOCH_NICHT_FERTIG]")
+
+
+def _react_should_continue(text: str) -> bool:
+    """Prueft ob Kiras Antwort ein Fortsetzungs-Signal enthaelt."""
+    upper = text.upper()
+    return any(sig.upper() in upper for sig in _REACT_CONTINUE_SIGNALS)
+
+
+def _react_strip_signal(text: str) -> str:
+    """Entfernt Fortsetzungs-Signale aus dem Antwort-Text."""
+    for sig in _REACT_CONTINUE_SIGNALS:
+        text = text.replace(sig, "").replace(sig.lower(), "")
+    return text.strip()
+
+
+def chat_react(task_id: str, user_input: str, max_rounds: int = 5) -> None:
+    """
+    ReAct-Loop: Fuehrt komplexe Aufgaben in mehreren Runden aus (Paket 5, session-oo).
+    Laeuft in Hintergrund-Thread. Fortschritt via get_react_task_status().
+
+    Kira signalisiert Fortsetzung mit [WEITER] am Ende der Antwort.
+    Nach max_rounds oder wenn kein Signal mehr: automatisch stopp.
+    """
+    with _REACT_TASKS_LOCK:
+        _REACT_TASKS[task_id] = {
+            "status": "running",
+            "steps": [],
+            "result": None,
+            "error": None,
+            "abgebrochen": False,
+            "gestartet_am": datetime.now().isoformat(),
+        }
+
+    def _run():
+        session_id = str(uuid.uuid4())
+        current_input = user_input
+        accumulated_results = []
+
+        for runde in range(1, max_rounds + 1):
+            # Abbruch-Check
+            with _REACT_TASKS_LOCK:
+                if _REACT_TASKS.get(task_id, {}).get("abgebrochen"):
+                    _REACT_TASKS[task_id]["status"] = "abgebrochen"
+                    return
+
+            # Chat-Call mit Session-Kontext
+            try:
+                result = chat(current_input, session_id=session_id)
+            except Exception as e:
+                with _REACT_TASKS_LOCK:
+                    _REACT_TASKS[task_id]["status"] = "fehler"
+                    _REACT_TASKS[task_id]["error"] = str(e)
+                return
+
+            if result.get("error"):
+                with _REACT_TASKS_LOCK:
+                    _REACT_TASKS[task_id]["status"] = "fehler"
+                    _REACT_TASKS[task_id]["error"] = result["error"]
+                return
+
+            text = result.get("text", "")
+            tools_used = result.get("tools", [])
+            continue_flag = _react_should_continue(text)
+            clean_text = _react_strip_signal(text)
+
+            step = {
+                "runde": runde,
+                "input": current_input[:200],
+                "output": clean_text[:500],
+                "tools": [t.get("tool") for t in tools_used],
+                "fortsetzung": continue_flag,
+            }
+            accumulated_results.append(clean_text)
+
+            with _REACT_TASKS_LOCK:
+                _REACT_TASKS[task_id]["steps"].append(step)
+
+            _elog("kira", "react_round",
+                  f"ReAct Runde {runde}/{max_rounds} | Task {task_id[:8]} | Fortsetzung={continue_flag}",
+                  source="kira_llm", modul="kira", submodul="react",
+                  session_id=session_id, actor_type="kira", status="ok",
+                  context_snapshot={"runde": runde, "tools": step["tools"]})
+
+            if not continue_flag:
+                break
+
+            # Naechste Runde: Ergebnis als Kontext mitnehmen
+            current_input = (
+                f"Vorheriges Ergebnis (Runde {runde}):\n{clean_text[:800]}\n\n"
+                f"Mach weiter mit der urspruenglichen Aufgabe: {user_input[:200]}"
+            )
+
+        # Fertig
+        with _REACT_TASKS_LOCK:
+            _REACT_TASKS[task_id]["status"] = "fertig"
+            _REACT_TASKS[task_id]["result"] = "\n\n".join(accumulated_results)
+
+    t = threading.Thread(target=_run, name=f"kira-react-{task_id[:8]}", daemon=True)
+    t.start()
+
+
+def start_react_task(user_input: str, max_rounds: int = 5) -> str:
+    """Startet einen ReAct-Hintergrund-Task. Gibt task_id zurueck."""
+    task_id = str(uuid.uuid4())
+    chat_react(task_id, user_input, max_rounds)
+    return task_id
+
+
+def get_react_task_status(task_id: str) -> dict:
+    """Status eines laufenden oder abgeschlossenen ReAct-Tasks."""
+    with _REACT_TASKS_LOCK:
+        task = _REACT_TASKS.get(task_id)
+    if not task:
+        return {"error": f"Task {task_id} nicht gefunden"}
+    return {
+        "task_id": task_id,
+        "status": task["status"],           # running | fertig | fehler | abgebrochen
+        "runden": len(task.get("steps", [])),
+        "letzter_step": task["steps"][-1] if task.get("steps") else None,
+        "result": task.get("result"),
+        "error": task.get("error"),
+        "gestartet_am": task.get("gestartet_am"),
+    }
+
+
+def cancel_react_task(task_id: str) -> bool:
+    """Bricht einen laufenden ReAct-Task ab."""
+    with _REACT_TASKS_LOCK:
+        if task_id in _REACT_TASKS:
+            _REACT_TASKS[task_id]["abgebrochen"] = True
+            return True
+    return False
+
+
 # Init DB bei Import
 init_conversations_db()
