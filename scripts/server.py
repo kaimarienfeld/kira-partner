@@ -3194,6 +3194,7 @@ window.pfOpenMail = function(m, el) {
 
   // ── Load mail content ──────────────────────────────────
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
+    if(_pfCurrentMail && _pfCurrentMail.message_id === m.message_id) _pfCurrentMail._text_plain = d.text||'';
     const body = document.getElementById('pf-prev-body');
     body.innerHTML = '';
     const rawText = d.text || '';
@@ -3297,6 +3298,7 @@ window.pfOpenCompose=function(replyTo){
 window.pfCloseCompose=function(){
   document.getElementById('pf-compose').style.display='none';
   document.getElementById('pf-preview-empty').style.display='flex';
+  window._pfReplyMsgId=null;
 };
 
 window.pfReply=function(){
@@ -3304,13 +3306,20 @@ window.pfReply=function(){
   const absender=document.getElementById('pf-prev-absender').textContent.replace('Von: ','');
   const emailMatch=absender.match(/<([^>]+@[^>]+)>/);
   const replyAddr=emailMatch?emailMatch[1]:absender.trim();
+  window._pfReplyMsgId=_pfCurrentMail&&_pfCurrentMail.message_id?_pfCurrentMail.message_id:null;
+  const origBody=(_pfCurrentMail&&_pfCurrentMail._text_plain)||document.getElementById('pf-prev-body').textContent||'';
+  const datum=_pfCurrentMail&&_pfCurrentMail.datum?_pfCurrentMail.datum:'';
+  const quoted=origBody.slice(0,1500).split('\\n').map(l=>'> '+l).join('\\n');
   pfOpenCompose(true);
   document.getElementById('pf-comp-to').value=replyAddr;
   document.getElementById('pf-comp-subj').value=(betreff.startsWith('Re:')?betreff:'Re: '+betreff);
+  document.getElementById('pf-comp-body').value='\\n\\n--- Am '+datum+' schrieb '+absender.trim()+': ---\\n'+quoted;
+  const bd=document.getElementById('pf-comp-body');bd.focus();bd.setSelectionRange(0,0);bd.scrollTop=0;
 };
 window.pfForward=function(){
   const betreff=document.getElementById('pf-prev-betreff').textContent;
   const body=document.getElementById('pf-prev-body').textContent;
+  window._pfReplyMsgId=null;
   pfOpenCompose(true);
   document.getElementById('pf-comp-subj').value=(betreff.startsWith('Fwd:')?betreff:'Fwd: '+betreff);
   document.getElementById('pf-comp-body').value='\\n\\n--- Weitergeleitet ---\\n'+body.slice(0,2000);
@@ -3326,11 +3335,13 @@ window.pfSend=function(){
   const btn=document.getElementById('pf-send-btn');
   btn.disabled=true;btn.textContent='Wird gesendet...';
   const bcc=document.getElementById('pf-comp-bcc')?.value.trim()||'';
+  const pl={from_email:from,to,cc,bcc,subject:subj,body_plain:body};
+  if(window._pfReplyMsgId)pl.in_reply_to=window._pfReplyMsgId;
   fetch('/api/mail/send',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({from_email:from,to,cc,bcc,subject:subj,body_plain:body})
+    body:JSON.stringify(pl)
   }).then(r=>r.json()).then(d=>{
     btn.disabled=false;btn.textContent='&#x27A4; Senden';
-    if(d.ok){showToast('Mail gesendet ✓','ok');pfCloseCompose();}
+    if(d.ok){showToast('Mail gesendet ✓','ok');pfCloseCompose();window._pfReplyMsgId=null;}
     else showToast('Fehler: '+(d.error||'?'),'fehler');
   }).catch(()=>{btn.disabled=false;btn.textContent='&#x27A4; Senden';showToast('Netzwerkfehler','fehler');});
 };
