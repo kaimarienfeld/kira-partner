@@ -3536,8 +3536,9 @@ def build_geschaeft(db):
     except: ar = []
     try: ang = [dict(r) for r in db.execute("SELECT * FROM angebote ORDER BY datum DESC").fetchall()]
     except: ang = []
-    try: eingang = [dict(r) for r in db.execute("SELECT * FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt') ORDER BY datum DESC").fetchall()]
+    try: eingang = [dict(r) for r in db.execute("SELECT * FROM geschaeft WHERE typ IN ('eingangsrechnung','zahlungserinnerung') ORDER BY datum DESC").fetchall()]
     except: eingang = []
+    eingang_offen = [r for r in eingang if (r.get("bewertung") or "") != "erledigt"]
 
     # Detail-Daten laden und anreichern
     re_details, mahnung_details = _load_rechnungen_detail()
@@ -3629,7 +3630,7 @@ def build_geschaeft(db):
       <div class="gesch-tab active" onclick="showGeschTab('uebersicht')">Übersicht</div>
       <div class="gesch-tab" onclick="showGeschTab('ausgangsre')">Ausgangsrechnungen ({len(ar)})</div>
       <div class="gesch-tab" onclick="showGeschTab('angebote')">Angebote ({len(ang)})</div>
-      <div class="gesch-tab" onclick="showGeschTab('eingangsre')">Eingangsrechnungen ({len(eingang)})</div>
+      <div class="gesch-tab" onclick="showGeschTab('eingangsre')">Eingangsrechnungen ({len(eingang_offen)} offen)</div>
       <div class="gesch-tab" onclick="showGeschTab('zahlungen')">Zahlungen ({len(ar_bezahlt)})</div>
       <div class="gesch-tab" onclick="showGeschTab('mahnungen')">Mahnungen ({n_mahnungen})</div>
       <div class="gesch-tab" onclick="showGeschTab('auswertung')">Auswertung</div>
@@ -3640,7 +3641,7 @@ def build_geschaeft(db):
     <div id="gesch-uebersicht" class="gesch-panel active">{_build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, eingang, today, stats)}</div>
     <div id="gesch-ausgangsre" class="gesch-panel">{_build_ar_table(ar)}</div>
     <div id="gesch-angebote" class="gesch-panel">{_build_ang_table(ang, today)}</div>
-    <div id="gesch-eingangsre" class="gesch-panel">{_gesch_aktiv_cards(eingang)}</div>
+    <div id="gesch-eingangsre" class="gesch-panel">{_gesch_eingangsre_table(eingang)}</div>
     <div id="gesch-zahlungen" class="gesch-panel">{_build_ar_table(ar_bezahlt, scope="az") if ar_bezahlt else "<p class='empty'>Keine bezahlten Rechnungen.</p>"}</div>
     <div id="gesch-mahnungen" class="gesch-panel">{_build_mahnung_section(ar_gemahnt, ar_offen, mahnung_details)}</div>
     <div id="gesch-auswertung" class="gesch-panel">{_build_gesch_auswertung(stats)}</div>
@@ -3676,7 +3677,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
     s = stats or {}
     n_ar_offen = len(ar_offen)
     n_ang_offen = len(ang_offen)
-    n_eingang = len(eingang)
+    n_eingang = len(eingang_offen)
     n_gemahnt = len(ar_gemahnt)
     ar_bez_eur = s.get("ar_bezahlt_eur", 0)
     ang_ges = s.get("ang_total", 0)
@@ -3995,56 +3996,89 @@ def _build_ang_table(rows, today):
     return html
 
 
-def _gesch_aktiv_cards(rows):
-    """Eingangsrechnungen / Aktive Geschäftsvorgänge als Karten."""
+def _gesch_eingangsre_table(rows):
+    """Eingangsrechnungen als Tabellen-Ansicht mit Filter + Neu-Dialog."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    offen_count = sum(1 for r in rows if (r.get("bewertung") or "") != "erledigt")
+    bezahlt_count = len(rows) - offen_count
+    betrag_offen = sum(r.get("betrag") or 0 for r in rows if (r.get("bewertung") or "") != "erledigt")
+
+    # Toolbar
+    html = f"""<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-sm btn-green" onclick="eingangNeuDialog()">+ Neue Eingangsrechnung</button>
+      <span style="flex:1"></span>
+      <span style="color:var(--muted);font-size:12px">{offen_count} offen &middot; {betrag_offen:,.2f} EUR &middot; {bezahlt_count} bezahlt</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-tiny eingang-filter-btn active" id="eingang-f-offen" onclick="filterEingangsre('offen',this)">Offen ({offen_count})</button>
+        <button class="btn btn-tiny eingang-filter-btn" id="eingang-f-alle" onclick="filterEingangsre('alle',this)">Alle ({len(rows)})</button>
+        <button class="btn btn-tiny eingang-filter-btn" id="eingang-f-bezahlt" onclick="filterEingangsre('bezahlt',this)">Bezahlt ({bezahlt_count})</button>
+      </div>
+    </div>"""
+
     if not rows:
-        return "<p class='empty'>Keine offenen Eingangsrechnungen.</p>"
-    html = ""
+        return html + "<p class='empty'>Keine Eingangsrechnungen gefunden.</p>"
+
+    html += """<div class="gesch-table" id="eingangsre-table">
+      <div class="gesch-row gesch-header">
+        <span class="gc-nr">RE-Nr</span>
+        <span class="gc-partner">Lieferant</span>
+        <span class="gc-datum">Datum</span>
+        <span class="gc-betrag">Betrag</span>
+        <span class="gc-datum">F&auml;lligkeit</span>
+        <span class="gc-status">Status</span>
+        <span class="gc-actions">Aktionen</span>
+      </div>"""
+
     for r in rows:
         gid = r.get("id", "")
-        betrag = f"{r.get('betrag', 0) or 0:,.2f} EUR" if r.get("betrag") else ""
-        typ = r.get("typ", "") or ""
-        typ_label = "Zahlungserinnerung" if typ == "zahlungserinnerung" else "Eingangsrechnung"
-        typ_cls = "gesch-typ-mahnung" if typ == "zahlungserinnerung" else "gesch-typ-eingang"
-        partner = esc((r.get("gegenpartei", "") or r.get("gegenpartei_email", "") or "")[:40])
-        betreff = esc((r.get("betreff", "") or "")[:60])
-        datum = format_datum(r.get("datum"))
-        re_nr = esc((r.get("rechnungsnummer", "") or "")[:25])
-        mail_ref = r.get("mail_ref", "") or ""
         bew = r.get("bewertung", "") or ""
-        korrekt_badge = '<span class="badge badge-korrekt">Korrekt</span>' if bew == "korrekt" else ""
+        is_bezahlt = bew == "erledigt"
+        re_nr = esc((r.get("rechnungsnummer", "") or "")[:30])
+        partner = esc((r.get("gegenpartei", "") or r.get("gegenpartei_email", "") or "?")[:35])
+        datum = (r.get("datum", "") or "")[:10]
+        datum_fmt = format_datum(datum)
+        betrag = r.get("betrag")
+        betrag_fmt = f'{betrag:,.2f}' if betrag else '—'
+        faell = (r.get("faelligkeit_datum", "") or "")[:10]
+        faell_fmt = format_datum(faell) if faell else '—'
+        faell_warn = ""
+        if faell and not is_bezahlt:
+            if faell < today:
+                faell_warn = ' style="color:var(--alarm)"'
+            elif faell <= (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d"):
+                faell_warn = ' style="color:var(--warning,#e6a817)"'
+        s_cls = "tag-muted" if is_bezahlt else "tag-alarm"
+        s_label = "Bezahlt" if is_bezahlt else "Offen"
+        row_data = "erledigt" if is_bezahlt else "offen"
         anh_pfad = r.get("anhaenge_pfad", "") or ""
+        mail_ref = r.get("mail_ref", "") or ""
         anh_btn = ""
         if anh_pfad:
             enc_path = urllib.parse.quote(anh_pfad, safe='')
-            anh_btn = f'<button class="btn btn-tiny btn-gold" onclick="openAttachments(\'{enc_path}\')" title="Anhang öffnen">Anhang</button>'
+            anh_btn = f'<button class="btn btn-tiny btn-gold" onclick="openAttachments(\'{enc_path}\')" title="Anhang">&#x1F4CE;</button>'
         mail_btn = ""
         if mail_ref:
             enc_mid = urllib.parse.quote(mail_ref, safe='')
-            mail_btn = f'<button class="btn btn-tiny btn-muted" onclick="readMail(\'{enc_mid}\')">Mail</button>'
-        korr_btn = (f'<button class="btn btn-tiny btn-muted" disabled style="opacity:.5">Korrekt</button>'
-                    if bew == "korrekt" else
-                    f'<button class="btn btn-tiny btn-muted" onclick="geschBewertung({gid},\'korrekt\')">Korrekt</button>')
-        html += f"""<div class="gesch-aktiv-card" id="gesch-{gid}" {'style="border-color:rgba(80,200,120,.3)"' if bew == 'korrekt' else ''}>
-          <div class="gesch-aktiv-header">
-            <span class="gesch-typ-badge {typ_cls}">{typ_label}</span>
-            {korrekt_badge}
-            <span class="gesch-aktiv-betrag">{betrag}</span>
-            <span class="gesch-aktiv-datum">{datum}</span>
-          </div>
-          <div class="gesch-aktiv-body">
-            <div class="gesch-aktiv-betreff">{betreff}</div>
-            <div class="gesch-aktiv-partner">{partner}{(' &middot; Re-Nr: ' + re_nr) if re_nr else ''}</div>
-          </div>
-          <div class="gesch-aktiv-actions">
-            <button class="btn btn-sm btn-green" onclick="geschErledigt({gid})">Erledigt</button>
-            {anh_btn}
-            {mail_btn}
-            {korr_btn}
-            <button class="btn btn-tiny btn-warn" onclick="geschBewertungDialog({gid})">Falsch</button>
-            <button class="btn btn-tiny btn-muted" onclick="geschKira('eingang','{js_esc(re_nr)}','{js_esc(partner)}','{js_esc(betrag)}')" title="Mit Kira besprechen">Kira</button>
-          </div>
+            mail_btn = f'<button class="btn btn-tiny btn-muted" onclick="readMail(\'{enc_mid}\')" title="Mail lesen">&#x2709;</button>'
+        betrag_js_val = f"{betrag:.2f}" if betrag else "null"
+        betrag_btn = (f'<button class="btn btn-tiny btn-muted" onclick="eingangBetragDialog({gid},{betrag_js_val},\'{faell}\')" title="Betrag / F&auml;lligkeit setzen">Betrag</button>'
+                      if not is_bezahlt else '')
+        bezahlt_btn = (f'<button class="btn btn-tiny btn-green" onclick="geschErledigt({gid})" title="Als bezahlt markieren">Bezahlt</button>'
+                       if not is_bezahlt else '')
+
+        html += f"""<div class="gesch-row eingangsre-row" data-status="{row_data}" id="gesch-{gid}" {'style="opacity:.55"' if is_bezahlt else ''}>
+          <span class="gc-nr" style="font-size:11px">{re_nr or '—'}</span>
+          <span class="gc-partner" style="font-size:12px">{partner}</span>
+          <span class="gc-datum" style="font-size:11px">{datum_fmt}</span>
+          <span class="gc-betrag" style="font-size:12px;font-weight:600">{betrag_fmt}</span>
+          <span class="gc-datum" style="font-size:11px"{faell_warn}>{faell_fmt}</span>
+          <span class="gc-status"><span class="tag {s_cls}">{s_label}</span></span>
+          <span class="gc-actions" style="display:flex;gap:4px;flex-wrap:wrap">
+            {bezahlt_btn}{betrag_btn}{anh_btn}{mail_btn}
+          </span>
         </div>"""
+
+    html += "</div>"
     return html
 
 
@@ -9093,6 +9127,105 @@ function geschKira(typ, nr, partner, betrag) {{
   }}
 }}
 
+// Eingangsrechnungen: Filter-Tabs
+function filterEingangsre(status, btn) {{
+  document.querySelectorAll('.eingang-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.querySelectorAll('.eingangsre-row').forEach(row=>{{
+    if(status==='alle') row.style.display='';
+    else row.style.display=(row.dataset.status===status)?'':'none';
+  }});
+}}
+
+// Eingangsrechnungen: Neue Eingangsrechnung Dialog
+function eingangNeuDialog() {{
+  const today = new Date().toISOString().slice(0,10);
+  const d30 = new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+  showSimpleModal('Neue Eingangsrechnung', `
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--muted)">Lieferant *
+          <input id="eineu-partner" class="es-inp" placeholder="Firma / Name" style="margin-top:4px;width:100%">
+        </label>
+        <label style="font-size:12px;color:var(--muted)">E-Mail
+          <input id="eineu-email" class="es-inp" type="email" placeholder="email@firma.de" style="margin-top:4px;width:100%">
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--muted)">RE-Nummer
+          <input id="eineu-renr" class="es-inp" placeholder="RE-2026-001" style="margin-top:4px;width:100%">
+        </label>
+        <label style="font-size:12px;color:var(--muted)">Betrag (EUR)
+          <input id="eineu-betrag" class="es-inp" type="number" step="0.01" min="0" placeholder="0.00" style="margin-top:4px;width:100%">
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--muted)">Rechnungsdatum
+          <input id="eineu-datum" class="es-inp" type="date" value="${{today}}" style="margin-top:4px;width:100%">
+        </label>
+        <label style="font-size:12px;color:var(--muted)">F&auml;lligkeitsdatum
+          <input id="eineu-faell" class="es-inp" type="date" value="${{d30}}" style="margin-top:4px;width:100%">
+        </label>
+      </div>
+      <label style="font-size:12px;color:var(--muted)">Betreff / Beschreibung
+        <input id="eineu-betreff" class="es-inp" placeholder="z.B. Hosting-Rechnung März 2026" style="margin-top:4px;width:100%">
+      </label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-muted" onclick="closeModal()">Abbrechen</button>
+        <button class="btn btn-green" onclick="submitEingangNeu()">Speichern</button>
+      </div>
+    </div>`, {{noBtns:true}});
+}}
+function submitEingangNeu() {{
+  const partner = document.getElementById('eineu-partner')?.value.trim();
+  if(!partner) {{ showToast('Lieferant ist Pflichtfeld'); return; }}
+  const body = {{
+    typ: 'eingangsrechnung',
+    gegenpartei: partner,
+    gegenpartei_email: document.getElementById('eineu-email')?.value.trim()||'',
+    rechnungsnummer: document.getElementById('eineu-renr')?.value.trim()||'',
+    betrag: parseFloat(document.getElementById('eineu-betrag')?.value||'0')||null,
+    datum: document.getElementById('eineu-datum')?.value||new Date().toISOString().slice(0,10),
+    faelligkeit_datum: document.getElementById('eineu-faell')?.value||'',
+    betreff: document.getElementById('eineu-betreff')?.value.trim()||''
+  }};
+  fetch('/api/geschaeft/eingangsrechnung/neu',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+    .then(r=>r.json()).then(d=>{{
+      closeModal();
+      if(d.ok){{ showToast('Eingangsrechnung gespeichert'); setTimeout(()=>location.reload(),600); }}
+      else showToast('Fehler: '+(d.error||'?'));
+    }}).catch(()=>showToast('Fehler'));
+}}
+
+// Eingangsrechnungen: Betrag + Fälligkeit setzen
+function eingangBetragDialog(id, currentBetrag, currentFaell) {{
+  const betragVal = currentBetrag && currentBetrag!='null' ? currentBetrag : '';
+  const faellVal = currentFaell && currentFaell!='null' ? currentFaell : '';
+  showSimpleModal('Betrag &amp; F&auml;lligkeit', `
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <label style="font-size:12px;color:var(--muted)">Betrag (EUR)
+        <input id="eibet-betrag" class="es-inp" type="number" step="0.01" min="0" value="${{betragVal}}" placeholder="0.00" style="margin-top:4px;width:100%">
+      </label>
+      <label style="font-size:12px;color:var(--muted)">F&auml;lligkeitsdatum
+        <input id="eibet-faell" class="es-inp" type="date" value="${{faellVal}}" style="margin-top:4px;width:100%">
+      </label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-muted" onclick="closeModal()">Abbrechen</button>
+        <button class="btn btn-green" onclick="submitEingangBetrag(${{id}})">Speichern</button>
+      </div>
+    </div>`, {{noBtns:true}});
+}}
+function submitEingangBetrag(id) {{
+  const betrag = parseFloat(document.getElementById('eibet-betrag')?.value||'0')||null;
+  const faell = document.getElementById('eibet-faell')?.value||'';
+  fetch('/api/geschaeft/'+id+'/betrag',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{betrag,faelligkeit_datum:faell}})}})
+    .then(r=>r.json()).then(d=>{{
+      closeModal();
+      if(d.ok){{ showToast('Gespeichert'); setTimeout(()=>location.reload(),600); }}
+      else showToast('Fehler: '+(d.error||'?'));
+    }}).catch(()=>showToast('Fehler'));
+}}
+
 // Geschäft: Erledigt -> Kira-Interaktion öffnen
 function geschErledigt(id) {{
   openKiraInterakt('geschaeft', id, 'erledigt', 'Eingangsrechnung erledigt', [
@@ -9627,6 +9760,27 @@ function exportRtLog() {{
     a.click();
     showToast(`${{rows.length}} Einträge exportiert`);
   }});
+}}
+
+// Generisches Simple-Modal (kein Kira-Kontext nötig)
+let _simpleModalEl = null;
+function showSimpleModal(title, bodyHtml, opts) {{
+  opts = opts||{{}};
+  if(!_simpleModalEl){{
+    _simpleModalEl = document.createElement('div');
+    _simpleModalEl.id = 'simpleModal';
+    _simpleModalEl.className = 'modal-ov';
+    _simpleModalEl.style.cssText='z-index:9999';
+    _simpleModalEl.innerHTML='<div class="modal-box" style="max-width:520px;width:90%;max-height:90vh;overflow-y:auto"><div class="modal-header"><span id="simpleModal-title" style="font-weight:600;font-size:14px"></span><button class="btn btn-tiny btn-muted" onclick="closeModal()" style="margin-left:auto">✕</button></div><div id="simpleModal-body" style="padding:12px 0"></div></div>';
+    document.body.appendChild(_simpleModalEl);
+    _simpleModalEl.addEventListener('click', e=>{{ if(e.target===_simpleModalEl)closeModal(); }});
+  }}
+  document.getElementById('simpleModal-title').innerHTML = title;
+  document.getElementById('simpleModal-body').innerHTML = bodyHtml;
+  _simpleModalEl.classList.add('open');
+}}
+function closeModal(){{
+  if(_simpleModalEl) _simpleModalEl.classList.remove('open');
 }}
 
 // Kritisch-Bestätigung — 3-Schritt Modal
@@ -15694,6 +15848,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
             threading.Timer(0.5, lambda: os._exit(0)).start()
             return
 
+        # Neue Eingangsrechnung manuell anlegen
+        if self.path == '/api/geschaeft/eingangsrechnung/neu':
+            try:
+                db = get_db()
+                now = datetime.now().isoformat()
+                typ        = body.get('typ', 'eingangsrechnung')
+                gegenpartei= (body.get('gegenpartei') or '').strip()
+                geo_email  = (body.get('gegenpartei_email') or '').strip()
+                re_nr      = (body.get('rechnungsnummer') or '').strip()
+                betrag     = body.get('betrag')
+                if betrag is not None:
+                    try: betrag = float(betrag)
+                    except: betrag = None
+                datum      = (body.get('datum') or now[:10])
+                faell      = (body.get('faelligkeit_datum') or '').strip() or None
+                betreff    = (body.get('betreff') or '').strip()
+                db.execute("""INSERT INTO geschaeft
+                    (typ, rechnungsnummer, datum, betrag, gegenpartei, gegenpartei_email,
+                     status, quelle, betreff, wichtigkeit, faelligkeit_datum, erstellt_am)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (typ, re_nr or None, datum, betrag, gegenpartei or None, geo_email or None,
+                     'offen', 'manuell', betreff or None, 'aktiv', faell, now))
+                db.commit()
+                db.close()
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Geschäft actions
         m3 = re.match(r'/api/geschaeft/(\d+)/(\w+)', self.path)
         if m3:
@@ -16666,6 +16849,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                            (bew, grund, gid))
                 db.execute("INSERT INTO geschaeft_statistik (typ,referenz_id,ereignis,daten_json,erstellt_am) VALUES (?,?,?,?,?)",
                            ('geschaeft', gid, f'bewertung_{bew}', json.dumps({"grund": grund, "zeitstempel": now}, ensure_ascii=False), now))
+                db.commit()
+                self._json({'ok': True})
+            elif aktion == 'betrag':
+                betrag = body.get('betrag')
+                faell = (body.get('faelligkeit_datum') or '').strip()
+                if betrag is not None:
+                    try: betrag = float(betrag)
+                    except: betrag = None
+                db.execute("UPDATE geschaeft SET betrag=?, faelligkeit_datum=? WHERE id=?",
+                           (betrag, faell or None, gid))
                 db.commit()
                 self._json({'ok': True})
             else:

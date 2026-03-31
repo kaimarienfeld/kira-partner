@@ -161,6 +161,8 @@ def rebuild_schema(db):
     except: pass
     try: db.execute("ALTER TABLE loeschhistorie ADD COLUMN message_id TEXT")
     except: pass
+    try: db.execute("ALTER TABLE geschaeft ADD COLUMN faelligkeit_datum TEXT")
+    except: pass
 
     # Zusätzliche Tabellen (IF NOT EXISTS - überleben Rebuilds)
     db.executescript("""

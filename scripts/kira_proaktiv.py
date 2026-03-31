@@ -724,6 +724,89 @@ def scan_tages_memory_summary(db, state: dict) -> dict:
         return {}
 
 
+def scan_offene_eingangsrechnungen(db, state: dict) -> list:
+    """Erinnert an offene Eingangsrechnungen die bald oder bereits fällig sind."""
+    today = date.today()
+    today_str = today.isoformat()
+    ergebnisse = []
+    try:
+        rows = db.execute("""
+            SELECT id, rechnungsnummer, gegenpartei, gegenpartei_email, betrag,
+                   datum, faelligkeit_datum, betreff
+            FROM geschaeft
+            WHERE typ IN ('eingangsrechnung','zahlungserinnerung')
+              AND (bewertung IS NULL OR bewertung != 'erledigt')
+            ORDER BY faelligkeit_datum ASC, datum ASC
+        """).fetchall()
+    except Exception:
+        return []
+
+    for r in rows:
+        gid = r['id']
+        state_key = f"eingangsre_erinnerung_{gid}"
+        last = state.get(state_key, {})
+        last_datum = last.get("datum", "")
+        # Max. 1x täglich pro Eingangsrechnung erinnern
+        if last_datum == today_str:
+            continue
+
+        partner = r['gegenpartei'] or r['gegenpartei_email'] or 'Unbekannt'
+        re_nr   = r['rechnungsnummer'] or 'ohne Nummer'
+        faell   = (r['faelligkeit_datum'] or '')[:10]
+        betrag  = r['betrag']
+        betrag_str = f"{betrag:,.2f} EUR" if betrag else "Betrag unbekannt"
+
+        # Klassifikation: wie dringend?
+        if faell:
+            try:
+                faell_dt = date.fromisoformat(faell)
+                tage_bis = (faell_dt - today).days
+            except Exception:
+                tage_bis = None
+        else:
+            try:
+                datum_dt = date.fromisoformat((r['datum'] or today_str)[:10])
+                tage_bis = None
+                # Ohne Fälligkeit: Erinnern nach 30 Tagen
+                alter = (today - datum_dt).days
+                if alter < 30:
+                    continue
+            except Exception:
+                continue
+
+        # Nur erinnern wenn fällig in <7 Tagen oder bereits überfällig
+        if tage_bis is not None and tage_bis > 7:
+            continue
+
+        if tage_bis is not None and tage_bis < 0:
+            prioritaet = "high"
+            status_str = f"ÜBERFÄLLIG seit {abs(tage_bis)} Tagen"
+        elif tage_bis is not None:
+            prioritaet = "default"
+            status_str = f"fällig in {tage_bis} Tag(en)"
+        else:
+            prioritaet = "default"
+            status_str = "seit >30 Tagen offen (kein Fälligkeitsdatum)"
+
+        msg = f"{partner} | {re_nr} | {betrag_str} | {status_str}"
+        ergebnisse.append({"id": gid, "partner": partner, "re_nr": re_nr,
+                           "betrag": betrag_str, "status": status_str})
+        state[state_key] = {"datum": today_str, "partner": partner}
+        # Runtime-Log-Eintrag
+        _elog('kira', 'eingangsrechnung_erinnerung', msg,
+              source='kira_proaktiv', modul='kira_proaktiv',
+              actor_type='kira_autonom', status='ok')
+
+    if ergebnisse:
+        _save_state(state)
+        _push(
+            f"Kira: {len(ergebnisse)} Eingangsrechnung(en) offen",
+            "\n".join(e["partner"] + " — " + e["status"] for e in ergebnisse[:3]),
+            priority="default"
+        )
+    return ergebnisse
+
+
 # ── Haupt-Scan ────────────────────────────────────────────────────────────────
 def run_proaktiver_scan() -> dict:
     """
@@ -787,6 +870,11 @@ def run_proaktiver_scan() -> dict:
         autonomy = scan_autonomy_decision(db, state)
         if autonomy:
             ergebnisse['autonomy_decision'] = autonomy
+
+        # Scan 10: Offene Eingangsrechnungen (session-qq)
+        eingang_offen = scan_offene_eingangsrechnungen(db, state)
+        if eingang_offen:
+            ergebnisse['eingangsrechnungen_offen'] = eingang_offen
 
         db.close()
         _save_state(state)
