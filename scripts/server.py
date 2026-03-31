@@ -5306,6 +5306,17 @@ function esInfoPopup(btn, text) {{
         <div class="es-toggle-vis"></div>
       </label>
     </div>
+    <div class="es-row">
+      <div class="es-rl">Max. Kontext-Items<div class="es-rd">Wie viele Eintr&auml;ge (Tasks, Mails, Rechnungen) Kira gleichzeitig sieht</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-llm-max-items" value="{llm.get('max_kontext_items', 50)}" min="5" max="200" style="width:72px">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Wissen extrahieren<div class="es-rd">Kira lernt automatisch aus Gespr&auml;chen und speichert Regeln</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-auto-wissen" {'checked' if llm.get('auto_wissen_extrahieren', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
   </div>
 
   <div class="es-grp">
@@ -9317,6 +9328,8 @@ function saveSettings() {{
       internet_recherche:      document.getElementById('cfg-llm-internet')?.checked ?? false,
       geschaeftsdaten_teilen:  document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
       konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
+      max_kontext_items:        parseInt(document.getElementById('cfg-llm-max-items')?.value || '50', 10),
+      auto_wissen_extrahieren:  document.getElementById('cfg-llm-auto-wissen')?.checked ?? true,
       _provider_updates: providerUpdates
     }},
     protokoll: {{

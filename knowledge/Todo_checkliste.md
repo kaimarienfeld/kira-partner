@@ -165,8 +165,8 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 ### 6d. LLM-Verhalten
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
-| ❌ | Max. Kontext-Items (Zeilen) | `cfg-llm-max-items` / `llm.max_kontext_items` | Kira liest bis 50 Items aus DB |
-| ❌ | Auto-Wissen extrahieren | `cfg-llm-auto-wissen` / `llm.auto_wissen_extrahieren` | Automatisch Wissensregeln aus Kira-Chats |
+| ✅ | Max. Kontext-Items (Zeilen) | `cfg-llm-max-items` / `llm.max_kontext_items` | Number-Input, default 50, session-pp |
+| ✅ | Auto-Wissen extrahieren | `cfg-llm-auto-wissen` / `llm.auto_wissen_extrahieren` | Toggle, default an, session-pp |
 | 💡 | System-Prompt anzeigen/editieren | `kira.system_prompt_custom` 🔗 | Eigenen Prompt-Anteil hinzufügen |
 | 💡 | Antwort-Länge | `llm.antwort_laenge` 🔗 | Kurz / Normal / Ausführlich |
 | 💡 | LLM-Temperatur | `llm.temperatur` | 0.0–1.0 (Kreativität vs. Präzision) |
@@ -207,7 +207,7 @@ _Komplett überarbeitet session-y + session-bb (2026-03-29)_
 | ✅ | Alle abrufen | `POST /api/mail/konto/alle-abrufen`, session-y |
 | ✅ | Volltest (IMAP+SMTP+Roundtrip) | `POST /api/mail/konto/volltest` + Polling Status, session-bb |
 | ✅ | Verbindung wiederherstellen (Reconnect) | `POST /api/mail/konto/reconnect` — neue OAuth-Token für bestehendes Konto, session-bb |
-| 🔧 | Konto löschen | Button vorhanden, Backend `POST /api/mail/konto/hinzufuegen` implementiert — Löschen noch nur Toast |
+| ✅ | Konto löschen | `POST /api/mail/konto/loeschen` — entfernt aus raumkult_config.json + config.json, session-pp |
 | ✅ | Konto hinzufügen (Mailbird-Wizard) | 6-Schritt-Assistent mit 3-stufiger Provider-Erkennung + OAuth-Browser, session-bb |
 | ✅ | IMAP-Ordner Accordion | Ordner laden via `GET /api/mail/konten/ordner`, session-y |
 
