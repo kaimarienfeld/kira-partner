@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ww",
-  "date": "2026-03-31 09:30",
+  "last_session": "session-xx-docs",
+  "date": "2026-03-31 21:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -36,7 +36,9 @@
     "session-oo (2026-03-31): KIRA Vollstaendige Aktive Assistenz — alle 9 Plan-Pakete implementiert. P1: Tool-Idempotenz, Circuit Breaker, Rate-Limiting. P2: mail_approve_queue, _tool_mail_senden, Dashboard-Badge. P3: kira_konversationen in System-Prompt, konversation_suchen, tages_memory_summary. P4: scan_angebot_followup_vorgang, scan_mahnung_eskalation, scan_autonomy_decision. P5: chat_react, /api/kira/task. P6: kira_feedback Tabelle, kirafb(), auto-Wissensregel. P7: mail_fts FTS5, semantisch_suchen. P8: termin_erstellen (Graph-API, braucht Azure-Permission). P9: panel-kira-aktivitaeten, /api/kira/aktivitaeten, actor_type kira_autonom/kira_vorschlag.",
     "session-uu (2026-03-31): UI-Fixes. (1) Stats-Zeile Dashboard springt via filterKomm()+jumpToSeg() zu korrektem Tab. (2) Ignorieren-Lernfrage mit 4 Presets schreibt Wissensregel. (3) Wissensregeln Timestamps in UI.",
     "session-vv (2026-03-31): UX + Modal-Fix. (1) _pfGlobalBadgeUpdate() — Badge-Polling unabhaengig von aktivem Panel. (2) Spaeter-Dialog: datetime-local Picker, 4 Schnellbuttons, Warum-Lernfrage. (3) Sidebar-Logo: Kira-Orb-SVG. (4) Favicon: Kira-SVG in head. (5) --bg-card Variable definiert, alle Modals auf CSS-Variablen umgestellt. Commit a2c580c.",
-    "session-ww (2026-03-31): Plan-Status-Scan — alle Pakete 1-9 bestaetigt done. session_handoff.json aktualisiert. Backfill (Paket 10) naechster Schritt."
+    "session-ww (2026-03-31): Plan-Status-Scan — alle Pakete 1-9 bestaetigt done. session_handoff.json aktualisiert. Backfill (Paket 10) naechster Schritt.",
+    "session-xx (2026-03-31): Antwort-Zitat (Reply Quoting) in Postfach: pfReply() mit quoted body + in_reply_to threading. Commit ecec464.",
+    "session-xx-docs (2026-03-31): Dokumentations-Konsolidierung 5 Phasen. KIRA_SYSTEM_ANALYSE.md komplett neu geschrieben (15 Sektionen, 23 Tools, 96 Endpoints, 46 DB-Tabellen, konsolidierte Status-Tabelle). 9 Referenzen in AGENT.md + 6 Agent-Definitionen + README auf Masterdatei umgestellt. 7 alte Planungsdokumente geloescht (~120 KB): KIRA_2_0_UMBAU_PLAN.md, KIRA_2_0_UI_UMBAU_PLAN.md, AGENT_TEAM_PLAYBOOK.md, Implementierungsplan.md, Zusatz v Kai.md, arbeitsanweisung_case_engine.md, Kontext_engen_GPT.txt."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",

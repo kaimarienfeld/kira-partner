@@ -49,11 +49,11 @@ Hat vorang: "C:\Users\kaimr\.claude\CLAUDE.md"
    - `_archiv/only_kais checkliste.md` aktualisieren
    - `knowledge/Todo_checkliste.md` aktualisieren (auch kleine Aufgaben!)
      → Alle drei mit `feature_registry.json` abgleichen
-     10a. **KIRA 2.0 UI-Umbau-Plan aktuell halten** (PFLICHT bei allen UI/UX-Änderungen):
-   - `_analyse/KIRA_2_0_UI_UMBAU_PLAN.md` — Status-Tabellen aktualisieren (✅ done, 📋 offen, 🔧 in Arbeit)
+     10a. **KIRA System-Analyse aktuell halten** (PFLICHT bei allen UI/UX-Aenderungen):
+   - `_analyse/KIRA_SYSTEM_ANALYSE.md` — Konsolidierte Status-Tabelle aktualisieren (✅ done, 📋 offen, 🔧 in Arbeit)
    - Neue To-dos die beim Bauen auffallen direkt eintragen
    - Ist-Zustand-Beschreibungen nach Umbau aktualisieren
-     → Gilt als Referenz für alle KIRA-Umbau-Sessions — immer lesen bevor neue KIRA-UI-Arbeit beginnt
+     → Gilt als Single Source of Truth fuer alle KIRA-Sessions — immer lesen bevor neue Arbeit beginnt
 10. **Partner-View generieren + automatisch pushen** (PFLICHT):
     ```
     python scripts/generate_partner_view.py        # immer: lokal aktualisieren

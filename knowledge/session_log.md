@@ -440,3 +440,34 @@
 
 **Offen geblieben:** Direkte E-Mail-Antwort, Kunden-360, Eingangsrechnungen-Scanner, Zu-Kira-Ordner-Button aus Postfach
 **Status:** erledigt
+
+---
+
+## 2026-03-31 18:30 — Session-Start (session-xx)
+
+**Auftrag:** KIRA Struktur-Analyse & Dokumentations-Konsolidierung. 5-Phasen-Auftrag: (1) Vollstaendige App-Struktur erfassen, (2) Abgleich mit 8 Planungsdokumenten, (3) Masterdatei KIRA_SYSTEM_ANALYSE.md als einzige Wahrheitsquelle schreiben, (4) Referenzen auf alte Dokumente durch Masterdatei-Pfad ersetzen, (5) Alte Planungsdokumente loeschen.
+**Erledigt:** Alle 5 Phasen abgeschlossen. KIRA_SYSTEM_ANALYSE.md komplett neu geschrieben (15 Sektionen, 700+ Zeilen). 9 Referenzen in 9 Dateien auf Masterdatei umgestellt. 7 alte Planungsdokumente geloescht (~120 KB). AGENT.md + 6 Agent-Definitionen + README aktualisiert.
+**Status:** erledigt
+
+---
+
+## 2026-03-31 21:00 — Session-Ende (session-xx)
+
+**Erledigt:**
+
+- Antwort-Zitat (Reply Quoting) in Postfach: pfReply() erweitert mit quoted body + in_reply_to threading
+  - _pfCurrentMail._text_plain caching beim Mail-Fetch (auch bei HTML-Mails in iframe)
+  - window._pfReplyMsgId speichert Message-ID fuer Thread-Header
+  - pfSend() sendet in_reply_to wenn gesetzt
+  - pfCloseCompose() / pfForward() reset _pfReplyMsgId
+  - Commit ecec464
+
+**Offen geblieben:** Kunden-360-Ansicht, Eingangsrechnungen-Scanner, Zu-Kira-Ordner-Button, Outlook-Kalender (wartet auf Azure-Scope)
+**Status:** erledigt
+
+---
+
+## 2026-03-31 21:00 — Session-Start (session-yy)
+
+**Auftrag:** Weiter bitte — autonomer Modus. Naechstes Feature: Kunden-360-Ansicht (Kundenprofil-Panel mit allen Interaktionen: Mails, Tasks, Vorgaenge, Rechnungen).
+**Status:** offen
