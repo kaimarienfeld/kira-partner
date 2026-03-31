@@ -4223,6 +4223,9 @@ def build_einstellungen():
     kira_bounce_dist = kira_cfg.get("bounce_dist", 130)
     kira_idle        = kira_cfg.get("idle_mode", True)
     kira_idle_delay  = kira_cfg.get("idle_delay", 10)
+    kira_name_cfg    = kira_cfg.get("name", "Kira")
+    kira_pers_cfg    = kira_cfg.get("persoenlichkeit", "direkt")
+    kira_prompt_custom = kira_cfg.get("system_prompt_custom", "")
     # Kira 2.0 erweiterte Einstellungen
     kira_memory_cfg    = kira_cfg.get("memory", {})
     kira_react_cfg     = kira_cfg.get("react", {})
@@ -5301,6 +5304,27 @@ function esInfoPopup(btn, text) {{
         <option value="120" {'selected' if kira_idle_delay==120 else ''}>2 Minuten</option>
         <option value="300" {'selected' if kira_idle_delay==300 else ''}>5 Minuten</option>
       </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Kira-Pers&ouml;nlichkeit &amp; Identit&auml;t</div>
+    <div class="es-grp-sub">Name, Stil und zus&auml;tzliche Anweisungen &mdash; flie&szlig;en direkt in Kiras System-Prompt ein.</div>
+    <div class="es-row">
+      <div class="es-rl">Kira-Name<div class="es-rd">Wie Kira sich nennt (Standard: Kira)</div></div>
+      <input class="es-inp" type="text" id="cfg-kira-name" value="{esc(kira_name_cfg)}" placeholder="Kira" style="max-width:180px">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Kommunikationsstil<div class="es-rd">Beeinflusst Kiras Ton und Formulierungen</div></div>
+      <select class="es-sel" id="cfg-kira-persoenlichkeit">
+        <option value="direkt" {'selected' if kira_pers_cfg=='direkt' else ''}>Direkt (Standard) &mdash; kurz, sachlich, kein Spam</option>
+        <option value="professionell" {'selected' if kira_pers_cfg=='professionell' else ''}>Professionell &mdash; sachlich, pr&auml;zise, formal</option>
+        <option value="freundlich" {'selected' if kira_pers_cfg=='freundlich' else ''}>Freundlich &mdash; zug&auml;nglich, positiver Ton</option>
+      </select>
+    </div>
+    <div class="es-row" style="align-items:flex-start">
+      <div class="es-rl" style="padding-top:6px">System-Prompt Erg&auml;nzung<div class="es-rd">Zus&auml;tzliche Anweisungen die Kira immer befolgt</div></div>
+      <textarea id="cfg-kira-prompt-custom" rows="4" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical;min-height:80px" placeholder="z.B.: Antworte immer auf Englisch wenn ich auf Englisch schreibe.">{esc(kira_prompt_custom)}</textarea>
     </div>
   </div>
 
@@ -9398,12 +9422,15 @@ function saveSettings() {{
       kira_darf_lesen:        document.getElementById('cfg-rl-kira-lesen')?.checked ?? true
     }},
     kira: {{
-      launcher_variant: document.getElementById('cfg-kira-variant')?.value || 'B',
-      size:        parseInt(document.getElementById('cfg-kira-size')?.value       || '112'),
-      prox_radius: parseFloat(document.getElementById('cfg-kira-prox')?.value    || '0.5'),
-      bounce_dist: parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
-      idle_mode:   document.getElementById('cfg-kira-idle')?.checked              ?? true,
-      idle_delay:  parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10'),
+      launcher_variant:    document.getElementById('cfg-kira-variant')?.value || 'B',
+      size:                parseInt(document.getElementById('cfg-kira-size')?.value       || '112'),
+      prox_radius:         parseFloat(document.getElementById('cfg-kira-prox')?.value    || '0.5'),
+      bounce_dist:         parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
+      idle_mode:           document.getElementById('cfg-kira-idle')?.checked              ?? true,
+      idle_delay:          parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10'),
+      name:                (document.getElementById('cfg-kira-name')?.value.trim() || 'Kira'),
+      persoenlichkeit:     document.getElementById('cfg-kira-persoenlichkeit')?.value || 'direkt',
+      system_prompt_custom: (document.getElementById('cfg-kira-prompt-custom')?.value || '').trim(),
       memory: {{
         aktiv:         document.getElementById('cfg-mem-aktiv')?.checked    ?? true,
         sessions:      parseInt(document.getElementById('cfg-mem-sessions')?.value || '3'),

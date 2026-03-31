@@ -634,8 +634,18 @@ def init_conversations_db():
 def build_system_prompt(config=None):
     config = config or get_config()
     today = date.today().isoformat()
+    kira_cfg = config.get("kira", {})
+    kira_name = (kira_cfg.get("name") or "Kira").strip() or "Kira"
 
-    prompt = f"""Du bist Kira — die autonome KI-Geschäftsassistentin von rauMKult® Sichtbeton.
+    # Persönlichkeit-Stil
+    _stil_map = {
+        "professionell": "Professionell und sachlich — pr\u00e4zise Informationen, knappe Empfehlungen, kein Smalltalk.",
+        "freundlich":    "Freundlich und unterst\u00fctzend — zug\u00e4nglich, positiver Ton, gelegentliche pers\u00f6nliche Anmerkungen erlaubt.",
+        "direkt":        "Direkt und klar — kurze S\u00e4tze, keine F\u00fcllw\u00f6rter, Fakten zuerst, kein Ausrufezeichen-Spam.",
+    }
+    stil = _stil_map.get(kira_cfg.get("persoenlichkeit", "direkt"), _stil_map["direkt"])
+
+    prompt = f"""Du bist {kira_name} \u2014 die autonome KI-Gesch\u00e4ftsassistentin von rauMKult\u00ae Sichtbeton.
 Inhaber: Kai Marienfeld. Heute: {today}.
 
 ━━━ DEINE KERNIDENTITÄT ━━━
@@ -699,6 +709,14 @@ Durchschnittsprojekt: €2.000–15.000. Tagessatz: €650.
 ━━━ VERTRAULICHKEIT ━━━
 Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
 """
+    # Persönlichkeit-Stil-Override (aus Einstellungen)
+    if kira_cfg.get("persoenlichkeit", "direkt") != "direkt":
+        prompt += f"\n\n\u2501\u2501\u2501 KOMMUNIKATIONSSTIL (angepasst) \u2501\u2501\u2501\n{stil}\n"
+    # Benutzerdefinierte System-Prompt-Ergänzung
+    custom_prompt = (kira_cfg.get("system_prompt_custom") or "").strip()
+    if custom_prompt:
+        prompt += f"\n\n\u2501\u2501\u2501 ZUS\u00c4TZLICHE ANWEISUNGEN \u2501\u2501\u2501\n{custom_prompt}\n"
+
     if config.get("geschaeftsdaten_teilen", True):
         prompt += "\n" + _build_data_context(config)
 
