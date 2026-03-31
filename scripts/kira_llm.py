@@ -1316,6 +1316,23 @@ def get_tools(config=None):
         }
     })
 
+    # ── Vorgang-Naechste-Aktion Tool (Paket 4, session-oo) ───────────────────
+    tools.append({
+        "name": "vorgang_naechste_aktion_vorschlagen",
+        "description": (
+            "Analysiert einen offenen Vorgang und schlaegt die optimale naechste Aktion vor. "
+            "Gibt erlaubte Status-Uebergaenge, Kundenhistorie und konkreten Handlungsvorschlag zurueck. "
+            "Nutze dieses Tool wenn du fuer einen Vorgang nicht weisst was als naechstes zu tun ist."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "vorgang_id": {"type": "integer", "description": "Vorgang-ID"}
+            },
+            "required": ["vorgang_id"]
+        }
+    })
+
     # ── Konversations-Gedaechtnis Tool (Paket 3, session-oo) ─────────────────
     tools.append({
         "name": "konversation_suchen",
@@ -1407,6 +1424,7 @@ def execute_tool(name, params):
             "mail_lesen": _tool_mail_lesen,
             "vorgang_kontext_laden": _tool_vorgang_kontext_laden,
             "vorgang_status_setzen": _tool_vorgang_status_setzen,
+            "vorgang_naechste_aktion_vorschlagen": _tool_vorgang_naechste_aktion_vorschlagen,
             "konversation_suchen": _tool_konversation_suchen,
             "mail_senden": _tool_mail_senden,
         }
@@ -2086,6 +2104,47 @@ def _tool_vorgang_status_setzen(p):
         return {
             "error": f"Übergang '{v['status']}' → '{neuer_status}' nicht erlaubt",
             "erlaubte_uebergaenge": erlaubt,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_vorgang_naechste_aktion_vorschlagen(p):
+    """Analysiert einen Vorgang und schlaegt naechste Aktion vor (Paket 4, session-oo)."""
+    vid = p.get("vorgang_id")
+    if not vid:
+        return {"error": "vorgang_id erforderlich"}
+    try:
+        from case_engine import get_vorgang_context, get_valid_transitions
+        ctx = get_vorgang_context(int(vid))
+        if not ctx:
+            return {"error": f"Vorgang {vid} nicht gefunden"}
+        v         = ctx.get("vorgang", {})
+        typ       = v.get("typ", "")
+        status    = v.get("status", "")
+        erlaubte  = get_valid_transitions(typ, status)
+        # Kompakter Kontext fuer internes LLM-Reasoning
+        eintraege = ctx.get("eintraege", [])
+        context_summary = (
+            f"Vorgang {v.get('vorgang_nr')}: {v.get('titel','')}\n"
+            f"Typ: {typ} | Status: {status}\n"
+            f"Kunde: {v.get('kunden_name') or v.get('kunden_email','?')}\n"
+            f"Erstellt: {(v.get('erstellt_am') or '')[:10]} | "
+            f"Letzte Aenderung: {(v.get('aktualisiert_am') or '')[:10]}\n"
+            f"Verknuepfte Eintraege: {len(eintraege)}\n"
+            f"Erlaubte Uebergaenge: {', '.join(erlaubte) if erlaubte else 'keine (abgeschlossen?)'}"
+        )
+        return {
+            "ok": True,
+            "vorgang_nr": v.get("vorgang_nr"),
+            "status": status,
+            "typ": typ,
+            "erlaubte_uebergaenge": erlaubte,
+            "kontext": context_summary,
+            "empfehlung": (
+                f"Naechster Schritt fuer {typ} im Status '{status}': "
+                + (erlaubte[0] if erlaubte else "kein weiterer Uebergang moeglich")
+            ),
         }
     except Exception as e:
         return {"error": str(e)}

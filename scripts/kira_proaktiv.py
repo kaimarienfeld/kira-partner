@@ -430,6 +430,234 @@ def scan_neue_kunden_erkennen(db, state: dict) -> list:
     return aktionen
 
 
+def scan_angebot_followup_vorgang(db, state: dict) -> list:
+    """
+    Scan 7 (Paket 4, session-oo): Angebote-Vorgaenge die seit > 7 Tagen auf Antwort warten.
+    Erstellt Mail-Entwurf in mail_approve_queue und Stufe-B-Signal.
+    """
+    aktionen = []
+    try:
+        from case_engine import get_open_vorgaenge
+        vorgaenge = get_open_vorgaenge(typ="angebot", limit=20)
+    except Exception:
+        return []
+
+    now = datetime.now()
+    for v in vorgaenge:
+        if v.get("status") != "angebot_versendet":
+            continue
+        try:
+            aktualisiert = datetime.fromisoformat(str(v["aktualisiert_am"])[:19])
+            tage_alt = (now - aktualisiert).days
+        except Exception:
+            continue
+        if tage_alt < 7:
+            continue
+
+        key = f"angebot-followup-vorgang-{v['id']}-{tage_alt // 7}"
+        if _already_done(state, key, ttl_hours=48):
+            continue
+
+        email      = v.get("kunden_email", "")
+        name       = v.get("kunden_name") or email or "?"
+        titel      = v.get("titel", "Angebot")
+        vorgang_nr = v.get("vorgang_nr", "")
+
+        # Mail-Entwurf in approve_queue erstellen
+        try:
+            betreff    = f"Nachfass: {titel}"
+            body_text  = (
+                f"Sehr geehrte(r) {name},\n\n"
+                f"ich melde mich bezueglich unserem Angebot {vorgang_nr} ({titel}).\n"
+                f"Das Angebot liegt nun seit {tage_alt} Tagen bei Ihnen vor — "
+                f"haben Sie Rueckfragen oder kann ich Ihnen weiterhelfen?\n\n"
+                f"Mit freundlichen Gruessen\nKai Marienfeld\nrauMKult Sichtbeton"
+            )
+            db.execute("""
+                INSERT INTO mail_approve_queue
+                    (an, betreff, body_plain, vorgang_id, erstellt_von, status, ablauf_am)
+                VALUES (?,?,?,?,'kira_proaktiv','pending',
+                        datetime('now','+3 days'))
+            """, (email, betreff, body_text, v["id"]))
+            db.commit()
+        except Exception:
+            pass
+
+        # Stufe-B-Signal
+        try:
+            from case_engine import create_signal
+            create_signal(
+                titel=f"Angebot-Nachfass: {name}",
+                nachricht=f"{vorgang_nr} seit {tage_alt} Tagen ohne Antwort",
+                stufe="B", quelle="kira_proaktiv",
+                meta={"vorgang_id": v["id"]},
+            )
+        except Exception:
+            pass
+
+        _mark_done(state, key)
+        aktionen.append({"vorgang_id": v["id"], "vorgang_nr": vorgang_nr,
+                         "tage": tage_alt, "email": email})
+        _elog('system', 'angebot_followup_draft',
+              f"Angebot {vorgang_nr} seit {tage_alt} Tagen — Mail-Entwurf erstellt",
+              source='kira_proaktiv', modul='kira_proaktiv', actor_type='system', status='ok')
+
+    return aktionen
+
+
+def scan_mahnung_eskalation(db, state: dict) -> list:
+    """
+    Scan 8 (Paket 4, session-oo): Mahnungs-Vorgaenge die seit > 14 Tagen offen sind.
+    Erstellt Stufe-B-Signal fuer User-Entscheidung.
+    """
+    aktionen = []
+    try:
+        from case_engine import get_open_vorgaenge
+        vorgaenge = get_open_vorgaenge(typ="mahnung", limit=20)
+    except Exception:
+        return []
+
+    now = datetime.now()
+    for v in vorgaenge:
+        if v.get("status") not in ("mahnung_versendet", "mahnung_1"):
+            continue
+        try:
+            aktualisiert = datetime.fromisoformat(str(v["aktualisiert_am"])[:19])
+            tage_alt = (now - aktualisiert).days
+        except Exception:
+            continue
+        if tage_alt < 14:
+            continue
+
+        key = f"mahnung-eskalation-{v['id']}-{tage_alt // 14}"
+        if _already_done(state, key, ttl_hours=72):
+            continue
+
+        name       = v.get("kunden_name") or v.get("kunden_email") or "?"
+        vorgang_nr = v.get("vorgang_nr", "")
+
+        try:
+            from case_engine import create_signal
+            create_signal(
+                titel=f"Mahnung eskalieren: {name}",
+                nachricht=f"{vorgang_nr} seit {tage_alt} Tagen ohne Reaktion. Naechste Stufe?",
+                stufe="B", quelle="kira_proaktiv",
+                meta={"vorgang_id": v["id"]},
+            )
+        except Exception:
+            pass
+
+        _mark_done(state, key)
+        aktionen.append({"vorgang_id": v["id"], "vorgang_nr": vorgang_nr,
+                         "tage": tage_alt, "name": name})
+        _elog('system', 'mahnung_eskalation_signal',
+              f"Mahnung {vorgang_nr} seit {tage_alt} Tagen — Eskalations-Signal erstellt",
+              source='kira_proaktiv', modul='kira_proaktiv', actor_type='system', status='ok')
+
+    return aktionen
+
+
+def scan_autonomy_decision(db, state: dict) -> list:
+    """
+    Scan 9 — Autonomy-Decision-Loop (Paket 4, session-oo).
+    Laesst Kira alle offenen Vorgaenge analysieren und schlaegt naechste Aktionen vor.
+    TTL: 60 Minuten.
+    """
+    if _already_done(state, "autonomy_decision", ttl_hours=1):
+        return []
+
+    try:
+        from case_engine import get_open_vorgaenge, get_valid_transitions
+        vorgaenge = get_open_vorgaenge(limit=15)
+    except Exception:
+        return []
+
+    if not vorgaenge:
+        return []
+
+    # Kompakte Vorgang-Liste fuer LLM
+    vorgang_liste = ""
+    for v in vorgaenge[:10]:
+        vorgang_liste += (
+            f"- ID={v['id']} | {v['vorgang_nr']} | Typ={v['typ']} | "
+            f"Status={v['status']} | Kunde={v.get('kunden_name') or v.get('kunden_email','?')} | "
+            f"Titel={v.get('titel','')[:60]}\n"
+        )
+
+    prompt = (
+        "Analysiere diese offenen Vorgaenge und schlage fuer jeden die wichtigste naechste Aktion vor.\n"
+        "Antworte als JSON-Liste: [{\"vorgang_id\": N, \"aktion\": \"...\", \"konfidenz\": 0.0-1.0}]\n"
+        "Beispiel-Aktionen: 'Nachfass-Mail senden', 'Mahnung erstellen', 'Angebot nachfassen', 'Termin vereinbaren'\n\n"
+        f"Vorgaenge:\n{vorgang_liste}\n\n"
+        "Nur Aktionen vorschlagen die wirklich sinnvoll sind. Konfidenz < 0.5 = weglassen."
+    )
+
+    try:
+        from kira_llm import chat as _kira_chat
+        import json as _json
+        result = _kira_chat(prompt)
+        text = (result.get("text") or "").strip()
+        # JSON aus Antwort extrahieren
+        start = text.find("[")
+        end   = text.rfind("]") + 1
+        if start < 0 or end <= start:
+            return []
+        vorschlaege = _json.loads(text[start:end])
+    except Exception:
+        return []
+
+    aktionen = []
+    for vs in vorschlaege:
+        vid  = vs.get("vorgang_id")
+        aktion = vs.get("aktion", "")
+        konfidenz = float(vs.get("konfidenz", 0))
+        if not vid or not aktion or konfidenz < 0.5:
+            continue
+
+        # Entscheidungsstufe anhand Konfidenz
+        if konfidenz >= 0.85:
+            stufe = "A"  # Stumm: Task erstellen
+        elif konfidenz >= 0.60:
+            stufe = "B"  # Toast
+        else:
+            stufe = "C"  # Modal
+
+        if stufe == "A":
+            # Task automatisch erstellen
+            try:
+                db.execute("""
+                    INSERT INTO tasks (kategorie, titel, status, kunden_email, konfidenz, vorgang_id)
+                    SELECT 'vorgang_aktion', ?, 'offen', kunden_email, ?, id
+                    FROM vorgaenge WHERE id=?
+                """, (f"Aktion: {aktion}", konfidenz, vid))
+                db.commit()
+            except Exception:
+                pass
+        else:
+            # Signal erstellen
+            try:
+                from case_engine import create_signal
+                create_signal(
+                    titel=f"Kira-Vorschlag: {aktion}",
+                    nachricht=f"Vorgang {vid} | Konfidenz: {konfidenz:.0%}",
+                    stufe=stufe, quelle="autonomy_decision",
+                    meta={"vorgang_id": vid, "konfidenz": konfidenz},
+                )
+            except Exception:
+                pass
+
+        aktionen.append({"vorgang_id": vid, "aktion": aktion,
+                         "konfidenz": konfidenz, "stufe": stufe})
+        _elog('system', 'autonomy_vorschlag',
+              f"Vorgang {vid}: {aktion} (Konfidenz {konfidenz:.0%}, Stufe {stufe})",
+              source='kira_proaktiv', modul='kira_proaktiv', actor_type='kira_autonom',
+              status='ok')
+
+    if aktionen:
+        _mark_done(state, "autonomy_decision")
+    return aktionen
+
+
 def scan_tages_memory_summary(db, state: dict) -> dict:
     """
     Taegliche Memory-Summary (Paket 3, session-oo).
@@ -530,6 +758,21 @@ def run_proaktiver_scan() -> dict:
         mem_summary = scan_tages_memory_summary(db, state)
         if mem_summary:
             ergebnisse['tages_memory_summary'] = mem_summary
+
+        # Scan 7: Angebot-Followup via Vorgang-Layer (Paket 4, session-oo)
+        angebot_followup = scan_angebot_followup_vorgang(db, state)
+        if angebot_followup:
+            ergebnisse['angebot_followup_vorgang'] = angebot_followup
+
+        # Scan 8: Mahnung-Eskalation (Paket 4, session-oo)
+        mahnung_esk = scan_mahnung_eskalation(db, state)
+        if mahnung_esk:
+            ergebnisse['mahnung_eskalation'] = mahnung_esk
+
+        # Scan 9: Autonomy-Decision-Loop (Paket 4, session-oo)
+        autonomy = scan_autonomy_decision(db, state)
+        if autonomy:
+            ergebnisse['autonomy_decision'] = autonomy
 
         db.close()
         _save_state(state)
