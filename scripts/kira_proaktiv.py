@@ -21,7 +21,7 @@ a) Einen automatischen Task in tasks.db
 b) Eine Push-Benachrichtigung via ntfy
 c) Einen Eintrag im Runtime-Log für KIRA
 """
-import json, sqlite3, logging
+import json, os, sqlite3, logging, threading
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
@@ -51,23 +51,29 @@ if not log.handlers:
 
 # Status-Datei: verhindert Spam-Aktionen (gleiche Aktion nicht 2x am Tag)
 SCAN_STATE_FILE = KNOWLEDGE_DIR / "proaktiv_state.json"
+_state_lock = threading.Lock()  # Thread-Safety innerhalb desselben Prozesses
 
 
 # ── Scan-State ────────────────────────────────────────────────────────────────
 def _load_state() -> dict:
-    try:
-        if SCAN_STATE_FILE.exists():
-            return json.loads(SCAN_STATE_FILE.read_text('utf-8'))
-    except Exception:
-        pass
-    return {}
+    with _state_lock:
+        try:
+            if SCAN_STATE_FILE.exists():
+                return json.loads(SCAN_STATE_FILE.read_text('utf-8'))
+        except Exception:
+            pass
+        return {}
 
 
 def _save_state(state: dict):
-    try:
-        SCAN_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), 'utf-8')
-    except Exception:
-        pass
+    """Atomischer Schreibvorgang via temp-Datei + os.replace — verhindert Korruption."""
+    with _state_lock:
+        try:
+            tmp_path = SCAN_STATE_FILE.with_suffix('.json.tmp')
+            tmp_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), 'utf-8')
+            os.replace(str(tmp_path), str(SCAN_STATE_FILE))
+        except Exception:
+            pass
 
 
 def _already_done(state: dict, key: str, ttl_hours: int = 24) -> bool:
