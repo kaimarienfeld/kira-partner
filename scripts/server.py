@@ -9535,11 +9535,17 @@ function appendKiraMsg(rolle, text, tools, providerInfo, fallbackInfo) {{
     const msgIdx = ++_kiraMsgIdx;
     wrap.innerHTML = '<div class="msg-head"><span class="msg-name">Kira</span><span class="msg-time">'+now+'</span></div>';
     wrap.appendChild(bubble);
-    // Feedback-Buttons (Paket 6, session-oo)
+    // Feedback-Buttons (Paket 6, session-oo) — DOM-Methoden statt innerHTML (Quote-Bug-Fix)
     const fbDiv = document.createElement('div');
     fbDiv.style.cssText = 'display:flex;gap:6px;margin-top:6px;padding-left:2px;';
-    fbDiv.innerHTML = '<button onclick="kirafb(\'gut\','+msgIdx+',this)" style="background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:2px 8px;cursor:pointer" title="Hilfreich">&#x1F44D;</button>'
-      +'<button onclick="kirafb(\'schlecht\','+msgIdx+',this,'+JSON.stringify(text.substring(0,500))+')" style="background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:2px 8px;cursor:pointer" title="Nicht hilfreich">&#x1F44E;</button>';
+    var _btnStyle = 'background:none;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:2px 8px;cursor:pointer';
+    var _btn1 = document.createElement('button');
+    _btn1.innerHTML = '&#x1F44D;'; _btn1.title = 'Hilfreich'; _btn1.style.cssText = _btnStyle;
+    (function(_mi){{ _btn1.onclick = function(){{ kirafb('gut', _mi, this); }}; }})(msgIdx);
+    var _btn2 = document.createElement('button');
+    _btn2.innerHTML = '&#x1F44E;'; _btn2.title = 'Nicht hilfreich'; _btn2.style.cssText = _btnStyle;
+    (function(_mi, _tx){{ _btn2.onclick = function(){{ kirafb('schlecht', _mi, this, _tx); }}; }})(msgIdx, text.substring(0,500));
+    fbDiv.appendChild(_btn1); fbDiv.appendChild(_btn2);
     wrap.appendChild(fbDiv);
   }} else if(rolle==='error') {{
     wrap.className = 'msg error';
