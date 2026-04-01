@@ -1,6 +1,6 @@
 {
-  "last_session": "session-iii",
-  "date": "2026-04-01 13:30",
+  "last_session": "session-jjj",
+  "date": "2026-04-01 18:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -46,6 +46,7 @@
     "session-ddd (2026-04-01): Alle verbleibenden open_tasks aus session_handoff.json abgearbeitet. (1) Google OAuth Persistierung: _wizPollGoogleOAuth() ruft jetzt health-check + esLoadMailKonten() nach Erfolg (parity mit MS-OAuth-Flow). (2) 'Zu Kira hinzufuegen'-Button im Postfach: '+'-Button auf allen Ordnern die NICHT in kira sync_ordner sind, pfAddFolderToKira() POST /api/mail/archiv/sync-ordner + Folder-Reload. (3) SMTP-Passwort-Auth im Volltest: run_full_connection_test() brancht jetzt use_password_smtp vs XOAUTH2, base64-Passwort wird dekodiert. Verifiziert: Tagesbriefing/geloeschte_protokoll/bereinigung-UI/polling-intervall/kira-FAB-drag waren bereits implementiert. Commits: f87c0de. KIRA_SYSTEM_ANALYSE.md §14 session-ddd Erledigt-Block.",
     "session-eee (2026-04-01): Lexware Office Modul vollstaendig implementiert (Pakete 1-9). (1) lexware_client.py: LexwareClient Klasse, alle API-Endpunkte (vouchers/contacts/articles/files), Rate-Limit-Handler (429+Retry), Sync-Methoden sync_belege/kontakte/artikel_to_db(). (2) server.py: _ensure_lexware_tables() (5 Tabellen: lexware_belege/kontakte/artikel/eingangsbelege_pruefqueue/lexware_config), build_lexware() mit 3-Zustand-Modul (nicht_gebucht/gesperrt/freigeschaltet), 6-Tab-Panel (Cockpit/Belege/Kontakte/Artikel/Buchhaltung/Diagnose), Sidebar-Eintrag nav-lexware, Einstellungen-Sektion es-sec-lexware (Modul-Status/API-Key/Sync/Prüfregeln/Dataverse), 7 GET + 5 POST API-Endpunkte, _handle_lexware_post() verdrahtet in do_POST, CSS lx-* Klassen, 9 JS-Funktionen (showLexTab/lexSync/lexTestConnection etc.). (3) kira_llm.py: lexware_belege_laden + lexware_eingangsbeleg_klassifizieren Tools (nur wenn Modul freigeschaltet), Lexware-Kontext in _build_data_context() (offene Posten + Pruefqueue-Counter). (4) mail_monitor.py: _scan_eingangsbeleg_lexware() mit PayPal-Ausnahme-Erkennung, Body-only-Rechnungen, idempotenter Queue-Eintrag, verdrahtet nach _auto_scan_eingangsrechnung(). Commit: 861e057. feature_registry.json: lexware-anbindung -> done.",
     "session-fff (2026-04-01): Lexware Office UI Komplettausbau (session-fff). build_lexware() vollstaendig umgebaut: (1) 9-Button Sekundaer-Navigation (showLexSec()), 4 In-Planung-Bereiche (Auswertungen/Kunden-360/Cashflow/Kalkulation). (2) Cockpit: Hero-KPIs (6 Kacheln), Schnellaktionen, letzte Belege (split-view ready), Signale-Panel mit Warnungen. (3) Belege: Split-View Detail-Panel (lx-detail-panel), Typ/Status-Filter, Kira-Badge-Spalte. (4) Zahlungen: In-Planung-Banner + lokale Zahlungserfassung aus pruefqueue. (5) Kontakte: Split-View Detail-Panel. (6) Artikel: Herkunft-Spalte. (7) Dateien: Kacheln + Belegdateien-Liste. (8) Buchhaltung: 6 Sub-Tabs (zu_pruefen/klassifiziert/abgelegt/unklar/vollautomatik/alle) mit lx-buch-nav. (9) Regeln & Muster: aus pruefqueue GROUP BY absender_domain abgeleitet. (10) Diagnose: 3-Panel-Layout (Verbindung/Daten/Mapping). (11) Einstellungen: 9-Button Sub-Navigation (lx-es-subnav) + 9 lx-es-subpanel Bereiche. (12) Sidebar: oranger Badge bei Pruefbedarf. 5 neue GET-Endpunkte: /api/lexware/cockpit|regeln|zahlungen|dateien|diagnose. 2 neue POST-Endpunkte: /api/lexware/kira-kontext + /eingangsbeleg/{id}/kira-klassifizieren. 16+ neue JS-Funktionen. Hilfsfunktionen: _mini_beleg_row/_pruef_row/_pruef_row_full/_buch_tab_table. Plan-Dateien: SESSION_PLAN/GAP_ANALYSE/MASTERCHECKLISTE/KOMPONENTEN/ENDPUNKTE/ENTSCHEIDUNGEN/KAI_TODO neu erstellt. Commit: 34d01cb.",
+    "session-jjj (2026-04-01): Admin-Komplett-Umbau. (1) Admin-Nav 3 Gruppen: ZUGANGSDATEN (API-Schluessel/E-Mail SMTP/Passwoerter) / DIENSTE (Messaging) / SYSTEM (Pfade & Server). (2) SMTP-Sektion: 17 Provider-Presets mit Dropdown (Gmail/GMX/IONOS/Office365/Postmark/SendGrid/Mailgun usw.) — füllt Server/Port/Hinweis-Felder automatisch. (3) API-Schluessel-Sektion: 3 Sub-Cards (KI-Provider/Provider-Keys/Integrationen mit GitHub PAT + Lexware API-Key + Lexware API-Basis-URL). (4) System-Sektion: SERVER (Port), PFADE (Mail-Archiv + Backup je mit admPickFolder()/api/browse/folder), EXTERNER ZUGANG (Cloudflare-Tunnel-Card mit Public-URL + Token + 5-Schritt-Anleitung-Toggle). (5) Einstellungen: Lexware API-Key + Lexware URL + Mail-Archiv-Pfad + Backup-Pfad als disabled + 'Im Admin'-Link-Buttons. (6) Mobile-Sektion: Externer-Zugang-Info-Block (Status-Chip / aktive URL / Im-Admin-Button). (7) 8 neue CSS-Klassen: adm-grp-lbl/adm-pick-btn/adm-preset-*/adm-cf-*/adm-goto-btn. (8) admPickFolder()/admCfToggle() neue JS-Funktionen. (9) _method_api_admin_data_get() + _method_api_admin_save() um cloudflare_tunnel + lexware erweitert. Commit: c64f205.",
     "session-iii (2026-04-01): Admin-Login-Panel + CSS-Compat-Typo-Fix. (1) build_admin(): passwortgeschuetztes Admin-Dashboard mit 6 Sektionen (API-Schluessel, E-Mail SMTP, WhatsApp, Lexware, Passwoerter, System). 2-Spalten-Layout (210px Nav / 1fr Content), Login-Wall mit HMAC-Check gegen secrets.json[admin_password] (Fallback: kira2026). JS: admLogin/Logout/Save/ShowSec/Toggle/LoadData/RenderProviderKeys. (2) 3 neue Backend-Endpunkte: /api/admin/data-get, /api/admin/login, /api/admin/save (section-basiertes Dispatching). (3) CSS-Compat-Aliase: .es-label/.es-input/.es-select/.es-toggle/.es-slider/.es-row-left/.es-lbl/.es-hint — behebt Lexware+Mobil Capture Typo-Uebergroesse (Typo war inkonsistent weil diese CSS-Klassen fehlten). (4) Capture JS-Fix: Literal-\n in JS-String innerhalb f-string. (5) Mobil Emoji-Fix: Surrogate-Pair-Bytes durch HTML-Entity ersetzt. Commit e7717c3."
   ],
   "completed_features": [
@@ -164,7 +165,14 @@
     "capture-mobile-webapp-mobil-route",
     "capture-3-tier-matching-hard-soft-llm",
     "capture-kira-tools-suchen-zuordnen",
-    "capture-einstellungen-mobil-section"
+    "capture-einstellungen-mobil-section",
+    "admin-nav-3-gruppen-zugangsdaten-dienste-system",
+    "admin-smtp-17-provider-presets",
+    "admin-api-3-subcards-integrationen-lexware-github",
+    "admin-system-pfade-ordnerpicker-admPickFolder",
+    "admin-cloudflare-tunnel-card-externer-zugang",
+    "einstellungen-admin-goto-buttons-keine-doppelten-felder",
+    "mobil-sektion-externer-zugang-info-admin-link"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -181,7 +189,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "session-iii abgeschlossen (Commit e7717c3). Admin-Panel + Typo-Fix live. Naechste Schritte: (1) admin_password in secrets.json setzen fuer Admin-Login. (2) Mobil-Passwort in secrets.json setzen (mobil_password). (3) Capture-Modul in Einstellungen > Mobil aktivieren. (4) KIRA_SYSTEM_ANALYSE.md mit session-iii Aenderungen aktualisieren.",
+  "next_step": "session-jjj abgeschlossen (Commit c64f205). Admin-Komplett-Umbau live. Naechste Schritte: (1) admin_password in secrets.json setzen (fuer Admin-Login). (2) mobil_password in secrets.json setzen (fuer /mobil Login). (3) Capture-Modul in Einstellungen > Mobil aktivieren. (4) Cloudflare Tunnel einrichten falls externer Zugang benoetigt (Admin > System > Externer Zugang). (5) KIRA_SYSTEM_ANALYSE.md mit session-iii + session-jjj Aenderungen aktualisieren.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-04-01 18:45 — Session-Ende (session-jjj)
+
+**Erledigt:** Admin-Komplett-Umbau — 3-Gruppen-Nav (ZUGANGSDATEN/DIENSTE/SYSTEM), SMTP 17 Provider-Presets, API-Schluessel Sub-Cards mit Integrationen (Lexware+GitHub), Pfade mit Ordner-Picker, Cloudflare-Tunnel-Karte im System-Bereich. Einstellungen: Lexware/Archiv/Backup disabled + Im-Admin-Buttons. Mobile-Sektion: Externer-Zugang-Info-Block. Commit c64f205.
+**Offen geblieben:** KIRA_SYSTEM_ANALYSE.md session-iii + session-jjj Sektionen. Cloudflare Tunnel Einrichtung (Kai).
+**Status:** erledigt
+
+---
+
+## 2026-04-01 13:45 — Session-Start (session-jjj / Admin-Komplett-Umbau)
+
+**Auftrag:** (1) SMTP Provider-Presets im Admin. (2) Admin 3-Gruppen-Nav (ZUGANGSDATEN/DIENSTE/SYSTEM), Lexware in API-Schluessel > Integrationen. (3) Keine doppelten Felder — Lexware/Archiv/Backup in Einstellungen disabled + Im-Admin-Link. (4) Ordner-Picker-Button bei Pfad-Feldern. (5) Externer Zugang (Cloudflare Tunnel) fuer Mobile. (6) Im-Admin-Verweise ueberall.
+**Status:** erledigt
+
+---
+
 ## 2026-04-01 13:30 — Session-Ende (session-iii)
 
 **Erledigt:** Admin-Login-Panel vollstaendig implementiert (build_admin, Login-Wall, 6 Sektionen, 3 API-Endpoints, Sidebar-Eintrag). CSS-Compat-Aliase fuer .es-label/.es-input/.es-toggle etc. behoben Lexware+Mobil Typo-Uebergroesse. 2 JS-Fixes (Capture \\n + Mobil Emoji). Playwright-Verifikation: 0 JS-Fehler, Login-Wall ✓, Admin-Dashboard ✓, Lexware-Typo-Fix ✓. Commit e7717c3.
