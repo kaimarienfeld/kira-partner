@@ -7197,7 +7197,7 @@ function esInfoPopup(btn, text) {{
     <div class="es-row">
       <div class="es-row-label"><span>Archiv-Ordner</span><span class="es-row-hint">Lokaler Pfad zum Mail-Archiv-Verzeichnis</span></div>
       <div style="display:flex;gap:6px;flex:1;max-width:520px;flex-wrap:wrap">
-        <input type="text" id="cfg-archiv-pfad" placeholder="Im Admin-Bereich konfigurieren" style="flex:1;min-width:180px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);opacity:.55;cursor:not-allowed" disabled>
+        <input type="text" id="cfg-archiv-pfad" value="{esc(archiv_pfad)}" placeholder="Im Admin-Bereich konfigurieren" style="flex:1;min-width:180px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);opacity:.55;cursor:not-allowed" disabled>
         <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('system');}},80)">&#x2699; Im Admin</button>
         <button class="es-mk-btn sec" onclick="esMkArchivPruefen()" style="white-space:nowrap">&#x2713; Pr&uuml;fen</button>
       </div>
@@ -7928,11 +7928,21 @@ function esInfoPopup(btn, text) {{
     </div>`;
   }}
   window.esMkArchivPruefen = function() {{
-    const pfad=document.getElementById('cfg-archiv-pfad').value;
-    if(!pfad){{showToast('Bitte Pfad eingeben','warnung');return;}}
+    const inp=document.getElementById('cfg-archiv-pfad');
+    const pfad=inp?inp.value:'';
+    if(!pfad){{
+      // Kein lokaler Pfad — direkt Server-Status abfragen
+      fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
+        if(d.pfad_ok) showToast('Archiv-Pfad OK ✓ — '+d.pfad,'ok');
+        else if(d.pfad) showToast('Pfad nicht gefunden: '+d.pfad,'fehler');
+        else showToast('Kein Archiv-Pfad konfiguriert. Im Admin-Bereich unter System eintragen.','warnung');
+        if(inp&&d.pfad) inp.value=d.pfad;
+      }}).catch(()=>{{}});
+      return;
+    }}
     fetch('/api/mail/archiv/pruefen?pfad='+encodeURIComponent(pfad)).then(r=>r.json()).then(d=>{{
       if(d.ok) showToast('Pfad vorhanden und erreichbar ✓','ok');
-      else showToast('Pfad nicht gefunden oder nicht erreichbar','fehler');
+      else showToast('Pfad nicht gefunden oder nicht erreichbar: '+pfad,'fehler');
     }}).catch(()=>{{}});
   }};
   window.esLadeProtokoll = function(btn) {{
@@ -15454,7 +15464,7 @@ function saveSettings() {{
       ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false
     }},
     mail_archiv: {{
-      pfad:                         document.getElementById('cfg-archiv-pfad')?.value.trim() || '',
+      pfad:                         document.getElementById('cfg-archiv-pfad')?.disabled ? undefined : (document.getElementById('cfg-archiv-pfad')?.value.trim() || ''),
       neue_mails_archivieren:       document.getElementById('cfg-archiv-aktiv')?.checked ?? true,
       geloeschte_bereinigung_aktiv: document.getElementById('cfg-archiv-bereinigung-aktiv')?.checked ?? true,
       bereinigung_frist_tage:       parseInt(document.getElementById('cfg-archiv-bereinigung-frist')?.value || '90', 10)
@@ -23197,6 +23207,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 for key in body:
                     if isinstance(body[key], dict) and isinstance(old.get(key), dict):
                         merged[key] = {**old[key], **body[key]}
+                # Schutz: mail_archiv.pfad nie mit leerem String ueberschreiben
+                if not merged.get('mail_archiv', {}).get('pfad') and old.get('mail_archiv', {}).get('pfad'):
+                    merged.setdefault('mail_archiv', {})['pfad'] = old['mail_archiv']['pfad']
                 # Provider-Updates aus llm._provider_updates anwenden
                 llm_section = merged.get("llm", {})
                 provider_updates = llm_section.pop("_provider_updates", None)
