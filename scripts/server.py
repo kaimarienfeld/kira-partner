@@ -10955,6 +10955,7 @@ def build_lexware(db):
     <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
     <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware</button>
     <button class="btn btn-sec btn-xs" onclick="showLexSec('diagnose')" title="Diagnose">&#x1F527;</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_LEXWARE,{erklaermodus:true})" title="Geführte Tour durch Lexware Office starten">Tour</button>
     <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira</button>
   </div>
 </div>"""
@@ -17877,6 +17878,7 @@ function _esc(s) {{
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }}
 </script>
+<script>{TOUR_JS}</script>
 </body>
 </html>"""
 
@@ -19036,8 +19038,184 @@ footer{color:var(--muted);font-size:var(--fs-sm);text-align:center;padding:13px;
 .cap-file-zone{border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;margin-top:8px;display:block;transition:border-color .12s,color .12s;}
 .cap-file-zone:hover{border-color:var(--accent);color:var(--accent);}
 .cap-view{flex:1;}
+/* ── Tour Engine (A-13a) ──────────────────────────────────────────────────── */
+.kt-overlay{position:fixed;inset:0;z-index:10000;pointer-events:all;background:transparent}
+.kt-spotlight{position:fixed;z-index:10001;box-shadow:0 0 0 9999px rgba(0,0,0,.72);border-radius:8px;pointer-events:none;transition:left .3s,top .3s,width .3s,height .3s}
+.kt-box{position:fixed;z-index:10002;background:var(--bg-modal);border:1px solid var(--border-strong);border-radius:12px;padding:18px 20px;max-width:360px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.45)}
+.kt-progress{font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px;letter-spacing:.3px}
+.kt-box-title{font-size:var(--fs-md);font-weight:700;margin-bottom:6px;color:var(--text)}
+.kt-box-text{font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.65}
+.kt-box-warn{font-size:var(--fs-xs);color:var(--warn);margin-top:8px;padding:6px 10px;background:rgba(212,147,62,.1);border-radius:5px}
+.kt-box-nav{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.kt-test-banner{position:fixed;top:0;left:0;right:0;z-index:10003;background:#c86400;color:#fff;text-align:center;padding:5px 12px;font-size:var(--fs-xs);font-weight:700}
+.kt-tour-btn{background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:4px 11px;font-size:var(--fs-xs);cursor:pointer;font-weight:500}
+.kt-tour-btn:hover{background:#28282e}
+[data-theme="light"] .kt-tour-btn{background:#18181c;color:#fff;border-color:transparent}
+[data-theme="light"] .kt-tour-btn:hover{background:#2e2e34}
 """
 
+# ── Tour Engine JS (A-13a) ────────────────────────────────────────────────────
+TOUR_JS = """
+(function(){
+  var _steps=[],_cur=0,_opts={};
+  var _ov=null,_sp=null,_bx=null,_bn=null;
+  function _init(){
+    if(_ov) return;
+    _ov=document.createElement('div');
+    _ov.className='kt-overlay';_ov.id='kt-overlay';
+    _ov.addEventListener('click',function(e){if(e.target===_ov)kira_tour.end();});
+    _sp=document.createElement('div');
+    _sp.className='kt-spotlight';_sp.id='kt-spotlight';
+    _bx=document.createElement('div');
+    _bx.className='kt-box';_bx.id='kt-box';
+    document.body.appendChild(_ov);
+    document.body.appendChild(_sp);
+    document.body.appendChild(_bx);
+    document.addEventListener('keydown',_onKey);
+  }
+  function _onKey(e){
+    if(!_ov||_ov.style.display==='none') return;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();kira_tour.next();}
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();kira_tour.prev();}
+    else if(e.key==='Escape') kira_tour.end();
+  }
+  function _posBox(rect){
+    var bx=_bx,bw=bx.offsetWidth||320,bh=bx.offsetHeight||180;
+    var vw=window.innerWidth,vh=window.innerHeight;
+    var L=rect.left,T=rect.bottom+14;
+    if(L+bw>vw-12) L=vw-bw-12;
+    if(L<12) L=12;
+    if(T+bh>vh-12) T=rect.top-bh-14;
+    if(T<56) T=56;
+    bx.style.left=L+'px';bx.style.top=T+'px';
+  }
+  function _escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function _showStep(idx){
+    var step=_steps[idx];if(!step) return;
+    if(step.tab){
+      var tb=document.querySelector('.lx-nav-btn[data-lxsec="'+step.tab+'"]')||
+             document.querySelector('[data-tab="'+step.tab+'"]');
+      if(tb) tb.click();
+    }
+    setTimeout(function(){
+      var target=step.target?document.querySelector(step.target):null;
+      var rect;
+      if(target){
+        try{target.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(e){}
+        rect=target.getBoundingClientRect();
+        var pad=8;
+        _sp.style.display='block';
+        _sp.style.left=(rect.left-pad)+'px';
+        _sp.style.top=(rect.top-pad)+'px';
+        _sp.style.width=(rect.width+pad*2)+'px';
+        _sp.style.height=(rect.height+pad*2)+'px';
+      } else {
+        _sp.style.display='none';
+        rect={left:window.innerWidth/2-160,top:window.innerHeight/2-90,bottom:window.innerHeight/2+10,right:window.innerWidth/2+160,width:320,height:0};
+      }
+      var tot=_steps.length,area=step.area||'';
+      var prog='<div class="kt-progress">Schritt '+(idx+1)+' von '+tot+(area?' &mdash; '+area:'')+'</div>';
+      var title=step.title?'<div class="kt-box-title">'+_escH(step.title)+'</div>':'';
+      var text=step.text?'<div class="kt-box-text">'+step.text+'</div>':'';
+      var warn=step.warn?'<div class="kt-box-warn">&#x26A0; '+_escH(step.warn)+'</div>':'';
+      var prev=idx>0?'<button class="kt-tour-btn" onclick="kira_tour.prev()">&#x2190; Zur&#252;ck</button>':'';
+      var nxt=idx<tot-1?'<button class="kt-tour-btn" onclick="kira_tour.next()">Weiter &#x2192;</button>':'<button class="kt-tour-btn" onclick="kira_tour.end()">Tour beenden &#x2713;</button>';
+      var end_btn='<button class="kt-tour-btn" onclick="kira_tour.end()" style="margin-left:auto;opacity:.55">Beenden</button>';
+      _bx.innerHTML=prog+title+text+warn+'<div class="kt-box-nav">'+prev+nxt+end_btn+'</div>';
+      _bx.style.display='block';
+      setTimeout(function(){_posBox(rect);},12);
+      if(typeof elog==='function') elog('tour','tour_schritt_'+(idx+1),step.title||'');
+    },step.tab?280:80);
+  }
+  window.kira_tour={
+    start:function(steps,opts){
+      _init();
+      _steps=steps||[];_cur=0;_opts=opts||{};
+      if(_opts.testdaten){
+        if(!_bn){
+          _bn=document.createElement('div');
+          _bn.className='kt-test-banner';_bn.id='kt-test-banner';
+          _bn.textContent='Testdaten-Modus \u2014 alle Aktionen sind gesperrt, nur Erkl\u00e4rungen';
+          document.body.appendChild(_bn);
+        }
+        _bn.style.display='block';
+      }
+      if(_opts.erklaermodus||_opts.testdaten){
+        document.querySelectorAll('.btn-primary,.lx-sync-btn').forEach(function(b){
+          if(!b.dataset.ktlocked){b.dataset.ktlocked='1';b.dataset.ktod=b.disabled?'1':'0';b.disabled=true;}
+        });
+      }
+      _ov.style.display='block';
+      _showStep(0);
+      if(typeof elog==='function') elog('tour','tour_gestartet',_steps.length+' Schritte');
+    },
+    next:function(){
+      if(_cur<_steps.length-1){_cur++;_showStep(_cur);}
+      else kira_tour.end();
+    },
+    prev:function(){if(_cur>0){_cur--;_showStep(_cur);}},
+    end:function(){
+      if(_ov)_ov.style.display='none';
+      if(_sp)_sp.style.display='none';
+      if(_bx)_bx.style.display='none';
+      if(_bn)_bn.style.display='none';
+      document.querySelectorAll('[data-ktlocked="1"]').forEach(function(b){
+        b.disabled=b.dataset.ktod==='1';delete b.dataset.ktlocked;delete b.dataset.ktod;
+      });
+      if(typeof elog==='function') elog('tour','tour_beendet','Schritt '+(_cur+1)+' von '+_steps.length);
+    },
+    goTo:function(i){if(i>=0&&i<_steps.length){_cur=i;_showStep(i);}}
+  };
+})();
+
+// ── Lexware Office Tour-Schritte (A-13b) ──────────────────────────────────────
+window.KIRA_TOUR_LEXWARE = [
+  {area:'Ueberblick',title:'Willkommen bei Lexware Office',
+   text:'Dieses Modul verbindet KIRA mit deiner Lexware Office-Buchhaltung. Du siehst hier Rechnungen, Kontakte, Zahlungen und Eingangsbelege \u2014 alles direkt aus Lexware, ohne den Browser wechseln zu m\u00fcssen. Klicke <b>Weiter</b> f\u00fcr eine vollst\u00e4ndige F\u00fchrung.'},
+  {area:'Kopfbereich',title:'Verbindungsstatus',target:'.lx-header .lx-status-row',
+   text:'Der farbige Punkt zeigt, ob KIRA gerade mit Lexware verbunden ist. Gr\u00fcn = verbunden, Gelb = API-Key fehlt. Ein Klick auf den Chip f\u00fchrt einen schnellen Verbindungstest durch.'},
+  {area:'Kopfbereich',title:'Letzte Synchronisierung',target:'.lx-header .lx-chip-muted',
+   text:'Hier steht, wann KIRA zuletzt Daten von Lexware abgerufen hat. Die Synchronisierung l\u00e4uft automatisch oder kann manuell gestartet werden.'},
+  {area:'Kopfbereich',title:'Sync-Button',target:'.lx-header .lx-header-right',
+   text:'Mit dem <b>Von Lexware</b>-Button holst du die neuesten Daten von Lexware in KIRA. Es werden Belege, Kontakte und Artikel aktualisiert. KIRA schreibt dabei nichts in Lexware zur\u00fcck \u2014 der Datenfluss geht nur in eine Richtung: Lexware \u2192 KIRA.',
+   warn:'Beim Sync werden bestehende KIRA-Daten \u00fcberschrieben, falls sich etwas in Lexware ge\u00e4ndert hat.'},
+  {area:'Navigation',title:'Navigationsbereiche',target:'#lx-nav-sec',tab:'cockpit',
+   text:'Die Navigation oben schaltet zwischen den Bereichen um. Jeder Bereich zeigt andere Daten aus Lexware. Du kannst jeden Bereich auch direkt anklicken \u2014 KIRA l\u00e4dt die Daten f\u00fcr den gew\u00e4hlten Bereich automatisch.'},
+  {area:'Cockpit',title:'Cockpit \u2014 der \u00dcberblick',target:'#lx-sec-cockpit',tab:'cockpit',
+   text:'Das Cockpit zeigt dir auf einen Blick, was gerade wichtig ist: offene Rechnungen, f\u00e4llige Zahlungen, zu pr\u00fcfende Eingangsbelege. Hier startest du jeden Tag \u2014 alles was Aktion braucht ist hier sichtbar.'},
+  {area:'Cockpit',title:'Warnmeldungen',target:'#lx-warn-banner',tab:'cockpit',
+   text:'Wenn Dinge Aufmerksamkeit brauchen \u2014 z.B. ein \u00fcberf\u00e4lliger Beleg oder eine Kira-R\u00fcckfrage \u2014 erscheinen sie hier als farbige Hinweisleisten. Gelb = Warnung, Rot = Fehler oder dringend.'},
+  {area:'Cockpit',title:'Schnellaktionen',target:'#lx-sec-cockpit .lx-action-row',tab:'cockpit',
+   text:'Die Schnellaktionen erm\u00f6glichen den direkten Sync f\u00fcr einen einzelnen Bereich. Z.B. nur Kontakte oder nur Belege aktualisieren, ohne alles neu zu laden.'},
+  {area:'Belege',title:'Belege \u2014 Rechnungen & Angebote',tab:'belege',target:'#lx-sec-belege',
+   text:'Hier siehst du alle Belege aus Lexware: Rechnungen, Angebote, Gutschriften. Du kannst nach Status filtern (Offen / Bezahlt / \u00dcberf\u00e4llig) und jeden Beleg anklicken, um die Details zu sehen.'},
+  {area:'Belege',title:'Beleg-Tabelle',tab:'belege',target:'#lx-belege-table',
+   text:'Jede Zeile ist ein Beleg. Die farbigen Chips zeigen den Status. Ein Klick auf eine Zeile \u00f6ffnet das Beleg-Detail-Fenster mit allen Feldern aus Lexware. Von dort kann Kira den Beleg auch analysieren.'},
+  {area:'Zahlungen',title:'Zahlungen \u2014 Einnahmen & Ausgaben',tab:'zahlungen',
+   text:'Dieser Bereich zeigt alle Zahlungsvorg\u00e4nge: eingegangene Zahlungen, offene Posten und Mahnungen. KIRA liest diese Daten direkt aus Lexware.'},
+  {area:'Kontakte',title:'Kontakte & Kunden',tab:'kontakte',target:'#lx-sec-kontakte',
+   text:'Alle Kontakte aus Lexware: Kunden, Lieferanten, Interessenten. KIRA synchronisiert Namen, Adressen, E-Mail und weitere Felder. Ein Klick auf einen Kontakt zeigt alle Details.'},
+  {area:'Artikel',title:'Artikel & Preispositionen',tab:'artikel',target:'#lx-sec-artikel',
+   text:'Deine Artikel und Dienstleistungen aus Lexware \u2014 mit Preis, Einheit und Kategorie. Diese Daten helfen Kira dabei, Angebote und Rechnungen korrekt einzuordnen.'},
+  {area:'Dateien',title:'Dateien & Belege',tab:'dateien',
+   text:'Dieser Bereich ist f\u00fcr Belegdateien (PDFs, Bilder) vorgesehen, die mit Lexware-Vorg\u00e4ngen verkn\u00fcpft sind. Eingangsrechnungen landen hier, bevor sie gebucht werden.'},
+  {area:'Buchhaltung',title:'Buchhaltung \u2014 Eingangsbelege pr\u00fcfen',tab:'buchhaltung',target:'#lx-sec-buchhaltung',
+   text:'Das ist der wichtigste Bereich f\u00fcr den Alltag: Hier landen alle Eingangsrechnungen, die Kira erkannt und vorsortiert hat. Du siehst, was noch zu pr\u00fcfen ist, was schon klassifiziert wurde und was unklar ist.'},
+  {area:'Buchhaltung',title:'Belege zu pr\u00fcfen',tab:'buchhaltung',target:'#lx-buch-zu_pruefen',
+   text:'Eingangsbelege, die noch nicht gebucht wurden, erscheinen hier. Kira schl\u00e4gt das Buchungskonto vor. Du pr\u00fcfst, best\u00e4tigst oder korrigierst \u2014 dann wird der Beleg in Lexware gebucht.',
+   warn:'Das Buchen eines Belegs schreibt Daten in Lexware. Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.'},
+  {area:'Buchhaltung',title:'Kira-R\u00fcckfragen',tab:'buchhaltung',
+   text:'Wenn Kira einen Beleg nicht eindeutig zuordnen kann, stellt sie eine R\u00fcckfrage. Diese erscheint direkt in der Belegliste. Du beantwortest die Frage im Kira-Chat oder direkt im Beleg-Dialog.'},
+  {area:'Regeln',title:'Regeln & Muster',tab:'regeln',target:'#lx-sec-regeln',
+   text:'Hier kannst du Kira beibringen, wie sie bestimmte Eingangsbelege automatisch erkennen soll. Z.B.: \u201eAlle Mails von shop@lieferant.de geh\u00f6ren auf Konto 4200.\u201c Kira lernt aus deinen Best\u00e4tigungen und wendet Regeln selbst\u00e4ndig an.'},
+  {area:'Diagnose',title:'Diagnose & Verbindungstest',tab:'diagnose',target:'#lx-sec-diagnose',
+   text:'Wenn die Verbindung zu Lexware nicht funktioniert, hilft dieser Bereich bei der Fehlersuche. Du kannst die Verbindung testen, den letzten Sync-Log einsehen und pr\u00fcfen, ob der API-Key g\u00fcltig ist.'},
+  {area:'Einstellungen',title:'Lexware Office einrichten',
+   text:'Alle Verbindungseinstellungen findest du unter <b>Einstellungen \u2192 Lexware Office</b>. Dort tr\u00e4gst du den API-Key ein, aktivierst den Sync-Automatismus und passt die Synchronisierungsintervalle an. Du kannst die Einstellungen jederzeit \u00e4ndern.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Du hast alle Bereiche von Lexware Office kennengelernt. Bei Fragen hilft dir Kira (oben rechts der lila Button) weiter \u2014 einfach fragen. Die Tour kann jederzeit neu gestartet werden.'}
+];
+"""
 
 # ── HTTP Handler ──────────────────────────────────────────────────────────────
 class DashboardHandler(BaseHTTPRequestHandler):
