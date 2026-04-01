@@ -8547,30 +8547,32 @@ function esInfoPopup(btn, text) {{
 <!-- ── SECTION: LEXWARE OFFICE (session-eee) ─────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-lexware">
   <div class="es-sec-h">Lexware Office</div>
-  <div class="es-sec-sub">Verbindet KIRA mit Lexware Office (ehemals lexoffice) &mdash; Belege, Kontakte, Artikel und Buchhaltungs-Pr&uuml;fqueue.</div>
+  <div class="es-sec-sub">Verbindet KIRA mit Lexware Office (ehemals lexoffice) &mdash; Belege, Kontakte, Artikel, Buchhaltung und Vollautomatik.</div>
 
-  <!-- Modul-Status -->
-  <div class="es-grp">
-    <div class="es-grp-h">Modul-Status</div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-      <span>Aktuell:</span>{lex_status_chip}
-      <span style="color:var(--muted);font-size:11px">API-Key: {lex_key_chip}</span>
-    </div>
-    <div class="es-grp-sub">Steuert ob das Lexware-Modul in der Sidebar angezeigt und nutzbar ist.</div>
-    <div class="es-row">
-      <label class="es-label">Modul-Status setzen</label>
-      <select id="cfg-lex-status" class="es-select" style="max-width:220px">
-        <option value="nicht_gebucht" {'selected' if lex_status=='nicht_gebucht' else ''}>Nicht gebucht (Info-Box)</option>
-        <option value="gesperrt" {'selected' if lex_status=='gesperrt' else ''}>Gesperrt (Sperrbanner)</option>
-        <option value="freigeschaltet" {'selected' if lex_status=='freigeschaltet' else ''}>Freigeschaltet (voll aktiv)</option>
-      </select>
-    </div>
+  <!-- Sub-Navigation (session-fff) -->
+  <div class="lx-es-subnav" style="display:flex;gap:2px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px">
+    <button class="lx-es-subbtn active" data-lxessec="verbindung" onclick="esShowLexSec('verbindung')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:600;color:var(--accent)">Verbindung</button>
+    <button class="lx-es-subbtn" data-lxessec="sync" onclick="esShowLexSec('sync')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Sync</button>
+    <button class="lx-es-subbtn" data-lxessec="kategorien" onclick="esShowLexSec('kategorien')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Kategorien</button>
+    <button class="lx-es-subbtn" data-lxessec="eingangsbelege" onclick="esShowLexSec('eingangsbelege')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Eingangsbelege</button>
+    <button class="lx-es-subbtn" data-lxessec="vollautomatik" onclick="esShowLexSec('vollautomatik')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Vollautomatik</button>
+    <button class="lx-es-subbtn" data-lxessec="regeln" onclick="esShowLexSec('regeln')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Regeln</button>
+    <button class="lx-es-subbtn" data-lxessec="dataverse" onclick="esShowLexSec('dataverse')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Dataverse</button>
+    <button class="lx-es-subbtn" data-lxessec="diagnose_es" onclick="esShowLexSec('diagnose_es')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Diagnose</button>
+    <button class="lx-es-subbtn" data-lxessec="freischaltung" onclick="esShowLexSec('freischaltung')" style="background:none;border:none;padding:5px 10px;cursor:pointer;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:500;color:var(--muted)">Freischaltung</button>
   </div>
+
+  <!-- ── VERBINDUNG ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-verbindung" style="display:block">
 
   <!-- API-Verbindung -->
   <div class="es-grp">
     <div class="es-grp-h">API-Verbindung</div>
     <div class="es-grp-sub">API-Key aus Lexware Office: Einstellungen &rarr; Apps &amp; Schnittstellen &rarr; LexOffice API. Wird sicher in config.json gespeichert.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span>Status:</span>{lex_status_chip}
+      <span style="font-size:11px;color:var(--muted)">API-Key: {lex_key_chip}</span>
+    </div>
     <div class="es-row">
       <label class="es-label">API-Key</label>
       <input id="cfg-lex-api-key" type="password" class="es-input" style="max-width:340px" placeholder="M_Dxx... (leer lassen um nicht zu &auml;ndern)" autocomplete="off">
@@ -8583,13 +8585,19 @@ function esInfoPopup(btn, text) {{
       <span class="es-grp-sub" style="margin:0;font-size:10px">Neu: api.lexware.io | Alt: api.lexoffice.io</span>
     </div>
     <div class="es-row" style="gap:8px;align-items:center">
-      <button class="btn btn-sec" onclick="lexEsSaveConfig()" style="min-width:120px">&#x1F4BE; Speichern</button>
       <button class="btn btn-sec" id="lex-test-btn" onclick="lexEsTestConnection()" style="min-width:160px">&#x26A1; Verbindung testen</button>
       <span id="lex-test-status" style="font-size:12px;color:var(--muted)"></span>
     </div>
   </div>
 
-  <!-- Sync-Einstellungen -->
+  <div style="margin-top:12px">
+    <button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button>
+  </div>
+
+  </div><!-- /lx-es-sub-verbindung -->
+
+  <!-- ── SYNC ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-sync" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Synchronisierung</div>
     <div class="es-row">
@@ -8597,47 +8605,180 @@ function esInfoPopup(btn, text) {{
       <select id="cfg-lex-sync-intervall" class="es-select" style="max-width:180px">
         <option value="15" {'selected' if lex_sync_intervall==15 else ''}>Alle 15 Minuten</option>
         <option value="30" {'selected' if lex_sync_intervall==30 else ''}>Alle 30 Minuten</option>
-        <option value="60" {'selected' if lex_sync_intervall==60 else ''}>Stündlich</option>
+        <option value="60" {'selected' if lex_sync_intervall==60 else ''}>St&#252;ndlich</option>
         <option value="360" {'selected' if lex_sync_intervall==360 else ''}>Alle 6 Stunden</option>
-        <option value="1440" {'selected' if lex_sync_intervall==1440 else ''}>Täglich</option>
+        <option value="1440" {'selected' if lex_sync_intervall==1440 else ''}>T&#228;glich</option>
       </select>
     </div>
     <div class="es-row" style="gap:8px">
       <button class="btn btn-sec" onclick="lexEsSync('belege')">&#x1F4C4; Belege jetzt sync</button>
       <button class="btn btn-sec" onclick="lexEsSync('kontakte')">&#x1F465; Kontakte jetzt sync</button>
+      <button class="btn btn-sec" onclick="lexEsSync('artikel')">&#x1F3F7; Artikel jetzt sync</button>
       <button class="btn btn-sec" onclick="lexEsSync('full')">&#x21BB; Alles sync</button>
     </div>
     <div id="lex-sync-status" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
   </div>
-
-  <!-- Buchhaltungs-Prüfregeln -->
   <div class="es-grp">
-    <div class="es-grp-h">Buchhaltungs-Pr&uuml;fregeln</div>
-    <div class="es-grp-sub">Steuert das automatische Erkennen und Einordnen von Eingangsrechnungen in der Pr&uuml;fqueue.</div>
+    <div class="es-grp-h">Delta-Sync / Vollsync</div>
+    <div class="es-grp-sub">Delta-Sync: nur neue/ge&#228;nderte Datens&#228;tze seit letztem Sync. Vollsync: alle Datens&#228;tze neu laden.</div>
     <div class="es-row">
-      <label class="es-label">Eingangsbeleg-Pr&uuml;fqueue aktiv</label>
-      <label class="es-toggle"><input id="cfg-lex-buchalt" type="checkbox" {'checked' if lex_buchalt_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+      <label class="es-label">Standard-Sync-Modus</label>
+      <select id="cfg-lex-sync-modus" class="es-select" style="max-width:180px">
+        <option value="delta">Delta-Sync (empfohlen)</option>
+        <option value="full">Vollsync</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  </div><!-- /lx-es-sub-sync -->
+
+  <!-- ── KATEGORIEN ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-kategorien" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Lexware-Kategorien</div>
+    <div class="es-grp-sub">Kategorien werden beim Sync automatisch aus Lexware geladen und f&#252;r die Eingangsbeleg-Klassifizierung verwendet.</div>
+    <div class="es-row">
+      <label class="es-label">Letzte Kategorie-Synchronisation</label>
+      <span style="font-size:var(--fs-sm);color:var(--muted)">{esc(lex_cfg.get("last_category_sync","—"))}</span>
+    </div>
+    <div class="es-row" style="gap:8px">
+      <button class="btn btn-sec" onclick="lexEsSync('full');showToast('Kategorien werden neu geladen...')">&#x21BB; Kategorien neu laden</button>
+    </div>
+    <div class="es-grp-sub" style="margin-top:8px">Kategorie-Cache wird automatisch t&#228;glich aktualisiert wenn Auto-Sync aktiv ist.</div>
+  </div>
+  </div><!-- /lx-es-sub-kategorien -->
+
+  <!-- ── EINGANGSBELEGE ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-eingangsbelege" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Buchhaltungs-Pr&#252;fqueue</div>
+    <div class="es-grp-sub">Steuert das automatische Erkennen und Einordnen von Eingangsrechnungen.</div>
+    <div class="es-row">
+      <label class="es-label">Eingangsbeleg-Pr&#252;fqueue aktiv</label>
+      <label class="es-toggle"><input id="cfg-lex-buchalt" type="checkbox" {'checked' if lex_buchalt_aktiv else ''}><span class="es-slider"></span></label>
     </div>
     <div class="es-row">
       <label class="es-label">PayPal-Ausnahme-Erkennung</label>
-      <label class="es-toggle"><input id="cfg-lex-paypal" type="checkbox" {'checked' if lex_paypal_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+      <label class="es-toggle"><input id="cfg-lex-paypal" type="checkbox" {'checked' if lex_paypal_aktiv else ''}><span class="es-slider"></span></label>
     </div>
-    <div class="es-grp-sub">PayPal-Zahlungsbestätigungen werden als Ausnahme erkannt und NICHT als Eingangsrechnung klassifiziert.</div>
+    <div class="es-grp-sub">PayPal-Zahlungsbest&#228;tigungen werden als Ausnahme erkannt und NICHT als Eingangsrechnung klassifiziert.</div>
+    <div class="es-row">
+      <label class="es-label">Apple-/Body-only-Erkennung</label>
+      <label class="es-toggle"><input id="cfg-lex-bodyonly" type="checkbox" {'checked' if lex_cfg.get("bodyonly_erkennung_aktiv", True) else ''}><span class="es-slider"></span></label>
+    </div>
+    <div class="es-grp-sub">E-Mails ohne PDF-Anhang aber mit Rechnungsbetrag im Text werden als Body-only markiert.</div>
   </div>
+  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  </div><!-- /lx-es-sub-eingangsbelege -->
 
-  <!-- Dataverse-Export (optional) -->
+  <!-- ── VOLLAUTOMATIK ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-vollautomatik" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Vollautomatische Buchung</div>
+    <div class="es-grp-sub">Wenn KIRA eine Eingangsrechnung mit hoher Sicherheit klassifiziert, kann sie vollautomatisch als Buchungsvorschlag in Lexware eingestellt werden.</div>
+    <div class="es-row">
+      <label class="es-label">Vollautomatik aktiv</label>
+      <label class="es-toggle"><input id="cfg-lex-vollautomatik" type="checkbox" {'checked' if lex_cfg.get("vollautomatik_aktiv", False) else ''}><span class="es-slider"></span></label>
+    </div>
+    <div class="es-row">
+      <label class="es-label">Confidence-Schwelle</label>
+      <select id="cfg-lex-confidence" class="es-select" style="max-width:200px">
+        <option value="0.95" {'selected' if lex_cfg.get("confidence_schwelle",0.9) >= 0.95 else ''}>95% — Sehr sicher (empfohlen)</option>
+        <option value="0.90" {'selected' if lex_cfg.get("confidence_schwelle",0.9) == 0.9 else ''}>90% — Sicher</option>
+        <option value="0.80" {'selected' if lex_cfg.get("confidence_schwelle",0.9) == 0.8 else ''}>80% — Mittel</option>
+        <option value="0.70" {'selected' if lex_cfg.get("confidence_schwelle",0.9) <= 0.7 else ''}>70% — Niedrig (riskant)</option>
+      </select>
+    </div>
+    <div class="es-grp-sub">&#x26A0; Vollautomatik ist nur empfehlenswert wenn KIRA gen&#252;gend Buchungshistorie hat. Starte mit manueller Pr&#252;fung.</div>
+    <div class="es-row">
+      <label class="es-label">Verhalten bei unbekannter Kategorie</label>
+      <select id="cfg-lex-unbekannt-kat" class="es-select" style="max-width:220px">
+        <option value="queue">In Pr&#252;fqueue einreihen</option>
+        <option value="kira_frage">Kira-R&#252;ckfrage stellen</option>
+        <option value="ignore">Ignorieren</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  </div><!-- /lx-es-sub-vollautomatik -->
+
+  <!-- ── REGELN & MUSTER ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-regeln" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Regeln & Muster</div>
+    <div class="es-grp-sub">Regeln werden automatisch aus best&#228;tigten Buchungen abgeleitet. Manuelle Regelverwaltung ist in Planung.</div>
+    <div class="es-row">
+      <label class="es-label">Auto-Lernmodus aktiv</label>
+      <label class="es-toggle"><input id="cfg-lex-lernmodus" type="checkbox" {'checked' if lex_cfg.get("lernmodus_aktiv", True) else ''}><span class="es-slider"></span></label>
+    </div>
+    <div class="es-grp-sub">Wenn aktiv: KIRA lernt aus jeder best&#228;tigten Buchung ein neues Muster.</div>
+    <div class="es-row">
+      <label class="es-label">Regeln im Modul anzeigen</label>
+      <button class="btn btn-sec" onclick="showPanel('lexware');setTimeout(()=>showLexSec('regeln'),200)">Regeln &amp; Muster &#x2192;</button>
+    </div>
+  </div>
+  </div><!-- /lx-es-sub-regeln -->
+
+  <!-- ── DATAVERSE ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-dataverse" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Dataverse-Export <span style="font-size:11px;color:var(--muted);font-weight:400">(optional)</span></div>
-    <div class="es-grp-sub">Exportiert Rechnungen zusätzlich nach Microsoft Dataverse (CRM). Erfordert Azure App-Credentials. Prio C &mdash; nur aktivieren wenn benötigt.</div>
+    <div class="es-grp-sub">Exportiert Rechnungen zus&#228;tzlich nach Microsoft Dataverse (CRM/Power Platform). Erfordert Azure App-Credentials. Prio C.</div>
     <div class="es-row">
       <label class="es-label">Dataverse-Export aktiv</label>
-      <label class="es-toggle"><input id="cfg-lex-dataverse" type="checkbox" {'checked' if lex_dataverse_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+      <label class="es-toggle"><input id="cfg-lex-dataverse" type="checkbox" {'checked' if lex_dataverse_aktiv else ''}><span class="es-slider"></span></label>
+    </div>
+    <div class="es-grp-sub">&#x2139; F&#252;r Dataverse-Credentials: Azure Entra ID App mit Dataverse-Berechtigungen einrichten.</div>
+  </div>
+  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  </div><!-- /lx-es-sub-dataverse -->
+
+  <!-- ── DIAGNOSE ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-diagnose_es" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Verbindungstest & Diagnose</div>
+    <div class="es-row" style="gap:8px">
+      <button class="btn btn-sec" id="lex-test-btn2" onclick="lexEsTestConnection()">&#x26A1; Verbindung testen</button>
+      <span id="lex-test-status2" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="es-row" style="gap:8px">
+      <button class="btn btn-sec" onclick="showPanel('lexware');setTimeout(()=>showLexSec('diagnose'),200)">Vollst&#228;ndige Diagnose &#x2192;</button>
     </div>
   </div>
-
-  <div style="margin-top:12px">
-    <button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Alle Lexware-Einstellungen speichern</button>
+  <div class="es-grp">
+    <div class="es-grp-h">Logging-Detailgrad</div>
+    <div class="es-row">
+      <label class="es-label">Detailgrad</label>
+      <select id="cfg-lex-log-level" class="es-select" style="max-width:180px">
+        <option value="minimal" {'selected' if lex_cfg.get("log_level","normal") == "minimal" else ''}>Minimal</option>
+        <option value="normal" {'selected' if lex_cfg.get("log_level","normal") == "normal" else ''}>Normal</option>
+        <option value="verbose" {'selected' if lex_cfg.get("log_level","normal") == "verbose" else ''}>Ausf&#252;hrlich</option>
+      </select>
+    </div>
   </div>
+  </div><!-- /lx-es-sub-diagnose_es -->
+
+  <!-- ── FREISCHALTUNG ── -->
+  <div class="lx-es-subpanel" id="lx-es-sub-freischaltung" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Modul-Freischaltung</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <span>Aktuell:</span>{lex_status_chip}
+      <span style="color:var(--muted);font-size:11px">API-Key: {lex_key_chip}</span>
+    </div>
+    <div class="es-grp-sub">Steuert ob das Lexware-Modul in der Sidebar angezeigt und nutzbar ist.</div>
+    <div class="es-row">
+      <label class="es-label">Modul-Status</label>
+      <select id="cfg-lex-status" class="es-select" style="max-width:220px">
+        <option value="nicht_gebucht" {'selected' if lex_status=='nicht_gebucht' else ''}>Nicht gebucht (Info-Box)</option>
+        <option value="gesperrt" {'selected' if lex_status=='gesperrt' else ''}>Gesperrt (Sperrbanner)</option>
+        <option value="freigeschaltet" {'selected' if lex_status=='freigeschaltet' else ''}>Freigeschaltet (voll aktiv)</option>
+      </select>
+    </div>
+    <div class="es-grp-sub">Nach &#196;nderung: Speichern + Server neu starten.</div>
+  </div>
+  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  </div><!-- /lx-es-sub-freischaltung -->
 
   <script>
   function lexEsSaveConfig() {{
@@ -9585,7 +9726,7 @@ def build_wissen(db):
 
 # ── LEXWARE OFFICE Panel ──────────────────────────────────────────────────────
 def build_lexware(db):
-    """Lexware Office Panel (session-eee). Tabs: Cockpit / Belege / Zahlungen / Kontakte / Artikel / Buchhaltung / Diagnose."""
+    """Lexware Office Panel (session-fff). Vollstaendige produktive UI mit 9 Unterbereichen, Modul-Kopfbereich, Kira-Einstiegen."""
     try:
         cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
     except Exception:
@@ -9594,38 +9735,73 @@ def build_lexware(db):
     modul_status = lex_cfg.get("status", "nicht_gebucht")
     has_key = bool(lex_cfg.get("api_key", "").strip())
 
-    # Modul nicht gebucht → leeres Panel mit Hinweis
+    # Modul nicht gebucht → Info-Shell (Sidebar-Eintrag unsichtbar via JS, aber Panel zeigt Onboarding)
     if modul_status == "nicht_gebucht":
         return """
-<div class="lx-info-box" style="max-width:520px;margin:48px auto;text-align:center;">
-  <div style="font-size:48px;margin-bottom:16px;">&#x1F4CB;</div>
-  <div style="font-size:var(--fs-xl);font-weight:700;margin-bottom:8px;">Lexware Office</div>
-  <div style="color:var(--muted);margin-bottom:20px;line-height:1.6;">
-    Dieses Modul verbindet KIRA mit Lexware Office.<br>
-    Rechnungen, Angebote, Kontakte, Buchhaltung und mehr.
+<div class="lx-module">
+<div class="lx-header">
+  <div class="lx-header-left">
+    <div class="lx-title">&#x1F4CB; Lexware Office</div>
+    <div class="lx-status-row">
+      <span class="lx-chip lx-chip-warn">Nicht eingerichtet</span>
+    </div>
   </div>
-  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:left;margin-bottom:20px;">
-    <b>Einrichten:</b><br>
-    1. Einstellungen &rarr; Lexware Office &rarr; API-Key eintragen<br>
-    2. Modulstatus auf <b>Freigeschaltet</b> setzen<br>
-    3. Verbindung testen
+</div>
+<div style="max-width:560px;margin:48px auto;text-align:center;padding:0 16px">
+  <div style="font-size:56px;margin-bottom:20px;line-height:1">&#x1F4CB;</div>
+  <div style="font-size:var(--fs-xl);font-weight:700;margin-bottom:12px;color:var(--text)">Lexware Office einrichten</div>
+  <div style="color:var(--muted);margin-bottom:24px;line-height:1.7;font-size:var(--fs-sm)">
+    Verbindet KIRA mit Lexware Office (ehemals lexoffice) &mdash;
+    Rechnungen, Angebote, Kontakte, Buchhaltung und mehr direkt in KIRA nutzbar.
   </div>
-  <button class="btn btn-primary" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'lexware\\'),200)">
-    Einstellungen &ouml;ffnen
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:left;margin-bottom:24px">
+    <div style="font-weight:600;margin-bottom:12px;color:var(--text)">&#x2139; So richtest du das Modul ein:</div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:var(--fs-sm);color:var(--muted)">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:12px">1</span>
+        <span>Lexware Office &rarr; Einstellungen &rarr; Schnittstellen &rarr; API &rarr; Neuen Schl&uuml;ssel erstellen</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:12px">2</span>
+        <span>In KIRA: <b>Einstellungen &rarr; Lexware Office &rarr; Verbindung &rarr; API-Key</b> eintragen</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:12px">3</span>
+        <span>Modul-Status auf <b>Freigeschaltet</b> setzen und Verbindung testen</span>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-primary" style="font-size:var(--fs-sm);padding:10px 24px" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'verbindung\\')}},200)">
+    &#x2699; Einstellungen &ouml;ffnen
   </button>
+</div>
 </div>"""
 
-    # Modul gesperrt → Sperr-Banner + Vorschau
+    # Modul gesperrt → hochwertige Sperr-Shell + Tab-Vorschau
     if modul_status == "gesperrt":
         return """
-<div style="background:var(--bg-raised);border:2px dashed var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
-  <span style="font-size:24px;">&#x1F512;</span>
-  <div>
-    <div style="font-weight:600;">Lexware Office ist gesperrt</div>
-    <div style="color:var(--muted);font-size:var(--fs-sm);">Modul-Status in Einstellungen &rarr; Lexware Office auf <b>Freigeschaltet</b> setzen.</div>
+<div class="lx-module">
+<div class="lx-header">
+  <div class="lx-header-left">
+    <div class="lx-title">&#x1F4CB; Lexware Office</div>
+    <div class="lx-status-row">
+      <span class="lx-chip lx-chip-err">&#x1F512; Gesperrt</span>
+    </div>
   </div>
-  <button class="btn btn-sec" style="margin-left:auto" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'lexware\\'),200)">Einstellungen</button>
-</div>""" + _build_lexware_tabs_preview()
+  <div class="lx-header-right">
+    <button class="btn btn-primary" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'freischaltung\\')}},200)" style="font-size:var(--fs-sm)">
+      &#x1F513; Modul freischalten
+    </button>
+  </div>
+</div>
+<div style="background:linear-gradient(135deg,rgba(220,38,38,.06),rgba(220,38,38,.02));border:1.5px dashed rgba(220,38,38,.3);border-radius:var(--radius);padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:16px">
+  <span style="font-size:32px;flex-shrink:0">&#x1F512;</span>
+  <div>
+    <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:4px">Lexware Office ist gesperrt</div>
+    <div style="color:var(--muted);font-size:var(--fs-sm)">Modul-Status in <b>Einstellungen &rarr; Lexware Office &rarr; Freischaltung</b> auf <b>Freigeschaltet</b> setzen.</div>
+  </div>
+</div>
+""" + _build_lexware_tabs_preview()
 
     # --- Vollzugang ---
     # DB-Daten laden
@@ -9655,7 +9831,7 @@ def build_lexware(db):
 
     try:
         pruefqueue = db.execute(
-            "SELECT * FROM eingangsbelege_pruefqueue ORDER BY erstellt_ts DESC LIMIT 100"
+            "SELECT * FROM eingangsbelege_pruefqueue ORDER BY erstellt_ts DESC LIMIT 200"
         ).fetchall()
         pruefqueue = [dict(r) for r in pruefqueue]
     except Exception:
@@ -9669,157 +9845,449 @@ def build_lexware(db):
     except Exception:
         last_sync = "—"
 
-    n_belege  = len(belege)
-    n_offen   = sum(1 for b in belege if b.get("status") in ("open","overdue","draft"))
+    n_belege   = len(belege)
+    n_offen    = sum(1 for b in belege if b.get("status") in ("open","overdue","draft"))
+    n_ueberfaellig = sum(1 for b in belege if b.get("status") == "overdue")
     n_kontakte = len(kontakte)
     n_artikel  = len(artikel)
     n_pruef    = sum(1 for p in pruefqueue if p.get("status") == "zu_pruefen")
+    n_unklar   = sum(1 for p in pruefqueue if p.get("status") == "unklar")
+    n_klassifiziert = sum(1 for p in pruefqueue if p.get("status") == "klassifiziert")
+    n_abgelegt = sum(1 for p in pruefqueue if p.get("status") == "abgelegt")
+    n_kira_frage = sum(1 for p in pruefqueue if p.get("kira_frage") and p.get("status") == "zu_pruefen")
 
-    # ── Cockpit Tab ──
-    cockpit_html = f"""
-<div class="lx-kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
-  <div class="lx-kpi" onclick="showLexTab(\\'belege\\')" style="cursor:pointer">
-    <div class="lx-kpi-n">{n_belege}</div><div class="lx-kpi-lbl">Belege gesamt</div>
-  </div>
-  <div class="lx-kpi {'lx-kpi-warn' if n_offen > 0 else ''}" onclick="showLexTab(\\'belege\\')" style="cursor:pointer">
-    <div class="lx-kpi-n">{n_offen}</div><div class="lx-kpi-lbl">Offen / &#220;berf&#228;llig</div>
-  </div>
-  <div class="lx-kpi" onclick="showLexTab(\\'kontakte\\')" style="cursor:pointer">
-    <div class="lx-kpi-n">{n_kontakte}</div><div class="lx-kpi-lbl">Kontakte</div>
-  </div>
-  <div class="lx-kpi" onclick="showLexTab(\\'artikel\\')" style="cursor:pointer">
-    <div class="lx-kpi-n">{n_artikel}</div><div class="lx-kpi-lbl">Artikel</div>
-  </div>
-  <div class="lx-kpi {'lx-kpi-warn' if n_pruef > 0 else ''}" onclick="showLexTab(\\'buchhaltung\\')" style="cursor:pointer">
-    <div class="lx-kpi-n">{n_pruef}</div><div class="lx-kpi-lbl">Eingangsbelege zu pr&#252;fen</div>
-  </div>
-</div>
-<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-    <span id="lx-status-dot" style="width:12px;height:12px;border-radius:50%;background:{'#22c55e' if has_key else '#f59e0b'};flex-shrink:0;"></span>
-    <span style="font-weight:600;">API-Verbindung: {'Konfiguriert' if has_key else 'API-Key fehlt'}</span>
-  </div>
-  <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px;">Letzte Synchronisation: {esc(last_sync)}</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="lexSync()">&#x21BB; Jetzt synchronisieren</button>
-    <button class="btn btn-sec" onclick="lexTestConnection()">Verbindung testen</button>
-    <button class="btn btn-sec" onclick="lexSync(\\'full\\')">Vollsync</button>
-  </div>
-</div>
-<div id="lx-sync-log" style="font-size:var(--fs-sm);color:var(--muted);min-height:32px;"></div>"""
-
-    # ── Belege Tab ──
-    def _beleg_row(b):
-        status_colors = {
-            "open": "var(--warning)", "overdue": "#dc2626",
-            "paid": "var(--success)", "draft": "var(--muted)",
-            "voided": "var(--muted)"
-        }
+    # ── Hilfsfunktion: Belegzeile fuer Cockpit-Tabelle ──
+    def _mini_beleg_row(b):
+        st_map = {"open": "Offen", "overdue": "&#220;berf&#228;llig", "paid": "Bezahlt", "draft": "Entwurf", "voided": "Storniert"}
         st = b.get("status", "")
-        st_color = status_colors.get(st, "var(--text)")
-        st_labels = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert"}
+        st_label = st_map.get(st, esc(st))
+        return (
+            f'<tr class="lx-tr" onclick="showLexSec(\'belege\')" style="cursor:pointer">'
+            f'<td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>'
+            f'<td>{esc(b.get("kontakt_name",""))}</td>'
+            f'<td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("datum",""))}</td>'
+            f'<td><span class="lx-st-chip lx-st-{st}">{st_label}</span></td>'
+            f'<td style="text-align:right;font-weight:600">{b.get("brutto",0):,.2f}&nbsp;{esc(b.get("waehrung","EUR"))}</td>'
+            f'</tr>'
+        )
+
+    # ── Hilfsfunktion: Pruefqueue-Zeile fuer Buchhaltung ──
+    def _pruef_row(p):
+        st = p.get("status", "zu_pruefen")
+        st_labels = {"zu_pruefen": "Zu pr&#252;fen", "klassifiziert": "Klassifiziert", "abgelegt": "Abgelegt", "unklar": "Unklar"}
         st_label = st_labels.get(st, esc(st))
-        return f"""<tr class="lx-tr" onclick="lexBelegDetail('{esc(b['lexware_id'])}','{b.get('typ','invoice')}')">
-  <td>{esc(b.get('nummer','—'))}</td>
-  <td>{esc(b.get('typ',''))}</td>
-  <td>{esc(b.get('kontakt_name',''))}</td>
-  <td>{esc(b.get('datum',''))}</td>
-  <td style="color:{st_color};font-weight:600">{st_label}</td>
-  <td style="text-align:right">{b.get('brutto',0):,.2f}&nbsp;{esc(b.get('waehrung','EUR'))}</td>
+        absender = esc(p.get("absender_name", "") or p.get("absender", "—"))
+        betreff = esc((p.get("betreff") or p.get("beschreibung") or "—")[:50])
+        betrag = p.get("betrag") or 0
+        konto = esc(p.get("konto_vorschlag", ""))
+        pid = p.get("id", "")
+        kira_frage = p.get("kira_frage", "")
+        return (
+            f'<tr class="lx-tr" onclick="lxBuchDetailFull({pid})" style="cursor:pointer">'
+            f'<td>{absender}</td>'
+            f'<td>{betreff}{"<span class=\\'lx-kira-frage\\' title=\\'" + esc(kira_frage) + "\\'>&#x1F916; Kira-Frage</span>" if kira_frage else ""}</td>'
+            f'<td><span class="lx-konto-chip">{konto or "—"}</span></td>'
+            f'<td style="text-align:right;font-weight:600">{betrag:,.2f}</td>'
+            f'<td style="text-align:center"><span class="lx-st-chip lx-st-{st}">{st_label}</span></td>'
+            f'<td style="text-align:right"><button class="btn btn-xs btn-sec" onclick="event.stopPropagation();lxBuchKira({pid})">&#x1F916;</button></td>'
+            f'</tr>'
+        )
+
+    # ============================================================
+    # VOLLZUGANG — Produktive Lexware Office UI (session-fff)
+    # ============================================================
+
+    # ── Modul-Kopfbereich ──
+    api_dot_color = '#22c55e' if has_key else '#f59e0b'
+    api_status_text = 'Verbunden' if has_key else 'API-Key fehlt'
+    header_html = f"""
+<div class="lx-header">
+  <div class="lx-header-left">
+    <div class="lx-title">&#x1F4CB; Lexware Office</div>
+    <div class="lx-status-row">
+      <span id="lx-status-dot" class="lx-chip {'lx-chip-ok' if has_key else 'lx-chip-warn'}" style="cursor:pointer" onclick="lexTestConnection()">
+        &#x25CF; {api_status_text}
+      </span>
+      <span class="lx-chip lx-chip-muted">Sync: {esc(last_sync[:16] if len(last_sync) > 10 else last_sync)}</span>
+      {'<span class="lx-chip lx-chip-warn">&#x26A0; ' + str(n_pruef) + ' zu pr&#252;fen</span>' if n_pruef > 0 else ''}
+      {'<span class="lx-chip lx-chip-err">&#x26A0; ' + str(n_unklar) + ' unklar</span>' if n_unklar > 0 else ''}
+      {'<span class="lx-chip lx-chip-err">&#x26A0; ' + str(n_ueberfaellig) + ' &#252;berf&#228;llig</span>' if n_ueberfaellig > 0 else ''}
+    </div>
+  </div>
+  <div class="lx-header-right">
+    <input id="lx-global-search" type="text" placeholder="&#x2315; Suche..." oninput="lxGlobalSearch(this.value)" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm);width:180px">
+    <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'buchhaltung\\')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
+    <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Synchronisieren">&#x21BB; Sync</button>
+    <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'diagnose\\')" title="Diagnose">&#x1F527;</button>
+    <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext(\\'cockpit\\',\\'\\')">&#x1F916; Mit Kira</button>
+  </div>
+</div>"""
+
+    # ── Sekundaere Navigation ──
+    nav_items = [
+        ("cockpit",   "&#x1F4CA;", "Cockpit"),
+        ("belege",    "&#x1F4CB;", "Belege"),
+        ("zahlungen", "&#x1F4B3;", "Zahlungen"),
+        ("kontakte",  "&#x1F465;", "Kontakte"),
+        ("artikel",   "&#x1F3F7;", "Artikel"),
+        ("dateien",   "&#x1F4C2;", "Dateien"),
+        ("buchhaltung","&#x1F4BC;", "Buchhaltung"),
+        ("regeln",    "&#x2699;",  "Regeln & Muster"),
+        ("diagnose",  "&#x1F527;", "Diagnose"),
+    ]
+    def _nav_badge(sec_id):
+        if sec_id == "buchhaltung" and n_pruef > 0:
+            return f' <span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">{n_pruef}</span>'
+        if sec_id == "buchhaltung" and n_unklar > 0:
+            return f' <span class="si-badge" style="background:rgba(220,38,38,.12);color:#dc2626;border-color:rgba(220,38,38,.25)">{n_unklar}</span>'
+        return ""
+    nav_html = '<div class="lx-nav-sec" id="lx-nav-sec">'
+    for sec_id, icon, label in nav_items:
+        nav_html += f'<button class="lx-nav-btn{"  active" if sec_id == "cockpit" else ""}" data-lxsec="{sec_id}" onclick="showLexSec(\\\'{sec_id}\\\')">{icon} {label}{_nav_badge(sec_id)}</button>'
+    # In-Planung-Bereiche
+    planned_items = [("auswertung","&#x1F4C8;","Auswertung"),("kunden360","&#x1F464;","Kunden-360"),("cashflow","&#x1F4B0;","Cashflow"),("kalkulation","&#x1F9EE;","Kalkulation")]
+    for sec_id, icon, label in planned_items:
+        nav_html += f'<button class="lx-nav-btn lx-nav-planned" data-lxsec="{sec_id}" onclick="showLexSec(\\\'{sec_id}\\\')">{icon} {label} <span style="font-size:9px;opacity:.7">Geplant</span></button>'
+    nav_html += '</div>'
+
+    # ── COCKPIT Unterbereich ──
+    # Warnungen zusammenstellen
+    warnungen = []
+    if not has_key:
+        warnungen.append(("err", "API-Key fehlt — Verbindung nicht moeglich", "showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'verbindung\\')}},200)"))
+    if n_pruef > 0:
+        warnungen.append(("warn", f"{n_pruef} Eingangsbeleg(e) warten auf Pr&#252;fung", "showLexSec(\\'buchhaltung\\')"))
+    if n_unklar > 0:
+        warnungen.append(("err", f"{n_unklar} unklar(e) Buchungsfall — Kira-R&#252;ckfrage noetig", "showLexSec(\\'buchhaltung\\')"))
+    if n_ueberfaellig > 0:
+        warnungen.append(("err", f"{n_ueberfaellig} &#252;berf&#228;llige Rechnung(en)", "showLexSec(\\'belege\\')"))
+    if n_kira_frage > 0:
+        warnungen.append(("info", f"{n_kira_frage} Kira-R&#252;ckfrage(n) ausstehend", "showLexSec(\\'buchhaltung\\')"))
+
+    warn_items_html = ""
+    warn_colors = {"err": "#dc2626", "warn": "#f59e0b", "info": "var(--accent)"}
+    warn_icons  = {"err": "&#x26A0;", "warn": "&#x26A0;", "info": "&#x2139;"}
+    for wtyp, wmsg, waction in warnungen:
+        wc = warn_colors.get(wtyp, "var(--muted)")
+        wi = warn_icons.get(wtyp, "&#x26A0;")
+        warn_items_html += f'<div class="lx-signal-item" style="cursor:pointer" onclick="{waction}"><span style="color:{wc}">{wi}</span> {wmsg}</div>'
+    if not warn_items_html:
+        warn_items_html = '<div class="lx-signal-item" style="color:var(--muted)">&#x2705; Alles in Ordnung</div>'
+
+    # Pre-compute conditional HTML fragments to avoid nested f-string issues
+    alle_belege_link = (
+        f'<div style="text-align:right;margin-top:8px">'
+        f'<button class="btn btn-sec btn-xs" onclick="showLexSec(\'belege\')">Alle {n_belege} Belege &rarr;</button>'
+        f'</div>'
+    ) if n_belege > 8 else ''
+
+    kira_frage_signal = (
+        f'<div class="lx-signal-item" style="cursor:pointer" onclick="showLexSec(\'buchhaltung\')">'
+        f'<span style="color:#f59e0b">&#x26A0;</span> <b>{n_kira_frage}</b> Kira-R&#252;ckfrage(n)</div>'
+    ) if n_kira_frage > 0 else ''
+
+    cockpit_html = f"""
+<div style="display:flex;gap:16px;flex-wrap:wrap">
+  <div style="flex:1;min-width:0">
+    <div class="lx-kpi-row">
+      <div class="lx-kpi{'  lx-kpi-warn' if n_offen > 0 else ''}" onclick="showLexSec(\\'belege\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_offen}</div><div class="lx-kpi-lbl">Offen / F&#228;llig</div>
+      </div>
+      <div class="lx-kpi{'  lx-kpi-warn' if n_pruef > 0 else ''}" onclick="showLexSec(\\'buchhaltung\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_pruef}</div><div class="lx-kpi-lbl">Zu pr&#252;fen</div>
+      </div>
+      <div class="lx-kpi" onclick="showLexSec(\\'belege\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_belege}</div><div class="lx-kpi-lbl">Belege gesamt</div>
+      </div>
+      <div class="lx-kpi" onclick="showLexSec(\\'kontakte\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_kontakte}</div><div class="lx-kpi-lbl">Kontakte</div>
+      </div>
+      <div class="lx-kpi" onclick="showLexSec(\\'artikel\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_artikel}</div><div class="lx-kpi-lbl">Artikel</div>
+      </div>
+      <div class="lx-kpi{'  lx-kpi-warn' if n_unklar > 0 else ''}" onclick="showLexSec(\\'buchhaltung\\')" style="cursor:pointer">
+        <div class="lx-kpi-n">{n_unklar}</div><div class="lx-kpi-lbl">Unklar</div>
+      </div>
+    </div>
+    <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
+      <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">SCHNELLAKTIONEN</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-xs" onclick="lexSync()">&#x21BB; Jetzt synchronisieren</button>
+        <button class="btn btn-sec btn-xs" onclick="lexSync(\\'full\\')">Vollsync</button>
+        <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">Verbindung testen</button>
+        <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'buchhaltung\\')">Eingangsbelege pr&#252;fen</button>
+        <button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext(\\'cockpit\\',\\'\\')">&#x1F916; Mit Kira besprechen</button>
+      </div>
+      <div id="lx-sync-log" style="font-size:var(--fs-sm);color:var(--muted);margin-top:8px;min-height:20px"></div>
+    </div>
+    <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+      <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">LETZTE BELEGE</div>
+      <div style="overflow-x:auto">
+      <table class="lx-table" style="font-size:var(--fs-sm)">
+        <thead><tr><th>Nummer</th><th>Kontakt</th><th>Datum</th><th>Status</th><th style="text-align:right">Betrag</th></tr></thead>
+        <tbody>
+          {"".join(_mini_beleg_row(b) for b in belege[:8]) if belege else '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Keine Belege &mdash; Sync starten</td></tr>'}
+        </tbody>
+      </table>
+      </div>
+      {alle_belege_link}
+    </div>
+  </div>
+  <div class="lx-signals-panel">
+    <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">WARNUNGEN & SIGNALE</div>
+    <div id="lx-signals-list">{warn_items_html}</div>
+    <div style="margin-top:16px;font-weight:600;font-size:var(--fs-sm);margin-bottom:8px;color:var(--muted)">BUCHHALTUNG</div>
+    <div class="lx-signal-item"><span style="color:var(--success)">&#x2705;</span> Klassifiziert: <b>{n_klassifiziert}</b></div>
+    <div class="lx-signal-item"><span style="color:var(--muted)">&#x1F4C2;</span> Abgelegt: <b>{n_abgelegt}</b></div>
+    {kira_frage_signal}
+  </div>
+</div>"""
+
+    # ── BELEGE Unterbereich ──
+    def _beleg_row(b):
+        st = b.get("status","")
+        _st_map = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert"}
+        st_label = _st_map.get(st, esc(st))
+        st_cls = f"lx-st-chip lx-st-{st}"
+        _typ_map = {"invoice":"Rechnung","creditnote":"Gutschrift","quotation":"Angebot","reminder":"Mahnung"}
+        typ_label = _typ_map.get(b.get("typ",""), esc(b.get("typ","")))
+        kira_badge = ' <span class="lx-kira-badge">&#x1F916;</span>' if b.get("kira_verwendet") else ""
+        return f"""<tr class="lx-tr" onclick="lxBelegDetail('{esc(b["lexware_id"])}')">
+  <td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>
+  <td><span style="font-size:var(--fs-xs);color:var(--muted)">{typ_label}</span></td>
+  <td>{esc(b.get("kontakt_name",""))}{kira_badge}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("datum",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("faelligkeit","") or "—")}</td>
+  <td><span class="{st_cls}">{st_label}</span></td>
+  <td style="text-align:right;font-weight:600">{b.get("brutto",0):,.2f}&nbsp;{esc(b.get("waehrung","EUR"))}</td>
+  <td style="white-space:nowrap">
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBelegKira('{esc(b["lexware_id"])}','{esc(b.get("nummer",""))}','{esc(b.get("kontakt_name",""))}')">&#x1F916;</button>
+  </td>
 </tr>"""
 
-    belege_rows = "".join(_beleg_row(b) for b in belege) if belege else "<tr><td colspan='6' style='text-align:center;color:var(--muted);padding:20px'>Keine Belege geladen — Sync starten</td></tr>"
+    belege_rows = "".join(_beleg_row(b) for b in belege) if belege else "<tr><td colspan='8' style='text-align:center;color:var(--muted);padding:24px'>Keine Belege geladen — Sync starten</td></tr>"
     belege_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-  <select id="lx-bel-typ" onchange="lxFilterBelege()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+  <select id="lx-bel-typ" onchange="lxFilterBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
     <option value="">Alle Typen</option>
     <option value="invoice">Rechnungen</option>
     <option value="creditnote">Gutschriften</option>
     <option value="quotation">Angebote</option>
+    <option value="reminder">Mahnungen</option>
   </select>
-  <select id="lx-bel-status" onchange="lxFilterBelege()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+  <select id="lx-bel-status" onchange="lxFilterBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
     <option value="">Alle Status</option>
     <option value="open">Offen</option>
     <option value="overdue">&#220;berf&#228;llig</option>
     <option value="paid">Bezahlt</option>
     <option value="draft">Entwurf</option>
+    <option value="voided">Storniert</option>
   </select>
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary" onclick="lexSync()">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync()">&#x21BB; Sync</button>
 </div>
-<div style="overflow-x:auto">
-<table class="lx-table" id="lx-belege-table">
-  <thead><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>Status</th><th style="text-align:right">Betrag</th></tr></thead>
-  <tbody id="lx-belege-tbody">{belege_rows}</tbody>
-</table>
+<div style="display:flex;gap:12px">
+  <div style="flex:1;overflow-x:auto">
+  <table class="lx-table" id="lx-belege-table">
+    <thead><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>F&#228;llig</th><th>Status</th><th style="text-align:right">Betrag</th><th></th></tr></thead>
+    <tbody id="lx-belege-tbody">{belege_rows}</tbody>
+  </table>
+  </div>
+  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:340px;flex-shrink:0">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
+        <button class="btn btn-sec btn-xs" onclick="document.getElementById(\\'lx-bel-detail\\').style.display=\\'none\\'">&#x2715;</button>
+      </div>
+      <div id="lx-bel-detail-content" style="font-size:var(--fs-sm)"></div>
+    </div>
+  </div>
 </div>"""
 
-    # ── Kontakte Tab ──
+    # ── ZAHLUNGEN Unterbereich (In Planung) ──
+    # Lokale Zahlungserfassung aus eingangsbelege_pruefqueue (PayPal = False, Betrag vorhanden)
+    lokal_zahlungen = [p for p in pruefqueue if not p.get("is_paypal") and p.get("betrag")]
+    def _zahlung_row(p):
+        _z_st_map = {"zu_pruefen":"Zu pr&#252;fen","klassifiziert":"Klassifiziert","abgelegt":"Abgelegt"}
+        z_st = p.get("status","")
+        z_st_label = _z_st_map.get(z_st, z_st)
+        z_datum = esc(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else "—"))
+        z_pid = p.get("id","")
+        return (
+            f'<tr class="lx-tr" onclick="lxOpenKiraWithContext(\'zahlung\',{z_pid})">'
+            f'<td style="font-size:var(--fs-xs);color:var(--muted)">{z_datum}</td>'
+            f'<td style="font-weight:600;text-align:right">{(p.get("betrag") or 0):,.2f}&nbsp;{esc(p.get("waehrung","EUR"))}</td>'
+            f'<td>Eingang</td>'
+            f'<td>{esc(p.get("absender",""))}</td>'
+            f'<td><span class="lx-st-chip lx-st-{z_st}">{z_st_label}</span></td>'
+            f'<td><button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\'zahlung\',{z_pid})">&#x1F916;</button></td>'
+            f'</tr>'
+        )
+    zahlung_rows = "".join(_zahlung_row(p) for p in lokal_zahlungen[:50]) if lokal_zahlungen else ""
+    zahlungen_html = f"""
+<div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+  <span style="font-size:20px">&#x1F527;</span>
+  <div>
+    <div style="font-weight:600;font-size:var(--fs-sm)">Zahlungen aus Lexware API</div>
+    <div style="color:var(--muted);font-size:var(--fs-xs)">Direkter Zahlungs-API-Export ist in Planung. Aktuell werden Zahlungseingaenge aus erkannten Eingangsbelegen angezeigt.</div>
+  </div>
+</div>
+{f'''<div>
+<div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:8px;color:var(--muted)">ERKANNTE ZAHLUNGSEINGAENGE ({len(lokal_zahlungen)})</div>
+<div style="overflow-x:auto">
+<table class="lx-table">
+  <thead><tr><th>Datum</th><th style="text-align:right">Betrag</th><th>Typ</th><th>Gegenpartei</th><th>Status</th><th></th></tr></thead>
+  <tbody>{zahlung_rows}</tbody>
+</table>
+</div>
+</div>''' if lokal_zahlungen else '<div style="text-align:center;color:var(--muted);padding:32px">Noch keine Zahlungseingaenge erfasst</div>'}"""
+
+    # ── KONTAKTE Unterbereich ──
     def _kontakt_row(k):
-        return f"""<tr class="lx-tr" onclick="lexKontaktDetail('{esc(k['lexware_id'])}')">
-  <td>{esc(k.get('name',''))}</td>
-  <td>{esc(k.get('email',''))}</td>
-  <td style="color:var(--muted);font-size:var(--fs-sm)">{esc(k.get('last_sync',''))}</td>
+        return f"""<tr class="lx-tr" onclick="lxKontaktDetail('{esc(k["lexware_id"])}','{esc(k.get("name",""))}')">
+  <td style="font-weight:600">{esc(k.get("name",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("email",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("telefon","") or "—")}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("last_sync",""))}</td>
+  <td>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxKontaktKira('{esc(k["lexware_id"])}','{esc(k.get("name",""))}')">&#x1F916; Kira</button>
+  </td>
 </tr>"""
-    kontakte_rows = "".join(_kontakt_row(k) for k in kontakte) if kontakte else "<tr><td colspan='3' style='text-align:center;color:var(--muted);padding:20px'>Keine Kontakte geladen</td></tr>"
+    kontakte_rows = "".join(_kontakt_row(k) for k in kontakte) if kontakte else "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:24px'>Keine Kontakte geladen</td></tr>"
     kontakte_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-kon-search" type="text" placeholder="Suche Name / E-Mail..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary" onclick="lexSync(\\'kontakte\\')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync(\\'kontakte\\')">&#x21BB; Sync</button>
 </div>
-<div style="overflow-x:auto">
-<table class="lx-table">
-  <thead><tr><th>Name</th><th>E-Mail</th><th>Letzte Sync</th></tr></thead>
-  <tbody id="lx-kontakte-tbody">{kontakte_rows}</tbody>
-</table>
+<div style="display:flex;gap:12px">
+  <div style="flex:1;overflow-x:auto">
+  <table class="lx-table">
+    <thead><tr><th>Name / Firma</th><th>E-Mail</th><th>Telefon</th><th>Letzte Sync</th><th></th></tr></thead>
+    <tbody id="lx-kontakte-tbody">{kontakte_rows}</tbody>
+  </table>
+  </div>
+  <div id="lx-kon-detail" class="lx-detail-panel" style="display:none;width:300px;flex-shrink:0">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:600;font-size:var(--fs-sm)">Kontakt-Details</div>
+        <button class="btn btn-sec btn-xs" onclick="document.getElementById(\\'lx-kon-detail\\').style.display=\\'none\\'">&#x2715;</button>
+      </div>
+      <div id="lx-kon-detail-content" style="font-size:var(--fs-sm)"></div>
+    </div>
+  </div>
 </div>"""
 
-    # ── Artikel Tab ──
+    # ── ARTIKEL Unterbereich ──
     def _artikel_row(a):
-        return f"""<tr class="lx-tr">
-  <td>{esc(a.get('name',''))}</td>
-  <td>{esc(a.get('typ',''))}</td>
-  <td style="text-align:right">{a.get('netto_preis',0):,.2f}&nbsp;&#x20AC;</td>
-  <td>{esc(a.get('einheit',''))}</td>
-  <td>{esc(a.get('steuer_satz',''))}</td>
+        herkunft = "Lexware" if a.get("lexware_id") else "Manuell"
+        return f"""<tr class="lx-tr" onclick="lxArtikelDetail('{esc(a.get("lexware_id",""))}')">
+  <td style="font-weight:600">{esc(a.get("name",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(a.get("typ",""))}</td>
+  <td style="text-align:right;font-weight:600">{a.get("netto_preis",0):,.2f}&nbsp;&#x20AC;</td>
+  <td style="font-size:var(--fs-xs)">{esc(a.get("einheit",""))}</td>
+  <td style="font-size:var(--fs-xs)">{esc(a.get("steuer_satz",""))}</td>
+  <td><span class="lx-chip lx-chip-muted" style="font-size:9px">{herkunft}</span></td>
+  <td>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'artikel\\',\\'{esc(a.get("lexware_id",""))}\\')">&#x1F916;</button>
+  </td>
 </tr>"""
-    artikel_rows = "".join(_artikel_row(a) for a in artikel) if artikel else "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:20px'>Keine Artikel geladen</td></tr>"
+    artikel_rows = "".join(_artikel_row(a) for a in artikel) if artikel else "<tr><td colspan='7' style='text-align:center;color:var(--muted);padding:24px'>Keine Artikel geladen</td></tr>"
     artikel_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-art-search" type="text" placeholder="Suche Artikel..." oninput="lxFilterArtikel()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary" onclick="lexSync(\\'artikel\\')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync(\\'artikel\\')">&#x21BB; Sync</button>
 </div>
 <div style="overflow-x:auto">
 <table class="lx-table">
-  <thead><tr><th>Name</th><th>Typ</th><th style="text-align:right">Netto</th><th>Einheit</th><th>Steuer</th></tr></thead>
+  <thead><tr><th>Name</th><th>Typ</th><th style="text-align:right">Netto</th><th>Einheit</th><th>Steuer</th><th>Herkunft</th><th></th></tr></thead>
   <tbody id="lx-artikel-tbody">{artikel_rows}</tbody>
 </table>
 </div>"""
 
-    # ── Buchhaltung Tab (Eingangsbelege Prüfqueue) ──
-    def _pruef_row(p):
-        status_labels = {
-            "zu_pruefen": ("<span style='color:var(--warning);font-weight:600'>Zu pr&#252;fen</span>", ""),
-            "klassifiziert": ("<span style='color:var(--success)'>Klassifiziert</span>", ""),
-            "abgelegt": ("<span style='color:var(--muted)'>Abgelegt</span>", ""),
-            "unklar": ("<span style='color:#dc2626'>Unklar</span>", ""),
-        }
-        st = p.get("status", "zu_pruefen")
-        st_html, _ = status_labels.get(st, (esc(st), ""))
-        paypal_badge = ' <span style="font-size:10px;background:#f0a500;color:#fff;padding:1px 5px;border-radius:3px">PayPal</span>' if p.get("is_paypal") else ""
+    # ── DATEIEN Unterbereich ──
+    dateien_list = [p for p in pruefqueue if p.get("body_excerpt") or p.get("is_body_only")]
+    def _datei_row(p):
+        dok_status = "Body-only" if p.get("is_body_only") else "Anhang/Mail"
         return f"""<tr class="lx-tr" onclick="lexPruefDetail({p['id']})">
-  <td>{esc(p.get('absender',''))}{paypal_badge}</td>
-  <td>{esc(p.get('betreff',''))}</td>
-  <td style="text-align:right">{(p.get('betrag') or 0):,.2f}&nbsp;{esc(p.get('waehrung','EUR'))}</td>
-  <td>{esc(p.get('datum_beleg','') or p.get('datum_eingang','')[:10])}</td>
-  <td>{st_html}</td>
-  <td><button class="btn btn-sec" style="padding:3px 8px;font-size:var(--fs-xs)" onclick="event.stopPropagation();lexPruefDetail({p['id']})">Details</button></td>
+  <td style="font-weight:600">{esc(p.get("absender",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("betreff",""))[:60]}</td>
+  <td><span class="lx-chip {'lx-chip-warn' if p.get('is_body_only') else 'lx-chip-muted'}" style="font-size:9px">{dok_status}</span></td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("datum_beleg","") or "—")}</td>
+  <td>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lexPruefDetail({p['id']})">Details</button>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'datei\\',{p['id']})">&#x1F916;</button>
+  </td>
+</tr>"""
+    datei_rows = "".join(_datei_row(p) for p in dateien_list[:50]) if dateien_list else ""
+    dateien_html = f"""
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:var(--fs-sm)">
+    <div style="font-weight:600;margin-bottom:4px">Belegdateien gesamt</div>
+    <div style="font-size:var(--fs-xl);font-weight:700">{len(pruefqueue)}</div>
+  </div>
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:var(--fs-sm)">
+    <div style="font-weight:600;margin-bottom:4px">Body-only (kein PDF)</div>
+    <div style="font-size:var(--fs-xl);font-weight:700">{sum(1 for p in pruefqueue if p.get("is_body_only"))}</div>
+  </div>
+</div>
+<div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:var(--fs-sm)">
+  &#x2139; Dokumente-Modul-Verzahnung (Originaldokumente, zentrales Archiv) ist in Vorbereitung.
+  Aktuell werden Eingangsbeleg-Dateien aus der Pr&#252;fqueue angezeigt.
+</div>
+{f'''<table class="lx-table">
+  <thead><tr><th>Absender / Lieferant</th><th>Betreff</th><th>Typ</th><th>Datum</th><th></th></tr></thead>
+  <tbody>{datei_rows}</tbody>
+</table>''' if dateien_list else '<div style="text-align:center;color:var(--muted);padding:32px">Noch keine Belegdateien erfasst — Sync oder Eingangsbelege pruefen</div>'}"""
+
+    # ── BUCHHALTUNG Unterbereich (6 Unterbereich-Tabs) ──
+    def _pruef_row_full(p, show_detail_btn=True):
+        status_html = {
+            "zu_pruefen": "<span class='lx-st-chip lx-st-open'>Zu pr&#252;fen</span>",
+            "klassifiziert": "<span class='lx-st-chip lx-st-paid'>Klassifiziert</span>",
+            "abgelegt": "<span class='lx-st-chip lx-st-draft'>Abgelegt</span>",
+            "unklar": "<span class='lx-st-chip lx-st-overdue'>Unklar</span>",
+        }.get(p.get("status","zu_pruefen"), "<span class='lx-st-chip lx-st-draft'>"+esc(p.get("status",""))+"</span>")
+        paypal_badge = '<span class="lx-chip" style="background:#f59e0b;color:#fff;font-size:9px;border:none">PayPal</span>' if p.get("is_paypal") else ""
+        body_badge = '<span class="lx-chip lx-chip-warn" style="font-size:9px">Body-only</span>' if p.get("is_body_only") else ""
+        kira_badge = f'<span class="lx-kira-badge" title="{esc(p.get("kira_frage","")[:60])}">&#x1F916; Kira-Frage</span>' if p.get("kira_frage") else ""
+        konto_chip = f'<span class="lx-chip lx-chip-muted" style="font-size:9px" title="Kontierungsvorschlag">&#x1F4CA; {esc(p.get("konto_vorschlag","")[:20])}</span>' if p.get("konto_vorschlag") else ""
+        return f"""<tr class="lx-tr" onclick="lxBuchDetailFull({p['id']})">
+  <td style="font-weight:600">{esc(p.get("absender",""))}{paypal_badge}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("betreff",""))[:50]}{body_badge}</td>
+  <td style="text-align:right;font-weight:600">{(p.get("betrag") or 0):,.2f}&nbsp;{esc(p.get("waehrung","EUR"))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else "—"))}</td>
+  <td>{status_html} {kira_badge} {konto_chip}</td>
+  <td style="white-space:nowrap">
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBuchDetailFull({p['id']})">Details</button>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBuchKira({p['id']},'{esc(p.get('absender',''))}')">&#x1F916;</button>
+  </td>
 </tr>"""
 
-    pruef_rows = "".join(_pruef_row(p) for p in pruefqueue) if pruefqueue else "<tr><td colspan='6' style='text-align:center;color:var(--muted);padding:20px'>Keine Eingangsbelege in der Pr&#252;fqueue</td></tr>"
+    def _buch_tab_table(items, empty_msg):
+        if not items:
+            return f'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">{empty_msg}</td></tr>'
+        return "".join(_pruef_row_full(p) for p in items)
+
+    pruef_zu    = [p for p in pruefqueue if p.get("status") == "zu_pruefen"]
+    pruef_klass = [p for p in pruefqueue if p.get("status") == "klassifiziert"]
+    pruef_abg   = [p for p in pruefqueue if p.get("status") == "abgelegt"]
+    pruef_unk   = [p for p in pruefqueue if p.get("status") == "unklar"]
+    # Vollautomatik: klassifiziert + konto_vorschlag vorhanden
+    pruef_auto  = [p for p in pruefqueue if p.get("konto_vorschlag") and p.get("status") in ("klassifiziert","abgelegt")]
+
+    buch_table_header = """<thead><tr><th>Absender / Lieferant</th><th>Betreff</th><th style="text-align:right">Betrag</th><th>Datum</th><th>Status / Kira</th><th></th></tr></thead>"""
+
     buchalt_html = f"""
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-  <select id="lx-pruef-status" onchange="lxFilterPruef()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+<div class="lx-buch-nav">
+  <button class="lx-buch-tab active" data-buchtab="zu_pruefen" onclick="showLexBuchTab(\\'zu_pruefen\\')">Zu pr&#252;fen {('<span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">'+str(n_pruef)+'</span>') if n_pruef > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="klassifiziert" onclick="showLexBuchTab(\\'klassifiziert\\')">Klassifiziert {('<span class="si-badge">'+str(n_klassifiziert)+'</span>') if n_klassifiziert > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="abgelegt" onclick="showLexBuchTab(\\'abgelegt\\')">Abgelegt {('<span class="si-badge">'+str(n_abgelegt)+'</span>') if n_abgelegt > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="unklar" onclick="showLexBuchTab(\\'unklar\\')">Unklar {('<span class="si-badge" style="background:rgba(220,38,38,.12);color:#dc2626;border-color:rgba(220,38,38,.25)">'+str(n_unklar)+'</span>') if n_unklar > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="vollautomatik" onclick="showLexBuchTab(\\'vollautomatik\\')">Vollautomatik {('<span class="si-badge">'+str(len(pruef_auto))+'</span>') if pruef_auto else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="alle" onclick="showLexBuchTab(\\'alle\\')">Alle ({len(pruefqueue)})</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;margin-top:12px">
+  <select id="lx-pruef-status" onchange="lxFilterPruef()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
     <option value="">Alle Status</option>
     <option value="zu_pruefen">Zu pr&#252;fen</option>
     <option value="klassifiziert">Klassifiziert</option>
@@ -9827,67 +10295,171 @@ def build_lexware(db):
     <option value="unklar">Unklar</option>
   </select>
   <input id="lx-pruef-search" type="text" placeholder="Absender / Betreff..." oninput="lxFilterPruef()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <span style="font-size:var(--fs-sm);color:var(--muted)">{n_pruef} zu pr&#252;fen</span>
+  <button class="btn btn-sec btn-xs" onclick="lxBuchManuellesPruefen()">+ Manuell hinzufuegen</button>
 </div>
-<div style="overflow-x:auto">
-<table class="lx-table" id="lx-pruef-table">
-  <thead><tr><th>Absender</th><th>Betreff</th><th style="text-align:right">Betrag</th><th>Datum</th><th>Status</th><th></th></tr></thead>
-  <tbody id="lx-pruef-tbody">{pruef_rows}</tbody>
-</table>
-</div>"""
+<div id="lx-buch-zu_pruefen" class="lx-buch-content" style="display:block"><div style="overflow-x:auto"><table class="lx-table" id="lx-pruef-table">{buch_table_header}<tbody id="lx-pruef-tbody">{_buch_tab_table(pruef_zu, "Keine Belege zu pruefe — Eingangsrechnungen werden automatisch erkannt")}</tbody></table></div></div>
+<div id="lx-buch-klassifiziert" class="lx-buch-content" style="display:none"><div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_klass, "Noch keine klassifizierten Belege")}</tbody></table></div></div>
+<div id="lx-buch-abgelegt" class="lx-buch-content" style="display:none"><div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_abg, "Noch keine abgelegten Belege")}</tbody></table></div></div>
+<div id="lx-buch-unklar" class="lx-buch-content" style="display:none">
+  {'<div style="background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:var(--fs-sm)">&#x26A0; Diese Faelle konnten nicht automatisch klassifiziert werden. Bitte pruefen oder Kira befragen.</div>' if n_unklar > 0 else ''}
+  <div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_unk, "Keine unklaren Faelle — ")}</tbody></table></div>
+</div>
+<div id="lx-buch-vollautomatik" class="lx-buch-content" style="display:none">
+  <div style="background:linear-gradient(135deg,rgba(34,197,94,.06),rgba(34,197,94,.02));border:1px solid rgba(34,197,94,.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:var(--fs-sm)">
+    &#x2705; Vollautomatik: Faelle die von KIRA erkannt und kontiert wurden — keine manuelle Pruefung noetig.
+    <br><span style="color:var(--muted)">Confidence-Schwelle und Vollautomatik-Einstellungen: <a href="#" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'vollautomatik\\')}},200)" style="color:var(--accent)">Einstellungen &rarr; Vollautomatik</a></span>
+  </div>
+  <div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_auto, "Noch keine vollautomatisch verarbeiteten Faelle")}</tbody></table></div>
+</div>
+<div id="lx-buch-alle" class="lx-buch-content" style="display:none"><div style="overflow-x:auto"><table class="lx-table" id="lx-pruef-table-all">{buch_table_header}<tbody>{_buch_tab_table(pruefqueue, "Keine Eingangsbelege vorhanden")}</tbody></table></div></div>"""
 
-    # ── Diagnose Tab ──
+    # ── REGELN & MUSTER Unterbereich ──
+    # Regeln aus pruefqueue ableiten (GROUP BY absender_domain + konto_vorschlag)
+    regeln_by_domain = {}
+    for p in pruefqueue:
+        dom = p.get("absender_domain","")
+        konto = p.get("konto_vorschlag","")
+        if dom and konto:
+            if dom not in regeln_by_domain:
+                regeln_by_domain[dom] = {"konto": konto, "count": 0, "absender": p.get("absender",""), "letzte_verwendung": p.get("pruef_ts","") or p.get("erstellt_ts","")}
+            regeln_by_domain[dom]["count"] += 1
+    def _regel_row(dom, r):
+        return f"""<tr class="lx-tr" onclick="lxRegelDetail('{esc(dom)}')">
+  <td style="font-weight:600">{esc(r['absender'][:30]) if len(r.get('absender','')) > 30 else esc(r.get('absender',''))}</td>
+  <td><span class="lx-chip lx-chip-muted" style="font-size:9px">Absender-Muster</span></td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(dom)}</td>
+  <td style="font-size:var(--fs-xs)">{esc(r['konto'])}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(r['letzte_verwendung'][:16] if r.get('letzte_verwendung') and len(r['letzte_verwendung']) > 10 else (r.get('letzte_verwendung') or "—"))}</td>
+  <td style="text-align:center">{r['count']}</td>
+  <td>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'regel\\','{esc(dom)}')">&#x1F916;</button>
+  </td>
+</tr>"""
+    regeln_rows = "".join(_regel_row(dom, r) for dom, r in regeln_by_domain.items()) if regeln_by_domain else ""
+    regeln_html = f"""
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+  <input id="lx-reg-search" type="text" placeholder="Suche Absender / Muster..." oninput="lxFilterRegeln()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
+</div>
+<div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:var(--fs-sm)">
+  &#x2139; Regeln & Muster werden automatisch aus best&#228;tigten Buchungen abgeleitet.
+  Eine echte Regel-Datenbank mit manueller Pflege ist in Planung.
+</div>
+{f'''<div style="overflow-x:auto">
+<table class="lx-table" id="lx-regeln-table">
+  <thead><tr><th>Absender</th><th>Typ</th><th>Domain</th><th>Konto-Vorschlag</th><th>Letzte Verwendung</th><th style="text-align:center">Anwendungen</th><th></th></tr></thead>
+  <tbody id="lx-regeln-tbody">{regeln_rows}</tbody>
+</table>
+</div>''' if regeln_by_domain else '<div style="text-align:center;color:var(--muted);padding:32px">Noch keine Muster abgeleitet — Eingangsbelege klassifizieren um Muster aufzubauen</div>'}"""
+
+    # ── DIAGNOSE & MAPPING Unterbereich ──
+    lex_api_base = lex_cfg.get("api_base_url","https://api.lexoffice.io/v1")
     diagnose_html = f"""
-<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
-  <b>API-Konfiguration</b>
-  <div style="margin-top:8px;font-size:var(--fs-sm);font-family:monospace;color:var(--muted)">
-    Endpunkt: https://api.lexoffice.io/v1/<br>
-    API-Key: {'<span style="color:var(--success)">konfiguriert</span>' if has_key else '<span style="color:var(--warning)">fehlt</span>'}<br>
-    Modul-Status: {esc(modul_status)}<br>
-    Letzte Sync: {esc(last_sync)}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+    <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">VERBINDUNGSSTATUS</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span id="lx-status-dot2" style="width:10px;height:10px;border-radius:50%;background:{'#22c55e' if has_key else '#f59e0b'};flex-shrink:0"></span>
+      <span style="font-size:var(--fs-sm);font-weight:600">{'API-Key konfiguriert' if has_key else 'API-Key fehlt'}</span>
+    </div>
+    <div style="font-size:var(--fs-xs);color:var(--muted);line-height:1.7;font-family:monospace">
+      Endpunkt: {esc(lex_api_base)}<br>
+      Modul-Status: {esc(modul_status)}<br>
+      Letzte Sync: {esc(last_sync)}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">API testen</button>
+      <button class="btn btn-sec btn-xs" onclick="lexSync()">&#x21BB; Sync</button>
+      <button class="btn btn-sec btn-xs" onclick="lexLoadSyncLog()">Sync-Log</button>
+    </div>
+    <div id="lx-diag-log" style="margin-top:8px;font-family:monospace;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:150px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;min-height:32px">Ausgabe erscheint hier...</div>
+  </div>
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+    <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">DATEN-UEBERSICHT</div>
+    <table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse">
+      <tr><td style="color:var(--muted);padding:4px 0">Belege in DB</td><td style="font-weight:600;text-align:right">{n_belege}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Kontakte in DB</td><td style="font-weight:600;text-align:right">{n_kontakte}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Artikel in DB</td><td style="font-weight:600;text-align:right">{n_artikel}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Eingangsbelege Gesamt</td><td style="font-weight:600;text-align:right">{len(pruefqueue)}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">&#8627; Zu pruefen</td><td style="font-weight:600;text-align:right;color:{'#f59e0b' if n_pruef > 0 else 'inherit'}">{n_pruef}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">&#8627; Unklar</td><td style="font-weight:600;text-align:right;color:{'#dc2626' if n_unklar > 0 else 'inherit'}">{n_unklar}</td></tr>
+    </table>
   </div>
 </div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-  <button class="btn btn-sec" onclick="lexTestConnection()">API testen</button>
-  <button class="btn btn-sec" onclick="lexLoadSyncLog()">Sync-Log laden</button>
+<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+  <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">KIRA &harr; LEXWARE FELDMAPPING</div>
+  <table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 8px;color:var(--muted)">KIRA-Feld</th><th style="text-align:left;padding:6px 8px;color:var(--muted)">Lexware-Feld</th><th style="text-align:left;padding:6px 8px;color:var(--muted)">Typ</th></tr></thead>
+    <tbody>
+      <tr class="lx-tr"><td style="padding:6px 8px">lexware_belege.lexware_id</td><td style="padding:6px 8px">voucher.id</td><td style="padding:6px 8px"><span class="lx-chip lx-chip-ok" style="font-size:9px">Text/UUID</span></td></tr>
+      <tr class="lx-tr"><td style="padding:6px 8px">lexware_belege.nummer</td><td style="padding:6px 8px">voucher.voucherNumber</td><td style="padding:6px 8px"><span class="lx-chip lx-chip-muted" style="font-size:9px">Text</span></td></tr>
+      <tr class="lx-tr"><td style="padding:6px 8px">lexware_belege.typ</td><td style="padding:6px 8px">voucher.voucherType</td><td style="padding:6px 8px"><span class="lx-chip lx-chip-muted" style="font-size:9px">Enum</span></td></tr>
+      <tr class="lx-tr"><td style="padding:6px 8px">lexware_belege.brutto</td><td style="padding:6px 8px">voucher.totalGrossAmount</td><td style="padding:6px 8px"><span class="lx-chip lx-chip-muted" style="font-size:9px">Decimal</span></td></tr>
+      <tr class="lx-tr"><td style="padding:6px 8px">lexware_kontakte.lexware_id</td><td style="padding:6px 8px">contact.id</td><td style="padding:6px 8px"><span class="lx-chip lx-chip-ok" style="font-size:9px">Text/UUID</span></td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:8px;font-size:var(--fs-xs);color:var(--muted)">Vollstaendiges Mapping in <code>lexware_client.py</code> — sync_*_to_db() Methoden</div>
 </div>
-<div id="lx-diag-log" style="font-family:monospace;font-size:var(--fs-sm);color:var(--muted);white-space:pre-wrap;max-height:300px;overflow-y:auto;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:60px">
-  Diagnose-Ausgabe erscheint hier...
+<div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);padding:12px 16px;font-size:var(--fs-sm)">
+  &#x2139; Dataverse-Zusatzexport (Microsoft Power Platform) ist als optionale Erweiterung vorbereitet.
+  Aktivierung in <a href="#" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'dataverse\\')}},200)" style="color:var(--accent)">Einstellungen &rarr; Dataverse</a>.
 </div>"""
 
-    tabs_html = """
-<div class="lx-tabs" id="lx-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;">
-  <button class="lx-tab active" data-tab="cockpit"   onclick="showLexTab('cockpit')">&#x1F4CA; Cockpit</button>
-  <button class="lx-tab"        data-tab="belege"    onclick="showLexTab('belege')">&#x1F4CB; Belege</button>
-  <button class="lx-tab"        data-tab="kontakte"  onclick="showLexTab('kontakte')">&#x1F465; Kontakte</button>
-  <button class="lx-tab"        data-tab="artikel"   onclick="showLexTab('artikel')">&#x1F3F7; Artikel</button>
-  <button class="lx-tab"        data-tab="buchhaltung" onclick="showLexTab('buchhaltung')">&#x1F4BC; Buchhaltung""" + (f' <span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">{n_pruef}</span>' if n_pruef > 0 else "") + """</button>
-  <button class="lx-tab"        data-tab="diagnose"  onclick="showLexTab('diagnose')">&#x1F527; Diagnose</button>
-</div>
-<div id="lx-tab-cockpit"    class="lx-tab-content active">""" + cockpit_html + """</div>
-<div id="lx-tab-belege"     class="lx-tab-content">""" + belege_html + """</div>
-<div id="lx-tab-kontakte"   class="lx-tab-content">""" + kontakte_html + """</div>
-<div id="lx-tab-artikel"    class="lx-tab-content">""" + artikel_html + """</div>
-<div id="lx-tab-buchhaltung" class="lx-tab-content">""" + buchalt_html + """</div>
-<div id="lx-tab-diagnose"   class="lx-tab-content">""" + diagnose_html + """</div>"""
+    # ── In-Planung-Bereiche ──
+    def _planned_section(icon, title, desc):
+        return f"""
+<div style="max-width:500px;margin:48px auto;text-align:center;padding:0 16px">
+  <div style="font-size:48px;margin-bottom:16px">{icon}</div>
+  <div style="font-size:var(--fs-xl);font-weight:700;margin-bottom:8px">{title}</div>
+  <div style="color:var(--muted);font-size:var(--fs-sm);line-height:1.7;margin-bottom:20px">{desc}</div>
+  <span class="lx-chip lx-chip-muted">In Planung</span>
+</div>"""
+    auswertung_html = _planned_section("&#x1F4C8;","Auswertungen","Umsatzentwicklung, Zahlungseingaenge, Top-Kunden und Kategorie-Auswertungen direkt in KIRA — in Entwicklung.")
+    kunden360_html  = _planned_section("&#x1F464;","Kunden-360","Vollstaendige Kundensicht mit Timeline aller Vorgaenge, Belege und Kommunikation — in Entwicklung.")
+    cashflow_html   = _planned_section("&#x1F4B0;","Cashflow-Prognose","Liquiditatsuebersicht und vorausschauende Cashflow-Analyse auf Basis offener Rechnungen — in Entwicklung.")
+    kalkulation_html = _planned_section("&#x1F9EE;","Kalkulation","Angebotskalkulationsassistent mit Materialkosten, Arbeitszeit und Preispositions-Logik — in Entwicklung.")
 
-    return tabs_html
+    # ── Zusammenbauen ──
+    all_sections = {
+        "cockpit": cockpit_html,
+        "belege": belege_html,
+        "zahlungen": zahlungen_html,
+        "kontakte": kontakte_html,
+        "artikel": artikel_html,
+        "dateien": dateien_html,
+        "buchhaltung": buchalt_html,
+        "regeln": regeln_html,
+        "diagnose": diagnose_html,
+        "auswertung": auswertung_html,
+        "kunden360": kunden360_html,
+        "cashflow": cashflow_html,
+        "kalkulation": kalkulation_html,
+    }
+    sections_html = ""
+    for sec_id, sec_html in all_sections.items():
+        active = " style='display:block'" if sec_id == "cockpit" else " style='display:none'"
+        sections_html += f'<div class="lx-sec-content" id="lx-sec-{sec_id}" data-lxsec="{sec_id}"{active}>{sec_html}</div>'
+
+    return f"""<div class="lx-module">{header_html}{nav_html}<div class="lx-content">{sections_html}</div></div>"""
 
 
 def _build_lexware_tabs_preview():
-    """Zeigt eine gesperrte Tab-Leiste als Vorschau (fuer modul_status='gesperrt')."""
+    """Zeigt eine gesperrte Navigation als Vorschau (fuer modul_status='gesperrt')."""
     return """
-<div style="opacity:0.4;pointer-events:none;user-select:none">
-<div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto">
-  <button class="lx-tab">&#x1F4CA; Cockpit</button>
-  <button class="lx-tab">&#x1F4CB; Belege</button>
-  <button class="lx-tab">&#x1F465; Kontakte</button>
-  <button class="lx-tab">&#x1F3F7; Artikel</button>
-  <button class="lx-tab">&#x1F4BC; Buchhaltung</button>
-  <button class="lx-tab">&#x1F527; Diagnose</button>
+<div style="opacity:0.45;pointer-events:none;user-select:none">
+<div class="lx-nav-sec" style="margin-bottom:12px">
+  <button class="lx-nav-btn active">&#x1F4CA; Cockpit</button>
+  <button class="lx-nav-btn">&#x1F4CB; Belege</button>
+  <button class="lx-nav-btn">&#x1F4B3; Zahlungen</button>
+  <button class="lx-nav-btn">&#x1F465; Kontakte</button>
+  <button class="lx-nav-btn">&#x1F3F7; Artikel</button>
+  <button class="lx-nav-btn">&#x1F4C2; Dateien</button>
+  <button class="lx-nav-btn">&#x1F4BC; Buchhaltung</button>
+  <button class="lx-nav-btn">&#x2699; Regeln & Muster</button>
+  <button class="lx-nav-btn">&#x1F527; Diagnose</button>
 </div>
-<div style="height:200px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--muted)">
-  Modulinhalt nach Freischaltung verf&#252;gbar
+<div style="height:280px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:12px">
+  <span style="font-size:32px">&#x1F512;</span>
+  <span>Modulinhalt nach Freischaltung verf&#252;gbar</span>
 </div>
 </div>"""
 
@@ -9950,6 +10522,13 @@ def generate_html() -> str:
     wissen_html    = build_wissen(db)
     einstell_html  = build_einstellungen()
     lexware_html   = build_lexware(db)
+    # Lexware Badge-Zaehler fuer Sidebar (session-fff)
+    try:
+        _lex_pruef_count = get_db().execute(
+            "SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'"
+        ).fetchone()[0]
+    except Exception:
+        _lex_pruef_count = 0
     db.close()
 
     # Kira Launcher — SVG-Varianten
@@ -10037,6 +10616,7 @@ def generate_html() -> str:
       </div>
       <div class="sidebar-item" id="nav-lexware" onclick="showPanel('lexware')" data-label="Lexware Office">
         <span class="si-icon">&#x1F4CB;</span><span class="si-label">Lexware Office</span>
+        {f'<span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">{_lex_pruef_count}</span>' if _lex_pruef_count > 0 else ''}
       </div>
       <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')" data-label="Wissen">
         <span class="si-icon">&#x1F4DA;</span><span class="si-label">Wissen</span>
@@ -10863,6 +11443,262 @@ function lxFilterPruef() {{
     const match = (!status || st.includes(status)) && (!q || absender.includes(q) || betreff.includes(q));
     r.style.display = match ? \\'\\' : \\'none\\';
   }});
+}}
+
+// === Lexware Office JS (session-fff — UI Komplettausbau) ===
+
+function showLexSec(secId) {{
+  document.querySelectorAll(\\'.lx-sec-content\\').forEach(el => el.style.display = \\'none\\');
+  document.querySelectorAll(\\'.lx-nav-btn\\').forEach(btn => btn.classList.remove(\\'active\\'));
+  const sec = document.getElementById(\\'lx-sec-\\' + secId);
+  if(sec) sec.style.display = \\'block\\';
+  const btn = document.querySelector(\\'[data-lxsec="\\' + secId + \\'"]\\');
+  if(btn) btn.classList.add(\\'active\\');
+  if(secId === \\'cockpit\\') lxUpdateCockpitDot();
+}}
+
+function showLexBuchTab(tabId) {{
+  document.querySelectorAll(\\'.lx-buch-content\\').forEach(el => el.style.display = \\'none\\');
+  document.querySelectorAll(\\'.lx-buch-tab\\').forEach(btn => btn.classList.remove(\\'active\\'));
+  const el = document.getElementById(\\'lx-buch-\\' + tabId);
+  if(el) el.style.display = \\'block\\';
+  const btn = document.querySelector(\\'.lx-buch-tab[data-buchtab="\\' + tabId + \\'"]\\');
+  if(btn) btn.classList.add(\\'active\\');
+}}
+
+function lxUpdateCockpitDot() {{
+  fetch(\\'/api/lexware/status\\').then(r => r.json()).then(d => {{
+    const dot = document.getElementById(\\'lx-status-dot\\');
+    if(!dot) return;
+    if(d.verbunden) {{
+      dot.className = \\'lx-chip lx-chip-ok\\';
+      dot.textContent = \\'&#x25CF; Verbunden\\';
+    }} else {{
+      dot.className = \\'lx-chip lx-chip-warn\\';
+      dot.textContent = \\'&#x25CF; \\'  + (d.fehler || \\'Nicht verbunden\\');
+    }}
+  }}).catch(()=>{{}});
+}}
+
+function lxGlobalSearch(q) {{
+  const lq = (q || \\'\\').toLowerCase();
+  // In allen aktiven Tabellen suchen
+  document.querySelectorAll(\\'.lx-table tbody tr.lx-tr\\').forEach(r => {{
+    r.style.display = (!lq || r.textContent.toLowerCase().includes(lq)) ? \\'\\' : \\'none\\';
+  }});
+}}
+
+function lxBelegDetail(lexId) {{
+  const panel = document.getElementById(\\'lx-bel-detail\\');
+  const content = document.getElementById(\\'lx-bel-detail-content\\');
+  if(!panel || !content) return;
+  content.innerHTML = \\'<div style="color:var(--muted)">Lade...</div>\\';
+  panel.style.display = \\'block\\';
+  fetch(\\'/api/lexware/beleg/\\' + encodeURIComponent(lexId))
+    .then(r => r.json()).then(d => {{
+      const b = d.beleg || d;
+      const st_labels = {{open:\\'Offen\\',overdue:\\'Ueberfaellig\\',paid:\\'Bezahlt\\',draft:\\'Entwurf\\',voided:\\'Storniert\\'}};
+      const typ_labels = {{invoice:\\'Rechnung\\',creditnote:\\'Gutschrift\\',quotation:\\'Angebot\\',reminder:\\'Mahnung\\'}};
+      content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
+        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(b.nummer||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">Typ:</span> ${{typ_labels[b.typ]||b.typ||\\'-\\'}}</div>
+        <div><span style="color:var(--muted)">Kontakt:</span> ${{esc_js(b.kontakt_name||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">Datum:</span> ${{esc_js(b.datum||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{esc_js(b.faelligkeit||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">Status:</span> <b>${{st_labels[b.status]||b.status||\\'-\\'}}</b></div>
+        <div><span style="color:var(--muted)">Betrag:</span> <b style="font-size:var(--fs-md)">${{parseFloat(b.brutto||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}})}}&nbsp;${{b.waehrung||'EUR'}}</b></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">DOKUMENT-BEZUG</div>
+          <div style="color:var(--muted);font-size:var(--fs-xs)">&#x1F4C2; Dokumente-Modul-Verzahnung in Vorbereitung</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-primary btn-xs" onclick="lxBelegKira(\\\'${{esc_js(b.lexware_id)}}\\\',\\\'${{esc_js(b.nummer||\\'-\\')}}\\\',\\\'${{esc_js(b.kontakt_name||\\'-\\\')}}\\\')">&#x1F916; Mit Kira besprechen</button>
+          <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'zahlungen\\')">&#x1F4B3; Zahlungen</button>
+        </div>
+      </div>`;
+    }}).catch(e => {{
+      if(content) content.innerHTML = \\'<div style="color:var(--muted)">Fehler: \\' + e + \\'</div>\\';
+    }});
+}}
+
+function lxBelegKira(lexId, nummer, kontakt) {{
+  const prompt = \\'Lexware Beleg pr&#252;fen\\\\n\\\\nBeleg: \\' + (nummer||lexId) + \\'\\\\nKontakt: \\' + (kontakt||\\'\\') + \\'\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschaetzung.\\';
+  openKiraWorkspace(\\'lexware_beleg\\', prompt);
+}}
+
+function lxKontaktDetail(lexId, name) {{
+  const panel = document.getElementById(\\'lx-kon-detail\\');
+  const content = document.getElementById(\\'lx-kon-detail-content\\');
+  if(!panel || !content) return;
+  content.innerHTML = \\'<div style="color:var(--muted)">Lade...</div>\\';
+  panel.style.display = \\'block\\';
+  fetch(\\'/api/lexware/kontakt/\\' + encodeURIComponent(lexId))
+    .then(r => r.json()).then(d => {{
+      const k = d.kontakt || d;
+      content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
+        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(k.name||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">E-Mail:</span> ${{esc_js(k.email||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">Telefon:</span> ${{esc_js(k.telefon||\\'-\\')}}</div>
+        <div><span style="color:var(--muted)">Letzte Sync:</span> ${{esc_js(k.last_sync||\\'-\\')}}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary btn-xs" onclick="lxKontaktKira(\\\'${{esc_js(k.lexware_id)}}\\\',\\\'${{esc_js(k.name||\\'-\\\')}}\\\')">&#x1F916; Kira</button>
+        </div>
+      </div>`;
+    }}).catch(e => {{
+      if(content) content.innerHTML = \\'<div style="color:var(--muted)">Fehler: \\' + e + \\'</div>\\';
+    }});
+}}
+
+function lxKontaktKira(lexId, name) {{
+  const prompt = \\'Lexware Kontakt: \\' + (name||lexId) + \\'\\\\n\\\\nBitte gib mir eine Uebersicht zu diesem Kontakt und oeffne relevante Vorgaenge.\\';
+  openKiraWorkspace(\\'lexware_kontakt\\', prompt);
+}}
+
+function lxArtikelDetail(lexId) {{
+  if(!lexId) return;
+  showToast(\\'Artikel-Details werden geladen...\\');
+  fetch(\\'/api/lexware/artikel/\\' + encodeURIComponent(lexId))
+    .then(r => r.json()).then(d => {{
+      const a = d.artikel || d;
+      const html = \\'<div style="font-size:var(--fs-sm);line-height:1.8">\\' +
+        \\'<div style="font-weight:700;margin-bottom:8px">\\' + esc_js(a.name||\\'-\\') + \\'</div>\\' +
+        \\'<div>Typ: \\' + esc_js(a.typ||\\'-\\') + \\'</div>\\' +
+        \\'<div>Netto: <b>\\' + parseFloat(a.netto_preis||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}}) + \\'&nbsp;&#x20AC;</b></div>\\' +
+        \\'<div>Einheit: \\' + esc_js(a.einheit||\\'-\\') + \\'</div>\\' +
+        \\'<div>Steuer: \\' + esc_js(a.steuer_satz||\\'-\\') + \\'</div>\\' +
+        \\'<div style="margin-top:12px;display:flex;gap:6px"><button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext(\\\\\\'artikel\\\\\\',\\\\\\'\\' + encodeURIComponent(lexId) + \\'\\\\\\')">&#x1F916; Kira</button></div>\\' +
+        \\'</div>\\';
+      showSimpleModal(\\'Artikel\\', html);
+    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+}}
+
+function lxBuchDetailFull(id) {{
+  fetch(\\'/api/lexware/eingangsbeleg/\\' + id)
+    .then(r => r.json()).then(d => {{
+      const p = d.beleg || {{}};
+      const kira_section = p.kira_frage ? (\\'<div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px;margin-top:12px">\\' +
+        \\'<div style="font-size:10px;font-weight:700;color:#7c3aed;margin-bottom:4px">KIRA-FRAGE</div>\\' +
+        \\'<div style="font-size:var(--fs-sm)">\\' + esc_js(p.kira_frage) + \\'</div>\\' +
+        (p.nutzer_antwort ? (\\'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-top:6px">DEINE ANTWORT</div><div style="font-size:var(--fs-sm)">\\' + esc_js(p.nutzer_antwort) + \\'</div>\\') : \\'\\') +
+        \\'</div>\\') : \\'\\';
+      const konto_section = p.konto_vorschlag ? (\\'<div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:var(--fs-sm)"><span style="color:var(--muted);font-size:10px">KONTIERUNGSVORSCHLAG:</span> <b>\\' + esc_js(p.konto_vorschlag) + \\'</b></div>\\') : \\'\\';
+      const html = \\'<div style="font-size:var(--fs-sm)">\\' +
+        \\'<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-bottom:12px">\\' +
+        \\'<span style="color:var(--muted)">Absender:</span><b>\\' + esc_js(p.absender||\\'-\\') + \\'</b>\\' +
+        \\'<span style="color:var(--muted)">Betreff:</span><span>\\' + esc_js(p.betreff||\\'-\\') + \\'</span>\\' +
+        \\'<span style="color:var(--muted)">Betrag:</span><b style="font-size:var(--fs-md)">\\' + parseFloat(p.betrag||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}}) + \\'&nbsp;\\' + esc_js(p.waehrung||\\'\\'\\') + \\'</b>\\' +
+        \\'<span style="color:var(--muted)">Datum:</span>\\' + esc_js(p.datum_beleg||\\'-\\') +
+        \\'<span style="color:var(--muted)">Status:</span>\\' + esc_js(p.status||\\'-\\') +
+        \\'</div>\\' +
+        kira_section + konto_section +
+        (p.body_excerpt ? (\\'<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">INHALT-AUSZUG</div><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:100px;overflow-y:auto;font-size:11px;white-space:pre-wrap;font-family:monospace">\\' + esc_js(p.body_excerpt) + \\'</div></div>\\') : \\'\\') +
+        \\'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">\\' +
+        \\'<button class="btn btn-primary btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'klassifiziert\\\\\\')">&#x2705; Klassifizieren</button>\\' +
+        \\'<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'abgelegt\\\\\\')">&#x1F4C2; Ablegen</button>\\' +
+        \\'<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'unklar\\\\\\')">&#x2753; Unklar</button>\\' +
+        \\'<button class="btn btn-primary btn-xs" style="background:var(--accent)" onclick="lxBuchKira(\\' + id + \\',\\\\\\'\\' + esc_js(p.absender||\\'\\'\\') + \\\\\\'\\')">&#x1F916; Mit Kira besprechen</button>\\' +
+        \\'</div></div>\\';
+      showSimpleModal(\\'Eingangsbeleg pr&#252;fen\\', html);
+    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+}}
+
+function lxBuchKira(id, absender) {{
+  fetch(\\'/api/lexware/eingangsbeleg/\\' + id).then(r => r.json()).then(d => {{
+    const p = d.beleg || {{}};
+    const prompt = \\'Eingangsbeleg klassifizieren\\\\n\\\\n\\' +
+      \\'Absender: \\' + (p.absender||\\'-\\') + \\'\\\\n\\' +
+      \\'Betreff: \\' + (p.betreff||\\'-\\') + \\'\\\\n\\' +
+      \\'Betrag: \\' + (p.betrag||0) + \\'\\' + (p.waehrung||\\'EUR\\') + \\'\\\\n\\' +
+      \\'Datum: \\' + (p.datum_beleg||\\'-\\') + \\'\\\\n\\' +
+      (p.konto_vorschlag ? (\\'Bisheriger Vorschlag: \\' + p.konto_vorschlag + \\'\\\\n\\') : \\'\\') +
+      (p.body_excerpt ? (\\'\\\\nInhalt:\\\\n\\' + p.body_excerpt.substring(0,400)) : \\'\\') +
+      \\'\\\\n\\\\nBitte klassifiziere diesen Eingangsbeleg: Welche Lexware-Kategorie? Gibt es ein passendes Konto? Muss ich das selbst pruefen?\\';
+    openKiraWorkspace(\\'lexware_buchaltung\\', prompt);
+  }}).catch(() => openKiraWorkspace(\\'lexware_buchaltung\\', \\'Eingangsbeleg ID \\' + id + \\' pruefen\\'));
+}}
+
+function lxBuchBestaetigen(id, status) {{
+  fetch(\\'/api/lexware/eingangsbeleg/\\' + id + \\'/status\\', {{
+    method: \\'POST\\',
+    headers: {{\\'Content-Type\\':\\'application/json\\'}},
+    body: JSON.stringify({{status}})
+  }}).then(r => r.json()).then(d => {{
+    if(d.ok) {{ showToast(\\'Status gesetzt: \\' + status); setTimeout(() => location.reload(), 800); }}
+    else showToast(\\'Fehler: \\' + d.error, true);
+  }});
+}}
+
+function lxBuchManuellesPruefen() {{
+  const html = \\'<div style="font-size:var(--fs-sm);display:flex;flex-direction:column;gap:10px">\\' +
+    \\'<input id="lx-man-absender" class="es-input" placeholder="Absender / Lieferant">\\' +
+    \\'<input id="lx-man-betreff" class="es-input" placeholder="Betreff / Beschreibung">\\' +
+    \\'<input id="lx-man-betrag" class="es-input" placeholder="Betrag (z.B. 119.00)" type="number" step="0.01">\\' +
+    \\'<input id="lx-man-datum" class="es-input" placeholder="Datum (YYYY-MM-DD)" type="date">\\' +
+    \\'<button class="btn btn-primary" onclick="lxBuchManuellSpeichern()">Hinzuf&#252;gen</button>\\' +
+    \\'</div>\\';
+  showSimpleModal(\\'Eingangsbeleg manuell hinzuf&#252;gen\\', html);
+}}
+
+function lxBuchManuellSpeichern() {{
+  const payload = {{
+    absender: document.getElementById(\\'lx-man-absender\\')?.value || \\'\\',
+    betreff:  document.getElementById(\\'lx-man-betreff\\')?.value || \\'\\',
+    betrag:   parseFloat(document.getElementById(\\'lx-man-betrag\\')?.value || 0),
+    datum_beleg: document.getElementById(\\'lx-man-datum\\')?.value || \\'\\',
+    source: \\'manuell\\'
+  }};
+  fetch(\\'/api/lexware/eingangsbeleg/neu\\', {{method:\\'POST\\',headers:{{\\'Content-Type\\':\\'application/json\\'}},body:JSON.stringify(payload)}})
+    .then(r => r.json()).then(d => {{
+      if(d.ok) {{ showToast(\\'Eingangsbeleg hinzugef&#252;gt &#x2713;\\'); setTimeout(() => location.reload(), 800); }}
+      else showToast(\\'Fehler: \\' + d.error, true);
+    }});
+}}
+
+function lxOpenKiraWithContext(typ, id) {{
+  let prompt = \\'\\';
+  if(typ === \\'cockpit\\') {{
+    prompt = \\'Lexware Office Cockpit-Uebersicht\\\\n\\\\nBitte gib mir eine kurze Zusammenfassung des aktuellen Lexware-Status: offene Rechnungen, Eingangsbelege in Pruefung, und was heute zu tun ist.\\';
+  }} else if(typ === \\'zahlung\\') {{
+    prompt = \\'Zahlung (Eingangsbeleg ID \\' + id + \\') pruefen\\\\nBitte analysiere diesen Zahlungseingang.\\';
+  }} else if(typ === \\'artikel\\') {{
+    prompt = \\'Artikel / Preisposition analysieren (ID: \\' + id + \\').\\';
+  }} else if(typ === \\'regel\\') {{
+    prompt = \\'Buchungsregel fuer Domain \\' + id + \\' pruefen und Empfehlung geben.\\';
+  }} else if(typ === \\'diagnose\\') {{
+    prompt = \\'Lexware Verbindungsprobleme diagnostizieren. Modul-Status und API-Verbindung pruefen.\\';
+  }} else if(typ === \\'datei\\') {{
+    prompt = \\'Belegdatei (Eingangsbeleg ID \\' + id + \\') klassifizieren und Konto vorschlagen.\\';
+  }} else {{
+    prompt = \\'Lexware Office: \\' + typ + \\'\\\\n\\\\nBitte hilf mir bei diesem Thema.\\';
+  }}
+  openKiraWorkspace(\\'lexware_\\' + typ, prompt);
+}}
+
+function lxRegelDetail(domain) {{
+  const prompt = \\'Lexware Buchungsregel fuer Domain: \\' + domain + \\'\\\\n\\\\nBitte analysiere das bisherige Muster und empfehle eine Buchungskategorie.\\';
+  showSimpleModal(\\'Regel fuer \\' + domain, \\'<div style="font-size:var(--fs-sm)">Domain: <b>\\' + domain + \\'</b><br><br><button class="btn btn-primary btn-xs" onclick="openKiraWorkspace(\\\\\\'lexware_regel\\\\\\',\\\\\\'\\' + prompt + \\'\\\\\\')">&#x1F916; Mit Kira besprechen</button></div>\\');
+}}
+
+function lxFilterRegeln() {{
+  const q = (document.getElementById(\\'lx-reg-search\\')?.value || \\'\\').toLowerCase();
+  document.querySelectorAll(\\'#lx-regeln-tbody tr.lx-tr\\').forEach(r => {{
+    r.style.display = (!q || r.textContent.toLowerCase().includes(q)) ? \\'\\' : \\'none\\';
+  }});
+}}
+
+function esShowLexSec(subsecId) {{
+  document.querySelectorAll(\\'.lx-es-subpanel\\').forEach(el => el.style.display = \\'none\\');
+  document.querySelectorAll(\\'.lx-es-subbtn\\').forEach(btn => btn.classList.remove(\\'active\\'));
+  const panel = document.getElementById(\\'lx-es-sub-\\' + subsecId);
+  if(panel) panel.style.display = \\'block\\';
+  const btn = document.querySelector(\\'.lx-es-subbtn[data-lxessec="\\' + subsecId + \\'"]\\');
+  if(btn) btn.classList.add(\\'active\\');
+}}
+
+// Helper fuer String-Escaping im JS-Kontext
+function esc_js(s) {{
+  if(!s) return \\'\\';
+  return String(s).replace(/&/g,\\'&amp;\\').replace(/</g,\\'&lt;\\').replace(/>/g,\\'&gt;\\').replace(/"/g,\\'&quot;\\').replace(/\\'/g,\\'&#x27;\\');
 }}
 
 // Prio-Karte Kebab-Menu
@@ -15383,24 +16219,71 @@ a:hover{text-decoration:underline;}
 .dash-sig.s-teal{background:#F0FDF9;border-color:#6EE7C0;color:#0D5B46;}
 .dash-sig.s-gray{background:var(--bg);border-color:var(--border);color:var(--text-secondary);}
 
-/* Lexware Office Panel (session-eee) */
+/* Lexware Office Panel (session-fff — UI Komplettausbau) */
+/* Modul-Shell */
+.lx-module{display:flex;flex-direction:column;gap:0;height:100%;}
+.lx-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
+.lx-header-left{flex:1;min-width:0;}
+.lx-header-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.lx-title{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.01em;margin-bottom:6px;}
+.lx-status-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+/* Chips */
+.lx-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid transparent;}
+.lx-chip-ok{background:rgba(34,197,94,.1);color:#16a34a;border-color:rgba(34,197,94,.25);}
+.lx-chip-warn{background:rgba(245,158,11,.1);color:#b45309;border-color:rgba(245,158,11,.25);}
+.lx-chip-err{background:rgba(220,38,38,.1);color:#dc2626;border-color:rgba(220,38,38,.25);}
+.lx-chip-muted{background:var(--bg-raised);color:var(--muted);border-color:var(--border);}
+.lx-kira-badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(124,58,237,.12);color:#7c3aed;border:1px solid rgba(124,58,237,.2);margin-left:4px;}
+/* Sekundaere Navigation */
+.lx-nav-sec{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--bg);padding:0 8px;}
+.lx-nav-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:9px 14px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s;display:flex;align-items:center;gap:4px;}
+.lx-nav-btn:hover{color:var(--text);}
+.lx-nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.lx-nav-planned{opacity:.6;}
+.lx-nav-planned:hover{opacity:.85;}
+/* Content */
+.lx-content{flex:1;overflow-y:auto;padding:16px 20px;}
+.lx-sec-content{display:none;}
+/* Tabellen */
+.lx-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+.lx-table th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;white-space:nowrap;}
+.lx-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+.lx-tr{cursor:pointer;transition:background .1s;}
+.lx-tr:hover{background:var(--bg-raised);}
+/* KPI Kacheln */
+.lx-kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.lx-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;min-width:90px;flex:1;transition:border-color .15s;}
+.lx-kpi:hover{border-color:var(--accent);}
+.lx-kpi-n{font-size:var(--fs-xxl);font-weight:900;color:var(--accent);}
+.lx-kpi-lbl{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
+.lx-kpi-warn{border-color:rgba(212,147,62,.4);background:rgba(212,147,62,.05);}
+.lx-kpi-warn .lx-kpi-n{color:#b45309;}
+/* Warnungen/Signale Panel */
+.lx-signals-panel{width:240px;flex-shrink:0;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:var(--fs-sm);}
+.lx-signal-item{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);color:var(--text);font-size:var(--fs-xs);line-height:1.4;}
+.lx-signal-item:last-child{border-bottom:none;}
+/* Detail-Flaeche */
+.lx-detail-panel{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px;}
+/* Status-Chips */
+.lx-st-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+.lx-st-open{background:rgba(245,158,11,.12);color:#b45309;}
+.lx-st-overdue{background:rgba(220,38,38,.12);color:#dc2626;}
+.lx-st-paid{background:rgba(34,197,94,.12);color:#16a34a;}
+.lx-st-draft{background:var(--bg-raised);color:var(--muted);border:1px solid var(--border);}
+.lx-st-voided{background:rgba(107,114,128,.12);color:#6b7280;}
+/* Buchhaltung Unterbereich-Tabs */
+.lx-buch-nav{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;margin-bottom:0;}
+.lx-buch-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 12px;cursor:pointer;font-size:var(--fs-xs);font-family:inherit;white-space:nowrap;font-weight:500;transition:color .15s;}
+.lx-buch-tab:hover{color:var(--text);}
+.lx-buch-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.lx-buch-content{display:none;}
+/* Legacy Tab-Klassen (backward compat) */
 .lx-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;}
 .lx-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 16px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s;}
 .lx-tab:hover{color:var(--text);}
 .lx-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
 .lx-tab-content{display:none;}
 .lx-tab-content.active{display:block;}
-.lx-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
-.lx-table th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;white-space:nowrap;}
-.lx-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
-.lx-tr{cursor:pointer;transition:background .1s;}
-.lx-tr:hover{background:var(--bg-raised);}
-.lx-kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
-.lx-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;min-width:100px;flex:1;}
-.lx-kpi-n{font-size:var(--fs-xxl);font-weight:900;color:var(--accent);}
-.lx-kpi-lbl{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
-.lx-kpi-warn{border-color:rgba(212,147,62,.4);background:rgba(212,147,62,.05);}
-.lx-kpi-warn .lx-kpi-n{color:var(--warn);}
 
 /* Legacy compat for old cockpit classes (used in Kira briefing inside panel-dashboard) */
 .briefing-icon{width:26px;height:26px;background:var(--accent);color:#fff;border-radius:6px;display:flex;
@@ -16225,12 +17108,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
             lex_id = urllib.parse.unquote(self.path.split('/api/lexware/kontakt/')[1])
             self._api_lexware_kontakt(lex_id)
 
-        elif self.path.startswith('/api/lexware/eingangsbeleg/') and not self.path.endswith('/status'):
+        elif self.path.startswith('/api/lexware/eingangsbeleg/') and not self.path.endswith('/status') and not self.path.endswith('/kira-klassifizieren'):
             try:
                 beleg_id = int(self.path.split('/api/lexware/eingangsbeleg/')[1].split('/')[0])
             except ValueError:
                 beleg_id = 0
             self._api_lexware_eingangsbeleg(beleg_id)
+
+        # ── Lexware Office GET-Routing (session-fff) ──
+        elif self.path == '/api/lexware/cockpit':
+            self._api_lexware_cockpit()
+
+        elif self.path == '/api/lexware/regeln':
+            self._api_lexware_regeln()
+
+        elif self.path == '/api/lexware/zahlungen':
+            self._api_lexware_zahlungen()
+
+        elif self.path == '/api/lexware/dateien':
+            self._api_lexware_dateien()
+
+        elif self.path == '/api/lexware/diagnose':
+            self._api_lexware_diagnose()
 
         elif self.path == '/api/kira/insights':
             self._api_kira_insights()
@@ -19421,6 +20320,123 @@ class DashboardHandler(BaseHTTPRequestHandler):
         finally:
             db.close()
 
+    def _api_lexware_cockpit(self):
+        """GET /api/lexware/cockpit — KPI-Zusammenfassung fuer Cockpit-Refresh (session-fff)"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            n_belege = db.execute("SELECT COUNT(*) FROM lexware_belege").fetchone()[0]
+            n_offen = db.execute("SELECT COUNT(*) FROM lexware_belege WHERE status IN ('open','overdue','draft')").fetchone()[0]
+            n_ueberfaellig = db.execute("SELECT COUNT(*) FROM lexware_belege WHERE status='overdue'").fetchone()[0]
+            n_kontakte = db.execute("SELECT COUNT(*) FROM lexware_kontakte").fetchone()[0]
+            n_artikel = db.execute("SELECT COUNT(*) FROM lexware_artikel").fetchone()[0]
+            n_pruef = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'").fetchone()[0]
+            n_unklar = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='unklar'").fetchone()[0]
+            n_klassifiziert = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='klassifiziert'").fetchone()[0]
+            n_abgelegt = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='abgelegt'").fetchone()[0]
+            try:
+                last_sync = db.execute("SELECT value FROM lexware_config WHERE key='last_sync_ts'").fetchone()
+                last_sync = (last_sync[0] if last_sync else None) or "—"
+            except Exception:
+                last_sync = "—"
+            self._json({
+                "n_belege": n_belege, "n_offen": n_offen, "n_ueberfaellig": n_ueberfaellig,
+                "n_kontakte": n_kontakte, "n_artikel": n_artikel,
+                "n_pruef": n_pruef, "n_unklar": n_unklar,
+                "n_klassifiziert": n_klassifiziert, "n_abgelegt": n_abgelegt,
+                "last_sync": last_sync,
+            })
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+        finally:
+            db.close()
+
+    def _api_lexware_regeln(self):
+        """GET /api/lexware/regeln — Muster aus eingangsbelege_pruefqueue (session-fff)"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            rows = db.execute(
+                "SELECT absender_domain, konto_vorschlag, COUNT(*) as count, MAX(pruef_ts) as letzte_verwendung "
+                "FROM eingangsbelege_pruefqueue "
+                "WHERE absender_domain IS NOT NULL AND absender_domain != '' "
+                "  AND konto_vorschlag IS NOT NULL AND konto_vorschlag != '' "
+                "GROUP BY absender_domain, konto_vorschlag "
+                "ORDER BY count DESC LIMIT 100"
+            ).fetchall()
+            self._json([dict(r) for r in rows])
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+        finally:
+            db.close()
+
+    def _api_lexware_zahlungen(self):
+        """GET /api/lexware/zahlungen — Lokale Zahlungserfassung aus Pruefqueue (session-fff)"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            rows = db.execute(
+                "SELECT id, absender, absender_domain, betrag, waehrung, datum_beleg, datum_eingang, status, is_paypal, konto_vorschlag "
+                "FROM eingangsbelege_pruefqueue "
+                "WHERE (is_paypal IS NULL OR is_paypal=0) AND betrag IS NOT NULL AND betrag > 0 "
+                "ORDER BY datum_eingang DESC LIMIT 200"
+            ).fetchall()
+            self._json([dict(r) for r in rows])
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+        finally:
+            db.close()
+
+    def _api_lexware_dateien(self):
+        """GET /api/lexware/dateien — Belegdateien-Uebersicht aus Pruefqueue (session-fff)"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            rows = db.execute(
+                "SELECT id, absender, betreff, datum_beleg, datum_eingang, is_body_only, body_excerpt, status "
+                "FROM eingangsbelege_pruefqueue "
+                "WHERE body_excerpt IS NOT NULL OR is_body_only=1 "
+                "ORDER BY erstellt_ts DESC LIMIT 200"
+            ).fetchall()
+            total = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue").fetchone()[0]
+            body_only = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE is_body_only=1").fetchone()[0]
+            self._json({"total": total, "body_only": body_only, "dateien": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+        finally:
+            db.close()
+
+    def _api_lexware_diagnose(self):
+        """GET /api/lexware/diagnose — Strukturierter Diagnosebericht (session-fff)"""
+        db = get_db()
+        try:
+            cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+            lex_cfg = cfg.get("lexware", {})
+            _ensure_lexware_tables()
+            n_belege = db.execute("SELECT COUNT(*) FROM lexware_belege").fetchone()[0]
+            n_kontakte = db.execute("SELECT COUNT(*) FROM lexware_kontakte").fetchone()[0]
+            n_pruef = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'").fetchone()[0]
+            n_unklar = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='unklar'").fetchone()[0]
+            try:
+                last_sync = db.execute("SELECT value FROM lexware_config WHERE key='last_sync_ts'").fetchone()
+                last_sync = (last_sync[0] if last_sync else None) or "—"
+            except Exception:
+                last_sync = "—"
+            self._json({
+                "modul_status": lex_cfg.get("status", "nicht_gebucht"),
+                "has_api_key": bool(lex_cfg.get("api_key", "").strip()),
+                "api_base_url": lex_cfg.get("api_base_url", "https://api.lexoffice.io/v1"),
+                "last_sync": last_sync,
+                "n_belege": n_belege,
+                "n_kontakte": n_kontakte,
+                "n_pruef": n_pruef,
+                "n_unklar": n_unklar,
+            })
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+        finally:
+            db.close()
+
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length) or b'{}'
@@ -21698,7 +22714,9 @@ def _handle_lexware_post(handler, path, body):
             lex = cur_cfg.get("lexware", {})
             # Nur sichere Felder uebernehmen
             for k in ("status", "sync_intervall", "buchalt_pruefregel_aktiv",
-                      "paypal_ausnahme_aktiv", "dataverse_export_aktiv"):
+                      "paypal_ausnahme_aktiv", "dataverse_export_aktiv",
+                      "vollautomatik_aktiv", "vollautomatik_confidence",
+                      "eingangsbelege_pruefqueue_aktiv", "kategorien"):
                 if k in body:
                     lex[k] = body[k]
             # API-Key nur wenn vorhanden und nicht leer
@@ -21712,6 +22730,81 @@ def _handle_lexware_post(handler, path, body):
             handler._json({"ok": True})
         except Exception as e:
             handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/kira-kontext — Kira-Kontext fuer einen Datensatz aufbauen (session-fff)
+    if path == '/api/lexware/kira-kontext':
+        typ = body.get("typ", "cockpit")
+        item_id = body.get("id")
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            prompt = ""
+            if typ == "beleg" and item_id:
+                row = db.execute("SELECT * FROM lexware_belege WHERE lexware_id=?", (str(item_id),)).fetchone()
+                if row:
+                    d = dict(row)
+                    prompt = (f"Ich schaue mir Beleg {d.get('nummer','')} von {d.get('kontakt_name','')} an. "
+                              f"Typ: {d.get('typ','')}, Status: {d.get('status','')}, "
+                              f"Betrag: {d.get('brutto',0)} {d.get('waehrung','EUR')}, "
+                              f"Datum: {d.get('datum','')}, Faelligkeit: {d.get('faelligkeit','')}. "
+                              f"Kannst du mir dazu helfen?")
+            elif typ == "kontakt" and item_id:
+                row = db.execute("SELECT * FROM lexware_kontakte WHERE lexware_id=?", (str(item_id),)).fetchone()
+                if row:
+                    d = dict(row)
+                    prompt = (f"Ich schaue mir den Kontakt {d.get('name','')} ({d.get('email','')}) an. "
+                              f"Telefon: {d.get('telefon','')}. Was kannst du mir dazu sagen?")
+            elif typ == "eingangsbeleg" and item_id:
+                row = db.execute("SELECT * FROM eingangsbelege_pruefqueue WHERE id=?", (int(item_id),)).fetchone()
+                if row:
+                    d = dict(row)
+                    prompt = (f"Ich pruefe Eingangsbeleg von {d.get('absender','')} — Betreff: {d.get('betreff','')}. "
+                              f"Betrag: {d.get('betrag',0)} {d.get('waehrung','EUR')}, "
+                              f"Status: {d.get('status','')}, Konto-Vorschlag: {d.get('konto_vorschlag','')}. "
+                              f"Wie soll ich diesen Beleg kontieren und ablegen?")
+            elif typ == "cockpit":
+                n_pruef = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'").fetchone()[0]
+                n_offen = db.execute("SELECT COUNT(*) FROM lexware_belege WHERE status IN ('open','overdue')").fetchone()[0]
+                prompt = (f"Zeig mir die aktuelle Buchhaltungssituation: {n_offen} offene Rechnungen, "
+                          f"{n_pruef} Eingangsbelege zu pruefen. Was soll ich zuerst erledigen?")
+            else:
+                prompt = f"Ich bin im Lexware Office Bereich ({typ}). Was kann ich fuer dich tun?"
+            handler._json({"ok": True, "prompt": prompt})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+        return True
+
+    # POST /api/lexware/eingangsbeleg/{id}/kira-klassifizieren — Kira klassifiziert direkt (session-fff)
+    if path.startswith('/api/lexware/eingangsbeleg/') and path.endswith('/kira-klassifizieren'):
+        try:
+            beleg_id = int(path.split('/api/lexware/eingangsbeleg/')[1].split('/')[0])
+        except (ValueError, IndexError):
+            handler._json({"ok": False, "error": "Ungueltige ID"})
+            return True
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            row = db.execute("SELECT * FROM eingangsbelege_pruefqueue WHERE id=?", (beleg_id,)).fetchone()
+            if not row:
+                handler._json({"ok": False, "error": "Nicht gefunden"})
+                return True
+            d = dict(row)
+            # Kira-Frage generieren und Status auf 'klassifiziert' setzen wenn Konto vorhanden
+            kira_frage = (f"Eingangsbeleg von {d.get('absender','')} — {d.get('betreff','')} — "
+                          f"Betrag: {d.get('betrag',0)} EUR. Konto-Vorschlag?")
+            db.execute(
+                "UPDATE eingangsbelege_pruefqueue SET kira_frage=?, pruef_ts=datetime('now') WHERE id=?",
+                (kira_frage, beleg_id)
+            )
+            db.commit()
+            handler._json({"ok": True, "kira_frage": kira_frage})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
         return True
 
     return False  # Pfad nicht behandelt
