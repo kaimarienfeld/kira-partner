@@ -7324,6 +7324,7 @@ function esInfoPopup(btn, text) {{
     .then(r=>r.json()).then(d=>{{
       if(btn){{btn.disabled=false;btn.textContent='SMTP testen';}}
       const key=email+'_smtp'; window._esMkLastErr[key]=d;
+      _rtlog('ui','mail_smtp_test',email+': '+(d.ok?'OK ('+d.dauer_ms+'ms)':'FEHLER: '+(d.error||'?')),{{submodul:'mail',context_type:'konto',context_id:email,status:d.ok?'ok':'fehler'}});
       if(res){{
         if(d.ok){{res.innerHTML='<span style="color:var(--success)">\u2713 Testmail gesendet ('+d.dauer_ms+'ms)</span>';}}
         else{{res.innerHTML='<span style="color:var(--danger)">\u2717 '+escH(d.error||'?')+'</span>\u00a0<button class="es-mk-btn sec" style="padding:2px 6px;font-size:var(--fs-xs)" onclick="esMkCopyLastErr(this.dataset.k)" data-k="'+key+'">Details</button>';}}
@@ -7331,6 +7332,7 @@ function esInfoPopup(btn, text) {{
       }}
     }}).catch(e=>{{
       if(btn){{btn.disabled=false;btn.textContent='SMTP testen';}}
+      _rtlog('ui','mail_smtp_test',email+': Netzwerkfehler',{{submodul:'mail',context_type:'konto',context_id:email,status:'fehler'}});
       if(res){{res.innerHTML='<span style="color:var(--danger)">\u2717 Netzwerkfehler</span>';res.style.display='block';}}
     }});
   }};
@@ -7343,6 +7345,7 @@ function esInfoPopup(btn, text) {{
     .then(r=>r.json()).then(d=>{{
       if(btn){{btn.disabled=false;btn.textContent='IMAP pr\u00fcfen';}}
       const key=email+'_imap'; window._esMkLastErr[key]=d;
+      _rtlog('ui','mail_imap_test',email+': '+(d.ok?d.ordner_anzahl+' Ordner ('+d.dauer_ms+'ms)':'FEHLER: '+(d.error||'?')),{{submodul:'mail',context_type:'konto',context_id:email,status:d.ok?'ok':'fehler'}});
       if(res){{
         if(d.ok){{res.innerHTML='<span style="color:var(--success)">\u2713 '+d.ordner_anzahl+' Ordner ('+d.dauer_ms+'ms)</span>';}}
         else{{res.innerHTML='<span style="color:var(--danger)">\u2717 '+escH(d.error||'?')+'</span>\u00a0<button class="es-mk-btn sec" style="padding:2px 6px;font-size:var(--fs-xs)" onclick="esMkCopyLastErr(this.dataset.k)" data-k="'+key+'">Details</button>';}}
@@ -7350,6 +7353,7 @@ function esInfoPopup(btn, text) {{
       }}
     }}).catch(e=>{{
       if(btn){{btn.disabled=false;btn.textContent='IMAP pr\u00fcfen';}}
+      _rtlog('ui','mail_imap_test',email+': Netzwerkfehler',{{submodul:'mail',context_type:'konto',context_id:email,status:'fehler'}});
       if(res){{res.innerHTML='<span style="color:var(--danger)">\u2717 Netzwerkfehler</span>';res.style.display='block';}}
     }});
   }};
@@ -7517,6 +7521,7 @@ function esInfoPopup(btn, text) {{
   }};
   window.esMkAbrufen = function(email,btn) {{
     if(btn) {{btn.disabled=true;btn.textContent='...';}}
+    _rtlog('ui','mail_konto_abruf','Mail-Abruf gestartet: '+email,{{submodul:'mail',context_type:'konto',context_id:email,status:'ok'}});
     fetch('/api/mail/konto/abrufen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email}})}})
     .then(r=>r.json()).then(d=>{{ showToast('Abruf gestartet','ok'); setTimeout(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Abrufen';}} esMkLoadStats(email);}},3000); }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='&#x25BA; Abrufen';}}}});
   }};
@@ -9164,6 +9169,7 @@ function esInfoPopup(btn, text) {{
   function lexEsSync(mode) {{
     const el = document.getElementById('lex-sync-status');
     if(el) el.textContent = 'Sync l\u00e4uft\u2026';
+    _rtlog('ui','lex_sync_start','Lexware Einstellungs-Sync: '+(mode||''),{{submodul:'lexware',context_type:'sync',status:'ok'}});
     fetch('/api/lexware/sync', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mode:mode}})}})
       .then(r=>r.json()).then(d=>{{
         if(d.ok) {{
@@ -9174,8 +9180,10 @@ function esInfoPopup(btn, text) {{
           if(s.artikel != null) parts.push('Artikel: '+s.artikel);
           if(el) el.textContent = '\u2713 ' + (parts.join(', ') || 'Sync abgeschlossen');
           showToast('Sync abgeschlossen','ok');
+          _rtlog('ui','lex_sync_done','Sync abgeschlossen: '+(parts.join(', ')||'ok'),{{submodul:'lexware',context_type:'sync',status:'ok'}});
         }} else {{
           if(el) el.textContent = '\u26A0 ' + (d.error||'Fehler');
+          _rtlog('ui','lex_sync_fehler',d.error||'Fehler',{{submodul:'lexware',context_type:'sync',status:'fehler'}});
           window._lexLastErr = d;
           showSimpleModal('Sync-Fehler',
             '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Synchronisierung fehlgeschlagen</p>' +
@@ -9185,6 +9193,7 @@ function esInfoPopup(btn, text) {{
         }}
       }}).catch(e=>{{
         if(el) el.textContent = 'Netzwerkfehler';
+        _rtlog('ui','lex_sync_fehler','Netzwerkfehler: '+String(e),{{submodul:'lexware',context_type:'sync',status:'fehler'}});
         window._lexLastErr = {{error: String(e)}};
         showSimpleModal('Sync-Fehler',
           '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Netzwerkfehler</p>' +
@@ -9505,6 +9514,7 @@ function esInfoPopup(btn, text) {{
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="es-btn" onclick="refreshRtLogStats()">&#x21BB; Aktualisieren</button>
         <button class="es-btn" onclick="exportRtLog()">&#x2197; Export CSV</button>
+        <button class="es-btn" onclick="rtLogCopyAll()" title="Alle aktuell angezeigten Log-Eintraege in Zwischenablage kopieren">&#x29C9; Alles kopieren</button>
         <button class="es-btn es-btn-red" onclick="clearRtLog()">DB leeren</button>
       </div>
     </div>
@@ -9519,6 +9529,9 @@ function esInfoPopup(btn, text) {{
           <option value="llm">llm</option>
           <option value="system">system</option>
           <option value="settings">settings</option>
+          <option value="mail">mail</option>
+          <option value="hintergrund">hintergrund</option>
+          <option value="tour">tour</option>
         </select>
         <select id="rl-filter-status" class="es-sel" style="min-width:110px">
           <option value="">Alle Status</option>
@@ -13376,6 +13389,7 @@ function showLexTab(tabId) {{
 function lexSync(mode) {{
   const log = document.getElementById('lx-sync-log');
   if(log) log.textContent = 'Synchronisierung laeuft...';
+  _rtlog('ui','lex_sync_start','Lexware Sync gestartet: '+(mode||'belege'),{{submodul:'lexware',context_type:'sync',status:'ok'}});
   fetch('/api/lexware/sync', {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
@@ -13383,9 +13397,11 @@ function lexSync(mode) {{
   }}).then(r => r.json()).then(d => {{
     if(d.ok) {{
       if(log) log.textContent = 'Sync abgeschlossen: ' + JSON.stringify(d.stats);
+      _rtlog('ui','lex_sync_done','Sync abgeschlossen: '+JSON.stringify(d.stats||{{}}),{{submodul:'lexware',context_type:'sync',status:'ok'}});
       setTimeout(() => location.reload(), 1500);
     }} else {{
       if(log) log.textContent = 'Fehler: ' + (d.error||'?');
+      _rtlog('ui','lex_sync_fehler',d.error||'Fehler',{{submodul:'lexware',context_type:'sync',status:'fehler'}});
       window._lexLastErr = d;
       showSimpleModal('Sync-Fehler',
         '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Synchronisierung fehlgeschlagen</p>' +
@@ -13395,6 +13411,7 @@ function lexSync(mode) {{
     }}
   }}).catch(e => {{
     if(log) log.textContent = 'Netzwerkfehler: ' + e;
+    _rtlog('ui','lex_sync_fehler','Netzwerkfehler: '+String(e),{{submodul:'lexware',context_type:'sync',status:'fehler'}});
     window._lexLastErr = {{error: String(e)}};
     showSimpleModal('Sync-Fehler',
       '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Netzwerkfehler</p>' +
@@ -15555,9 +15572,9 @@ function saveSettings() {{
     method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify(cfg)
   }}).then(r=>r.json()).then(d=>{{
-    if(d.ok) showToast('Einstellungen gespeichert');
-    else showToast(d.error||'Fehler');
-  }}).catch(()=>showToast('Fehler'));
+    if(d.ok){{showToast('Einstellungen gespeichert');_rtlog('settings','einstellungen_gespeichert','Einstellungen via UI gespeichert',{{submodul:'einstellungen',status:'ok'}});}}
+    else{{showToast(d.error||'Fehler');_rtlog('settings','einstellungen_fehler',d.error||'Fehler',{{submodul:'einstellungen',status:'fehler'}});}}
+  }}).catch(()=>{{showToast('Fehler');_rtlog('settings','einstellungen_fehler','Netzwerkfehler',{{submodul:'einstellungen',status:'fehler'}});}});
 }}
 
 function testPush() {{
@@ -15637,6 +15654,17 @@ function loadRuntimeLog(append, onlyFehler) {{
       box.appendChild(btn);
     }}
   }}).catch(()=>{{box.innerHTML='<div style="padding:10px;color:#e84545;font-size:11px">Fehler beim Laden.</div>';box.style.display='block';}});
+}}
+
+function rtLogCopyAll() {{
+  const box = document.getElementById('runtimelog-entries');
+  if(!box) return;
+  const lines = [];
+  box.querySelectorAll('div').forEach(row=>{{ if(row.textContent.trim()) lines.push(row.textContent.trim()); }});
+  const text = lines.join('\n');
+  if(!text) {{ showToast('Keine Eintr\u00e4ge zum Kopieren','warnung'); return; }}
+  if(navigator.clipboard) {{ navigator.clipboard.writeText(text).then(()=>showToast('Log kopiert ('+lines.length+' Zeilen)','ok')).catch(()=>_copyFallback(text)); }}
+  else {{ _copyFallback(text); }}
 }}
 
 function refreshRtLogStats() {{
