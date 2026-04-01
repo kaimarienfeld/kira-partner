@@ -5236,6 +5236,8 @@ def build_einstellungen():
     kira_proaktiv_cfg  = config.get("kira_proaktiv", {})
     backup_cfg_es      = config.get("backup", {})
     capture_cfg_es     = config.get("capture", {})
+    cf_tunnel_cfg      = config.get("cloudflare_tunnel", {})
+    cf_public_url      = cf_tunnel_cfg.get("public_url", "")
     # Circuit Breaker Status laden
     circuit_state = {}
     try:
@@ -5619,6 +5621,18 @@ def build_einstellungen():
 .adm-inp:focus{{outline:none;border-color:var(--primary);}}
 .adm-show-btn{{background:none;border:0.5px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer;flex-shrink:0;transition:border-color .12s;}}
 .adm-show-btn:hover{{border-color:var(--primary);color:var(--primary);}}
+.adm-grp-lbl{{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:10px 6px 3px;}}
+.adm-pick-btn{{background:none;border:0.5px solid var(--border);border-radius:5px;padding:4px 8px;font-size:13px;color:var(--muted);cursor:pointer;flex-shrink:0;transition:border-color .12s;}}
+.adm-pick-btn:hover{{border-color:var(--primary);color:var(--primary);}}
+.adm-goto-btn{{font-size:11px;padding:3px 9px;background:var(--primary-light,#f0ebff);color:var(--primary);border:0.5px solid var(--primary-200,#d0c4f7);border-radius:5px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .12s;}}
+.adm-goto-btn:hover{{background:var(--primary);color:#fff;}}
+.adm-preset-bar{{display:flex;align-items:center;gap:10px;padding:10px 0 14px;border-bottom:0.5px solid var(--border);margin-bottom:4px;flex-wrap:wrap;}}
+.adm-preset-lbl{{font-size:12px;color:var(--muted);white-space:nowrap;}}
+.adm-preset-sel{{background:var(--bg-raised,var(--bg));border:0.5px solid var(--border-strong);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;cursor:pointer;min-width:220px;}}
+.adm-inp-wide{{width:300px;}}
+.adm-cf-card{{background:var(--primary-light,#f5f0ff);border:0.5px solid var(--primary-200,#ddd4f8);border-radius:8px;padding:12px 14px;margin-top:10px;}}
+.adm-cf-steps{{font-size:12px;color:var(--text-secondary);padding-left:16px;margin:8px 0 0;line-height:1.7;}}
+.adm-sub-hd{{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}}
 .es-proto-tabs{{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);}}
 .es-proto-tab{{padding:8px 16px;font-size:var(--fs-xs);font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
 .es-proto-tab.act{{color:var(--accent,#444441);border-bottom-color:var(--accent,#444441);}}
@@ -7182,9 +7196,9 @@ function esInfoPopup(btn, text) {{
     <div class="es-grp-sub">KIRA ben&ouml;tigt ein lokales Archiv f&uuml;r vollst&auml;ndigen LLM-Kontext. Das Archiv ist deine exportierbare Datenbasis.</div>
     <div class="es-row">
       <div class="es-row-label"><span>Archiv-Ordner</span><span class="es-row-hint">Lokaler Pfad zum Mail-Archiv-Verzeichnis</span></div>
-      <div style="display:flex;gap:6px;flex:1;max-width:460px">
-        <input type="text" id="cfg-archiv-pfad" placeholder="C:/Pfad/zum/Mail Archiv/Archiv" style="flex:1;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text)">
-        <button class="es-mk-btn sec" onclick="esArchivOrdnerWaehlen(this)" style="white-space:nowrap" title="Ordner im Explorer ausw&auml;hlen">&#x1F4C2;</button>
+      <div style="display:flex;gap:6px;flex:1;max-width:520px;flex-wrap:wrap">
+        <input type="text" id="cfg-archiv-pfad" placeholder="Im Admin-Bereich konfigurieren" style="flex:1;min-width:180px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);opacity:.55;cursor:not-allowed" disabled>
+        <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('system');}},80)">&#x2699; Im Admin</button>
         <button class="es-mk-btn sec" onclick="esMkArchivPruefen()" style="white-space:nowrap">&#x2713; Pr&uuml;fen</button>
       </div>
     </div>
@@ -8739,14 +8753,15 @@ function esInfoPopup(btn, text) {{
     </div>
     <div class="es-row">
       <label class="es-label">API-Key</label>
-      <input id="cfg-lex-api-key" type="password" class="es-input" style="max-width:340px" placeholder="M_Dxx... (leer lassen um nicht zu &auml;ndern)" autocomplete="off">
+      <input id="cfg-lex-api-key" type="password" class="es-input" style="max-width:260px;opacity:.55;cursor:not-allowed" disabled placeholder="Im Admin-Bereich konfigurieren" autocomplete="off">
+      <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('api');}},80)">&#x2699; Im Admin</button>
     </div>
     <div class="es-row">
       <label class="es-label">API-Basis-URL</label>
-      <input id="cfg-lex-api-base" type="text" class="es-input" style="max-width:340px"
+      <input id="cfg-lex-api-base" type="text" class="es-input" style="max-width:260px;opacity:.55;cursor:not-allowed" disabled
              value="{esc(lex_cfg.get('api_base_url','https://api.lexoffice.io/v1'))}"
              placeholder="https://api.lexoffice.io/v1">
-      <span class="es-grp-sub" style="margin:0;font-size:10px">Neu: https://api.lexware.io/v1 &nbsp;|&nbsp; Alt: https://api.lexoffice.io/v1 &nbsp;&mdash;&nbsp; <b>/v1 am Ende ben&#246;tigt!</b></span>
+      <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('api');}},80)">&#x2699; Im Admin</button>
     </div>
     <div class="es-row" style="gap:8px;align-items:center">
       <button class="btn btn-sec" id="lex-test-btn" onclick="lexEsTestConnection()" style="min-width:160px">&#x26A1; Verbindung testen</button>
@@ -9499,7 +9514,8 @@ function esInfoPopup(btn, text) {{
       </div>
       <div class="es-row">
         <div class="es-rl">Backup-Pfad<div class="es-rd">Zielordner (leer = knowledge/backups/)</div></div>
-        <input class="es-inp-md" type="text" id="cfg-backup-pfad" value="{esc(backup_cfg_es.get('pfad',''))}" placeholder="knowledge/backups/">
+        <input class="es-inp-md" type="text" id="cfg-backup-pfad" value="{esc(backup_cfg_es.get('pfad',''))}" placeholder="Im Admin konfigurieren" disabled style="opacity:.55;cursor:not-allowed">
+        <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('system');}},80)">&#x2699; Im Admin</button>
       </div>
       <div class="es-row">
         <div class="es-rl">Versionen aufbewahren<div class="es-rd">Anzahl der Backup-Dateien die behalten werden</div></div>
@@ -9858,9 +9874,19 @@ function esInfoPopup(btn, text) {{
     <input class="es-inp-sm" type="number" id="cap-cfg-session-hours" min="1" max="720" value="{capture_cfg_es.get('session_duration_hours', 24)}">
   </div>
   <div class="es-row">
-    <div class="es-row-left"><span class="es-lbl">Mobile-URL</span><span class="es-hint">Lokal erreichbare Adresse fuer das Handy</span></div>
+    <div class="es-row-left"><span class="es-lbl">Mobile-URL (lokal)</span><span class="es-hint">Nur im Heimnetz erreichbar</span></div>
     <code style="font-size:12px;background:var(--bg);padding:4px 8px;border-radius:4px;border:1px solid var(--border)">http://localhost:8765/mobil</code>
     <a href="/mobil" target="_blank" class="btn btn-sec btn-xs" style="margin-left:8px">Oeffnen &#x2197;</a>
+  </div>
+</div>
+
+<div class="es-grp" style="margin-top:10px">
+  <div class="es-grp-h" style="display:flex;align-items:center;gap:8px">Externer Zugang (unterwegs)
+    {'<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--success-light,#e8f9f3);color:var(--success,#1D9E75);border:0.5px solid var(--success,#1D9E75)">Aktiv</span>' if cf_public_url else '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)">Nicht konfiguriert</span>'}
+  </div>
+  {'<div class="es-row"><div class="es-row-left"><span class="es-lbl">Externe URL</span><span class="es-hint">Cloudflare Tunnel &mdash; von ueberall erreichbar</span></div><code style="font-size:12px;background:var(--bg);padding:4px 8px;border-radius:4px;border:1px solid var(--border)">' + esc(cf_public_url) + '/mobil</code><a href="' + esc(cf_public_url) + '/mobil" target="_blank" class="btn btn-sec btn-xs" style="margin-left:8px">Oeffnen &#x2197;</a></div>' if cf_public_url else '<div style="font-size:12px;color:var(--muted);padding:6px 0 4px">Noch kein externer Zugang eingerichtet &mdash; die Mobile-App ist nur im lokalen Netzwerk erreichbar.</div>'}
+  <div style="margin-top:6px">
+    <button class="adm-goto-btn" onclick="showPanel('admin');setTimeout(function(){{admShowSec('system');}},80)">&#x2699; Im Admin konfigurieren (Cloudflare Tunnel)</button>
   </div>
 </div>
 
@@ -9904,9 +9930,9 @@ function saveCaptureSettings() {{
 </div><!-- /es-shell -->"""
     return html
 
-# ── ADMIN Panel (session-iii) ─────────────────────────────────────────────────
+# ── ADMIN Panel (session-jjj) ─────────────────────────────────────────────────
 def build_admin():
-    """Admin-Dashboard: Passwort-Login + Secrets/Config-Verwaltung."""
+    """Admin-Dashboard: 3-Gruppen-Nav, SMTP-Presets, Ordner-Picker, Cloudflare Tunnel."""
     return """
 <div class="page-header" style="border-bottom:0.5px solid var(--border);padding-bottom:14px;margin-bottom:0">
   <h1 class="page-title">&#x1F512; Admin-Bereich</h1>
@@ -9920,8 +9946,7 @@ def build_admin():
     <div style="font-size:17px;font-weight:600;color:var(--text);text-align:center;margin-bottom:4px">Admin-Zugang</div>
     <div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px">Bitte Admin-Passwort eingeben</div>
     <div style="display:flex;gap:8px">
-      <input id="adm-pw" type="password" class="adm-inp" style="width:100%;flex:1"
-             placeholder="Passwort..."
+      <input id="adm-pw" type="password" class="adm-inp" style="width:100%;flex:1" placeholder="Passwort..."
              onkeydown="if(event.key==='Enter')admLogin()">
       <button class="btn btn-primary" onclick="admLogin()">Anmelden</button>
     </div>
@@ -9931,77 +9956,168 @@ def build_admin():
 
 <!-- Admin-Content (nach Login sichtbar) -->
 <div id="adm-content" style="display:none;height:calc(100vh - 112px);overflow:hidden">
-  <div style="display:grid;grid-template-columns:210px 1fr;height:100%">
+  <div style="display:grid;grid-template-columns:220px 1fr;height:100%">
 
-    <!-- Linke Nav -->
-    <div style="border-right:0.5px solid var(--border);padding:14px 10px;overflow-y:auto;background:var(--bg)">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 6px 6px">Bereiche</div>
-      <div class="adm-nav-item act" id="adm-nav-api" onclick="admShowSec('api')"><span class="adm-nav-ico">&#x1F511;</span>API-Schluessel</div>
-      <div class="adm-nav-item" id="adm-nav-smtp" onclick="admShowSec('smtp')"><span class="adm-nav-ico">&#x2709;</span>E-Mail SMTP</div>
-      <div class="adm-nav-item" id="adm-nav-whatsapp" onclick="admShowSec('whatsapp')"><span class="adm-nav-ico">&#x1F4AC;</span>WhatsApp</div>
-      <div class="adm-nav-item" id="adm-nav-lexware" onclick="admShowSec('lexware')"><span class="adm-nav-ico">&#x1F4CA;</span>Lexware</div>
-      <div class="adm-nav-item" id="adm-nav-passwoerter" onclick="admShowSec('passwoerter')"><span class="adm-nav-ico">&#x1F510;</span>Passwoerter</div>
-      <div class="adm-nav-item" id="adm-nav-system" onclick="admShowSec('system')"><span class="adm-nav-ico">&#x2699;</span>System</div>
-      <div style="margin-top:auto;padding-top:20px">
-        <button class="btn btn-sec btn-xs" style="width:100%;margin-top:12px" onclick="admLogout()">&#x21A9; Abmelden</button>
+    <!-- ── Linke Nav (3 Gruppen) ── -->
+    <div style="border-right:0.5px solid var(--border);padding:10px 10px 20px;overflow-y:auto;background:var(--bg)">
+
+      <div class="adm-grp-lbl">Zugangsdaten</div>
+      <div class="adm-nav-item act" id="adm-nav-api" onclick="admShowSec('api')">
+        <span class="adm-nav-ico">&#x1F511;</span>API-Schluessel</div>
+      <div class="adm-nav-item" id="adm-nav-smtp" onclick="admShowSec('smtp')">
+        <span class="adm-nav-ico">&#x2709;</span>E-Mail SMTP</div>
+      <div class="adm-nav-item" id="adm-nav-passwoerter" onclick="admShowSec('passwoerter')">
+        <span class="adm-nav-ico">&#x1F510;</span>Passwoerter</div>
+
+      <div class="adm-grp-lbl" style="margin-top:6px">Dienste</div>
+      <div class="adm-nav-item" id="adm-nav-messaging" onclick="admShowSec('messaging')">
+        <span class="adm-nav-ico">&#x1F4AC;</span>Messaging</div>
+
+      <div class="adm-grp-lbl" style="margin-top:6px">System</div>
+      <div class="adm-nav-item" id="adm-nav-system" onclick="admShowSec('system')">
+        <span class="adm-nav-ico">&#x2699;</span>Pfade &amp; Server</div>
+
+      <div style="padding:18px 4px 0">
+        <button class="btn btn-sec btn-xs" style="width:100%" onclick="admLogout()">&#x21A9; Abmelden</button>
       </div>
     </div>
 
-    <!-- Rechter Content -->
+    <!-- ── Rechter Content ── -->
     <div style="overflow-y:auto;padding:24px 32px;background:var(--bg-raised,var(--bg))">
 
-      <!-- API-Schluessel -->
+      <!-- ══ API-SCHLUESSEL ══ -->
       <div class="adm-sec" id="adm-sec-api" style="display:block">
         <div class="es-grp-h" style="margin-bottom:4px">API-Schluessel</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer KI-Provider und externe Dienste. Werden in <code>secrets.json</code> gespeichert.</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer KI-Provider und externe Dienste. In <code>secrets.json</code> + <code>config.json</code> gespeichert.</div>
+
+        <!-- KI-Provider -->
         <div class="es-grp">
+          <div class="adm-sub-hd">KI-Provider</div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Anthropic API-Key</div><div class="adm-field-hint">Pflichtfeld fuer KIRA KI-Funktionen &middot; sk-ant-...</div></div>
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Anthropic API-Key</div>
+              <div class="adm-field-hint">Pflichtfeld fuer KIRA KI-Funktionen &middot; sk-ant-...</div>
+            </div>
             <input id="adm-f-anthropic" type="password" class="adm-inp" placeholder="sk-ant-...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-anthropic')">&#x1F441;</button>
           </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">GitHub Personal Access Token</div><div class="adm-field-hint">Fuer Partner-View GitHub-Sync &middot; ghp_...</div></div>
-            <input id="adm-f-github" type="password" class="adm-inp" placeholder="ghp_...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-github')">&#x1F441;</button>
-          </div>
         </div>
-        <div class="es-grp" style="margin-top:12px">
-          <div class="es-grp-h" style="font-size:13px;margin-bottom:8px">Provider API-Keys (OpenAI, Ollama, etc.)</div>
+
+        <!-- Provider-Keys -->
+        <div class="es-grp" style="margin-top:10px">
+          <div class="adm-sub-hd">Provider-Keys (OpenAI, Ollama, etc.)</div>
           <div id="adm-provider-keys-list"></div>
           <button class="es-btn es-btn-green" style="margin-top:8px" onclick="admAddProviderKey()">&#x2B; Provider-Key hinzufuegen</button>
         </div>
+
+        <!-- Integrationen -->
+        <div class="es-grp" style="margin-top:10px">
+          <div class="adm-sub-hd">Integrationen</div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">GitHub Personal Access Token</div>
+              <div class="adm-field-hint">Fuer Partner-View GitHub-Sync &middot; ghp_...</div>
+            </div>
+            <input id="adm-f-github" type="password" class="adm-inp" placeholder="ghp_...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-github')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Lexware Office API-Key</div>
+              <div class="adm-field-hint">Lexware Office &rarr; Mein Konto &rarr; API-Zugang &rarr; Token erstellen</div>
+            </div>
+            <input id="adm-f-lex-key" type="password" class="adm-inp" placeholder="t-...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-lex-key')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Lexware API-Basis-URL</div>
+              <div class="adm-field-hint">Standard: https://api.lexware.io/v1 &nbsp;&mdash;&nbsp; /v1 am Ende benoetigt!</div>
+            </div>
+            <input id="adm-f-lex-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://api.lexware.io/v1">
+          </div>
+        </div>
+
         <div class="es-save-bar">
           <button class="btn btn-primary" onclick="admSaveSection('api')">&#x1F4BE; Speichern</button>
           <span id="adm-save-api-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
         </div>
       </div>
 
-      <!-- E-Mail SMTP -->
+      <!-- ══ E-MAIL SMTP ══ -->
       <div class="adm-sec" id="adm-sec-smtp">
         <div class="es-grp-h" style="margin-bottom:4px">E-Mail SMTP</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende E-Mails: Benachrichtigungen, Partnereinladungen. Gespeichert in <code>config.json &rarr; email_notification</code>.</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende Mails fuer Benachrichtigungen &amp; Partnereinladungen. In <code>config.json &rarr; email_notification</code>.</div>
         <div class="es-grp">
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">SMTP-Server</div><div class="adm-field-hint">z.B. smtp.gmail.com oder smtp.ionos.de</div></div>
-            <input id="adm-f-smtp-server" type="text" class="adm-inp" placeholder="smtp.gmail.com">
+          <!-- Preset-Auswahl -->
+          <div class="adm-preset-bar">
+            <span class="adm-preset-lbl">&#x26A1; Anbieter-Voreinstellung:</span>
+            <select class="adm-preset-sel" onchange="admSmtpPreset(this.value)">
+              <option value="">&#x2014; Anbieter waehlen und Felder automatisch ausfullen &#x2014;</option>
+              <optgroup label="Privat (Deutschland)">
+                <option value="gmail">Gmail (Google)</option>
+                <option value="gmx">GMX</option>
+                <option value="webde">web.de</option>
+                <option value="tonline">T-Online</option>
+                <option value="freenet">Freenet</option>
+              </optgroup>
+              <optgroup label="Business / Hosting">
+                <option value="ionos">IONOS / 1&amp;1</option>
+                <option value="strato">Strato</option>
+                <option value="allinkl">All-Inkl.com</option>
+                <option value="hetzner">Hetzner</option>
+              </optgroup>
+              <optgroup label="Microsoft">
+                <option value="outlook">Outlook.com / Hotmail / Live</option>
+                <option value="office365">Microsoft 365 (Exchange Online)</option>
+              </optgroup>
+              <optgroup label="Transaktional">
+                <option value="postmark">Postmark</option>
+                <option value="sendgrid">SendGrid</option>
+                <option value="mailgun">Mailgun</option>
+              </optgroup>
+              <optgroup label="Sonstige">
+                <option value="yahoo">Yahoo Mail</option>
+                <option value="fastmail">Fastmail</option>
+                <option value="custom">Benutzerdefiniert</option>
+              </optgroup>
+            </select>
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Port</div><div class="adm-field-hint">Standard: 587 (STARTTLS) oder 465 (SSL)</div></div>
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">SMTP-Server</div>
+              <div class="adm-field-hint" id="adm-smtp-hint-srv">z.B. smtp.gmail.com oder smtp.ionos.de</div>
+            </div>
+            <input id="adm-f-smtp-server" type="text" class="adm-inp adm-inp-wide" placeholder="smtp.gmail.com">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Port</div>
+              <div class="adm-field-hint">587 (STARTTLS) oder 465 (SSL/TLS)</div>
+            </div>
             <input id="adm-f-smtp-port" type="number" class="adm-inp" placeholder="587" style="width:100px">
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Absender E-Mail</div><div class="adm-field-hint">Von-Adresse fuer ausgehende Mails</div></div>
-            <input id="adm-f-smtp-email" type="email" class="adm-inp" placeholder="kira@raumkult.eu">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Absender E-Mail</div>
+              <div class="adm-field-hint">Von-Adresse fuer ausgehende Mails</div>
+            </div>
+            <input id="adm-f-smtp-email" type="email" class="adm-inp adm-inp-wide" placeholder="kira@raumkult.eu">
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">SMTP-Passwort / App-Passwort</div><div class="adm-field-hint">Bei Gmail: App-Passwort verwenden (2FA noetig)</div></div>
-            <input id="adm-f-smtp-passwort" type="password" class="adm-inp" placeholder="...">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">SMTP-Passwort / App-Passwort</div>
+              <div class="adm-field-hint" id="adm-smtp-hint-pw">Bei Gmail: App-Passwort erstellen (Google-Konto &rarr; Sicherheit &rarr; 2FA)</div>
+            </div>
+            <input id="adm-f-smtp-passwort" type="password" class="adm-inp adm-inp-wide" placeholder="...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-smtp-passwort')">&#x1F441;</button>
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Empfaenger E-Mail</div><div class="adm-field-hint">Wohin sollen System-Benachrichtigungen gehen</div></div>
-            <input id="adm-f-smtp-empf" type="email" class="adm-inp" placeholder="kai@raumkult.eu">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Empfaenger E-Mail</div>
+              <div class="adm-field-hint">Wohin gehen System-Benachrichtigungen</div>
+            </div>
+            <input id="adm-f-smtp-empf" type="email" class="adm-inp adm-inp-wide" placeholder="kai@raumkult.eu">
           </div>
         </div>
         <div class="es-save-bar">
@@ -10010,69 +10126,31 @@ def build_admin():
         </div>
       </div>
 
-      <!-- WhatsApp -->
-      <div class="adm-sec" id="adm-sec-whatsapp">
-        <div class="es-grp-h" style="margin-bottom:4px">WhatsApp Business</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Meta Business Cloud API Zugangsdaten. Gespeichert in <code>secrets.json</code>.</div>
-        <div class="es-grp">
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Verify-Token</div><div class="adm-field-hint">Webhook-Verifizierung (frei waehlbar, muss mit Meta-Einstellung uebereinstimmen)</div></div>
-            <input id="adm-f-wa-verify" type="password" class="adm-inp" placeholder="...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-verify')">&#x1F441;</button>
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">App Secret</div><div class="adm-field-hint">HMAC-Signaturpruefung von Webhook-Events</div></div>
-            <input id="adm-f-wa-secret" type="password" class="adm-inp" placeholder="...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-secret')">&#x1F441;</button>
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Phone Number ID</div><div class="adm-field-hint">Meta Business Manager &rarr; WhatsApp &rarr; Phone Number ID</div></div>
-            <input id="adm-f-wa-phone-id" type="text" class="adm-inp" placeholder="1234567890">
-          </div>
-        </div>
-        <div class="es-save-bar">
-          <button class="btn btn-primary" onclick="admSaveSection('whatsapp')">&#x1F4BE; Speichern</button>
-          <span id="adm-save-whatsapp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
-        </div>
-      </div>
-
-      <!-- Lexware -->
-      <div class="adm-sec" id="adm-sec-lexware">
-        <div class="es-grp-h" style="margin-bottom:4px">Lexware Office</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">API-Zugangsdaten fuer Lexware Office. Gespeichert in <code>config.json &rarr; lexware</code>.</div>
-        <div class="es-grp">
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">API-Key</div><div class="adm-field-hint">Lexware Office &rarr; Mein Konto &rarr; API-Zugang &rarr; Token erstellen</div></div>
-            <input id="adm-f-lex-key" type="password" class="adm-inp" placeholder="t-...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-lex-key')">&#x1F441;</button>
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">API Basis-URL</div><div class="adm-field-hint">Standard: https://api.lexware.io</div></div>
-            <input id="adm-f-lex-url" type="text" class="adm-inp" placeholder="https://api.lexware.io">
-          </div>
-        </div>
-        <div class="es-save-bar">
-          <button class="btn btn-primary" onclick="admSaveSection('lexware')">&#x1F4BE; Speichern</button>
-          <span id="adm-save-lexware-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
-        </div>
-      </div>
-
-      <!-- Passwoerter -->
+      <!-- ══ PASSWOERTER ══ -->
       <div class="adm-sec" id="adm-sec-passwoerter">
         <div class="es-grp-h" style="margin-bottom:4px">System-Passwoerter</div>
         <div class="es-grp-sub" style="margin-bottom:16px">Login-Passwoerter fuer Admin und Mobile-App. Gespeichert in <code>secrets.json</code>.</div>
         <div class="es-grp">
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Admin-Passwort</div><div class="adm-field-hint">Schutzt diesen Admin-Bereich. Fallback: kira2026</div></div>
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Admin-Passwort</div>
+              <div class="adm-field-hint">Schuetzt diesen Admin-Bereich (Fallback: kira2026)</div>
+            </div>
             <input id="adm-f-admin-pw" type="password" class="adm-inp" placeholder="Neues Passwort...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-admin-pw')">&#x1F441;</button>
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Admin-Passwort bestaetigen</div><div class="adm-field-hint">Zur Sicherheit zweimal eingeben</div></div>
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Admin-Passwort bestaetigen</div>
+              <div class="adm-field-hint">Zur Sicherheit zweimal eingeben</div>
+            </div>
             <input id="adm-f-admin-pw2" type="password" class="adm-inp" placeholder="Wiederholung...">
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Mobile-App Passwort</div><div class="adm-field-hint">Login-Schutz fuer /mobil &middot; Kira Capture App</div></div>
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Mobile-App Passwort</div>
+              <div class="adm-field-hint">Login-Schutz fuer /mobil &middot; Kira Capture App</div>
+            </div>
             <input id="adm-f-mobil-pw" type="password" class="adm-inp" placeholder="...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-mobil-pw')">&#x1F441;</button>
           </div>
@@ -10083,24 +10161,120 @@ def build_admin():
         </div>
       </div>
 
-      <!-- System -->
-      <div class="adm-sec" id="adm-sec-system">
-        <div class="es-grp-h" style="margin-bottom:4px">System-Einstellungen</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Server-Konfiguration und Pfade. Gespeichert in <code>config.json</code>.</div>
+      <!-- ══ MESSAGING ══ -->
+      <div class="adm-sec" id="adm-sec-messaging">
+        <div class="es-grp-h" style="margin-bottom:4px">Messaging-Dienste</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer externe Messaging-Dienste. Gespeichert in <code>secrets.json</code>.</div>
         <div class="es-grp">
+          <div class="adm-sub-hd">WhatsApp Business Cloud API</div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Server-Port</div><div class="adm-field-hint">Standard: 8765 &middot; Aenderung erfordert Neustart</div></div>
-            <input id="adm-f-port" type="number" class="adm-inp" placeholder="8765" style="width:100px">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Verify-Token</div>
+              <div class="adm-field-hint">Webhook-Verifizierung &mdash; muss mit Meta-Einstellung uebereinstimmen</div>
+            </div>
+            <input id="adm-f-wa-verify" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-verify')">&#x1F441;</button>
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Mail-Archiv Pfad</div><div class="adm-field-hint">Absoluter Pfad zum Mail-Archiv-Verzeichnis</div></div>
-            <input id="adm-f-archiv-pfad" type="text" class="adm-inp" style="width:300px" placeholder="C:/Pfad/zum/Archiv">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">App Secret</div>
+              <div class="adm-field-hint">HMAC-Signaturpruefung von Webhook-Events</div>
+            </div>
+            <input id="adm-f-wa-secret" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-secret')">&#x1F441;</button>
           </div>
           <div class="adm-field">
-            <div class="adm-field-lbl"><div class="adm-field-key">Backup-Pfad</div><div class="adm-field-hint">Zielverzeichnis fuer automatische Backups</div></div>
-            <input id="adm-f-backup-pfad" type="text" class="adm-inp" style="width:300px" placeholder="C:/Pfad/zum/Backup">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Phone Number ID</div>
+              <div class="adm-field-hint">Meta Business Manager &rarr; WhatsApp &rarr; Phone Number ID</div>
+            </div>
+            <input id="adm-f-wa-phone-id" type="text" class="adm-inp" placeholder="1234567890">
           </div>
         </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('messaging')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-messaging-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- ══ PFADE & SERVER ══ -->
+      <div class="adm-sec" id="adm-sec-system">
+        <div class="es-grp-h" style="margin-bottom:4px">Pfade &amp; Server</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Server-Konfiguration, Pfade und externer Zugang. In <code>config.json</code> gespeichert.</div>
+
+        <!-- Server -->
+        <div class="es-grp">
+          <div class="adm-sub-hd">Server</div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Server-Port</div>
+              <div class="adm-field-hint">Standard: 8765 &middot; Aenderung erfordert Neustart</div>
+            </div>
+            <input id="adm-f-port" type="number" class="adm-inp" placeholder="8765" style="width:100px">
+          </div>
+        </div>
+
+        <!-- Pfade -->
+        <div class="es-grp" style="margin-top:10px">
+          <div class="adm-sub-hd">Pfade</div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Mail-Archiv Pfad</div>
+              <div class="adm-field-hint">Absoluter Pfad zum Mail-Archiv-Verzeichnis (Pflicht)</div>
+            </div>
+            <input id="adm-f-archiv-pfad" type="text" class="adm-inp adm-inp-wide" placeholder="C:/Pfad/zum/Archiv">
+            <button class="adm-pick-btn" title="Ordner auswaehlen" onclick="admPickFolder('adm-f-archiv-pfad',this)">&#x1F4C2;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Backup-Pfad</div>
+              <div class="adm-field-hint">Zielverzeichnis fuer automatische Backups</div>
+            </div>
+            <input id="adm-f-backup-pfad" type="text" class="adm-inp adm-inp-wide" placeholder="knowledge/backups/">
+            <button class="adm-pick-btn" title="Ordner auswaehlen" onclick="admPickFolder('adm-f-backup-pfad',this)">&#x1F4C2;</button>
+          </div>
+        </div>
+
+        <!-- Externer Zugang -->
+        <div class="es-grp" style="margin-top:10px">
+          <div class="adm-sub-hd">Externer Zugang (Cloudflare Tunnel)</div>
+          <div class="es-grp-sub" style="margin-bottom:10px">Macht KIRA von ueberall erreichbar &mdash; kostenlos, HTTPS, kein VPS noetig. Fuer die Mobil-App (<code>/mobil</code>) benoetigt.</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span id="adm-cf-chip" style="font-size:11px;padding:2px 9px;border-radius:10px;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)">Nicht konfiguriert &mdash; nur lokal erreichbar</span>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Oeffentliche URL</div>
+              <div class="adm-field-hint">z.B. https://kira-raumkult.cfargotunnel.com &middot; nach Schritt 3 erhalten</div>
+            </div>
+            <input id="adm-f-cf-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://...cfargotunnel.com">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Tunnel-Token</div>
+              <div class="adm-field-hint">cloudflared-Token fuer automatischen Start als Windows-Dienst</div>
+            </div>
+            <input id="adm-f-cf-token" type="password" class="adm-inp adm-inp-wide" placeholder="eyJhIjoiO...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-cf-token')">&#x1F441;</button>
+          </div>
+          <div style="margin-top:10px">
+            <button class="btn btn-sec btn-xs" onclick="admCfToggle()" id="adm-cf-anl-btn">&#x1F4D6; Einrichtungs-Anleitung anzeigen</button>
+            <div id="adm-cf-anl" style="display:none" class="adm-cf-card">
+              <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px">Cloudflare Tunnel einrichten (kostenlos, einmalig)</div>
+              <ol class="adm-cf-steps">
+                <li><b>cloudflared.exe herunterladen:</b> github.com/cloudflare/cloudflared/releases &rarr; cloudflared-windows-amd64.exe</li>
+                <li><b>Im Browser einloggen:</b> <code>cloudflared.exe login</code> &rarr; kostenloses Cloudflare-Konto erstellen oder nutzen</li>
+                <li><b>Tunnel erstellen:</b> <code>cloudflared.exe tunnel create kira</code> &rarr; Tunnel-ID &amp; Token werden angezeigt</li>
+                <li><b>Als Windows-Dienst starten:</b> <code>cloudflared.exe service install &lt;TOKEN&gt;</code> &rarr; laeuft ab sofort automatisch</li>
+                <li><b>URL in KIRA eintragen:</b> Oben &ldquo;Oeffentliche URL&rdquo; eingeben (aus Schritt 3) &rarr; Speichern</li>
+              </ol>
+              <div style="font-size:11px;color:var(--muted);margin-top:8px;border-top:0.5px solid var(--primary-200,#ddd4f8);padding-top:6px">
+                Zukuenftige KIRA-Installationspakete liefern cloudflared.exe direkt mit und richten den Tunnel beim Setup automatisch ein.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="es-save-bar">
           <button class="btn btn-primary" onclick="admSaveSection('system')">&#x1F4BE; Speichern</button>
           <span id="adm-save-system-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
@@ -10114,6 +10288,74 @@ def build_admin():
 <script>
 var _admAuth = false;
 var _admData = {};
+
+/* ── SMTP-Voreinstellungen (recherchierte 2025-Werte) ── */
+var _ADM_SMTP = {
+  gmail:     {s:'smtp.gmail.com',         p:587, hs:'smtp.gmail.com',          hp:'App-Passwort erforderlich: Google-Konto \u2192 Sicherheit \u2192 2-Schritt-Verifizierung \u2192 App-Passwoerter'},
+  gmx:       {s:'mail.gmx.net',           p:587, hs:'mail.gmx.net',            hp:'Normales GMX-Passwort oder App-Passwort (Mein GMX \u2192 Sicherheit \u2192 Passwoerter &amp; Zugangsdaten)'},
+  webde:     {s:'smtp.web.de',            p:587, hs:'smtp.web.de',             hp:'Normales web.de-Passwort'},
+  tonline:   {s:'securesmtp.t-online.de', p:587, hs:'securesmtp.t-online.de',  hp:'T-Online E-Mail-Passwort (nicht das Telekom-Hauptpasswort!)'},
+  freenet:   {s:'mx.freenet.de',          p:587, hs:'mx.freenet.de',           hp:'Freenet-Passwort'},
+  ionos:     {s:'smtp.ionos.de',          p:587, hs:'smtp.ionos.de',           hp:'IONOS-Passwort \u2014 vollstaendige E-Mail-Adresse als Benutzername verwenden'},
+  strato:    {s:'smtp.strato.de',         p:587, hs:'smtp.strato.de',          hp:'Strato-Passwort \u2014 vollstaendige E-Mail-Adresse als Benutzername'},
+  allinkl:   {s:'',                       p:587, hs:'Server-Adresse aus All-Inkl-Kundencenter entnehmen (z.B. w00abc.kasserver.com)', hp:'All-Inkl-Hosting-Passwort'},
+  hetzner:   {s:'mail.your-server.de',    p:587, hs:'mail.your-server.de',     hp:'Hetzner E-Mail-Passwort'},
+  outlook:   {s:'smtp-mail.outlook.com',  p:587, hs:'smtp-mail.outlook.com',   hp:'Microsoft-Konto Passwort (bei 2FA: App-Passwort unter Konto \u2192 Sicherheit erstellen)'},
+  office365: {s:'smtp.office365.com',     p:587, hs:'smtp.office365.com',      hp:'Microsoft 365 \u2014 SMTP AUTH muss in Exchange Online aktiviert sein (Admin \u2192 Org Settings)'},
+  postmark:  {s:'smtp.postmarkapp.com',   p:587, hs:'smtp.postmarkapp.com',    hp:'Postmark API-Token als Benutzername UND Passwort eingeben'},
+  sendgrid:  {s:'smtp.sendgrid.net',      p:587, hs:'smtp.sendgrid.net',       hp:'Benutzername: apikey \u2014 Passwort: dein SendGrid API-Key (beginnt mit SG.)'},
+  mailgun:   {s:'smtp.mailgun.org',       p:587, hs:'smtp.mailgun.org',        hp:'Mailgun SMTP-Credentials aus Dashboard \u2192 Sending \u2192 Domain Settings \u2192 SMTP'},
+  yahoo:     {s:'smtp.mail.yahoo.com',    p:587, hs:'smtp.mail.yahoo.com',     hp:'Yahoo App-Passwort erstellen: Konto \u2192 Sicherheit \u2192 Andere App-Verwaltung'},
+  fastmail:  {s:'smtp.fastmail.com',      p:587, hs:'smtp.fastmail.com',       hp:'Fastmail App-Passwort (Einstellungen \u2192 Passwoerter &amp; App-Sicherheit)'},
+  custom:    {s:'',                       p:587, hs:'SMTP-Serveradresse eintragen',    hp:'SMTP-Passwort eingeben'}
+};
+
+function admSmtpPreset(provider) {
+  if (!provider || !_ADM_SMTP[provider]) return;
+  var p = _ADM_SMTP[provider];
+  var srv = document.getElementById('adm-f-smtp-server');
+  var prt = document.getElementById('adm-f-smtp-port');
+  var hs  = document.getElementById('adm-smtp-hint-srv');
+  var hp  = document.getElementById('adm-smtp-hint-pw');
+  if (srv && p.s) srv.value = p.s;
+  if (prt) prt.value = p.p;
+  if (hs) hs.textContent = p.hs;
+  if (hp) hp.textContent = p.hp;
+}
+
+function admPickFolder(inputId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '\u2026'; }
+  fetch('/api/browse/folder').then(function(r){return r.json();}).then(function(d){
+    if (!d.ok) { if(btn){btn.disabled=false;btn.textContent='\uD83D\uDCC2';} return; }
+    var jobId = d.job_id, polls = 0;
+    var t = setInterval(function(){
+      polls++;
+      fetch('/api/browse/result?job_id='+jobId).then(function(r){return r.json();}).then(function(s){
+        if (s.done) {
+          clearInterval(t);
+          if (btn) { btn.disabled=false; btn.textContent='\uD83D\uDCC2'; }
+          if (s.path) { var inp=document.getElementById(inputId); if(inp) inp.value=s.path; }
+        } else if (polls > 60) {
+          clearInterval(t);
+          if (btn) { btn.disabled=false; btn.textContent='\uD83D\uDCC2'; }
+        }
+      }).catch(function(){});
+    }, 500);
+  }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='\uD83D\uDCC2';} });
+}
+
+function admCfToggle() {
+  var el = document.getElementById('adm-cf-anl');
+  var btn = document.getElementById('adm-cf-anl-btn');
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (btn) btn.textContent = '\uD83D\uDCD6 Anleitung ausblenden';
+  } else {
+    el.style.display = 'none';
+    if (btn) btn.textContent = '\uD83D\uDCD6 Einrichtungs-Anleitung anzeigen';
+  }
+}
 
 function admLogin() {
   var pw = document.getElementById('adm-pw').value;
@@ -10130,14 +10372,11 @@ function admLogin() {
     } else {
       document.getElementById('adm-login-err').textContent = d.error || 'Falsches Passwort';
     }
-  }).catch(function(e){
-    document.getElementById('adm-login-err').textContent = 'Verbindungsfehler';
-  });
+  }).catch(function(){ document.getElementById('adm-login-err').textContent = 'Verbindungsfehler'; });
 }
 
 function admLogout() {
-  _admAuth = false;
-  _admData = {};
+  _admAuth = false; _admData = {};
   document.getElementById('adm-content').style.display = 'none';
   document.getElementById('adm-login-wall').style.display = 'flex';
   document.getElementById('adm-pw').value = '';
@@ -10162,36 +10401,41 @@ function admLoadData() {
   fetch('/api/admin/data-get').then(function(r){return r.json();}).then(function(d){
     if (!d.ok) return;
     _admData = d;
-    var s = d.secrets || {};
-    var c = d.config || {};
-    // API-Keys
-    var setVal = function(id, v) { var el=document.getElementById(id); if(el&&v!==undefined) el.value=v; };
+    var s = d.secrets || {}, c = d.config || {};
+    var setVal = function(id, v) { var el=document.getElementById(id); if(el&&v!=null&&v!==undefined) el.value=v; };
     setVal('adm-f-anthropic', s.anthropic_api_key);
     setVal('adm-f-github', s.github_pat);
-    // WhatsApp
-    setVal('adm-f-wa-verify', s.whatsapp_verify_token);
-    setVal('adm-f-wa-secret', s.whatsapp_app_secret);
-    setVal('adm-f-wa-phone-id', s.whatsapp_phone_number_id);
-    // SMTP
-    var smtp = (c.email_notification || {});
+    var lx = c.lexware || {};
+    setVal('adm-f-lex-key', lx.api_key);
+    setVal('adm-f-lex-url', lx.api_base_url);
+    var smtp = c.email_notification || {};
     setVal('adm-f-smtp-server', smtp.smtp_server);
     setVal('adm-f-smtp-port', smtp.smtp_port);
     setVal('adm-f-smtp-email', smtp.absender_email);
     setVal('adm-f-smtp-passwort', smtp.absender_passwort);
     setVal('adm-f-smtp-empf', smtp.empfaenger_email);
-    // Lexware
-    var lx = (c.lexware || {});
-    setVal('adm-f-lex-key', lx.api_key);
-    setVal('adm-f-lex-url', lx.api_base_url);
-    // Passwoerter
-    setVal('adm-f-admin-pw', s.admin_password || '');
-    setVal('adm-f-admin-pw2', s.admin_password || '');
-    setVal('adm-f-mobil-pw', s.mobil_password || '');
-    // System
+    setVal('adm-f-admin-pw', s.admin_password||'');
+    setVal('adm-f-admin-pw2', s.admin_password||'');
+    setVal('adm-f-mobil-pw', s.mobil_password||'');
+    setVal('adm-f-wa-verify', s.whatsapp_verify_token);
+    setVal('adm-f-wa-secret', s.whatsapp_app_secret);
+    setVal('adm-f-wa-phone-id', s.whatsapp_phone_number_id);
     setVal('adm-f-port', (c.server||{}).port);
     setVal('adm-f-archiv-pfad', (c.mail_archiv||{}).pfad);
     setVal('adm-f-backup-pfad', (c.backup||{}).pfad);
-    // Provider keys
+    var cf = c.cloudflare_tunnel || {};
+    setVal('adm-f-cf-url', cf.public_url);
+    setVal('adm-f-cf-token', cf.tunnel_token);
+    var chip = document.getElementById('adm-cf-chip');
+    if (chip) {
+      if (cf.public_url) {
+        chip.textContent = '\u2705 Aktiv: ' + cf.public_url;
+        chip.style.cssText = 'font-size:11px;padding:2px 9px;border-radius:10px;background:var(--success-light,#e8f9f3);color:var(--success,#1D9E75);border:0.5px solid var(--success,#1D9E75)';
+      } else {
+        chip.textContent = 'Nicht konfiguriert \u2014 nur lokal erreichbar';
+        chip.style.cssText = 'font-size:11px;padding:2px 9px;border-radius:10px;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)';
+      }
+    }
     admRenderProviderKeys(s.provider_keys || {});
   }).catch(function(){});
 }
@@ -10200,14 +10444,14 @@ function admRenderProviderKeys(keys) {
   var list = document.getElementById('adm-provider-keys-list');
   if (!list) return;
   list.innerHTML = '';
-  Object.keys(keys).forEach(function(provider_id) {
+  Object.keys(keys).forEach(function(pid) {
     var row = document.createElement('div');
     row.className = 'adm-field';
-    row.dataset.provId = provider_id;
-    row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+provider_id+'</div>'
+    row.dataset.provId = pid;
+    row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+pid+'</div>'
       +'<div class="adm-field-hint">Provider API-Key</div></div>'
-      +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+provider_id+'" value="'+String(keys[provider_id]).substring(0,60)+'">'
-      +'<button class="adm-show-btn" onclick="admToggleThis(this)">&#x1F441;</button>';
+      +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+pid+'" value="'+String(keys[pid]).substring(0,60)+'">'
+      +'<button class="adm-show-btn" onclick="admToggleThis(this)">\uD83D\uDC41</button>';
     list.appendChild(row);
   });
 }
@@ -10219,15 +10463,15 @@ function admToggleThis(btn) {
 
 function admAddProviderKey() {
   var list = document.getElementById('adm-provider-keys-list');
-  var row = document.createElement('div');
-  row.className = 'adm-field';
   var newId = prompt('Provider-ID (z.B. openai-main oder ollama-lokal):');
   if (!newId) return;
+  var row = document.createElement('div');
+  row.className = 'adm-field';
   row.dataset.provId = newId;
   row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+newId+'</div>'
     +'<div class="adm-field-hint">Neuer Provider API-Key</div></div>'
     +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+newId+'" placeholder="sk-... oder leer fuer Ollama">'
-    +'<button class="adm-show-btn" onclick="admToggleThis(this)">&#x1F441;</button>';
+    +'<button class="adm-show-btn" onclick="admToggleThis(this)">\uD83D\uDC41</button>';
   list.appendChild(row);
 }
 
@@ -10239,29 +10483,31 @@ function admSaveSection(section) {
     document.querySelectorAll('.adm-prov-key').forEach(function(inp){
       if (inp.dataset.prov) provKeys[inp.dataset.prov] = inp.value;
     });
-    payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'), provider_keys: provKeys};
+    payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'),
+      provider_keys: provKeys, lex_api_key: g('adm-f-lex-key'), lex_api_base_url: g('adm-f-lex-url')};
   } else if (section === 'smtp') {
     payload.data = {smtp_server: g('adm-f-smtp-server'), smtp_port: parseInt(g('adm-f-smtp-port'))||587,
       absender_email: g('adm-f-smtp-email'), absender_passwort: g('adm-f-smtp-passwort'), empfaenger_email: g('adm-f-smtp-empf')};
-  } else if (section === 'whatsapp') {
-    payload.data = {whatsapp_verify_token: g('adm-f-wa-verify'), whatsapp_app_secret: g('adm-f-wa-secret'), whatsapp_phone_number_id: g('adm-f-wa-phone-id')};
-  } else if (section === 'lexware') {
-    payload.data = {api_key: g('adm-f-lex-key'), api_base_url: g('adm-f-lex-url')};
   } else if (section === 'passwoerter') {
     var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
-    if (pw1 && pw1 !== pw2) { showToast('Admin-Passwoerter stimmen nicht ueberein', 'fehler'); return; }
+    if (pw1 && pw1 !== pw2) { showToast('Passwoerter stimmen nicht ueberein', 'fehler'); return; }
     payload.data = {};
     if (pw1) payload.data.admin_password = pw1;
     var mp = g('adm-f-mobil-pw'); if (mp) payload.data.mobil_password = mp;
+  } else if (section === 'messaging') {
+    payload.data = {whatsapp_verify_token: g('adm-f-wa-verify'),
+      whatsapp_app_secret: g('adm-f-wa-secret'), whatsapp_phone_number_id: g('adm-f-wa-phone-id')};
   } else if (section === 'system') {
-    payload.data = {port: parseInt(g('adm-f-port'))||8765, archiv_pfad: g('adm-f-archiv-pfad'), backup_pfad: g('adm-f-backup-pfad')};
+    payload.data = {port: parseInt(g('adm-f-port'))||8765, archiv_pfad: g('adm-f-archiv-pfad'),
+      backup_pfad: g('adm-f-backup-pfad'), cf_public_url: g('adm-f-cf-url'), cf_tunnel_token: g('adm-f-cf-token')};
   }
   fetch('/api/admin/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
   .then(function(r){return r.json();}).then(function(d){
     var msgEl = document.getElementById('adm-save-'+section+'-msg');
     if (d.ok) {
       showToast('Admin: '+section+' gespeichert', 'ok');
-      if (msgEl) { msgEl.textContent = 'Gespeichert'; setTimeout(function(){msgEl.textContent='';}, 3000); }
+      if (msgEl) { msgEl.textContent = 'Gespeichert \u2714'; setTimeout(function(){msgEl.textContent='';}, 3000); }
+      if (section === 'system') admLoadData();
     } else {
       showToast(d.error || 'Fehler beim Speichern', 'fehler');
     }
@@ -25002,6 +25248,7 @@ def _method_api_admin_data_get(self):
             "server": cfg.get("server", {}),
             "mail_archiv": {"pfad": cfg.get("mail_archiv", {}).get("pfad", "")},
             "backup": cfg.get("backup", {}),
+            "cloudflare_tunnel": {k: v for k, v in cfg.get("cloudflare_tunnel", {}).items() if not k.startswith("_")},
         }
         self._json({"ok": True, "secrets": secs_clean, "config": admin_cfg})
     except Exception as e:
@@ -25042,6 +25289,14 @@ def _method_api_admin_save(self, body):
                 old_prov.update({k: v for k, v in data["provider_keys"].items() if v})
                 secs["provider_keys"] = old_prov
             secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
+            # Lexware API (in config.json) - jetzt unter api-Sektion zusammengefasst
+            lx = cfg.get("lexware", {})
+            if data.get("lex_api_key"):
+                lx["api_key"] = data["lex_api_key"]
+            if data.get("lex_api_base_url"):
+                lx["api_base_url"] = data["lex_api_base_url"]
+            cfg["lexware"] = lx
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
         elif section == "smtp":
             smtp = cfg.get("email_notification", {})
@@ -25051,13 +25306,14 @@ def _method_api_admin_save(self, body):
             cfg["email_notification"] = smtp
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
-        elif section == "whatsapp":
+        elif section in ("whatsapp", "messaging"):
             for k in ("whatsapp_verify_token", "whatsapp_app_secret", "whatsapp_phone_number_id"):
                 if data.get(k):
                     secs[k] = data[k]
             secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
 
         elif section == "lexware":
+            # Rueckwaertskompatibilitaet: separate Lexware-Sektion
             lx = cfg.get("lexware", {})
             if data.get("api_key"):
                 lx["api_key"] = data["api_key"]
@@ -25080,6 +25336,13 @@ def _method_api_admin_save(self, body):
                 cfg.setdefault("mail_archiv", {})["pfad"] = data["archiv_pfad"]
             if "backup_pfad" in data:
                 cfg.setdefault("backup", {})["pfad"] = data["backup_pfad"]
+            # Cloudflare Tunnel
+            cf = cfg.get("cloudflare_tunnel", {})
+            if "cf_public_url" in data:
+                cf["public_url"] = data["cf_public_url"]
+            if data.get("cf_tunnel_token"):
+                cf["tunnel_token"] = data["cf_tunnel_token"]
+            cfg["cloudflare_tunnel"] = cf
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
         else:
