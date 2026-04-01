@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-04-01 11:00 — Session-Ende (session-hhh)
+
+**Erledigt:** Capture/Mobile-Memo Modul vollstaendig implementiert und getestet. 4 neue DB-Tabellen, Desktop-Panel, Mobile-Webapp /mobil, 3-Stufen-Matching, 2 Kira-Tools, 11 API-Endpoints, Einstellungen-Sektion. 2 JS-Bugs behoben (\n-in-String-Literal + Surrogate-Emoji). 0 JS-Fehler. Commit 31e8d7f.
+**Offen geblieben:** KIRA_SYSTEM_ANALYSE.md session-hhh Sektion. Mobil-Passwort in secrets.json setzen.
+**Status:** erledigt
+
+---
+
+## 2026-04-01 09:00 — Session-Start (session-hhh / Capture Mobile Memo Modul)
+
+**Auftrag:** Neues Modul Capture/Mobile Memo vollstaendig implementieren: Desktop-Panel (3 Ansichten), Mobile-Webapp /mobil, 3-Stufen-Matching (Hard/Soft/LLM), 4 SQLite-Tabellen, HMAC-Token-Auth, Kira-Tools, Einstellungen. Autonome Session ohne Rueckfragen.
+**Status:** erledigt
+
+---
+
 ## 2026-04-01 08:00 — Session-Start (session-fff / Lexware UI Komplettausbau)
 
 **Auftrag:** Vollstaendiger UI-Ausbau des Lexware Office Moduls. 6 Phasen: Planung, Repo-Audit, Gap-Analyse, Plan-Dateien erstellen, Vollimplementierung in server.py (Pakete A-F), Abschluss-Tracking. Ausnahmeregel: nie blockieren, autonome Arbeit, am Ende Abschluss-Tabelle.

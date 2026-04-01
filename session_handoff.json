@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ggg",
-  "date": "2026-04-01 09:45",
+  "last_session": "session-hhh",
+  "date": "2026-04-01 11:00",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -156,8 +156,14 @@
     "lexware-ui-regeln-aus-pruefqueue-abgeleitet",
     "lexware-ui-5-neue-get-endpoints",
     "lexware-ui-2-neue-post-endpoints",
+    "session-hhh (2026-04-01): Capture / Mobile-Memo Modul vollstaendig implementiert. (1) 4 neue SQLite-Tabellen: capture_items/files/matches/actions. (2) Desktop-Panel build_capture(): KPI-Kacheln, Quick-Form, 3 Ansichten (Uebersicht/Eingang/Detail), Sidebar-Badge. (3) Mobile-Webapp /mobil: HMAC-Token-Auth (secrets.json mobil_password), Foto-Upload, Status-Log, PWA-Manifest. (4) 3-Stufen-Matching: Hard (Regex RE-*/A-SB*), Soft (LIKE-Tokenizer), LLM (via kira_chat wenn confidence<threshold). (5) Hintergrund-Analyse-Thread _capture_analyse() per Capture-Item. (6) 2 neue Kira-Tools: capture_suchen + capture_zuordnen (kira_llm.py). (7) 11 API-Endpoints: /api/capture/stats|list|create|item/{id}|assign|action|upload + /mobil|/mobil/manifest.json|/mobil/api/. (8) Einstellungen > Mobil: capture.* Feature-Flags in config.json. (9) 2 Bugfixes: \\n in JS-String-Literal + Surrogate-Emoji durch HTML-Entities ersetzt. Commit: 31e8d7f.",
     "lexware-ui-kira-kontext-integration",
-    "lexware-js-syntaxerrors-alle-behoben"
+    "lexware-js-syntaxerrors-alle-behoben",
+    "capture-mobile-memo-modul-komplett",
+    "capture-mobile-webapp-mobil-route",
+    "capture-3-tier-matching-hard-soft-llm",
+    "capture-kira-tools-suchen-zuordnen",
+    "capture-einstellungen-mobil-section"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -174,7 +180,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "session-ggg: JS-Fehler behoben (Commit d7fadd2). App laeuft mit 0 JS-Fehlern. Kai kann jetzt normal in der App arbeiten. Naechste Schritte: (1) Einstellungen > Lexware Office > Verbindung: API-Key eintragen + Verbindung testen. (2) Modul-Status auf Freigeschaltet setzen. (3) Cockpit > Jetzt synchronisieren. Optional: KIRA_SYSTEM_ANALYSE.md Sektion 15 aktualisieren.",
+  "next_step": "session-hhh abgeschlossen (Commit 31e8d7f). Capture/Mobile-Memo Modul live, 0 JS-Fehler. Naechste Schritte: (1) Mobil-Passwort in secrets.json setzen (Schluessel: mobil_password) fuer Mobile-Login. (2) Capture-Modul in Einstellungen > Mobil aktivieren. (3) Lexware Office: API-Key eintragen + Verbindung testen. (4) KIRA_SYSTEM_ANALYSE.md Sektion 15 mit session-hhh aktualisieren (neue Tabellen, Endpoints, Kira-Tools).",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
