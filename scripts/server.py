@@ -360,6 +360,102 @@ def _ensure_case_engine_tables():
     finally:
         db.close()
 
+def _ensure_lexware_tables():
+    """Erstellt Lexware Office Tabellen in tasks.db (session-eee, idempotent)."""
+    db = sqlite3.connect(str(TASKS_DB))
+    try:
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS lexware_belege (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                lexware_id   TEXT UNIQUE NOT NULL,
+                typ          TEXT NOT NULL DEFAULT 'invoice',
+                nummer       TEXT,
+                status       TEXT,
+                kontakt_id   TEXT,
+                kontakt_name TEXT,
+                netto        REAL DEFAULT 0,
+                brutto       REAL DEFAULT 0,
+                waehrung     TEXT DEFAULT 'EUR',
+                datum        TEXT,
+                faellig      TEXT,
+                sync_ts      TEXT,
+                payload_json TEXT,
+                erstellt_ts  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_lxb_typ ON lexware_belege(typ);
+            CREATE INDEX IF NOT EXISTS idx_lxb_status ON lexware_belege(status);
+            CREATE INDEX IF NOT EXISTS idx_lxb_datum ON lexware_belege(datum);
+            CREATE INDEX IF NOT EXISTS idx_lxb_kontakt ON lexware_belege(kontakt_id);
+
+            CREATE TABLE IF NOT EXISTS lexware_kontakte (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                lexware_id   TEXT UNIQUE NOT NULL,
+                name         TEXT,
+                email        TEXT,
+                adresse_json TEXT,
+                last_sync    TEXT,
+                payload_json TEXT,
+                erstellt_ts  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_lxk_name ON lexware_kontakte(name);
+
+            CREATE TABLE IF NOT EXISTS lexware_artikel (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                lexware_id   TEXT UNIQUE NOT NULL,
+                name         TEXT,
+                beschreibung TEXT,
+                einheit      TEXT,
+                netto_preis  REAL DEFAULT 0,
+                steuer_satz  TEXT,
+                typ          TEXT DEFAULT 'SERVICE',
+                last_sync    TEXT,
+                payload_json TEXT,
+                erstellt_ts  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS eingangsbelege_pruefqueue (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                mail_id         TEXT,
+                source          TEXT DEFAULT 'mail',
+                absender        TEXT,
+                absender_domain TEXT,
+                betreff         TEXT,
+                betrag          REAL,
+                waehrung        TEXT DEFAULT 'EUR',
+                datum_beleg     TEXT,
+                datum_eingang   TEXT NOT NULL DEFAULT (datetime('now')),
+                anhang_pfad     TEXT,
+                body_excerpt    TEXT,
+                is_paypal       INTEGER DEFAULT 0,
+                is_body_only    INTEGER DEFAULT 0,
+                status          TEXT NOT NULL DEFAULT 'zu_pruefen',
+                kira_frage      TEXT,
+                nutzer_antwort  TEXT,
+                konto_vorschlag TEXT,
+                konto_nummer    TEXT,
+                steuer_typ      TEXT,
+                abschreibung    INTEGER DEFAULT 0,
+                beleg_text      TEXT,
+                pruef_ts        TEXT,
+                lexware_id      TEXT,
+                erstellt_ts     TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_ebp_status ON eingangsbelege_pruefqueue(status);
+            CREATE INDEX IF NOT EXISTS idx_ebp_datum ON eingangsbelege_pruefqueue(datum_eingang);
+            CREATE INDEX IF NOT EXISTS idx_ebp_mail ON eingangsbelege_pruefqueue(mail_id);
+
+            CREATE TABLE IF NOT EXISTS lexware_config (
+                key        TEXT PRIMARY KEY,
+                value      TEXT,
+                updated_ts TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+        """)
+        db.commit()
+    except Exception as _e:
+        pass
+    finally:
+        db.close()
+
 def esc(s):
     return str(s or "").replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;')
 
@@ -5082,6 +5178,25 @@ def build_einstellungen():
         else:                            db_size_str = f"{db_size_bytes/1024**2:.2f} MB"
     except: db_size_str = "unbekannt"
 
+    # Lexware Office Konfiguration (session-eee)
+    lex_cfg = config.get("lexware", {})
+    lex_status        = lex_cfg.get("status", "nicht_gebucht")
+    lex_api_key_set   = bool(lex_cfg.get("api_key", "").strip())
+    lex_sync_intervall = int(lex_cfg.get("sync_intervall", 60))
+    lex_buchalt_aktiv = bool(lex_cfg.get("buchalt_pruefregel_aktiv", True))
+    lex_paypal_aktiv  = bool(lex_cfg.get("paypal_ausnahme_aktiv", True))
+    lex_dataverse_aktiv = bool(lex_cfg.get("dataverse_export_aktiv", False))
+    _lex_status_colors = {
+        "nicht_gebucht": ("#888", "Nicht gebucht"),
+        "gesperrt":      ("#e84545", "Gesperrt"),
+        "freigeschaltet": ("#28c850", "Freigeschaltet"),
+    }
+    _lex_sc, _lex_sl = _lex_status_colors.get(lex_status, ("#888", lex_status))
+    lex_status_chip = f'<span style="display:inline-block;background:{_lex_sc};color:#fff;border-radius:8px;padding:1px 10px;font-size:11px;font-weight:700">{_lex_sl}</span>'
+    lex_key_chip    = ('<span style="color:#28c850;font-weight:600">&#x2713; Hinterlegt</span>'
+                       if lex_api_key_set else
+                       '<span style="color:#e84545;font-weight:600">&#x26A0; Nicht gesetzt</span>')
+
     # Mail-Archiv Konfiguration
     mail_archiv_cfg = config.get("mail_archiv", {})
     archiv_pfad = mail_archiv_cfg.get("pfad", "")
@@ -5533,6 +5648,7 @@ function esInfoPopup(btn, text) {{
   <div class="es-sn" data-essec="provider" onclick="esShowSec('provider')"><span class="es-sico">&#x25C8;</span>Kira / LLM / Provider<span class="es-scnt">{len(providers)}</span></div>
   <div class="es-sn" data-essec="mail" onclick="esShowSec('mail')"><span class="es-sico">&#x2709;</span>Mail &amp; Konten</div>
   <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
+  <div class="es-sn" data-essec="lexware" onclick="esShowSec('lexware')"><span class="es-sico">&#x1F4CB;</span>Lexware Office</div>
   <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
   <div class="es-sn" data-essec="sicherheit-audit" onclick="esShowSec('sicherheit-audit')"><span class="es-sico">&#x1F6E1;</span>Sicherheit &amp; Audit</div>
   <div class="es-sn" data-essec="verbrauch" onclick="esShowSec('verbrauch')"><span class="es-sico">&#x1F4CA;</span>Verbrauch &amp; Kosten</div>
@@ -8428,6 +8544,156 @@ function esInfoPopup(btn, text) {{
   </script>
 </div>
 
+<!-- ── SECTION: LEXWARE OFFICE (session-eee) ─────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-lexware">
+  <div class="es-sec-h">Lexware Office</div>
+  <div class="es-sec-sub">Verbindet KIRA mit Lexware Office (ehemals lexoffice) &mdash; Belege, Kontakte, Artikel und Buchhaltungs-Pr&uuml;fqueue.</div>
+
+  <!-- Modul-Status -->
+  <div class="es-grp">
+    <div class="es-grp-h">Modul-Status</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <span>Aktuell:</span>{lex_status_chip}
+      <span style="color:var(--muted);font-size:11px">API-Key: {lex_key_chip}</span>
+    </div>
+    <div class="es-grp-sub">Steuert ob das Lexware-Modul in der Sidebar angezeigt und nutzbar ist.</div>
+    <div class="es-row">
+      <label class="es-label">Modul-Status setzen</label>
+      <select id="cfg-lex-status" class="es-select" style="max-width:220px">
+        <option value="nicht_gebucht" {'selected' if lex_status=='nicht_gebucht' else ''}>Nicht gebucht (Info-Box)</option>
+        <option value="gesperrt" {'selected' if lex_status=='gesperrt' else ''}>Gesperrt (Sperrbanner)</option>
+        <option value="freigeschaltet" {'selected' if lex_status=='freigeschaltet' else ''}>Freigeschaltet (voll aktiv)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- API-Verbindung -->
+  <div class="es-grp">
+    <div class="es-grp-h">API-Verbindung</div>
+    <div class="es-grp-sub">API-Key aus Lexware Office: Einstellungen &rarr; Apps &amp; Schnittstellen &rarr; LexOffice API. Wird sicher in config.json gespeichert.</div>
+    <div class="es-row">
+      <label class="es-label">API-Key</label>
+      <input id="cfg-lex-api-key" type="password" class="es-input" style="max-width:340px" placeholder="M_Dxx... (leer lassen um nicht zu &auml;ndern)" autocomplete="off">
+    </div>
+    <div class="es-row" style="gap:8px;align-items:center">
+      <button class="btn btn-sec" onclick="lexEsSaveConfig()" style="min-width:120px">&#x1F4BE; Speichern</button>
+      <button class="btn btn-sec" id="lex-test-btn" onclick="lexEsTestConnection()" style="min-width:160px">&#x26A1; Verbindung testen</button>
+      <span id="lex-test-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <!-- Sync-Einstellungen -->
+  <div class="es-grp">
+    <div class="es-grp-h">Synchronisierung</div>
+    <div class="es-row">
+      <label class="es-label">Auto-Sync Intervall</label>
+      <select id="cfg-lex-sync-intervall" class="es-select" style="max-width:180px">
+        <option value="15" {'selected' if lex_sync_intervall==15 else ''}>Alle 15 Minuten</option>
+        <option value="30" {'selected' if lex_sync_intervall==30 else ''}>Alle 30 Minuten</option>
+        <option value="60" {'selected' if lex_sync_intervall==60 else ''}>Stündlich</option>
+        <option value="360" {'selected' if lex_sync_intervall==360 else ''}>Alle 6 Stunden</option>
+        <option value="1440" {'selected' if lex_sync_intervall==1440 else ''}>Täglich</option>
+      </select>
+    </div>
+    <div class="es-row" style="gap:8px">
+      <button class="btn btn-sec" onclick="lexEsSync('belege')">&#x1F4C4; Belege jetzt sync</button>
+      <button class="btn btn-sec" onclick="lexEsSync('kontakte')">&#x1F465; Kontakte jetzt sync</button>
+      <button class="btn btn-sec" onclick="lexEsSync('full')">&#x21BB; Alles sync</button>
+    </div>
+    <div id="lex-sync-status" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+  </div>
+
+  <!-- Buchhaltungs-Prüfregeln -->
+  <div class="es-grp">
+    <div class="es-grp-h">Buchhaltungs-Pr&uuml;fregeln</div>
+    <div class="es-grp-sub">Steuert das automatische Erkennen und Einordnen von Eingangsrechnungen in der Pr&uuml;fqueue.</div>
+    <div class="es-row">
+      <label class="es-label">Eingangsbeleg-Pr&uuml;fqueue aktiv</label>
+      <label class="es-toggle"><input id="cfg-lex-buchalt" type="checkbox" {'checked' if lex_buchalt_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+    </div>
+    <div class="es-row">
+      <label class="es-label">PayPal-Ausnahme-Erkennung</label>
+      <label class="es-toggle"><input id="cfg-lex-paypal" type="checkbox" {'checked' if lex_paypal_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+    </div>
+    <div class="es-grp-sub">PayPal-Zahlungsbestätigungen werden als Ausnahme erkannt und NICHT als Eingangsrechnung klassifiziert.</div>
+  </div>
+
+  <!-- Dataverse-Export (optional) -->
+  <div class="es-grp">
+    <div class="es-grp-h">Dataverse-Export <span style="font-size:11px;color:var(--muted);font-weight:400">(optional)</span></div>
+    <div class="es-grp-sub">Exportiert Rechnungen zusätzlich nach Microsoft Dataverse (CRM). Erfordert Azure App-Credentials. Prio C &mdash; nur aktivieren wenn benötigt.</div>
+    <div class="es-row">
+      <label class="es-label">Dataverse-Export aktiv</label>
+      <label class="es-toggle"><input id="cfg-lex-dataverse" type="checkbox" {'checked' if lex_dataverse_aktiv else ''} onchange=""><span class="es-slider"></span></label>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Alle Lexware-Einstellungen speichern</button>
+  </div>
+
+  <script>
+  function lexEsSaveConfig() {{
+    const apiKey = document.getElementById('cfg-lex-api-key').value.trim();
+    const payload = {{
+      status: document.getElementById('cfg-lex-status').value,
+      sync_intervall: parseInt(document.getElementById('cfg-lex-sync-intervall').value),
+      buchalt_pruefregel_aktiv: document.getElementById('cfg-lex-buchalt').checked,
+      paypal_ausnahme_aktiv: document.getElementById('cfg-lex-paypal').checked,
+      dataverse_export_aktiv: document.getElementById('cfg-lex-dataverse').checked,
+    }};
+    if(apiKey) payload.api_key = apiKey;
+    fetch('/api/lexware/config/save', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+      .then(r=>r.json()).then(d=>{{
+        if(d.ok) showToast('Lexware Einstellungen gespeichert \u2713','ok');
+        else showToast('Fehler: '+(d.error||'?'),'fehler');
+      }}).catch(()=>showToast('Speichern fehlgeschlagen','fehler'));
+  }}
+  function lexEsTestConnection() {{
+    const btn = document.getElementById('lex-test-btn');
+    const st  = document.getElementById('lex-test-status');
+    if(btn) btn.disabled = true;
+    if(st) st.textContent = 'Teste\u2026';
+    fetch('/api/lexware/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+      .then(r=>r.json()).then(d=>{{
+        if(btn) btn.disabled = false;
+        if(d.ok) {{
+          if(st) st.innerHTML = '<span style="color:#28c850;font-weight:600">\u2713 Verbunden</span>';
+          if(d.company) st.innerHTML += ' &mdash; ' + d.company;
+          showToast('Lexware Verbindung OK \u2713','ok');
+        }} else {{
+          if(st) st.innerHTML = '<span style="color:#e84545;font-weight:600">\u26A0 ' + (d.error||'Fehler') + '</span>';
+          showToast('Verbindungstest fehlgeschlagen','fehler');
+        }}
+      }}).catch(e=>{{
+        if(btn) btn.disabled = false;
+        if(st) st.innerHTML = '<span style="color:#e84545">Netzwerkfehler</span>';
+      }});
+  }}
+  function lexEsSync(mode) {{
+    const el = document.getElementById('lex-sync-status');
+    if(el) el.textContent = 'Sync läuft\u2026';
+    fetch('/api/lexware/sync', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mode:mode}})}})
+      .then(r=>r.json()).then(d=>{{
+        if(d.ok) {{
+          const s = d.stats || {{}};
+          const parts = [];
+          if(s.belege != null) parts.push('Belege: '+s.belege);
+          if(s.kontakte != null) parts.push('Kontakte: '+s.kontakte);
+          if(s.artikel != null) parts.push('Artikel: '+s.artikel);
+          if(el) el.textContent = '\u2713 ' + (parts.join(', ') || 'Sync abgeschlossen');
+          showToast('Sync abgeschlossen','ok');
+        }} else {{
+          if(el) el.textContent = '\u26A0 ' + (d.error||'Fehler');
+          showToast('Sync fehlgeschlagen: '+(d.error||'?'),'fehler');
+        }}
+      }}).catch(()=>{{
+        if(el) el.textContent = 'Netzwerkfehler';
+      }});
+  }}
+  </script>
+</div>
+
 <!-- ── SECTION: AUTOMATIONEN ──────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-automationen">
   <div class="es-sec-h">Automationen</div>
@@ -9308,6 +9574,315 @@ def build_wissen(db):
     <div id="wissen-level-regelsteuerung" class="wissen-level">{regelsteuerung_html}</div>
     <div id="wissen-level-neu" class="wissen-level">{neue_html}</div>"""
 
+# ── LEXWARE OFFICE Panel ──────────────────────────────────────────────────────
+def build_lexware(db):
+    """Lexware Office Panel (session-eee). Tabs: Cockpit / Belege / Zahlungen / Kontakte / Artikel / Buchhaltung / Diagnose."""
+    try:
+        cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+    except Exception:
+        cfg = {}
+    lex_cfg = cfg.get("lexware", {})
+    modul_status = lex_cfg.get("status", "nicht_gebucht")
+    has_key = bool(lex_cfg.get("api_key", "").strip())
+
+    # Modul nicht gebucht → leeres Panel mit Hinweis
+    if modul_status == "nicht_gebucht":
+        return """
+<div class="lx-info-box" style="max-width:520px;margin:48px auto;text-align:center;">
+  <div style="font-size:48px;margin-bottom:16px;">&#x1F4CB;</div>
+  <div style="font-size:var(--fs-xl);font-weight:700;margin-bottom:8px;">Lexware Office</div>
+  <div style="color:var(--muted);margin-bottom:20px;line-height:1.6;">
+    Dieses Modul verbindet KIRA mit Lexware Office.<br>
+    Rechnungen, Angebote, Kontakte, Buchhaltung und mehr.
+  </div>
+  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:left;margin-bottom:20px;">
+    <b>Einrichten:</b><br>
+    1. Einstellungen &rarr; Lexware Office &rarr; API-Key eintragen<br>
+    2. Modulstatus auf <b>Freigeschaltet</b> setzen<br>
+    3. Verbindung testen
+  </div>
+  <button class="btn btn-primary" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'lexware\\'),200)">
+    Einstellungen &ouml;ffnen
+  </button>
+</div>"""
+
+    # Modul gesperrt → Sperr-Banner + Vorschau
+    if modul_status == "gesperrt":
+        return """
+<div style="background:var(--bg-raised);border:2px dashed var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+  <span style="font-size:24px;">&#x1F512;</span>
+  <div>
+    <div style="font-weight:600;">Lexware Office ist gesperrt</div>
+    <div style="color:var(--muted);font-size:var(--fs-sm);">Modul-Status in Einstellungen &rarr; Lexware Office auf <b>Freigeschaltet</b> setzen.</div>
+  </div>
+  <button class="btn btn-sec" style="margin-left:auto" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'lexware\\'),200)">Einstellungen</button>
+</div>""" + _build_lexware_tabs_preview()
+
+    # --- Vollzugang ---
+    # DB-Daten laden
+    try:
+        belege = db.execute(
+            "SELECT * FROM lexware_belege ORDER BY datum DESC LIMIT 200"
+        ).fetchall()
+        belege = [dict(r) for r in belege]
+    except Exception:
+        belege = []
+
+    try:
+        kontakte = db.execute(
+            "SELECT * FROM lexware_kontakte ORDER BY name LIMIT 200"
+        ).fetchall()
+        kontakte = [dict(r) for r in kontakte]
+    except Exception:
+        kontakte = []
+
+    try:
+        artikel = db.execute(
+            "SELECT * FROM lexware_artikel ORDER BY name LIMIT 200"
+        ).fetchall()
+        artikel = [dict(r) for r in artikel]
+    except Exception:
+        artikel = []
+
+    try:
+        pruefqueue = db.execute(
+            "SELECT * FROM eingangsbelege_pruefqueue ORDER BY erstellt_ts DESC LIMIT 100"
+        ).fetchall()
+        pruefqueue = [dict(r) for r in pruefqueue]
+    except Exception:
+        pruefqueue = []
+
+    try:
+        last_sync = db.execute(
+            "SELECT value FROM lexware_config WHERE key='last_sync_ts'"
+        ).fetchone()
+        last_sync = (last_sync[0] if last_sync else None) or "—"
+    except Exception:
+        last_sync = "—"
+
+    n_belege  = len(belege)
+    n_offen   = sum(1 for b in belege if b.get("status") in ("open","overdue","draft"))
+    n_kontakte = len(kontakte)
+    n_artikel  = len(artikel)
+    n_pruef    = sum(1 for p in pruefqueue if p.get("status") == "zu_pruefen")
+
+    # ── Cockpit Tab ──
+    cockpit_html = f"""
+<div class="lx-kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+  <div class="lx-kpi" onclick="showLexTab(\\'belege\\')" style="cursor:pointer">
+    <div class="lx-kpi-n">{n_belege}</div><div class="lx-kpi-lbl">Belege gesamt</div>
+  </div>
+  <div class="lx-kpi {'lx-kpi-warn' if n_offen > 0 else ''}" onclick="showLexTab(\\'belege\\')" style="cursor:pointer">
+    <div class="lx-kpi-n">{n_offen}</div><div class="lx-kpi-lbl">Offen / &#220;berf&#228;llig</div>
+  </div>
+  <div class="lx-kpi" onclick="showLexTab(\\'kontakte\\')" style="cursor:pointer">
+    <div class="lx-kpi-n">{n_kontakte}</div><div class="lx-kpi-lbl">Kontakte</div>
+  </div>
+  <div class="lx-kpi" onclick="showLexTab(\\'artikel\\')" style="cursor:pointer">
+    <div class="lx-kpi-n">{n_artikel}</div><div class="lx-kpi-lbl">Artikel</div>
+  </div>
+  <div class="lx-kpi {'lx-kpi-warn' if n_pruef > 0 else ''}" onclick="showLexTab(\\'buchhaltung\\')" style="cursor:pointer">
+    <div class="lx-kpi-n">{n_pruef}</div><div class="lx-kpi-lbl">Eingangsbelege zu pr&#252;fen</div>
+  </div>
+</div>
+<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+    <span id="lx-status-dot" style="width:12px;height:12px;border-radius:50%;background:{'#22c55e' if has_key else '#f59e0b'};flex-shrink:0;"></span>
+    <span style="font-weight:600;">API-Verbindung: {'Konfiguriert' if has_key else 'API-Key fehlt'}</span>
+  </div>
+  <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px;">Letzte Synchronisation: {esc(last_sync)}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="lexSync()">&#x21BB; Jetzt synchronisieren</button>
+    <button class="btn btn-sec" onclick="lexTestConnection()">Verbindung testen</button>
+    <button class="btn btn-sec" onclick="lexSync(\\'full\\')">Vollsync</button>
+  </div>
+</div>
+<div id="lx-sync-log" style="font-size:var(--fs-sm);color:var(--muted);min-height:32px;"></div>"""
+
+    # ── Belege Tab ──
+    def _beleg_row(b):
+        status_colors = {
+            "open": "var(--warning)", "overdue": "#dc2626",
+            "paid": "var(--success)", "draft": "var(--muted)",
+            "voided": "var(--muted)"
+        }
+        st = b.get("status", "")
+        st_color = status_colors.get(st, "var(--text)")
+        st_labels = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert"}
+        st_label = st_labels.get(st, esc(st))
+        return f"""<tr class="lx-tr" onclick="lexBelegDetail('{esc(b['lexware_id'])}','{b.get('typ','invoice')}')">
+  <td>{esc(b.get('nummer','—'))}</td>
+  <td>{esc(b.get('typ',''))}</td>
+  <td>{esc(b.get('kontakt_name',''))}</td>
+  <td>{esc(b.get('datum',''))}</td>
+  <td style="color:{st_color};font-weight:600">{st_label}</td>
+  <td style="text-align:right">{b.get('brutto',0):,.2f}&nbsp;{esc(b.get('waehrung','EUR'))}</td>
+</tr>"""
+
+    belege_rows = "".join(_beleg_row(b) for b in belege) if belege else "<tr><td colspan='6' style='text-align:center;color:var(--muted);padding:20px'>Keine Belege geladen — Sync starten</td></tr>"
+    belege_html = f"""
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <select id="lx-bel-typ" onchange="lxFilterBelege()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+    <option value="">Alle Typen</option>
+    <option value="invoice">Rechnungen</option>
+    <option value="creditnote">Gutschriften</option>
+    <option value="quotation">Angebote</option>
+  </select>
+  <select id="lx-bel-status" onchange="lxFilterBelege()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+    <option value="">Alle Status</option>
+    <option value="open">Offen</option>
+    <option value="overdue">&#220;berf&#228;llig</option>
+    <option value="paid">Bezahlt</option>
+    <option value="draft">Entwurf</option>
+  </select>
+  <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
+  <button class="btn btn-primary" onclick="lexSync()">&#x21BB; Sync</button>
+</div>
+<div style="overflow-x:auto">
+<table class="lx-table" id="lx-belege-table">
+  <thead><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>Status</th><th style="text-align:right">Betrag</th></tr></thead>
+  <tbody id="lx-belege-tbody">{belege_rows}</tbody>
+</table>
+</div>"""
+
+    # ── Kontakte Tab ──
+    def _kontakt_row(k):
+        return f"""<tr class="lx-tr" onclick="lexKontaktDetail('{esc(k['lexware_id'])}')">
+  <td>{esc(k.get('name',''))}</td>
+  <td>{esc(k.get('email',''))}</td>
+  <td style="color:var(--muted);font-size:var(--fs-sm)">{esc(k.get('last_sync',''))}</td>
+</tr>"""
+    kontakte_rows = "".join(_kontakt_row(k) for k in kontakte) if kontakte else "<tr><td colspan='3' style='text-align:center;color:var(--muted);padding:20px'>Keine Kontakte geladen</td></tr>"
+    kontakte_html = f"""
+<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+  <input id="lx-kon-search" type="text" placeholder="Suche Name / E-Mail..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
+  <button class="btn btn-primary" onclick="lexSync(\\'kontakte\\')">&#x21BB; Sync</button>
+</div>
+<div style="overflow-x:auto">
+<table class="lx-table">
+  <thead><tr><th>Name</th><th>E-Mail</th><th>Letzte Sync</th></tr></thead>
+  <tbody id="lx-kontakte-tbody">{kontakte_rows}</tbody>
+</table>
+</div>"""
+
+    # ── Artikel Tab ──
+    def _artikel_row(a):
+        return f"""<tr class="lx-tr">
+  <td>{esc(a.get('name',''))}</td>
+  <td>{esc(a.get('typ',''))}</td>
+  <td style="text-align:right">{a.get('netto_preis',0):,.2f}&nbsp;&#x20AC;</td>
+  <td>{esc(a.get('einheit',''))}</td>
+  <td>{esc(a.get('steuer_satz',''))}</td>
+</tr>"""
+    artikel_rows = "".join(_artikel_row(a) for a in artikel) if artikel else "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:20px'>Keine Artikel geladen</td></tr>"
+    artikel_html = f"""
+<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+  <input id="lx-art-search" type="text" placeholder="Suche Artikel..." oninput="lxFilterArtikel()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
+  <button class="btn btn-primary" onclick="lexSync(\\'artikel\\')">&#x21BB; Sync</button>
+</div>
+<div style="overflow-x:auto">
+<table class="lx-table">
+  <thead><tr><th>Name</th><th>Typ</th><th style="text-align:right">Netto</th><th>Einheit</th><th>Steuer</th></tr></thead>
+  <tbody id="lx-artikel-tbody">{artikel_rows}</tbody>
+</table>
+</div>"""
+
+    # ── Buchhaltung Tab (Eingangsbelege Prüfqueue) ──
+    def _pruef_row(p):
+        status_labels = {
+            "zu_pruefen": ("<span style='color:var(--warning);font-weight:600'>Zu pr&#252;fen</span>", ""),
+            "klassifiziert": ("<span style='color:var(--success)'>Klassifiziert</span>", ""),
+            "abgelegt": ("<span style='color:var(--muted)'>Abgelegt</span>", ""),
+            "unklar": ("<span style='color:#dc2626'>Unklar</span>", ""),
+        }
+        st = p.get("status", "zu_pruefen")
+        st_html, _ = status_labels.get(st, (esc(st), ""))
+        paypal_badge = ' <span style="font-size:10px;background:#f0a500;color:#fff;padding:1px 5px;border-radius:3px">PayPal</span>' if p.get("is_paypal") else ""
+        return f"""<tr class="lx-tr" onclick="lexPruefDetail({p['id']})">
+  <td>{esc(p.get('absender',''))}{paypal_badge}</td>
+  <td>{esc(p.get('betreff',''))}</td>
+  <td style="text-align:right">{(p.get('betrag') or 0):,.2f}&nbsp;{esc(p.get('waehrung','EUR'))}</td>
+  <td>{esc(p.get('datum_beleg','') or p.get('datum_eingang','')[:10])}</td>
+  <td>{st_html}</td>
+  <td><button class="btn btn-sec" style="padding:3px 8px;font-size:var(--fs-xs)" onclick="event.stopPropagation();lexPruefDetail({p['id']})">Details</button></td>
+</tr>"""
+
+    pruef_rows = "".join(_pruef_row(p) for p in pruefqueue) if pruefqueue else "<tr><td colspan='6' style='text-align:center;color:var(--muted);padding:20px'>Keine Eingangsbelege in der Pr&#252;fqueue</td></tr>"
+    buchalt_html = f"""
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <select id="lx-pruef-status" onchange="lxFilterPruef()" class="btn btn-sec" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+    <option value="">Alle Status</option>
+    <option value="zu_pruefen">Zu pr&#252;fen</option>
+    <option value="klassifiziert">Klassifiziert</option>
+    <option value="abgelegt">Abgelegt</option>
+    <option value="unklar">Unklar</option>
+  </select>
+  <input id="lx-pruef-search" type="text" placeholder="Absender / Betreff..." oninput="lxFilterPruef()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
+  <span style="font-size:var(--fs-sm);color:var(--muted)">{n_pruef} zu pr&#252;fen</span>
+</div>
+<div style="overflow-x:auto">
+<table class="lx-table" id="lx-pruef-table">
+  <thead><tr><th>Absender</th><th>Betreff</th><th style="text-align:right">Betrag</th><th>Datum</th><th>Status</th><th></th></tr></thead>
+  <tbody id="lx-pruef-tbody">{pruef_rows}</tbody>
+</table>
+</div>"""
+
+    # ── Diagnose Tab ──
+    diagnose_html = f"""
+<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+  <b>API-Konfiguration</b>
+  <div style="margin-top:8px;font-size:var(--fs-sm);font-family:monospace;color:var(--muted)">
+    Endpunkt: https://api.lexoffice.io/v1/<br>
+    API-Key: {'<span style="color:var(--success)">konfiguriert</span>' if has_key else '<span style="color:var(--warning)">fehlt</span>'}<br>
+    Modul-Status: {esc(modul_status)}<br>
+    Letzte Sync: {esc(last_sync)}
+  </div>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+  <button class="btn btn-sec" onclick="lexTestConnection()">API testen</button>
+  <button class="btn btn-sec" onclick="lexLoadSyncLog()">Sync-Log laden</button>
+</div>
+<div id="lx-diag-log" style="font-family:monospace;font-size:var(--fs-sm);color:var(--muted);white-space:pre-wrap;max-height:300px;overflow-y:auto;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:60px">
+  Diagnose-Ausgabe erscheint hier...
+</div>"""
+
+    tabs_html = """
+<div class="lx-tabs" id="lx-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;">
+  <button class="lx-tab active" data-tab="cockpit"   onclick="showLexTab('cockpit')">&#x1F4CA; Cockpit</button>
+  <button class="lx-tab"        data-tab="belege"    onclick="showLexTab('belege')">&#x1F4CB; Belege</button>
+  <button class="lx-tab"        data-tab="kontakte"  onclick="showLexTab('kontakte')">&#x1F465; Kontakte</button>
+  <button class="lx-tab"        data-tab="artikel"   onclick="showLexTab('artikel')">&#x1F3F7; Artikel</button>
+  <button class="lx-tab"        data-tab="buchhaltung" onclick="showLexTab('buchhaltung')">&#x1F4BC; Buchhaltung""" + (f' <span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">{n_pruef}</span>' if n_pruef > 0 else "") + """</button>
+  <button class="lx-tab"        data-tab="diagnose"  onclick="showLexTab('diagnose')">&#x1F527; Diagnose</button>
+</div>
+<div id="lx-tab-cockpit"    class="lx-tab-content active">""" + cockpit_html + """</div>
+<div id="lx-tab-belege"     class="lx-tab-content">""" + belege_html + """</div>
+<div id="lx-tab-kontakte"   class="lx-tab-content">""" + kontakte_html + """</div>
+<div id="lx-tab-artikel"    class="lx-tab-content">""" + artikel_html + """</div>
+<div id="lx-tab-buchhaltung" class="lx-tab-content">""" + buchalt_html + """</div>
+<div id="lx-tab-diagnose"   class="lx-tab-content">""" + diagnose_html + """</div>"""
+
+    return tabs_html
+
+
+def _build_lexware_tabs_preview():
+    """Zeigt eine gesperrte Tab-Leiste als Vorschau (fuer modul_status='gesperrt')."""
+    return """
+<div style="opacity:0.4;pointer-events:none;user-select:none">
+<div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto">
+  <button class="lx-tab">&#x1F4CA; Cockpit</button>
+  <button class="lx-tab">&#x1F4CB; Belege</button>
+  <button class="lx-tab">&#x1F465; Kontakte</button>
+  <button class="lx-tab">&#x1F3F7; Artikel</button>
+  <button class="lx-tab">&#x1F4BC; Buchhaltung</button>
+  <button class="lx-tab">&#x1F527; Diagnose</button>
+</div>
+<div style="height:200px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--muted)">
+  Modulinhalt nach Freischaltung verf&#252;gbar
+</div>
+</div>"""
+
+
 # ── HAUPT-HTML ────────────────────────────────────────────────────────────────
 def generate_html() -> str:
     db = get_db()
@@ -9365,6 +9940,7 @@ def generate_html() -> str:
     gesch_html     = build_geschaeft(db)
     wissen_html    = build_wissen(db)
     einstell_html  = build_einstellungen()
+    lexware_html   = build_lexware(db)
     db.close()
 
     # Kira Launcher — SVG-Varianten
@@ -9450,6 +10026,9 @@ def generate_html() -> str:
         <span class="si-icon">&#x1F4AC;</span><span class="si-label">Social / DMs</span>
         <span class="si-badge planned">Geplant</span>
       </div>
+      <div class="sidebar-item" id="nav-lexware" onclick="showPanel('lexware')" data-label="Lexware Office">
+        <span class="si-icon">&#x1F4CB;</span><span class="si-label">Lexware Office</span>
+      </div>
       <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')" data-label="Wissen">
         <span class="si-icon">&#x1F4DA;</span><span class="si-label">Wissen</span>
       </div>
@@ -9501,6 +10080,7 @@ def generate_html() -> str:
   <div class="panel pf-panel" id="panel-postfach">{postfach_html}</div>
   <div class="panel" id="panel-organisation">{org_html}</div>
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
+  <div class="panel" id="panel-lexware">{lexware_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
   <div class="panel" id="panel-kira-aktivitaeten">
@@ -10115,7 +10695,7 @@ let kiraOpen = false;
 // ═══ SIDEBAR & NAV ═══
 const PANEL_TITLES = {{
   dashboard:'Start', kommunikation:'Kommunikation', organisation:'Organisation',
-  geschaeft:'Gesch\u00e4ft', wissen:'Wissen', einstellungen:'Einstellungen',
+  geschaeft:'Gesch\u00e4ft', lexware:'Lexware Office', wissen:'Wissen', einstellungen:'Einstellungen',
   kunden:'Kunden', marketing:'Marketing',
   social:'Social / DMs', automationen:'Automationen', analysen:'Analysen'
 }};
@@ -10135,6 +10715,145 @@ function showPanel(name) {{
   if(name==='postfach' && typeof window.pfInit==='function') {{ window.pfInit(); }}
   if(name==='dashboard') {{ setTimeout(loadDashKalender, 400); }}
   if(name==='geschaeft') {{ setTimeout(loadGeschKiraSignale, 500); }}
+}}
+
+// === Lexware Office JS (session-eee) ===
+function showLexTab(tabId) {{
+  document.querySelectorAll('.lx-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.lx-tab-content').forEach(c => c.classList.remove('active'));
+  const btn = document.querySelector(\\'[data-tab=\\'' + tabId + '\\']\\');
+  if(btn) btn.classList.add(\\'active\\');
+  const content = document.getElementById(\\'lx-tab-\\' + tabId);
+  if(content) content.classList.add(\\'active\\');
+}}
+
+function lexSync(mode) {{
+  const log = document.getElementById(\\'lx-sync-log\\');
+  if(log) log.textContent = \\'Synchronisierung laeuft...\\';
+  fetch(\\'/api/lexware/sync\\', {{
+    method: \\'POST\\',
+    headers: {{\\'Content-Type\\':\\'application/json\\'}},
+    body: JSON.stringify({{mode: mode || \\'belege\\'}})
+  }}).then(r => r.json()).then(d => {{
+    if(log) log.textContent = d.ok ? (\\'Sync abgeschlossen: \\' + JSON.stringify(d.stats)) : (\\'Fehler: \\' + d.error);
+    if(d.ok) setTimeout(() => location.reload(), 1500);
+  }}).catch(e => {{ if(log) log.textContent = \\'Netzwerkfehler: \\' + e; }});
+}}
+
+function lexTestConnection() {{
+  const log = document.getElementById(\\'lx-diag-log\\');
+  if(log) log.textContent = \\'Verbindungstest laeuft...\\';
+  fetch(\\'/api/lexware/test\\', {{method:\\'POST\\',headers:{{\\'Content-Type\\':\\'application/json\\'}},body:\\'{{}}\\'}})
+    .then(r => r.json()).then(d => {{
+      if(log) log.textContent = d.ok ? (\\'OK: \\' + JSON.stringify(d.info, null, 2)) : (\\'FEHLER: \\' + d.error);
+      const dot = document.getElementById(\\'lx-status-dot\\');
+      if(dot) dot.style.background = d.ok ? \\'#22c55e\\' : \\'#dc2626\\';
+    }}).catch(e => {{ if(log) log.textContent = \\'Fehler: \\' + e; }});
+}}
+
+function lexLoadSyncLog() {{
+  const log = document.getElementById(\\'lx-diag-log\\');
+  if(log) log.textContent = \\'Lade Sync-Log...\\';
+  fetch(\\'/api/lexware/status\\').then(r => r.json()).then(d => {{
+    if(log) log.textContent = JSON.stringify(d, null, 2);
+  }}).catch(e => {{ if(log) log.textContent = \\'Fehler: \\' + e; }});
+}}
+
+function lexBelegDetail(lexId, typ) {{
+  showToast(\\'Belegdetail wird geladen...\\');
+  fetch(\\'/api/lexware/beleg/\\' + encodeURIComponent(lexId))
+    .then(r => r.json()).then(d => {{
+      const html = \\'<pre style="white-space:pre-wrap;font-size:12px">\\' + JSON.stringify(d, null, 2) + \\'</pre>\\';
+      showSimpleModal(\\'Beleg-Detail\\', html);
+    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+}}
+
+function lexKontaktDetail(lexId) {{
+  fetch(\\'/api/lexware/kontakt/\\' + encodeURIComponent(lexId))
+    .then(r => r.json()).then(d => {{
+      const html = \\'<pre style="white-space:pre-wrap;font-size:12px">\\' + JSON.stringify(d, null, 2) + \\'</pre>\\';
+      showSimpleModal(\\'Kontakt-Detail\\', html);
+    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+}}
+
+function lexPruefDetail(id) {{
+  fetch(\\'/api/lexware/eingangsbeleg/\\' + id)
+    .then(r => r.json()).then(d => {{
+      const p = d.beleg || {{}};
+      const html = \\'<div style="font-size:var(--fs-sm)">\\' +
+        \\'<b>Absender:</b> \\' + (p.absender||\\'-\\') + \\'<br>\\' +
+        \\'<b>Betreff:</b> \\' + (p.betreff||\\'-\\') + \\'<br>\\' +
+        \\'<b>Betrag:</b> \\' + (p.betrag||0) + \\'\\' + (p.waehrung||\\'\\'\\') + \\'<br>\\' +
+        \\'<b>Datum:</b> \\' + (p.datum_beleg||\\'-\\') + \\'<br>\\' +
+        \\'<b>Status:</b> \\' + (p.status||\\'-\\') + \\'<br>\\' +
+        (p.kira_frage ? (\\'<br><b>Kira-Frage:</b> \\' + p.kira_frage) : \\'\\') +
+        (p.nutzer_antwort ? (\\'<br><b>Nutzer-Antwort:</b> \\' + p.nutzer_antwort) : \\'\\') +
+        (p.konto_vorschlag ? (\\'<br><b>Konto-Vorschlag:</b> \\' + p.konto_vorschlag) : \\'\\') +
+        \\'<br><br><b>Auszug:</b><br><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:120px;overflow-y:auto;font-size:11px;white-space:pre-wrap">\\' + (p.body_excerpt||\\'-\\') + \\'</div>\\' +
+        \\'<br><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">\\' +
+        \\'<button class="btn btn-primary" onclick=\\\\\\'lexPruefSetStatus(\\' + id + \\',\\\\\\\\'klassifiziert\\\\\\')\\\\\\'>Klassifizieren</button>\\' +
+        \\'<button class="btn btn-sec" onclick=\\\\\\'lexPruefSetStatus(\\' + id + \\',\\\\\\\\'abgelegt\\\\\\')\\\\\\'>Ablegen</button>\\' +
+        \\'<button class="btn btn-sec" onclick=\\\\\\'openKiraWorkspace(\\\\\\\\'buchaltung\\\\\\', \\' + id + \\')\\\\\\'>Mit Kira besprechen</button>\\' +
+        \\'</div></div>\\';
+      showSimpleModal(\\'Eingangsbeleg pr\\u00fcfen\\', html);
+    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+}}
+
+function lexPruefSetStatus(id, status) {{
+  fetch(\\'/api/lexware/eingangsbeleg/\\' + id + \\'/status\\', {{
+    method: \\'POST\\',
+    headers: {{\\'Content-Type\\':\\'application/json\\'}},
+    body: JSON.stringify({{status}})
+  }}).then(r => r.json()).then(d => {{
+    if(d.ok) {{ showToast(\\'Status gesetzt: \\' + status); setTimeout(() => location.reload(), 800); }}
+    else showToast(\\'Fehler: \\' + d.error, true);
+  }});
+}}
+
+function lxFilterBelege() {{
+  const typ = document.getElementById(\\'lx-bel-typ\\')?.value || \\'\\';
+  const status = document.getElementById(\\'lx-bel-status\\')?.value || \\'\\';
+  const q = (document.getElementById(\\'lx-bel-search\\')?.value || \\'\\').toLowerCase();
+  const rows = document.querySelectorAll(\\'#lx-belege-tbody tr.lx-tr\\');
+  rows.forEach(r => {{
+    const cells = r.querySelectorAll(\\'td\\');
+    const num = cells[0]?.textContent || \\'\\';
+    const t   = cells[1]?.textContent || \\'\\';
+    const k   = cells[2]?.textContent || \\'\\';
+    const st  = cells[4]?.textContent || \\'\\';
+    const match = (!typ || t.includes(typ)) && (!status || st.toLowerCase().includes(status)) &&
+                  (!q || num.toLowerCase().includes(q) || k.toLowerCase().includes(q));
+    r.style.display = match ? \\'\\' : \\'none\\';
+  }});
+}}
+
+function lxFilterKontakte() {{
+  const q = (document.getElementById(\\'lx-kon-search\\')?.value || \\'\\').toLowerCase();
+  document.querySelectorAll(\\'#lx-kontakte-tbody tr.lx-tr\\').forEach(r => {{
+    const txt = r.textContent.toLowerCase();
+    r.style.display = !q || txt.includes(q) ? \\'\\' : \\'none\\';
+  }});
+}}
+
+function lxFilterArtikel() {{
+  const q = (document.getElementById(\\'lx-art-search\\')?.value || \\'\\').toLowerCase();
+  document.querySelectorAll(\\'#lx-artikel-tbody tr\\').forEach(r => {{
+    const txt = r.textContent.toLowerCase();
+    r.style.display = !q || txt.includes(q) ? \\'\\' : \\'none\\';
+  }});
+}}
+
+function lxFilterPruef() {{
+  const status = document.getElementById(\\'lx-pruef-status\\')?.value || \\'\\';
+  const q = (document.getElementById(\\'lx-pruef-search\\')?.value || \\'\\').toLowerCase();
+  document.querySelectorAll(\\'#lx-pruef-tbody tr.lx-tr\\').forEach(r => {{
+    const cells = r.querySelectorAll(\\'td\\');
+    const absender = cells[0]?.textContent.toLowerCase() || \\'\\';
+    const betreff  = cells[1]?.textContent.toLowerCase() || \\'\\';
+    const st = cells[4]?.textContent.toLowerCase() || \\'\\';
+    const match = (!status || st.includes(status)) && (!q || absender.includes(q) || betreff.includes(q));
+    r.style.display = match ? \\'\\' : \\'none\\';
+  }});
 }}
 
 // Prio-Karte Kebab-Menu
@@ -14655,6 +15374,25 @@ a:hover{text-decoration:underline;}
 .dash-sig.s-teal{background:#F0FDF9;border-color:#6EE7C0;color:#0D5B46;}
 .dash-sig.s-gray{background:var(--bg);border-color:var(--border);color:var(--text-secondary);}
 
+/* Lexware Office Panel (session-eee) */
+.lx-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;}
+.lx-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 16px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s;}
+.lx-tab:hover{color:var(--text);}
+.lx-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.lx-tab-content{display:none;}
+.lx-tab-content.active{display:block;}
+.lx-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+.lx-table th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;white-space:nowrap;}
+.lx-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+.lx-tr{cursor:pointer;transition:background .1s;}
+.lx-tr:hover{background:var(--bg-raised);}
+.lx-kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.lx-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;min-width:100px;flex:1;}
+.lx-kpi-n{font-size:var(--fs-xxl);font-weight:900;color:var(--accent);}
+.lx-kpi-lbl{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
+.lx-kpi-warn{border-color:rgba(212,147,62,.4);background:rgba(212,147,62,.05);}
+.lx-kpi-warn .lx-kpi-n{color:var(--warn);}
+
 /* Legacy compat for old cockpit classes (used in Kira briefing inside panel-dashboard) */
 .briefing-icon{width:26px;height:26px;background:var(--accent);color:#fff;border-radius:6px;display:flex;
   align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;}
@@ -15456,6 +16194,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path.startswith('/api/angebote'):
             self._api_angebote()
+
+        # ── Lexware Office GET-Routing (session-eee) ──
+        elif self.path == '/api/lexware/status':
+            self._api_lexware_status()
+
+        elif self.path == '/api/lexware/belege':
+            self._api_lexware_belege_list()
+
+        elif self.path == '/api/lexware/kontakte':
+            self._api_lexware_kontakte_list()
+
+        elif self.path == '/api/lexware/eingangsbelege':
+            self._api_lexware_eingangsbelege_list()
+
+        elif self.path.startswith('/api/lexware/beleg/'):
+            lex_id = urllib.parse.unquote(self.path.split('/api/lexware/beleg/')[1])
+            self._api_lexware_beleg(lex_id)
+
+        elif self.path.startswith('/api/lexware/kontakt/'):
+            lex_id = urllib.parse.unquote(self.path.split('/api/lexware/kontakt/')[1])
+            self._api_lexware_kontakt(lex_id)
+
+        elif self.path.startswith('/api/lexware/eingangsbeleg/') and not self.path.endswith('/status'):
+            try:
+                beleg_id = int(self.path.split('/api/lexware/eingangsbeleg/')[1].split('/')[0])
+            except ValueError:
+                beleg_id = 0
+            self._api_lexware_eingangsbeleg(beleg_id)
 
         elif self.path == '/api/kira/insights':
             self._api_kira_insights()
@@ -18542,6 +19308,110 @@ class DashboardHandler(BaseHTTPRequestHandler):
         finally:
             db.close()
 
+    # ── Lexware Office GET-Endpunkte (session-eee) ──────────────────────────────
+    def _api_lexware_status(self):
+        """GET /api/lexware/status"""
+        db = get_db()
+        try:
+            last_sync = db.execute("SELECT value FROM lexware_config WHERE key='last_sync_ts'").fetchone()
+            n_belege  = db.execute("SELECT COUNT(*) FROM lexware_belege").fetchone()[0]
+            n_kontakte = db.execute("SELECT COUNT(*) FROM lexware_kontakte").fetchone()[0]
+            n_pruef   = db.execute("SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'").fetchone()[0]
+        except Exception:
+            last_sync = None; n_belege = 0; n_kontakte = 0; n_pruef = 0
+        finally:
+            db.close()
+        try:
+            cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+        except Exception:
+            cfg = {}
+        lex_cfg = cfg.get("lexware", {})
+        self._json({
+            "status": lex_cfg.get("status", "nicht_gebucht"),
+            "has_key": bool(lex_cfg.get("api_key", "").strip()),
+            "last_sync_ts": (last_sync[0] if last_sync else None),
+            "n_belege": n_belege, "n_kontakte": n_kontakte, "n_pruef": n_pruef,
+        })
+
+    def _api_lexware_beleg(self, lex_id):
+        """GET /api/lexware/beleg/{id}"""
+        db = get_db()
+        try:
+            row = db.execute("SELECT * FROM lexware_belege WHERE lexware_id=?", (lex_id,)).fetchone()
+            if row:
+                d = dict(row)
+                if d.get("payload_json"):
+                    try: d["payload"] = json.loads(d["payload_json"])
+                    except Exception: pass
+                self._json(d)
+            else:
+                self._json({"error": "Nicht gefunden"}, 404)
+        finally:
+            db.close()
+
+    def _api_lexware_kontakt(self, lex_id):
+        """GET /api/lexware/kontakt/{id}"""
+        db = get_db()
+        try:
+            row = db.execute("SELECT * FROM lexware_kontakte WHERE lexware_id=?", (lex_id,)).fetchone()
+            if row:
+                d = dict(row)
+                if d.get("payload_json"):
+                    try: d["payload"] = json.loads(d["payload_json"])
+                    except Exception: pass
+                self._json(d)
+            else:
+                self._json({"error": "Nicht gefunden"}, 404)
+        finally:
+            db.close()
+
+    def _api_lexware_eingangsbeleg(self, beleg_id):
+        """GET /api/lexware/eingangsbeleg/{id}"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            row = db.execute("SELECT * FROM eingangsbelege_pruefqueue WHERE id=?", (beleg_id,)).fetchone()
+            if row:
+                self._json({"beleg": dict(row)})
+            else:
+                self._json({"error": "Nicht gefunden"}, 404)
+        finally:
+            db.close()
+
+    def _api_lexware_belege_list(self):
+        """GET /api/lexware/belege"""
+        db = get_db()
+        try:
+            rows = db.execute("SELECT * FROM lexware_belege ORDER BY datum DESC LIMIT 500").fetchall()
+            self._json([dict(r) for r in rows])
+        except Exception:
+            self._json([])
+        finally:
+            db.close()
+
+    def _api_lexware_kontakte_list(self):
+        """GET /api/lexware/kontakte"""
+        db = get_db()
+        try:
+            rows = db.execute("SELECT * FROM lexware_kontakte ORDER BY name LIMIT 500").fetchall()
+            self._json([dict(r) for r in rows])
+        except Exception:
+            self._json([])
+        finally:
+            db.close()
+
+    def _api_lexware_eingangsbelege_list(self):
+        """GET /api/lexware/eingangsbelege"""
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            rows = db.execute("SELECT * FROM eingangsbelege_pruefqueue ORDER BY erstellt_ts DESC LIMIT 200").fetchall()
+            self._json([dict(r) for r in rows])
+        except Exception:
+            self._json([])
+        finally:
+            db.close()
+
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length) or b'{}'
@@ -19703,6 +20573,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._api_vorgang_signal_gelesen(body)
             return
 
+        # Lexware Office POST-Routing (session-eee)
+        if self.path.startswith('/api/lexware/'):
+            if _handle_lexware_post(self, self.path, body):
+                return
+
         self._respond(404, 'text/plain', b'Not found')
 
     def _handle_whatsapp_webhook(self, raw_body: bytes, body: dict):
@@ -20699,6 +21574,137 @@ def _kill_old_instances(port):
         time.sleep(1.0)  # letzter Versuch
 
 
+# ── Lexware Office POST-Handler (session-eee) ────────────────────────────────
+def _handle_lexware_post(handler, path, body):
+    """
+    Zentraler POST-Handler fuer alle /api/lexware/* Endpunkte.
+    Gibt True zurueck wenn der Pfad behandelt wurde.
+    """
+    try:
+        cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+    except Exception:
+        cfg = {}
+
+    # POST /api/lexware/test — Verbindung testen
+    if path == '/api/lexware/test':
+        try:
+            from lexware_client import get_client, LexwareAuthError
+            client = get_client(cfg)
+            result = client.test_connection()
+            handler._json(result)
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/sync — Synchronisierung starten
+    if path == '/api/lexware/sync':
+        mode = body.get("mode", "belege")
+        try:
+            from lexware_client import get_client, LexwareAuthError
+            client = get_client(cfg)
+            db = get_db()
+            stats = {}
+            if mode in ("belege", "full"):
+                stats["belege"] = client.sync_belege_to_db(db)
+            if mode in ("kontakte", "full"):
+                stats["kontakte"] = client.sync_kontakte_to_db(db)
+            if mode in ("artikel", "full"):
+                stats["artikel"] = client.sync_artikel_to_db(db)
+            # Timestamp speichern
+            ts = datetime.now().isoformat(timespec="seconds")
+            db.execute(
+                "INSERT OR REPLACE INTO lexware_config(key, value, updated_ts) VALUES('last_sync_ts',?,datetime('now'))",
+                (ts,)
+            )
+            db.commit()
+            db.close()
+            rlog('system', 'lexware_sync', f"Sync abgeschlossen: {stats}",
+                 source='server', modul='lexware', actor_type='system', status='ok')
+            handler._json({"ok": True, "stats": stats, "ts": ts})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/eingangsbeleg/{id}/status — Status setzen
+    if path.startswith('/api/lexware/eingangsbeleg/') and path.endswith('/status'):
+        try:
+            beleg_id = int(path.split('/api/lexware/eingangsbeleg/')[1].split('/')[0])
+        except ValueError:
+            handler._json({"ok": False, "error": "Ungueltige ID"})
+            return True
+        new_status = body.get("status", "")
+        valid_states = ("zu_pruefen", "klassifiziert", "abgelegt", "unklar")
+        if new_status not in valid_states:
+            handler._json({"ok": False, "error": f"Ungültiger Status. Erlaubt: {valid_states}"})
+            return True
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            db.execute(
+                "UPDATE eingangsbelege_pruefqueue SET status=?, pruef_ts=datetime('now') WHERE id=?",
+                (new_status, beleg_id)
+            )
+            db.commit()
+            handler._json({"ok": True})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+        return True
+
+    # POST /api/lexware/eingangsbeleg/neu — Neuen Eingangsbeleg manuell anlegen
+    if path == '/api/lexware/eingangsbeleg/neu':
+        db = get_db()
+        try:
+            _ensure_lexware_tables()
+            db.execute("""
+                INSERT INTO eingangsbelege_pruefqueue
+                    (mail_id, source, absender, absender_domain, betreff, betrag, waehrung,
+                     datum_beleg, body_excerpt, status)
+                VALUES (?,?,?,?,?,?,?,?,?,'zu_pruefen')
+            """, (
+                body.get("mail_id"),
+                body.get("source", "manuell"),
+                body.get("absender", ""),
+                (body.get("absender", "") or "").split("@")[-1] if "@" in (body.get("absender", "") or "") else "",
+                body.get("betreff", ""),
+                body.get("betrag"),
+                body.get("waehrung", "EUR"),
+                body.get("datum_beleg"),
+                body.get("body_excerpt", ""),
+            ))
+            db.commit()
+            handler._json({"ok": True})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+        return True
+
+    # POST /api/lexware/config/save — Lexware-Konfiguration speichern
+    if path == '/api/lexware/config/save':
+        try:
+            cfg_path = SCRIPTS_DIR / "config.json"
+            cur_cfg = json.loads(cfg_path.read_text('utf-8'))
+            lex = cur_cfg.get("lexware", {})
+            # Nur sichere Felder uebernehmen
+            for k in ("status", "sync_intervall", "buchalt_pruefregel_aktiv",
+                      "paypal_ausnahme_aktiv", "dataverse_export_aktiv"):
+                if k in body:
+                    lex[k] = body[k]
+            # API-Key nur wenn vorhanden und nicht leer
+            if body.get("api_key", "").strip():
+                lex["api_key"] = body["api_key"].strip()
+            cur_cfg["lexware"] = lex
+            cfg_path.write_text(json.dumps(cur_cfg, ensure_ascii=False, indent=2), 'utf-8')
+            handler._json({"ok": True})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    return False  # Pfad nicht behandelt
+
+
 def run_server(open_browser=True):
     config = {}
     try:
@@ -20710,6 +21716,7 @@ def run_server(open_browser=True):
 
     _kill_old_instances(port)
     _ensure_case_engine_tables()
+    _ensure_lexware_tables()
     rlog_ensure_cfg()
     alog("Server", "Start", f"Port {port} | Python {__import__('sys').version.split()[0]}", "ok")
     rlog('system', 'server_started', f"Kira Dashboard gestartet auf Port {port}",

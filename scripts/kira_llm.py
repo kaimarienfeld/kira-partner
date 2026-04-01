@@ -1006,6 +1006,27 @@ def _build_data_context(config, kira_cfg=None):
     except Exception:
         pass
 
+    # Lexware Office — offene Posten Kurzuebersicht (session-eee, nur wenn Modul aktiv)
+    try:
+        _lex_cfg = config.get("lexware", {})
+        if _lex_cfg.get("status") == "freigeschaltet":
+            _lrows = db.execute(
+                "SELECT typ, kontakt_name, brutto, datum, faellig FROM lexware_belege "
+                "WHERE status='open' ORDER BY faellig LIMIT 10"
+            ).fetchall()
+            if _lrows:
+                ctx += f"\n=== LEXWARE OFFICE — OFFENE POSTEN ({len(_lrows)}) ===\n"
+                for lr in _lrows:
+                    faellig = lr[4] or lr[3] or ""
+                    ctx += f"  {lr[0].upper()} | {lr[1] or '?'} | {lr[2]:.2f} EUR | faellig: {faellig[:10]}\n"
+            _pq = db.execute(
+                "SELECT COUNT(*) FROM eingangsbelege_pruefqueue WHERE status='zu_pruefen'"
+            ).fetchone()
+            if _pq and _pq[0]:
+                ctx += f"  {_pq[0]} Eingangsbeleg(e) warten auf Prüfung in Buchhaltungs-Queue.\n"
+    except Exception:
+        pass
+
     db.close()
     return ctx
 
@@ -1490,6 +1511,62 @@ def get_tools(config=None):
         }
     })
 
+    # ── Lexware Office Tools (session-eee) ───────────────────────────────────
+    try:
+        from lexware_client import is_lexware_configured
+        _lex_ok = is_lexware_configured(config)
+    except Exception:
+        _lex_ok = False
+    if _lex_ok:
+        tools.append({
+            "name": "lexware_belege_laden",
+            "description": (
+                "Laedt aktuelle Belege (Rechnungen, Angebote, Eingangsrechnungen) aus Lexware Office. "
+                "Nutze dieses Tool wenn Kai nach Rechnungen, Debitoren oder Zahlungsstaenden fragt. "
+                "Gibt offene Posten, faellige Betraege und letzte Sync-Zeit zurueck."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "typ": {
+                        "type": "string",
+                        "enum": ["invoice", "quotation", "purchase_invoice", "alle"],
+                        "description": "Belegtyp (Standard: alle)"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["open", "paidoff", "voided", "overdue", "alle"],
+                        "description": "Belegstatus (Standard: open)"
+                    },
+                    "limit": {"type": "integer", "description": "Max. Anzahl Belege (Standard: 20)"}
+                }
+            }
+        })
+        tools.append({
+            "name": "lexware_eingangsbeleg_klassifizieren",
+            "description": (
+                "Klassifiziert einen Eingangsbeleg in der Buchhaltungs-Pruefqueue: "
+                "setzt Konto-Vorschlag, Steuer-Typ und Status. "
+                "Nutze dieses Tool wenn Kai einen Eingangsbeleg manuell oder automatisch einordnen moechte."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "beleg_id": {"type": "integer", "description": "ID des Eingangsbellegs in der Pruefqueue"},
+                    "konto_vorschlag": {"type": "string", "description": "Buchungskonto-Bezeichnung (z.B. 'Buerokosten')"},
+                    "konto_nummer": {"type": "string", "description": "SKR04-Kontonummer (z.B. '4930')"},
+                    "steuer_typ": {"type": "string", "description": "z.B. '19%', '7%', 'steuerfrei'"},
+                    "beleg_text": {"type": "string", "description": "Buchungstext fuer Lexware"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["klassifiziert", "abgelegt", "unklar"],
+                        "description": "Neuer Status nach Klassifizierung"
+                    }
+                },
+                "required": ["beleg_id", "status"]
+            }
+        })
+
     return tools
 
 
@@ -1544,6 +1621,8 @@ def execute_tool(name, params):
             "vorgang_naechste_aktion_vorschlagen": _tool_vorgang_naechste_aktion_vorschlagen,
             "konversation_suchen": _tool_konversation_suchen,
             "mail_senden": _tool_mail_senden,
+            "lexware_belege_laden": _tool_lexware_belege_laden,
+            "lexware_eingangsbeleg_klassifizieren": _tool_lexware_eingangsbeleg_klassifizieren,
         }
         handler = handlers.get(name)
         if not handler:
@@ -2507,6 +2586,95 @@ def _tool_mail_senden(p):
         "message": f"Mail-Entwurf #{queue_id} erstellt und wartet auf Freigabe im Dashboard.",
         "vorschau": {"an": an, "betreff": betreff, "text_preview": text[:200]},
     }
+
+
+# ── Lexware Office Tools (session-eee) ───────────────────────────────────────
+
+def _tool_lexware_belege_laden(p):
+    """Laedt Belege aus lexware_belege (tasks.db) fuer Kira-Kontext."""
+    typ    = p.get("typ", "alle")
+    status = p.get("status", "open")
+    limit  = int(p.get("limit", 20))
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        try:
+            where_parts = []
+            bind = []
+            if typ and typ != "alle":
+                where_parts.append("typ=?")
+                bind.append(typ)
+            if status and status != "alle":
+                where_parts.append("status=?")
+                bind.append(status)
+            where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+            rows = db.execute(
+                f"SELECT * FROM lexware_belege {where_sql} ORDER BY datum DESC LIMIT ?",
+                bind + [limit]
+            ).fetchall()
+        except Exception:
+            rows = []
+        finally:
+            db.close()
+
+        if not rows:
+            return {"ok": True, "message": "Keine Belege gefunden (oder noch kein Sync durchgefuehrt)."}
+
+        total_offen = sum(r["brutto"] for r in rows if r["status"] == "open" and r["brutto"])
+        lines = [f"Lexware Belege ({len(rows)} Eintraege, offen: {total_offen:.2f} EUR):"]
+        for r in rows:
+            faellig = f" | Faellig: {r['faellig']}" if r["faellig"] else ""
+            lines.append(
+                f"  [{r['typ'].upper()}] {r['nummer'] or r['lexware_id'][:8]} "
+                f"| {r['kontakt_name'] or '?'} | {r['brutto']:.2f} EUR "
+                f"| Status: {r['status']}{faellig}"
+            )
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(rows), "offen_eur": total_offen}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _tool_lexware_eingangsbeleg_klassifizieren(p):
+    """Klassifiziert einen Eingangsbeleg in der Pruefqueue (tasks.db)."""
+    beleg_id        = p.get("beleg_id")
+    status          = p.get("status", "klassifiziert")
+    konto_vorschlag = (p.get("konto_vorschlag") or "").strip()
+    konto_nummer    = (p.get("konto_nummer") or "").strip()
+    steuer_typ      = (p.get("steuer_typ") or "").strip()
+    beleg_text      = (p.get("beleg_text") or "").strip()
+
+    if not beleg_id:
+        return {"error": "beleg_id erforderlich"}
+
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        try:
+            db.execute("""
+                UPDATE eingangsbelege_pruefqueue
+                SET status=?, konto_vorschlag=?, konto_nummer=?,
+                    steuer_typ=?, beleg_text=?, pruef_ts=datetime('now'),
+                    kira_frage='Automatisch klassifiziert von Kira'
+                WHERE id=?
+            """, (status, konto_vorschlag, konto_nummer, steuer_typ, beleg_text, beleg_id))
+            db.commit()
+            updated = db.execute(
+                "SELECT id, absender, betrag, betreff FROM eingangsbelege_pruefqueue WHERE id=?",
+                (beleg_id,)
+            ).fetchone()
+        finally:
+            db.close()
+
+        if updated:
+            return {
+                "ok": True,
+                "message": (
+                    f"Eingangsbeleg #{beleg_id} klassifiziert: Status={status}, "
+                    f"Konto: {konto_vorschlag} ({konto_nummer}), Steuer: {steuer_typ}"
+                )
+            }
+        return {"error": f"Beleg #{beleg_id} nicht gefunden"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────

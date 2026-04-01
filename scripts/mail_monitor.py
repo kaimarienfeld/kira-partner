@@ -956,6 +956,130 @@ def _auto_scan_eingangsrechnung(mail_data: dict, konto_label: str, kategorie: st
               status='fehler', context_id=msg_id)
 
 
+# ── Lexware Eingangsbeleg-Pruefqueue-Scan (session-eee) ──────────────────────
+# Erkennt Eingangsrechnungen intelligenter: PayPal-Ausnahme, Body-only-Rechnungen,
+# Lieferantenrechnungen vs. Zahlungsbestaetigung.
+_LEX_INVOICE_SIGNALS = [
+    r'rechnung', r'invoice', r'faktura', r'rechnungs?nummer', r'invoice\s*number',
+    r'lieferschein', r'bestellung', r'abonnement', r'abo\b', r'subscription',
+    r'umsatzsteuer', r'mehrwertsteuer', r'mwst', r'vat', r'ust\b',
+    r'zahlungsziel', r'faellig', r'bitte.*(?:bezahlen|ueberweisen)',
+]
+_LEX_PAYPAL_DOMAINS = {'paypal.com', 'paypal.de', 'e.paypal.com'}
+_LEX_PAYPAL_CONFIRM = [
+    r'zahlung\s*best', r'payment\s*confirm', r'zahlung\s*eingegangen',
+    r'wir haben.*zahlung', r'payment\s*received', r'you\s*sent\s*a\s*payment',
+]
+
+def _is_paypal_mail(absender_email: str, betreff: str, text: str) -> bool:
+    """Erkennt ob eine Mail eine PayPal-Zahlungsbestaetigung ist (kein Beleg)."""
+    domain = absender_email.split('@')[-1].lower() if '@' in absender_email else ''
+    if domain not in _LEX_PAYPAL_DOMAINS:
+        return False
+    combined = (betreff + ' ' + text[:500]).lower()
+    return any(re.search(pat, combined, re.IGNORECASE) for pat in _LEX_PAYPAL_CONFIRM)
+
+
+def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: str,
+                                 msg_id: str, absender: str, betreff: str, text: str):
+    """
+    Erweiterter Eingangsbeleg-Scan fuer Lexware Buchhaltungs-Pruefqueue (session-eee).
+    Wird nur aufgerufen wenn lexware.status == 'freigeschaltet' und
+    lexware.buchalt_pruefregel_aktiv == True.
+    Schreibt in eingangsbelege_pruefqueue (idempotent via mail_id).
+    """
+    # Nur fuer eingehende Belege
+    if kategorie not in ('Rechnung / Beleg', 'Abonnement / Kosten', 'Sonstiges'):
+        return
+
+    try:
+        cfg_path = SCRIPTS_DIR / 'config.json'
+        cfg = {}
+        try:
+            import json as _json
+            cfg = _json.loads(cfg_path.read_text('utf-8'))
+        except Exception:
+            pass
+        lex_cfg = cfg.get('lexware', {})
+        if lex_cfg.get('status') != 'freigeschaltet':
+            return
+        if not lex_cfg.get('buchalt_pruefregel_aktiv', True):
+            return
+
+        # E-Mail-Adresse aus absender
+        _se_m = re.search(r'<([^>]+@[^>]+)>', absender)
+        absender_email = _se_m.group(1).lower() if _se_m else absender.strip().lower()
+        absender_domain = absender_email.split('@')[-1] if '@' in absender_email else ''
+
+        # PayPal-Ausnahme prüfen
+        is_paypal = False
+        if lex_cfg.get('paypal_ausnahme_aktiv', True):
+            is_paypal = _is_paypal_mail(absender_email, betreff, text)
+            if is_paypal and kategorie not in ('Rechnung / Beleg',):
+                return  # PayPal-Zahlungsbestaetigung nicht in Queue
+
+        # Rechnungs-Signale suchen
+        combined = (betreff + ' ' + text[:2000]).lower()
+        has_invoice_signal = any(re.search(pat, combined, re.IGNORECASE) for pat in _LEX_INVOICE_SIGNALS)
+        if not has_invoice_signal and kategorie not in ('Rechnung / Beleg',):
+            return  # Kein klares Rechnungs-Signal
+
+        # Betrag extrahieren
+        betrag = None
+        _betrag_patterns = [
+            r'(?:Gesamtbetrag|Total|Summe|Rechnungsbetrag|Betrag|Amount)[^\d]*?([\d]{1,6}[.,]\d{2})',
+            r'([\d]{1,6}[.,]\d{2})\s*(?:EUR|€|\$)',
+        ]
+        for _pat in _betrag_patterns:
+            _m = re.search(_pat, combined, re.IGNORECASE)
+            if _m:
+                _raw = _m.group(1).replace('.', '').replace(',', '.')
+                try:
+                    _b = float(_raw)
+                    if 0.5 < _b < 999999:
+                        betrag = _b
+                        break
+                except Exception:
+                    pass
+
+        # Body-Excerpt (fuer Pruefqueue-Ansicht)
+        body_excerpt = text[:500].strip() if text else ''
+
+        # Ist es eine Body-only-Rechnung (kein Anhang angekuendigt)?
+        is_body_only = betrag is not None and not mail_data.get('hat_anhaenge', False)
+
+        db = sqlite3.connect(str(TASKS_DB))
+        try:
+            # Idempotent — kein Doppeleintrag fuer gleiche mail_id
+            existing = db.execute(
+                'SELECT id FROM eingangsbelege_pruefqueue WHERE mail_id=?', (msg_id,)
+            ).fetchone()
+            if not existing:
+                db.execute("""
+                    INSERT INTO eingangsbelege_pruefqueue
+                        (mail_id, source, absender, absender_domain, betreff, betrag, waehrung,
+                         datum_beleg, body_excerpt, is_paypal, is_body_only, status)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'zu_pruefen')
+                """, (
+                    msg_id, 'mail_monitor', absender_email, absender_domain,
+                    betreff[:500], betrag, 'EUR',
+                    (mail_data.get('datum', '') or '')[:10],
+                    body_excerpt, 1 if is_paypal else 0, 1 if is_body_only else 0,
+                ))
+                db.commit()
+                _elog('system', 'eingangsbeleg_pruefqueue',
+                      f'Eingangsbeleg Queue: {absender_email} | {betrag} EUR | {betreff[:60]}',
+                      source='mail_monitor', modul='lexware', actor_type='system',
+                      status='ok', context_id=msg_id)
+        finally:
+            db.close()
+    except Exception as _e:
+        _elog('system', 'eingangsbeleg_scan_fehler',
+              f'Lexware-Scan fehlgeschlagen: {_e}',
+              source='mail_monitor', modul='lexware', actor_type='system',
+              status='fehler', context_id=msg_id)
+
+
 # ── Verarbeitung ─────────────────────────────────────────────────────────────
 def _process_mail(mail_data, konto_label, folder_name):
     """Verarbeitet eine neue Mail: Klassifizierung + Task-Erstellung."""
@@ -1106,6 +1230,9 @@ def _process_mail(mail_data, konto_label, folder_name):
 
     # ── Eingangsrechnungs-Auto-Scan ───────────────────────────────────────────
     _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+
+    # ── Lexware Buchhaltungs-Pruefqueue (session-eee) ─────────────────────────
+    _scan_eingangsbeleg_lexware(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
 
     # ── Anthropic Billing Push ────────────────────────────────────────────────
     _check_anthropic_billing(absender, betreff, text)
