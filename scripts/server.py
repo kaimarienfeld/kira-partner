@@ -8804,10 +8804,10 @@ function esInfoPopup(btn, text) {{
       </select>
     </div>
     <div class="es-row" style="gap:8px">
-      <button class="btn btn-sec" onclick="lexEsSync('belege')">&#x1F4C4; Belege jetzt sync</button>
-      <button class="btn btn-sec" onclick="lexEsSync('kontakte')">&#x1F465; Kontakte jetzt sync</button>
-      <button class="btn btn-sec" onclick="lexEsSync('artikel')">&#x1F3F7; Artikel jetzt sync</button>
-      <button class="btn btn-sec" onclick="lexEsSync('full')">&#x21BB; Alles sync</button>
+      <button class="btn btn-sec" onclick="lexEsSync('belege')" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Belege von Lexware laden</button>
+      <button class="btn btn-sec" onclick="lexEsSync('kontakte')" title="Kontakte von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Kontakte von Lexware laden</button>
+      <button class="btn btn-sec" onclick="lexEsSync('artikel')" title="Artikel von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Artikel von Lexware laden</button>
+      <button class="btn btn-sec" onclick="lexEsSync('full')" title="Alle Daten von Lexware neu laden (Lexware &rarr; KIRA, Vollsync)">&#x2190; Alles von Lexware laden</button>
     </div>
     <div id="lex-sync-status" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
   </div>
@@ -8835,7 +8835,7 @@ function esInfoPopup(btn, text) {{
       <span style="font-size:var(--fs-sm);color:var(--muted)">{esc(lex_cfg.get("last_category_sync","—"))}</span>
     </div>
     <div class="es-row" style="gap:8px">
-      <button class="btn btn-sec" onclick="lexEsSync('full');showToast('Kategorien werden neu geladen...')">&#x21BB; Kategorien neu laden</button>
+      <button class="btn btn-sec" onclick="lexEsSync('full');showToast('Kategorien werden von Lexware geladen...')" title="Kategorien von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Kategorien von Lexware laden</button>
     </div>
     <div class="es-grp-sub" style="margin-top:8px">Kategorie-Cache wird automatisch t&#228;glich aktualisiert wenn Auto-Sync aktiv ist.</div>
   </div>
@@ -10899,7 +10899,7 @@ def build_lexware(db):
   <div class="lx-header-right">
     <input id="lx-global-search" type="text" placeholder="&#x2315; Suche..." oninput="lxGlobalSearch(this.value)" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm);width:180px">
     <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
-    <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Synchronisieren">&#x21BB; Sync</button>
+    <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware</button>
     <button class="btn btn-sec btn-xs" onclick="showLexSec('diagnose')" title="Diagnose">&#x1F527;</button>
     <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira</button>
   </div>
@@ -10994,8 +10994,8 @@ def build_lexware(db):
     <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
       <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">SCHNELLAKTIONEN</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-xs" onclick="lexSync()">&#x21BB; Jetzt synchronisieren</button>
-        <button class="btn btn-sec btn-xs" onclick="lexSync('full')">Vollsync</button>
+        <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Neue und geaenderte Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware abrufen</button>
+        <button class="btn btn-sec btn-xs" onclick="lexSync('full')" title="Alle Daten vollstaendig von Lexware neu laden (Lexware &rarr; KIRA, langsamer)">&#x2190; Vollsync von Lexware</button>
         <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">Verbindung testen</button>
         <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')">Eingangsbelege pr&#252;fen</button>
         <button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira besprechen</button>
@@ -11066,7 +11066,7 @@ def build_lexware(db):
     <option value="voided">Storniert</option>
   </select>
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync()">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
 </div>
 <div style="display:flex;gap:12px">
   <div style="flex:1;overflow-x:auto">
@@ -11139,7 +11139,7 @@ def build_lexware(db):
     kontakte_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-kon-search" type="text" placeholder="Suche Name / E-Mail..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync('kontakte')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync('kontakte')" title="Kontakte von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
 </div>
 <div style="display:flex;gap:12px">
   <div style="flex:1;overflow-x:auto">
@@ -11177,7 +11177,7 @@ def build_lexware(db):
     artikel_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-art-search" type="text" placeholder="Suche Artikel..." oninput="lxFilterArtikel()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync('artikel')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync('artikel')" title="Artikel von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
 </div>
 <div style="overflow-x:auto">
 <table class="lx-table">
@@ -11350,7 +11350,7 @@ def build_lexware(db):
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">API testen</button>
-      <button class="btn btn-sec btn-xs" onclick="lexSync()">&#x21BB; Sync</button>
+      <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
       <button class="btn btn-sec btn-xs" onclick="lexLoadSyncLog()">Sync-Log</button>
     </div>
     <div id="lx-diag-log" style="margin-top:8px;font-family:monospace;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:150px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;min-height:32px">Ausgabe erscheint hier...</div>
