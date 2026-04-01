@@ -5615,6 +5615,9 @@ def build_einstellungen():
 .es-lbl{{font-size:13px;color:var(--text);font-weight:500;line-height:1.3;}}
 .es-hint{{font-size:11px;color:var(--muted,var(--text-muted));line-height:1.4;margin-top:1px;}}
 .es-badge-plan{{background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border);}}
+/* Help-Tooltip Button (A-12 session-ooo) */
+.es-help-btn{{background:none;border:1px solid var(--border);border-radius:50%;width:17px;height:17px;font-size:10px;line-height:1;cursor:pointer;color:var(--muted);flex-shrink:0;padding:0;display:inline-flex;align-items:center;justify-content:center;}}
+.es-help-btn:hover{{background:var(--bg-raised);color:var(--text);}}
 /* ── Admin-Panel CSS (session-iii) ── */
 .adm-sec{{display:none;}}.adm-sec.active{{display:block;}}
 .adm-nav-item{{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;font-size:13px;color:var(--text-secondary);cursor:pointer;user-select:none;transition:background .12s;margin-bottom:2px;}}
@@ -8972,67 +8975,74 @@ function esInfoPopup(btn, text) {{
   <div class="lx-es-subpanel" id="lx-es-sub-dataverse" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Dataverse-Export <span style="font-size:11px;color:var(--muted);font-weight:400">(Microsoft Power Platform)</span></div>
-    <div class="es-grp-sub">Exportiert Datens&#228;tze direkt in Microsoft Dataverse-Tabellen. Ben&#246;tigt eine Azure Entra ID App-Registrierung mit Dataverse-Berechtigungen (Rolle: Dataverse Service User oder Basic User).</div>
+    <div class="es-grp-sub">Exportiert Datens&#228;tze direkt in Microsoft Dataverse-Tabellen (z.B. für Power BI, Teams, Power Automate).</div>
+    <div class="es-row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sec btn-xs" onclick="dvStartWizard()">&#x1F9ED; Einrichtungsassistent</button>
+      <button class="es-help-btn" onclick="dvHelp('was_ist_dataverse')" title="Was ist Dataverse?">?</button>
+    </div>
     <div class="es-row">
       <label class="es-label">Dataverse-Export aktiv</label>
       <label class="es-toggle"><input id="cfg-lex-dataverse" type="checkbox" {'checked' if lex_dataverse_aktiv else ''}><span class="es-slider"></span></label>
     </div>
   </div>
   <div class="es-grp">
-    <div class="es-grp-h">Azure App-Credentials</div>
-    <div class="es-grp-sub">Azure Portal &rarr; Entra ID &rarr; App-Registrierungen &rarr; App-Name &rarr; &Uuml;bersicht (Tenant-ID + Client-ID) und Zertifikate &amp; Geheimnisse (Client-Secret).</div>
+    <div class="es-grp-h">Azure App-Credentials <button class="es-help-btn" onclick="dvHelp('azure_app')" title="Wo finde ich diese Werte?">?</button></div>
+    <div class="es-grp-sub">Zugangsdaten der Azure Entra ID App-Registrierung (App mit Dataverse-Berechtigungen).</div>
     <div class="es-row">
-      <label class="es-label">Tenant-ID (Verzeichnis-ID)</label>
-      <input id="cfg-dv-tenant-id" type="text" class="es-input" style="max-width:320px"
+      <label class="es-label">Tenant-ID <button class="es-help-btn" onclick="dvHelp('tenant_id')" title="Was ist die Tenant-ID?">?</button></label>
+      <input id="cfg-dv-tenant-id" type="text" class="es-input" style="max-width:300px"
              value="{esc(lex_dv_tenant_id)}"
              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
     </div>
     <div class="es-row">
-      <label class="es-label">Client-ID (App-ID)</label>
-      <input id="cfg-dv-client-id" type="text" class="es-input" style="max-width:320px"
+      <label class="es-label">Client-ID <button class="es-help-btn" onclick="dvHelp('client_id')" title="Was ist die Client-ID?">?</button></label>
+      <input id="cfg-dv-client-id" type="text" class="es-input" style="max-width:300px"
              value="{esc(lex_dv_client_id)}"
              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
     </div>
     <div class="es-row">
-      <label class="es-label">Client-Secret</label>
-      <input id="cfg-dv-client-secret" type="password" class="es-input" style="max-width:320px"
-             placeholder="(leer lassen um bestehendes Secret nicht zu &#228;ndern)" autocomplete="off">
-      <span style="font-size:10px;color:var(--muted)">{'&#x2713;&nbsp;Secret&nbsp;hinterlegt' if lex_cfg.get('dataverse_client_secret','').strip() else '&#x26A0;&nbsp;Kein Secret'}</span>
+      <label class="es-label">Client-Secret <button class="es-help-btn" onclick="dvHelp('client_secret')" title="Was ist das Client-Secret?">?</button></label>
+      <input id="cfg-dv-client-secret" type="password" class="es-input" style="max-width:300px"
+             placeholder="(leer = bestehendes beibehalten)" autocomplete="off">
+      <span style="font-size:10px;color:var(--muted)">{'&#x2713;&nbsp;Secret hinterlegt' if lex_cfg.get('dataverse_client_secret','').strip() else '&#x26A0;&nbsp;Kein Secret'}</span>
     </div>
   </div>
   <div class="es-grp">
-    <div class="es-grp-h">Dataverse-Umgebung &amp; Tabelle</div>
-    <div class="es-grp-sub">Organisations-URL aus Power Apps &rarr; Einstellungen &rarr; Sitzungsdetails, oder Tabellen-Werkzeuge &rarr; API-Link (nur Basis-URL ohne Pfad).</div>
+    <div class="es-grp-h">Dataverse-Umgebung &amp; Tabelle <button class="es-help-btn" onclick="dvHelp('org_url')" title="Wo finde ich die Organisations-URL?">?</button></div>
     <div class="es-row">
-      <label class="es-label">Organisations-URL</label>
-      <input id="cfg-dv-org-url" type="text" class="es-input" style="max-width:320px"
+      <label class="es-label">Organisations-URL <button class="es-help-btn" onclick="dvHelp('org_url')" title="Wo finde ich die Organisations-URL?">?</button></label>
+      <input id="cfg-dv-org-url" type="text" class="es-input" style="max-width:300px"
              value="{esc(lex_dv_org_url)}"
              placeholder="https://orgXXXX.crm16.dynamics.com">
     </div>
     <div class="es-row">
-      <label class="es-label">Tabellen-Name (plural, logisch)</label>
+      <label class="es-label">Tabellen-Name <button class="es-help-btn" onclick="dvHelp('table_name')" title="Was ist der Tabellen-Name?">?</button></label>
       <input id="cfg-dv-table-name" type="text" class="es-input" style="max-width:240px"
              value="{esc(lex_dv_table_name)}"
-             placeholder="z.B. a_btb_arbeiten_vorlagen">
-      <span style="font-size:10px;color:var(--muted)">Plural-Logikname aus Power Apps</span>
+             placeholder="z.B. cr123_raumkult_auftraege">
+      <span style="font-size:10px;color:var(--muted)">Plural-Logikname (API-Name)</span>
     </div>
     <div class="es-row">
-      <label class="es-label">Duplikat-Pr&#252;ffeld</label>
-      <input id="cfg-dv-dedup-field" type="text" class="es-input" style="max-width:240px"
+      <label class="es-label">Duplikat-Pruefeld <button class="es-help-btn" onclick="dvHelp('dedup_field')" title="Was ist das Duplikat-Prueffeld?">?</button></label>
+      <input id="cfg-dv-dedup-field" type="text" class="es-input" style="max-width:220px"
              value="{esc(lex_dv_dedup_field)}"
-             placeholder="z.B. vorl_arb_BEZEICHNUNG">
-      <span style="font-size:10px;color:var(--muted)">Spalte zum Pr&#252;fen auf Duplikate vor dem Import</span>
+             placeholder="z.B. cr123_lexware_id">
+      <button class="btn btn-sec btn-xs" onclick="dvTestDedupField()">Pruefen</button>
+    </div>
+    <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px;padding:0 0 4px">
+      Spaltenname (API-Name) der Spalte die als eindeutiger Schlussel fuer Duplikat-Erkennung dient.
+      KIRA prüft vor jedem Import: existiert ein Datensatz mit diesem Wert bereits?
     </div>
   </div>
   <div class="es-grp">
     <div class="es-grp-h">Verbindungstest</div>
     <div class="es-row" style="gap:8px;align-items:center">
-      <button class="btn btn-sec" id="dv-test-btn" onclick="dvEsTestConnection()">&#x26A1; Dataverse testen</button>
+      <button class="btn btn-sec" id="dv-test-btn" onclick="dvEsTestConnection()">&#x26A1; Verbindung testen</button>
       <span id="dv-test-status" style="font-size:12px;color:var(--muted)"></span>
     </div>
-    <div class="es-grp-sub">Testet Token-Abruf (WhoAmI) + optionalen Tabellen-Zugriff ($top=1). Aktuelle Eingaben werden verwendet &mdash; nicht gespeicherte Werte werden direkt getestet.</div>
+    <div class="es-grp-sub">Testet Token-Abruf (Azure Auth) + Dataverse-Zugriff (WhoAmI + Tabellen-Ping). Aktuelle Eingaben werden direkt getestet — Speichern nicht erforderlich.</div>
   </div>
-  <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
+  <div style="margin-top:12px"><button class="btn btn-sec" onclick="lexEsSaveConfig()">Speichern</button></div>
   </div><!-- /lx-es-sub-dataverse -->
 
   <!-- ── DIAGNOSE ── -->
@@ -9146,6 +9156,234 @@ function esInfoPopup(btn, text) {{
         if(st) st.innerHTML = '<span style="color:#e84545">Netzwerkfehler</span>';
       }});
   }}
+  // ── Dataverse Hilfe-Tooltips + Einrichtungsassistent (A-12 session-ooo) ──
+  const _dvHelpContent = {{
+    was_ist_dataverse: {{
+      title: 'Was ist Microsoft Dataverse?',
+      body: `<p>Dataverse ist Microsofts Cloud-Datenbank f&#252;r Power Platform (Power BI, Power Apps, Power Automate, Teams).</p>
+<p>KIRA kann Datens&#228;tze wie Angebote, Rechnungen und Kontakte direkt in eine Dataverse-Tabelle exportieren.</p>
+<p><b>Wozu nutzbar:</b> Live-Dashboards in Power BI, automatische Workflows in Power Automate, Teilen mit Kollegen in Teams.</p>
+<p><b>Voraussetzung:</b> Microsoft 365 Business- oder Enterprise-Lizenz mit Power Platform.</p>`
+    }},
+    azure_app: {{
+      title: 'Azure App-Registrierung einrichten',
+      body: `<ol style="line-height:2">
+<li>Azure Portal &#x2192; <a href="https://portal.azure.com" target="_blank" style="color:var(--accent)">portal.azure.com</a></li>
+<li><b>Entra ID</b> (fr&#252;her: Azure Active Directory) &#x2192; App-Registrierungen</li>
+<li><b>Neue Registrierung</b> &#x2192; Name: z.B. "KIRA Export" &#x2192; Registrieren</li>
+<li>Auf der &#220;bersichtsseite: <b>Verzeichnis-ID</b> (= Tenant-ID) + <b>App-ID</b> (= Client-ID) kopieren</li>
+<li><b>Zertifikate &amp; Geheimnisse</b> &#x2192; Neuer geheimer Clientschl&#252;ssel &#x2192; Wert kopieren (einmalig sichtbar!)</li>
+<li><b>API-Berechtigungen</b> &#x2192; Berechtigung hinzuf&#252;gen &#x2192; Dynamics CRM &#x2192; Delegiert &#x2192; user_impersonation</li>
+<li>Mandantenadmin-Zustimmung erteilen</li>
+</ol>`
+    }},
+    tenant_id: {{
+      title: 'Tenant-ID (Verzeichnis-ID)',
+      body: `<p>Die Tenant-ID ist die eindeutige ID deiner Microsoft-Organisation (Mandant).</p>
+<b>Wo finden:</b>
+<ul>
+<li>Azure Portal &#x2192; Entra ID &#x2192; &#220;bersicht &#x2192; <b>Mandanten-ID</b></li>
+<li>Oder: Azure Portal &#x2192; App-Registrierungen &#x2192; deine App &#x2192; <b>Verzeichnis-ID</b></li>
+</ul>
+<p><b>Format:</b> xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (UUID)</p>`
+    }},
+    client_id: {{
+      title: 'Client-ID (App-ID)',
+      body: `<p>Die Client-ID ist die eindeutige ID der App-Registrierung in Azure Entra ID.</p>
+<b>Wo finden:</b>
+<ul>
+<li>Azure Portal &#x2192; Entra ID &#x2192; App-Registrierungen &#x2192; deine App &#x2192; <b>Anwendungs-ID (Client-ID)</b></li>
+</ul>
+<p><b>Format:</b> xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (UUID)</p>`
+    }},
+    client_secret: {{
+      title: 'Client-Secret',
+      body: `<p>Das Client-Secret ist ein Passwort f&#252;r die App-Registrierung.</p>
+<b>Einrichten:</b>
+<ul>
+<li>Azure Portal &#x2192; App-Registrierungen &#x2192; deine App &#x2192; <b>Zertifikate &amp; Geheimnisse</b></li>
+<li>&#x2192; Geheime Clientschl&#252;ssel &#x2192; <b>Neuer geheimer Clientschl&#252;ssel</b></li>
+<li>Ablaufzeit w&#228;hlen (z.B. 24 Monate) &#x2192; Hinzuf&#252;gen</li>
+<li><b>Den Wert sofort kopieren</b> — er wird danach nicht mehr vollst&#228;ndig angezeigt!</li>
+</ul>`
+    }},
+    org_url: {{
+      title: 'Organisations-URL',
+      body: `<p>Die Basis-URL deiner Dataverse-Umgebung.</p>
+<b>Wo finden:</b>
+<ul>
+<li>Power Apps &#x2192; Einstellungen &#x2192; Sitzungsdetails &#x2192; <b>Instanz-URL</b></li>
+<li>Oder: Power Platform Admin Center &#x2192; Umgebungen &#x2192; deine Umgebung &#x2192; URL</li>
+</ul>
+<p><b>Format:</b> https://orgXXXXXXXX.crm16.dynamics.com</p>
+<p><b>Achtung:</b> Nur die Basis-URL, ohne Pfad (/api/data/...) eintragen.</p>`
+    }},
+    table_name: {{
+      title: 'Tabellen-Name (Plural-Logikname)',
+      body: `<p>Der interne API-Name der Dataverse-Tabelle.</p>
+<b>Wo finden:</b>
+<ul>
+<li>Power Apps &#x2192; Tabellen &#x2192; deine Tabelle ausw&#228;hlen &#x2192; Erweiterte Einstellungen &#x2192; <b>Pluralname</b></li>
+<li>Oder in der URL wenn du die Tabelle in Power Apps &#246;ffnest</li>
+</ul>
+<p><b>Format:</b> Immer Kleinbuchstaben, mit Publisher-Prefix.<br>Beispiel: <code>cr123_raumkult_auftraege</code></p>
+<p>cr123 = dein Publisher-Prefix (2-5 Zeichen, in Power Apps konfiguriert)</p>`
+    }},
+    dedup_field: {{
+      title: 'Duplikat-Prueffeld',
+      body: `<p>Der API-Name der Spalte die als eindeutiger Schlüssel verwendet wird.</p>
+<p><b>Zweck:</b> KIRA pr&#252;ft vor jedem Export: existiert bereits ein Datensatz mit diesem Wert? Wenn ja, wird er aktualisiert statt dupliziert.</p>
+<b>Empfehlung:</b>
+<ul>
+<li>Eine Spalte die du speziell für den Lexware-Export angelegt hast (z.B. <code>cr123_lexware_id</code>)</li>
+<li>Oder eine andere eindeutige Kennung (z.B. Rechnungsnummer)</li>
+</ul>
+<b>Spalten-API-Name finden:</b>
+<ul>
+<li>Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Spalte ausw&#228;hlen &#x2192; <b>Name</b> (nicht Anzeigename!)</li>
+</ul>
+<p><b>Format:</b> Kleinbuchstaben mit Prefix. Beispiel: <code>cr123_belegnummer</code></p>`
+    }}
+  }};
+
+  function dvHelp(topic) {{
+    const c = _dvHelpContent[topic];
+    if(!c) return;
+    showSimpleModal(c.title, c.body);
+  }}
+
+  function dvTestDedupField() {{
+    const field = (document.getElementById('cfg-dv-dedup-field')||{{}}).value||'';
+    if(!field.trim()) {{ showToast('Bitte zuerst einen Feldnamen eingeben','warnung'); return; }}
+    showSimpleModal('Duplikat-Prueffeld: ' + field, `<p>Das Feld <code>${{esc_js(field)}}</code> wird bei jedem Export als Duplikat-Schluessel verwendet.</p>
+<p>Um zu pruefen ob das Feld in deiner Dataverse-Tabelle existiert: Dataverse-Verbindungstest ausfuehren (Verbindungstest-Button).</p>
+<p><b>Richtig?</b> Wenn du dir unsicher bist ob der API-Name korrekt ist:<br>
+Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigenamen &#x2192; Spalte auswaehlen &#x2192; Feld "Name" (Pflichtfeld, beginnt mit Publisher-Prefix).</p>`);
+  }}
+
+  let _dvWizStep = 0;
+  const _dvWizSteps = [
+    {{
+      title: 'Dataverse einrichten',
+      sub: 'Verbinde KIRA mit Microsoft Dataverse f&#252;r automatischen Daten-Export in Power Platform.',
+      fields: [],
+      hint: ''
+    }},
+    {{
+      title: 'Azure App-Registrierung',
+      sub: 'Tenant-ID und Client-ID aus Azure Portal &rarr; Entra ID &rarr; App-Registrierungen &rarr; deine App &rarr; &#220;bersicht.',
+      fields: ['cfg-dv-tenant-id','cfg-dv-client-id'],
+      hint: '<a class="kira-wiz-link" href="https://portal.azure.com" target="_blank">&#x2197; Azure Portal &#246;ffnen</a>'
+    }},
+    {{
+      title: 'Client-Secret',
+      sub: 'Azure Portal &rarr; App-Registrierungen &rarr; deine App &rarr; Zertifikate &amp; Geheimnisse &rarr; Neuer geheimer Clientschl&#252;ssel.',
+      fields: ['cfg-dv-client-secret'],
+      hint: '<span style="color:var(--warn);font-size:12px">Das Secret wird nur einmalig angezeigt &mdash; sofort kopieren!</span>'
+    }},
+    {{
+      title: 'Dataverse-Umgebung',
+      sub: 'Organisations-URL aus Power Apps &rarr; Einstellungen &rarr; Sitzungsdetails. Tabellen-Name aus Power Apps &rarr; Tabellen (Plural-Logikname).',
+      fields: ['cfg-dv-org-url','cfg-dv-table-name','cfg-dv-dedup-field'],
+      hint: '<a class="kira-wiz-link" href="https://make.powerapps.com" target="_blank">&#x2197; Power Apps &#246;ffnen</a>'
+    }},
+    {{
+      title: 'Verbindung testen',
+      sub: 'Alle Einstellungen sind hinterlegt. Teste jetzt die Verbindung um sicherzustellen dass alles korrekt ist.',
+      fields: [],
+      hint: ''
+    }}
+  ];
+
+  function dvStartWizard() {{
+    _dvWizStep = 0;
+    const ol = document.createElement('div');
+    ol.id = 'dv-wiz-overlay';
+    ol.className = 'kira-wiz-overlay';
+    ol.innerHTML = _dvWizRender();
+    document.body.appendChild(ol);
+  }}
+
+  function _dvWizRender() {{
+    const s = _dvWizSteps[_dvWizStep];
+    const dots = _dvWizSteps.map((_,i) =>
+      `<div class="kira-wiz-dot${{i===_dvWizStep?' active':''}}"></div>`).join('');
+    let fields = '';
+    (s.fields||[]).forEach(id => {{
+      const el = document.getElementById(id);
+      const lbl = {{
+        'cfg-dv-tenant-id': 'Tenant-ID (Verzeichnis-ID)',
+        'cfg-dv-client-id': 'Client-ID (App-ID)',
+        'cfg-dv-client-secret': 'Client-Secret',
+        'cfg-dv-org-url': 'Organisations-URL',
+        'cfg-dv-table-name': 'Tabellen-Name',
+        'cfg-dv-dedup-field': 'Duplikat-Prueffeld'
+      }}[id] || id;
+      const typ = id.includes('secret') ? 'password' : 'text';
+      const ph = id === 'cfg-dv-tenant-id' || id === 'cfg-dv-client-id' ? 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' :
+                 id === 'cfg-dv-org-url' ? 'https://orgXXXX.crm16.dynamics.com' :
+                 id === 'cfg-dv-table-name' ? 'cr123_raumkult_auftraege' :
+                 id === 'cfg-dv-dedup-field' ? 'cr123_lexware_id' : '';
+      const curVal = (el && el.value) ? el.value : '';
+      fields += `<div class="kira-wiz-field"><label>${{lbl}}</label>
+        <input type="${{typ}}" id="dv-wiz-${{id}}" value="${{esc_js(curVal)}}" placeholder="${{esc_js(ph)}}" autocomplete="${{typ==='password'?'off':'on'}}"></div>`;
+    }});
+    let actionBtn = '';
+    if(_dvWizStep === _dvWizSteps.length - 1) {{
+      actionBtn = `<button class="kira-wiz-btn-primary" onclick="_dvWizTestAndFinish()">&#x26A1; Verbindung testen &amp; Speichern</button>`;
+    }} else {{
+      actionBtn = `<button class="kira-wiz-btn-primary" onclick="_dvWizNext()">Weiter &rarr;</button>`;
+    }}
+    return `<div class="kira-wiz-box"><div class="kira-wiz-step">
+      <div class="kira-wiz-dots">${{dots}}</div>
+      <div class="kira-wiz-title">${{s.title}}</div>
+      <div class="kira-wiz-sub">${{s.sub}}</div>
+      <div class="kira-wiz-fields">${{fields}}</div>
+      ${{s.hint ? '<div style="text-align:center;margin-bottom:16px">'+s.hint+'</div>' : ''}}
+      <div class="kira-wiz-btns">
+        <button class="btn btn-sec btn-xs" onclick="_dvWizClose()">Abbrechen</button>
+        <div class="kira-wiz-btns-right">
+          ${{_dvWizStep>0 ? '<button class="btn btn-sec btn-xs" onclick="_dvWizPrev()">&larr; Zur&#252;ck</button>' : ''}}
+          ${{actionBtn}}
+        </div>
+      </div>
+    </div></div>`;
+  }}
+
+  function _dvWizApplyFields() {{
+    _dvWizSteps[_dvWizStep].fields.forEach(id => {{
+      const wizEl = document.getElementById('dv-wiz-' + id);
+      const mainEl = document.getElementById(id);
+      if(wizEl && mainEl && wizEl.value) mainEl.value = wizEl.value;
+    }});
+  }}
+
+  function _dvWizNext() {{
+    _dvWizApplyFields();
+    _dvWizStep = Math.min(_dvWizStep + 1, _dvWizSteps.length - 1);
+    const ol = document.getElementById('dv-wiz-overlay');
+    if(ol) ol.innerHTML = _dvWizRender();
+  }}
+
+  function _dvWizPrev() {{
+    _dvWizApplyFields();
+    _dvWizStep = Math.max(_dvWizStep - 1, 0);
+    const ol = document.getElementById('dv-wiz-overlay');
+    if(ol) ol.innerHTML = _dvWizRender();
+  }}
+
+  function _dvWizClose() {{
+    const ol = document.getElementById('dv-wiz-overlay');
+    if(ol) ol.remove();
+  }}
+
+  function _dvWizTestAndFinish() {{
+    _dvWizApplyFields();
+    _dvWizClose();
+    lexEsSaveConfig();
+    setTimeout(() => dvEsTestConnection(), 600);
+  }}
+
   function lexEsTestConnection() {{
     const btn = document.getElementById('lex-test-btn');
     const st  = document.getElementById('lex-test-status');
