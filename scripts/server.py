@@ -10994,8 +10994,9 @@ def build_lexware(db):
     nav_html = '<div class="lx-nav-sec" id="lx-nav-sec">'
     for sec_id, icon, label in nav_items:
         nav_html += f'<button class="lx-nav-btn{"  active" if sec_id == "cockpit" else ""}" data-lxsec="{sec_id}" onclick="showLexSec(\'{sec_id}\')">{icon} {label}{_nav_badge(sec_id)}</button>'
-    # In-Planung-Bereiche
+    # In-Planung-Bereiche (mit Trenner)
     planned_items = [("auswertung","&#x1F4C8;","Auswertung"),("kunden360","&#x1F464;","Kunden-360"),("cashflow","&#x1F4B0;","Cashflow"),("kalkulation","&#x1F9EE;","Kalkulation")]
+    nav_html += '<div class="lx-nav-sep"></div>'
     for sec_id, icon, label in planned_items:
         nav_html += f'<button class="lx-nav-btn lx-nav-planned" data-lxsec="{sec_id}" onclick="showLexSec(\'{sec_id}\')">{icon} {label} <span style="font-size:9px;opacity:.7">Geplant</span></button>'
     nav_html += '</div>'
@@ -11489,14 +11490,15 @@ def build_lexware(db):
         active = " style='display:block'" if sec_id == "cockpit" else " style='display:none'"
         sections_html += f'<div class="lx-sec-content" id="lx-sec-{sec_id}" data-lxsec="{sec_id}"{active}>{sec_html}</div>'
 
-    return f"""<div class="lx-module">{header_html}{nav_html}<div class="lx-content">{sections_html}</div></div>"""
+    return f"""<div class="lx-module">{header_html}<div class="lx-body"><div class="lx-sidebar">{nav_html}</div><div class="lx-content">{sections_html}</div></div></div>"""
 
 
 def _build_lexware_tabs_preview():
     """Zeigt eine gesperrte Navigation als Vorschau (fuer modul_status='gesperrt')."""
     return """
-<div style="opacity:0.45;pointer-events:none;user-select:none">
-<div class="lx-nav-sec" style="margin-bottom:12px">
+<div style="opacity:0.45;pointer-events:none;user-select:none;display:flex;height:320px">
+<div class="lx-sidebar" style="width:164px">
+<div class="lx-nav-sec">
   <button class="lx-nav-btn active">&#x1F4CA; Cockpit</button>
   <button class="lx-nav-btn">&#x1F4CB; Belege</button>
   <button class="lx-nav-btn">&#x1F4B3; Zahlungen</button>
@@ -11504,10 +11506,11 @@ def _build_lexware_tabs_preview():
   <button class="lx-nav-btn">&#x1F3F7; Artikel</button>
   <button class="lx-nav-btn">&#x1F4C2; Dateien</button>
   <button class="lx-nav-btn">&#x1F4BC; Buchhaltung</button>
-  <button class="lx-nav-btn">&#x2699; Regeln & Muster</button>
+  <button class="lx-nav-btn">&#x2699; Regeln</button>
   <button class="lx-nav-btn">&#x1F527; Diagnose</button>
 </div>
-<div style="height:280px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:12px">
+</div>
+<div style="flex:1;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:12px">
   <span style="font-size:32px">&#x1F512;</span>
   <span>Modulinhalt nach Freischaltung verf&#252;gbar</span>
 </div>
@@ -18362,11 +18365,14 @@ a:hover{text-decoration:underline;}
 .lx-chip-err{background:rgba(220,38,38,.1);color:#dc2626;border-color:rgba(220,38,38,.25);}
 .lx-chip-muted{background:var(--bg-raised);color:var(--muted);border-color:var(--border);}
 .lx-kira-badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(124,58,237,.12);color:#7c3aed;border:1px solid rgba(124,58,237,.2);margin-left:4px;}
-/* Sekundaere Navigation */
-.lx-nav-sec{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--bg);padding:0 8px;}
-.lx-nav-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:9px 14px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s;display:flex;align-items:center;gap:4px;}
-.lx-nav-btn:hover{color:var(--text);}
-.lx-nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+/* Sekundaere Navigation — Seitenleiste (A-02/A-03 session-ooo) */
+.lx-body{display:flex;flex:1;overflow:hidden;min-height:0;}
+.lx-sidebar{width:164px;flex-shrink:0;background:var(--bg-raised);border-right:1px solid var(--border);overflow-y:auto;padding:6px 0;}
+.lx-nav-sec{display:flex;flex-direction:column;gap:0;background:transparent;padding:4px 0;}
+.lx-nav-sep{height:1px;background:var(--border);margin:6px 10px;}
+.lx-nav-btn{background:none;border:none;border-left:3px solid transparent;color:var(--muted);padding:9px 12px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;white-space:nowrap;transition:color .15s,background .15s,border-color .15s;display:flex;align-items:center;gap:6px;width:100%;text-align:left;box-sizing:border-box;}
+.lx-nav-btn:hover{color:var(--text);background:var(--bg-card);}
+.lx-nav-btn.active{color:var(--accent);border-left-color:var(--accent);font-weight:600;background:rgba(79,125,249,.06);}
 .lx-nav-planned{opacity:.6;}
 .lx-nav-planned:hover{opacity:.85;}
 /* Content */
