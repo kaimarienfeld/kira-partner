@@ -767,6 +767,7 @@ def build_dashboard(tasks, db):
     briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
   <div class="dash-briefing-head">
     <div class="dash-briefing-title">Tagesbriefing{_ts_display}</div>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_DASHBOARD,{{erklaermodus:true}})" title="Gefuehrte Tour durch das Dashboard">Tour</button>
     <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
   </div>
   <div class="dash-briefing-items">{"".join(briefing_items)}</div>
@@ -1487,6 +1488,7 @@ def build_postfach():
 <div class="pf-left" id="pf-left">
   <div class="pf-left-hdr">
     <span class="pf-left-title">Postfach</span>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_POSTFACH,{erklaermodus:true})" style="margin-right:4px" title="Gefuehrte Tour durch das Postfach starten">Tour</button>
     <button class="pf-compose-btn" onclick="pfOpenCompose()" title="Neue Mail verfassen">&#x270F; Neu</button>
   </div>
   <div id="pf-folders-loading" style="padding:16px;color:var(--text-muted);font-size:13px">Lade Konten...</div>
@@ -4350,6 +4352,7 @@ def build_geschaeft(db):
         </div>
       </div>
       <div class="gh-mod-acts">
+        <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_GESCHAEFT,{{erklaermodus:true}})" title="Gefuehrte Tour durch das Geschaeft-Modul">Tour</button>
         <button class="btn btn-sm btn-muted" onclick="openKiraWorkspace('chat')">Kira fragen</button>
         <button class="btn btn-sm btn-muted" onclick="location.reload()">Sync</button>
       </div>
@@ -5795,6 +5798,7 @@ function esInfoPopup(btn, text) {{
     <span class="es-ms">Log-Eintr.: <b>{rl_total}</b></span>
   </div>
   <div class="es-macts">
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_EINSTELLUNGEN,{{erklaermodus:true}})" title="Gefuehrte Tour durch die Einstellungen">Tour</button>
     <button class="es-ma" onclick="configExport()">&#x2197; Export</button>
     <button class="es-ma" onclick="configImport()">&#x2199; Import</button>
     <button class="es-ma es-pri" onclick="saveSettings()">Speichern</button>
@@ -11010,10 +11014,11 @@ def build_wissen(db):
     n_biblio = sum(len(grouped.get(k, [])) for k, _ in BIBLIO_CATS)
     n_regeln = len(grouped.get("fest", [])) + len(grouped.get("gelernt", [])) + len(grouped.get("vorschlag", [])) + len(korr_list)
 
-    top_tabs = f"""<div class="wissen-level-tabs">
+    top_tabs = f"""<div class="wissen-level-tabs" style="align-items:center">
       <div class="wissen-level-tab active" onclick="showWissenLevel(this,'bibliothek')">Bibliothek ({n_biblio})</div>
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'regelsteuerung')">Regelsteuerung ({n_regeln})</div>
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'neu')">+ Neue Regel</div>
+      <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_WISSEN,{{erklaermodus:true}})" style="margin-left:auto" title="Gefuehrte Tour durch das Wissen-Modul">Tour</button>
     </div>"""
 
 
@@ -12270,10 +12275,11 @@ def build_capture(db):
   </div>
 
   <!-- Navigation Tabs -->
-  <div class="cap-nav" id="capNav">
+  <div class="cap-nav" id="capNav" style="display:flex;align-items:center">
     <div class="cap-tab active" id="capTabUebersicht" onclick="capShowView('uebersicht')">&#x1F4CA; Uebersicht</div>
     <div class="cap-tab" id="capTabEingang" onclick="capShowView('eingang');capLoadList(1)">&#x1F4E5; Eingang</div>
     <div class="cap-tab" id="capTabDetail" id="capTabDetail" style="display:none">&#x1F4C4; Detail</div>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_CAPTURE,{erklaermodus:true})" style="margin-left:auto;margin-right:4px" title="Gefuehrte Tour durch Capture starten">Tour</button>
   </div>
 
   <!-- View: Uebersicht -->
@@ -13401,6 +13407,7 @@ def generate_html() -> str:
         </div>
       </div>
       <div class="kw-header-right">
+        <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_KIRA,{erklaermodus:true})" style="margin-right:4px" title="Gefuehrte Tour durch den Kira Workspace">Tour</button>
         <button class="btn btn-xs btn-muted" onclick="newKiraChat()">Neuer Chat</button>
         <button class="btn btn-xs btn-muted" onclick="toggleKiraTools()">Werkzeuge</button>
         <button class="kira-close" onclick="closeKiraWorkspace()">&times;</button>
@@ -19810,6 +19817,146 @@ window.KIRA_TOUR_LEXWARE = [
    text:'Alle Verbindungseinstellungen findest du unter <b>Einstellungen \u2192 Lexware Office</b>. Dort tr\u00e4gst du den API-Key ein, aktivierst den Sync-Automatismus und passt die Synchronisierungsintervalle an. Du kannst die Einstellungen jederzeit \u00e4ndern.'},
   {area:'Fertig',title:'Tour abgeschlossen!',
    text:'Du hast alle Bereiche von Lexware Office kennengelernt. Bei Fragen hilft dir Kira (oben rechts der lila Button) weiter \u2014 einfach fragen. Die Tour kann jederzeit neu gestartet werden.'}
+];
+
+// \u2500\u2500 Postfach Tour (D-04) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_POSTFACH = [
+  {area:'Ueberblick',title:'Das Postfach',
+   text:'Das Postfach ist dein zentrales Mail-Cockpit. Die Ansicht ist dreigeteilt: links Ordner, Mitte Mail-Liste, rechts Vorschau. Alles ohne Browser-Wechsel.'},
+  {area:'Aktionsleiste',title:'Ribbon \u2014 Aktionsleiste',target:'#pf-ribbon-wrap',
+   text:'Die Aktionsleiste oben enth\u00e4lt alle Funktionen: Antworten, Weiterleiten, Kennzeichnen, Anh\u00e4nung, L\u00f6schen. Die Buttons aktivieren sich automatisch sobald eine Mail gew\u00e4hlt ist.'},
+  {area:'Ordner',title:'Konten & Ordner',target:'#pf-left',
+   text:'Links siehst du alle verbundenen Mail-Konten mit ihren Ordnern. Klicke auf einen Ordner um dessen Mails anzuzeigen. KIRA synchronisiert Posteingang und konfigurierte Ordner automatisch.'},
+  {area:'Mailliste',title:'Mail-Liste',target:'#pf-list-panel',
+   text:'Die Liste zeigt alle Mails des gew\u00e4hlten Ordners. Ungelesene Mails sind fettgedruckt. Hover zeigt schnelle Aktions-Icons. Mit Checkboxes k\u00f6nnen mehrere Mails gleichzeitig bearbeitet werden.'},
+  {area:'Vorschau',title:'Mail-Vorschau',target:'#pf-preview',
+   text:'Die rechte Spalte zeigt die gew\u00e4hlte Mail vollst\u00e4ndig. HTML-Mails werden sicher in einem iFrame gerendert. Die Symbolleiste \u00fcber dem Mail-Text erlaubt schnelle Aktionen.'},
+  {area:'Kira',title:'Kira-Integration',target:'#pf-rb-kira',
+   text:'Der lila Kira-Button \u00f6ffnet den Kira-Workspace direkt mit dem Mail-Kontext. Kira l\u00e4dt den Mail-Text und die letzten Mails dieses Absenders \u2014 und kann direkt eine Antwort formulieren.',
+   warn:'Wenn Kira einen Antwort-Entwurf erstellt und du ihn freigibst, wird er tats\u00e4chlich versendet.'},
+  {area:'Neue Mail',title:'Neue Mail verfassen',target:'#pf-rb-compose',
+   text:'\u00dcber "Neue Mail" \u00f6ffnet sich der Compose-Dialog. Du f\u00fcllst An, Betreff und Text aus. Kira kann auch beim Schreiben helfen \u2014 einfach im Kira-Chat danach fragen.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Du kennst jetzt alle Bereiche des Postfachs. F\u00fcr Fragen beim Antworten oder Einordnen einfach Kira fragen \u2014 der lila Button ist immer erreichbar.'}
+];
+
+// \u2500\u2500 Geschaeft Tour (D-05) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_GESCHAEFT = [
+  {area:'Ueberblick',title:'Das Gesch\u00e4ft-Modul',
+   text:'Hier verwaltest du alle Gesch\u00e4ftsvorg\u00e4nge: Ausgangsrechnungen, Angebote, Eingangsrechnungen, Mahnungen und mehr. KIRA liest diese Daten direkt aus deinen Datenbanken.'},
+  {area:'Statistik',title:'Kennzahlen-\u00dcberblick',target:'.gh-mod-stats',
+   text:'Die Kacheln oben zeigen offenes Rechnungsvolumen, Eingangsrechnungen, offene Angebote, f\u00e4llige Nachfasse und gemahnte Rechnungen auf einen Blick. Rot = Handlungsbedarf.'},
+  {area:'Uebersicht',title:'\u00dcbersicht-Tab',target:'#gesch-uebersicht',tab:'uebersicht',
+   text:'Die \u00dcbersicht fasst alle wichtigen Vorg\u00e4nge zusammen: was heute f\u00e4llig ist, was gemahnt wurde, welche Angebote auf Antwort warten. Guter Ausgangspunkt f\u00fcr den Arbeitstag.'},
+  {area:'Rechnungen',title:'Ausgangsrechnungen',target:'#gesch-ausgangsre',tab:'ausgangsre',
+   text:'Alle Ausgangsrechnungen mit Status (Offen/Bezahlt/\u00dcberf\u00e4llig). Filtere nach Status, klicke eine Rechnung an f\u00fcr Details. Gemahnte Rechnungen sind rot markiert.'},
+  {area:'Angebote',title:'Angebote',target:'#gesch-angebote',tab:'angebote',
+   text:'Alle Angebote mit Status und G\u00fcltigkeitsdatum. Kira erinnert automatisch an Angebote die kurz vor Ablauf stehen oder lange ohne R\u00fcckmeldung sind.'},
+  {area:'Eingangsrechnungen',title:'Eingangsrechnungen',target:'#gesch-eingangsre',tab:'eingangsre',
+   text:'Eingehende Rechnungen die KIRA aus Mails erkannt hat. Kira schl\u00e4gt das Buchungskonto vor. Du best\u00e4tigst und die Rechnung wandert in die Buchhaltung.',
+   warn:'Best\u00e4tigte Eingangsrechnungen k\u00f6nnen in Lexware gebucht werden \u2014 das schreibt Daten in Lexware Office.'},
+  {area:'CRM',title:'CRM Pipeline',tab:'crm',
+   text:'Die CRM-Pipeline zeigt alle Leads und Vorg\u00e4nge nach Stufe: Neu \u2192 Qualifiziert \u2192 Angebot \u2192 Gewonnen/Verloren. Kira verschiebt Karten automatisch wenn sich der Status \u00e4ndert.'},
+  {area:'Kalkulation',title:'Kalkulation',tab:'kalkulation',
+   text:'Der Kalkulations-Assistent hilft beim Erstellen von Angeboten: Material, Arbeitszeit, Fremdleistungen \u2014 plus automatische Berechnung von Gemeinkosten, Marge und Mehrwertsteuer.'},
+  {area:'Zeiterfassung',title:'Zeiterfassung',tab:'zeiterfassung',
+   text:'Erfasse Arbeitszeiten direkt in KIRA. Der Timer l\u00e4uft im Hintergrund. In der Monats\u00fcbersicht siehst du alle gebuchten Zeiten je Projekt.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Das Gesch\u00e4ft-Modul deckt alle kaufm\u00e4nnischen Funktionen ab. Bei Fragen oder Auswertungsw\u00fcnschen hilft Kira gerne weiter.'}
+];
+
+// \u2500\u2500 Wissen Tour (D-06) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_WISSEN = [
+  {area:'Ueberblick',title:'Kiras Wissensdatenbank',
+   text:'Das Wissen-Modul ist das Ged\u00e4chtnis von KIRA. Hier speicherst du Regeln, Stil-Vorgaben, Preise und Prozesse \u2014 Kira wendet sie bei jeder Antwort automatisch an.'},
+  {area:'Bibliothek',title:'Bibliothek',target:'#wissen-level-bibliothek',
+   text:'Die Bibliothek zeigt alle Wissenseintr\u00e4ge nach Kategorie: Stil & Ton, Preise, Technik, Prozesse, feste Gesch\u00e4ftsregeln. Klicke einen Eintrag an um ihn zu lesen oder zu bearbeiten.'},
+  {area:'Kategorien',title:'Kategorien erkl\u00e4rt',
+   text:'<b>Stil</b> steuert wie Kira schreibt. <b>Preise</b> enth\u00e4lt Kalkulationsvorgaben. <b>Technik</b> erkl\u00e4rt Fachthemen. <b>Prozess</b> beschreibt Abl\u00e4ufe. <b>Feste Regeln</b> sind immer verbindlich.'},
+  {area:'Regelsteuerung',title:'Regelsteuerung',target:'#wissen-level-regelsteuerung',
+   text:'Hier siehst du Regeln die Kira selbst gelernt hat \u2014 aus deinen Korrekturen und Freigaben. Du kannst jede Regel best\u00e4tigen, anpassen oder l\u00f6schen.',
+   warn:'Gel\u00f6schte Regeln kann Kira nicht mehr anwenden. Bei versehentlichem L\u00f6schen: einfach neu eintragen.'},
+  {area:'Gelernt',title:'Von Kira gelernt',
+   text:'Eintr\u00e4ge mit dem Badge "Von Kira gelernt" wurden automatisch erstellt \u2014 z.B. wenn du eine Antwort korrigiert hast. Diese Eintr\u00e4ge sind besonders wertvoll f\u00fcr die Qualit\u00e4t der Antworten.'},
+  {area:'Neu',title:'Neue Regel hinzuf\u00fcgen',target:'#wissen-level-neu',
+   text:'\u00dcber "+ Neue Regel" kannst du Kira neues Wissen beibringen: Kategorie w\u00e4hlen, Titel und Inhalt schreiben und speichern. Die Regel wirkt sofort in der n\u00e4chsten Kira-Antwort.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Je mehr Regeln du pflegst, desto besser wird Kira. Gute Wissensdatenbank = bessere Antworten. Du kannst jederzeit neue Regeln hinzuf\u00fcgen oder bestehende korrigieren.'}
+];
+
+// \u2500\u2500 Capture Tour (D-07) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_CAPTURE = [
+  {area:'Ueberblick',title:'Capture \u2014 Mobiler Eingang',
+   text:'Capture ist dein digitaler Notizblock: Gedanken, Fotos, Baustellennotizen \u2014 alles landet hier. KIRA analysiert und ordnet jeden Eintrag automatisch den passenden Aufgaben oder Vorg\u00e4ngen zu.'},
+  {area:'Statistik',title:'Heute & \u00dcbersicht',
+   text:'Die Statistik-Kacheln zeigen: wie viele Items heute eingegangen sind, wie viele zu pr\u00fcfen sind, wie viele zugeordnet wurden. Ein roter Wert zeigt Pr\u00fcfbedarf an.'},
+  {area:'Uebersicht',title:'Letzte Eintr\u00e4ge',target:'#capViewUebersicht',
+   text:'Die \u00dcbersicht listet alle zuletzt erfassten Items mit Zeit, Kanal, Text-Auszug, Status und Konfidenz-Wert. Ein Klick auf eine Zeile \u00f6ffnet das Detail.'},
+  {area:'Eingang',title:'Eingang \u2014 Klassifizieren',target:'#capViewEingang',
+   text:'Im Eingang siehst du neue Items die noch nicht verarbeitet wurden. Filtere nach Kanal, Status oder Datum. Kira ordnet automatisch zu \u2014 du best\u00e4tigst oder korrigierst.'},
+  {area:'Erfassen',title:'Schnell erfassen',
+   text:'\u00dcber die Schnell-Erfassungs-Karte kannst du sofort eine Notiz schreiben und optional Dateien anh\u00e4ngen. Kira analysiert den Inhalt direkt im Hintergrund.'},
+  {area:'Mobil',title:'Mobil-Webapp',
+   text:'Unter /mobil erreichst du KIRA vom Smartphone. Mit deinem Passwort kannst du direkt Fotos und Notizen erfassen \u2014 sie erscheinen sofort in diesem Eingang.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Capture sorgt daf\u00fcr, dass kein Gedanke verloren geht. Vom Baustellenfoto bis zur Idee unterwegs \u2014 alles landet in KIRA und wird automatisch eingeordnet.'}
+];
+
+// \u2500\u2500 Kira Workspace Tour (D-08) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_KIRA = [
+  {area:'Ueberblick',title:'Der Kira Workspace',
+   text:'Der Kira Workspace ist dein direktes Gespr\u00e4ch mit der KI-Assistenz. Du erreichst ihn \u00fcber das schwebende K-Symbol oder den Kira-Button in jedem Modul. Kira kennt deine Daten.'},
+  {area:'Kontextpanel',title:'Kontext & Verl\u00e4ufe',target:'#kwCtxPanel',
+   text:'Links siehst du die Kontext-Auswahl: Chat, Aufgaben, Muster, Wissen. Darunter sind fr\u00fchere Gespr\u00e4chsverl\u00e4ufe gespeichert. Du kannst jeden alten Verlauf wieder \u00f6ffnen und fortf\u00fchren.'},
+  {area:'Chat',title:'Freier Chat',
+   text:'Im Chat-Modus kannst du Kira alles fragen: Antwort f\u00fcr eine Mail formulieren, Angebot pr\u00fcfen, Vorgang zusammenfassen. Kira hat Zugriff auf alle KIRA-Daten.',
+   warn:'Kira kann Aktionen ausf\u00fchren wie Aufgaben erstellen oder Mail-Entw\u00fcrfe speichern. Diese erscheinen erst nach deiner Freigabe.'},
+  {area:'Aufgaben',title:'Aufgaben-Kontext',
+   text:'Im Aufgaben-Modus sieht Kira alle offenen Aufgaben priorisiert. Frage: "Was sollte ich heute tun?" und erhalte eine Empfehlung auf Basis deiner Daten.'},
+  {area:'Muster',title:'Erkannte Muster',
+   text:'KIRA erkennt automatisch Zahlungsverhalten, Angebotsquoten und Kommunikationsmuster. Kira kann diese Erkenntnisse erkl\u00e4ren und Handlungsempfehlungen geben.'},
+  {area:'Foto',title:'Foto-Analyse',
+   text:'Du kannst Fotos direkt in den Chat einf\u00fcgen (B\u00fcroklammer-Icon). Kira analysiert das Bild \u2014 ideal f\u00fcr Baustellenfotos, handgeschriebene Notizen oder Produktfotos.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Kira ist deine intelligenteste Funktion. Je mehr du fragst, desto besser lernt Kira deinen Stil und deine Pr\u00e4ferenzen kennen. Einfach ausprobieren!'}
+];
+
+// \u2500\u2500 Dashboard Tour (D-09) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_DASHBOARD = [
+  {area:'Ueberblick',title:'Das Dashboard',
+   text:'Das Dashboard ist deine Schaltzentrale: t\u00e4glicher \u00dcberblick \u00fcber alles was wichtig ist. Briefing, Kennzahlen, Aufgabenliste und Signale auf einen Blick.'},
+  {area:'Tagesbriefing',title:'Tagesbriefing',target:'.dash-briefing-head',
+   text:'Das Tagesbriefing fasst zusammen was heute ansteht: offene Antworten, f\u00e4llige Angebote, Mahnungen. Wird beim Start automatisch generiert und kann per Klick aktualisiert werden.'},
+  {area:'KPIs',title:'Kennzahl-Kacheln',
+   text:'Die bunten Kacheln zeigen Kernkennzahlen: Anzahl Aufgaben, neue Leads, offene Rechnungen. Ein Klick auf eine Kachel springt direkt in das zugeh\u00f6rige Modul.'},
+  {area:'Aufgaben',title:'Arbeitsliste',
+   text:'Die Arbeitsliste zeigt alle offenen Aufgaben nach Priorit\u00e4t. Klicke eine Aufgabe an um Details zu sehen oder Kira um Hilfe zu bitten. Erledigte Aufgaben direkt hier abhaken.'},
+  {area:'Signale',title:'Signale & Auff\u00e4lligkeiten',
+   text:'KIRA erkennt automatisch Ausrei\u00dfer und Pr\u00fcfbedarf: \u00fcberf\u00e4llige Rechnungen, ablaufende Skontofristen, ungew\u00f6hnliche Muster. Jedes Signal springt beim Klick zum betroffenen Bereich.'},
+  {area:'Kalender',title:'Kalender-Widget',
+   text:'Das Kalender-Widget zeigt bevorstehende Termine aus dem verbundenen Outlook-Kalender. Bei konfigurierten Azure-Berechtigungen werden Termine automatisch synchronisiert.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Das Dashboard gibt dir t\u00e4glich den n\u00f6tigen \u00dcberblick. Starte jeden Morgen hier \u2014 dann siehst du sofort was heute Priorit\u00e4t hat.'}
+];
+
+// \u2500\u2500 Einstellungen Tour (D-10) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_EINSTELLUNGEN = [
+  {area:'Ueberblick',title:'Einstellungen \u2014 3-Spalten',
+   text:'Die Einstellungen sind dreigeteilt: Links Hauptnavigation, Mitte Unter-Navigation, Rechts Inhalt. \u00dcber "Speichern" oben rechts werden alle \u00c4nderungen sofort gespeichert.'},
+  {area:'Navigation',title:'Hauptnavigation',target:'.es-snav',
+   text:'Die linke Navigation listet alle Bereiche: Konfiguration (Design bis Dashboard), System (Kira, Mail, Integrationen) und Mobil & Capture. Ein Klick wechselt sofort.'},
+  {area:'Design',title:'Design & Erscheinungsbild',
+   text:'Unter Design w\u00e4hlst du Farbschema (Hell/Dunkel), Akzentfarbe, Schriftfamilie, Schriftgr\u00f6\u00dfe. Alle \u00c4nderungen sind sofort sichtbar \u2014 kein Neustart n\u00f6tig.'},
+  {area:'Provider',title:'Kira / LLM / Provider',
+   text:'Hier richtest du die KI-Verbindung ein: Anthropic API-Key, Modell-Auswahl, Budget-Limits. Ohne konfigurierten Provider kann Kira nicht arbeiten. Mehrere Provider k\u00f6nnen als Fallback eingetragen werden.'},
+  {area:'Mail',title:'Mail & Konten',
+   text:'Unter Mail richtest du E-Mail-Konten ein, konfigurierst Sync-Ordner und testest die Verbindung. Auch Mail-Klassifizierung und Nachklassifizierung sind hier erreichbar.'},
+  {area:'Protokoll',title:'Protokoll & Logs',
+   text:'Unter Protokoll siehst du alle Runtime-Ereignisse, den \u00c4nderungsverlauf und die aktuelle Konfiguration. N\u00fctzlich zur Fehlersuche und zur Nachverfolgung von Kira-Aktivit\u00e4ten.'},
+  {area:'Admin',title:'Admin-Bereich',
+   text:'Der Admin-Bereich (passwortgesch\u00fctzt) enth\u00e4lt alle sensiblen Zugangsdaten: API-Keys, SMTP-Konfiguration, Pfade. Erreichbar \u00fcber "Admin" in der Sidebar.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Nach jeder \u00c4nderung den "Speichern"-Button nicht vergessen. \u00c4nderungen werden sofort in config.json gespeichert und sind beim n\u00e4chsten Start automatisch aktiv.'}
 ];
 """
 

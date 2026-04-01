@@ -292,28 +292,28 @@
 **Status:** 🔜 Langfristig
 
 ### D-04 — Tour: Kommunikation / Postfach
-**Status:** 🔜 Offen — Tour-Vorlage wird mit A-13c erstellt, Inhalt folgt danach
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_POSTFACH, 8 Schritte, Tour-Button in pf-left-hdr
 
 ### D-05 — Tour: Geschaeft
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_GESCHAEFT, 10 Schritte, Tour-Button in gh-mod-acts
 
 ### D-06 — Tour: Wissen
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_WISSEN, 7 Schritte, Tour-Button in wissen-level-tabs
 
 ### D-07 — Tour: Capture / Mobile Memo
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_CAPTURE, 7 Schritte, Tour-Button in cap-nav
 
 ### D-08 — Tour: Kira-Workspace
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_KIRA, 7 Schritte, Tour-Button in kw-header-right
 
 ### D-09 — Tour: Dashboard
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_DASHBOARD, 7 Schritte, Tour-Button in dash-briefing-head
 
 ### D-10 — Tour: Einstellungen komplett (alle Sektionen)
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_EINSTELLUNGEN, 8 Schritte, Tour-Button in es-macts
 
 ### D-11 — Tour: Partner-View / Leni
-**Status:** 🔜 Offen — nach Tour-Vorlage
+**Status:** 🔜 Offen — partner_view.html ist separate Datei (kein TOUR_JS). Bei Bedarf dort integrieren.
 
 ---
 
@@ -324,11 +324,11 @@
 | Block A (UI/Bugs + Tours) | 16 | 15 | 1 | 0 | 0 |
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
 | Block C (Laufend) | 0 | 0 | 0 | 0 | 0 |
-| Block D (Zukunft + offene Tours) | 11 | 0 | 0 | 0 | 0 |
-| **Gesamt** | **31** | **16** | **0** | **0** | **4** |
+| Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
+| **Gesamt** | **31** | **23** | **1** | **0** | **4** |
 
-> Block-A vollstaendig abgeschlossen (16/16). session-ppp: A-10 Diagnose Test-Ergebnis-Buttons erledigt.
-> D-04 bis D-11 (Modul-Tours) folgen sobald Zeit ist (Tour-Vorlage A-13c steht).
+> Block-A 16/16. session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
+> Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
 
 ---
 
@@ -342,6 +342,7 @@
 | 2026-04-01 | A-13 aufgeteilt in 13a/b/c + Tour-Vorlage + Modul-Liste D-04 bis D-11 |
 | 2026-04-01 | session-ooo: A-00/01/04/07/08/11/13a/b/c als erledigt markiert |
 | 2026-04-01 | session-ppp: A-10 Diagnose Test-Ergebnis-Buttons erledigt — Block-A 16/16 komplett |
+| 2026-04-01 | session-qqq: D-04..D-10 Modul-Tours alle erledigt (7 Tours, 59 Schritte gesamt) |
 | 2026-04-01 | session-ooo (Fortsetzung): A-02/03/05/06/09/12 erledigt — alle AUFGABEN abgeschlossen |
 
 ---
