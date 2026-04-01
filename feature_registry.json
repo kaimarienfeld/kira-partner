@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-bbb-2",
+  "_updated": "session-hhh",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -808,6 +808,32 @@
       "prio": "niedrig",
       "leni_visible": false,
       "icon": "📄"
+    },
+    {
+      "id": "capture-module",
+      "name": "Capture / Mobile Memo",
+      "icon": "📥",
+      "leni_name": "Schnellerfassung & Mobile Memos",
+      "leni_desc": "Spontane Notizen, Telefonmemos oder Fotos einfach erfassen — Kira ordnet sie automatisch dem richtigen Vorgang, Kunden oder Auftrag zu. Keine Pflichtfelder, kein Aufwand.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "in_progress",
+      "last_updated": "2026-04-01",
+      "description": "4 DB-Tabellen, 3-Tier-Matching, Desktop-Panel 3 Views, Mobile-Webapp /mobil, HMAC-Session"
+    },
+    {
+      "id": "capture-mobile-webapp",
+      "name": "Mobile Webapp /mobil",
+      "icon": "📱",
+      "leni_name": "Kira auf dem Handy",
+      "leni_desc": "Direkt vom Smartphone erfassen: kurze Notiz, Foto oder Dokument hochladen — Kira uebernimmt den Rest.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "in_progress",
+      "last_updated": "2026-04-01",
+      "description": "Standalone HTML /mobil, mob-* CSS, HMAC token login, PWA manifest vorbereitet"
     }
   ],
   "_total": 64

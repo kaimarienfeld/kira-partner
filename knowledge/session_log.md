@@ -56,6 +56,13 @@
 
 ---
 
+## 2026-04-01 10:30 — Session-Start (session-hhh / Capture & Mobile Memo Modul)
+
+**Auftrag:** Neues Modul "Capture / Mobile Memo" vollstaendig bauen. Strukturierter Eingangskanal fuer Text, Fotos, Screenshots, Dokumente mit Desktop- und Mobile-Flow, Kira-Zuordnung, 3-stufigem Matching (hart/weich/LLM), Statuslogik, Runtime-Log-Anbindung, vorbereiteter Abo-Faehigkeit. Einstellungsbereich "Mobil". Mobile-Webapp als separater HTTP-Endpunkt. Ausnahmeregel: nie blockieren, dokumentieren, dann weiter.
+**Status:** offen
+
+---
+
 ## 2026-03-31 23:59 — Session-Ende (session-zz)
 
 **Erledigt:** Alle P1/P2/P3 Tasks abgearbeitet. 4 Commits. feature_registry.json +6 Eintraege. partner_view.html regeneriert (43/63 sichtbar, 26 done / 4 partial / 13 planned).

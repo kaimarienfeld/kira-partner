@@ -1567,6 +1567,48 @@ def get_tools(config=None):
             }
         })
 
+    # Capture / Mobile Memo Tools (session-hhh)
+    tools.append({
+        "name": "capture_suchen",
+        "description": (
+            "Sucht in Capture-Eintraegen (Schnellerfassungen, Memos, Fotos, Baustellennotizen). "
+            "Nutze dieses Tool wenn Kai nach einem frueheren Memo sucht oder fragt ob etwas erfasst wurde."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "suchbegriff": {"type": "string", "description": "Freitext-Suchbegriff"},
+                "status": {
+                    "type": "string",
+                    "enum": ["eingegangen", "pruefung", "zugeordnet", "erledigt", "alle"],
+                    "description": "Status-Filter (Standard: alle offenen)"
+                },
+                "limit": {"type": "integer", "description": "Max. Anzahl Ergebnisse (Standard: 10)"}
+            },
+            "required": []
+        }
+    })
+    tools.append({
+        "name": "capture_zuordnen",
+        "description": (
+            "Ordnet einen Capture-Eintrag einem Objekt im System zu: Vorgang, Kunde, Rechnung, Angebot, Aufgabe, Wissen. "
+            "Nutze dieses Tool wenn Kira einen Capture-Eintrag einem bekannten Kontext zuordnen soll."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "capture_id": {"type": "integer", "description": "ID des Capture-Eintrags"},
+                "entity_type": {
+                    "type": "string",
+                    "description": "Typ: vorgang, kunde, rechnung, angebot, aufgabe, wissen, lexware_kontakt"
+                },
+                "entity_id": {"type": "string", "description": "ID oder Nummer des Zielobjekts"},
+                "begruendung": {"type": "string", "description": "Kurze Begruendung fuer die Zuordnung"}
+            },
+            "required": ["capture_id", "entity_type", "entity_id"]
+        }
+    })
+
     return tools
 
 
@@ -1623,6 +1665,8 @@ def execute_tool(name, params):
             "mail_senden": _tool_mail_senden,
             "lexware_belege_laden": _tool_lexware_belege_laden,
             "lexware_eingangsbeleg_klassifizieren": _tool_lexware_eingangsbeleg_klassifizieren,
+            "capture_suchen": _tool_capture_suchen,
+            "capture_zuordnen": _tool_capture_zuordnen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -3520,6 +3564,78 @@ def cancel_react_task(task_id: str) -> bool:
             _REACT_TASKS[task_id]["abgebrochen"] = True
             return True
     return False
+
+
+# ── Capture Tools (session-hhh) ───────────────────────────────────────────────
+
+def _tool_capture_suchen(p):
+    """Sucht in capture_items nach Suchbegriff und/oder Status."""
+    suchbegriff = (p.get("suchbegriff") or "").strip()
+    status = p.get("status", "")
+    limit = min(int(p.get("limit", 10)), 30)
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        where_parts = ["archived=0"]
+        params = []
+        if suchbegriff:
+            where_parts.append("(LOWER(raw_text) LIKE ? OR LOWER(normalized_text) LIKE ?)")
+            params += [f'%{suchbegriff.lower()}%', f'%{suchbegriff.lower()}%']
+        if status and status != "alle":
+            where_parts.append("status=?")
+            params.append(status)
+        where = " AND ".join(where_parts)
+        rows = db.execute(
+            f"SELECT id, created_at, source_channel, raw_text, status, confidence, matched_entity_type, matched_entity_id FROM capture_items WHERE {where} ORDER BY created_at DESC LIMIT ?",
+            params + [limit]
+        ).fetchall()
+        db.close()
+        if not rows:
+            return {"ok": True, "message": "Keine Capture-Eintraege gefunden.", "anzahl": 0}
+        lines = [f"Capture-Eintraege ({len(rows)} Ergebnisse):"]
+        for r in rows:
+            ts = r["created_at"][:16] if r["created_at"] else ""
+            txt = (r["raw_text"] or "")[:100]
+            match = f"→ {r['matched_entity_type']}#{r['matched_entity_id']}" if r["matched_entity_type"] else ""
+            lines.append(f"  #{r['id']} [{r['status']}] {ts} ({r['source_channel']}) | {txt} {match}")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(rows)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_capture_zuordnen(p):
+    """Ordnet einen Capture-Eintrag einem Systemobjekt zu."""
+    cap_id = int(p.get("capture_id", 0))
+    entity_type = p.get("entity_type", "")
+    entity_id = str(p.get("entity_id", ""))
+    begruendung = p.get("begruendung", "")
+    if not cap_id or not entity_type or not entity_id:
+        return {"ok": False, "error": "capture_id, entity_type und entity_id erforderlich"}
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        item = db.execute("SELECT id FROM capture_items WHERE id=?", (cap_id,)).fetchone()
+        if not item:
+            db.close()
+            return {"ok": False, "error": f"Capture #{cap_id} nicht gefunden"}
+        db.execute("""UPDATE capture_items SET status='zugeordnet', final_entity_type=?,
+                      final_entity_id=?, review_required=0, updated_at=datetime('now') WHERE id=?""",
+                   (entity_type, entity_id, cap_id))
+        db.execute("""INSERT INTO capture_matches (capture_id, candidate_type, candidate_id, score, reason, accepted)
+                      VALUES (?,?,?,1.0,?,1)""",
+                   (cap_id, entity_type, entity_id, f"Kira-Zuordnung: {begruendung}" if begruendung else "Kira-Zuordnung"))
+        db.execute("INSERT INTO capture_actions (capture_id, actor_type, action, result) VALUES (?,?,?,?)",
+                   (cap_id, 'kira', 'zugeordnet', f"{entity_type}#{entity_id}"))
+        db.commit()
+        db.close()
+        try:
+            _elog("capture", "tool_capture_zugeordnet", f"Capture #{cap_id} → {entity_type}#{entity_id} via Kira",
+                  source="kira_llm", modul="capture", status="ok")
+        except Exception:
+            pass
+        return {"ok": True, "message": f"Capture #{cap_id} erfolgreich {entity_type}#{entity_id} zugeordnet."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # Init DB bei Import

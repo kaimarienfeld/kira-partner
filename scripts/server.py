@@ -22,7 +22,8 @@ _BROWSE_RESULTS   = {}   # {job_id: path_or_None}
 DETAIL_DB     = KNOWLEDGE_DIR / "rechnungen_detail.db"
 ARCHIV_ROOT   = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\Archiv")
 ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
-RUNTIME_EVENTS_DB = KNOWLEDGE_DIR / "runtime_events.db"
+RUNTIME_EVENTS_DB  = KNOWLEDGE_DIR / "runtime_events.db"
+CAPTURE_FILES_DIR  = KNOWLEDGE_DIR / "capture_files"   # Capture-Modul Datei-Storage
 
 # LLM Kostenanalyse — Preistabelle USD pro 1M Token (Stand: 2026-03)
 MODEL_PRICING_USD_PER_1M = {
@@ -455,6 +456,109 @@ def _ensure_lexware_tables():
         pass
     finally:
         db.close()
+
+def _ensure_capture_tables():
+    """Erstellt Capture / Mobile Memo Tabellen in tasks.db (session-hhh, idempotent)."""
+    db = sqlite3.connect(str(TASKS_DB))
+    try:
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS capture_items (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                source_type         TEXT NOT NULL DEFAULT 'manual',
+                source_channel      TEXT NOT NULL DEFAULT 'desktop',
+                raw_text            TEXT,
+                normalized_text     TEXT,
+                status              TEXT NOT NULL DEFAULT 'eingegangen',
+                processing_status   TEXT NOT NULL DEFAULT 'pending',
+                confidence          REAL DEFAULT 0.0,
+                matched_entity_type TEXT,
+                matched_entity_id   TEXT,
+                final_entity_type   TEXT,
+                final_entity_id     TEXT,
+                review_required     INTEGER DEFAULT 0,
+                review_reason       TEXT,
+                task_extracted      INTEGER DEFAULT 0,
+                archived            INTEGER DEFAULT 0,
+                metadata_json       TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_cap_status ON capture_items(status);
+            CREATE INDEX IF NOT EXISTS idx_cap_created ON capture_items(created_at);
+            CREATE INDEX IF NOT EXISTS idx_cap_channel ON capture_items(source_channel);
+            CREATE INDEX IF NOT EXISTS idx_cap_archived ON capture_items(archived);
+
+            CREATE TABLE IF NOT EXISTS capture_files (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                capture_id      INTEGER NOT NULL,
+                file_type       TEXT,
+                mime_type       TEXT,
+                original_name   TEXT,
+                storage_path    TEXT,
+                file_size       INTEGER DEFAULT 0,
+                upload_status   TEXT NOT NULL DEFAULT 'ok',
+                preview_status  TEXT DEFAULT 'none',
+                metadata_json   TEXT,
+                FOREIGN KEY(capture_id) REFERENCES capture_items(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_capf_capture ON capture_files(capture_id);
+
+            CREATE TABLE IF NOT EXISTS capture_matches (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                capture_id     INTEGER NOT NULL,
+                candidate_type TEXT NOT NULL,
+                candidate_id   TEXT NOT NULL,
+                score          REAL DEFAULT 0.0,
+                reason         TEXT,
+                accepted       INTEGER DEFAULT 0,
+                FOREIGN KEY(capture_id) REFERENCES capture_items(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_capm_capture ON capture_matches(capture_id);
+
+            CREATE TABLE IF NOT EXISTS capture_actions (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                capture_id   INTEGER NOT NULL,
+                actor_type   TEXT NOT NULL DEFAULT 'user',
+                actor_id     TEXT,
+                action       TEXT NOT NULL,
+                result       TEXT,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                payload_json TEXT,
+                FOREIGN KEY(capture_id) REFERENCES capture_items(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_capa_capture ON capture_actions(capture_id);
+            CREATE INDEX IF NOT EXISTS idx_capa_action ON capture_actions(action);
+        """)
+        db.commit()
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+
+def _ensure_capture_config_defaults():
+    """Schreibt Capture-Feature-Flags als Defaults in config.json (session-hhh, idempotent)."""
+    cfg_path = SCRIPTS_DIR / "config.json"
+    try:
+        cfg = json.loads(cfg_path.read_text('utf-8'))
+    except Exception:
+        cfg = {}
+    if "capture" not in cfg:
+        cfg["capture"] = {
+            "active": True,
+            "auto_analyse": True,
+            "auto_assign": False,
+            "confidence_threshold": 0.75,
+            "upload_limit_per_item": 5,
+            "upload_size_mb": 10,
+            "session_duration_hours": 24,
+            "mobile_access": True
+        }
+        try:
+            cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), 'utf-8')
+        except Exception:
+            pass
+
 
 def esc(s):
     return str(s or "").replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;')
@@ -5131,6 +5235,7 @@ def build_einstellungen():
     kira_sicherheit_cfg = kira_cfg.get("sicherheit", {})
     kira_proaktiv_cfg  = config.get("kira_proaktiv", {})
     backup_cfg_es      = config.get("backup", {})
+    capture_cfg_es     = config.get("capture", {})
     # Circuit Breaker Status laden
     circuit_state = {}
     try:
@@ -5652,6 +5757,9 @@ function esInfoPopup(btn, text) {{
   <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
   <div class="es-sn" data-essec="sicherheit-audit" onclick="esShowSec('sicherheit-audit')"><span class="es-sico">&#x1F6E1;</span>Sicherheit &amp; Audit</div>
   <div class="es-sn" data-essec="verbrauch" onclick="esShowSec('verbrauch')"><span class="es-sico">&#x1F4CA;</span>Verbrauch &amp; Kosten</div>
+  <div class="es-sn-sep"></div>
+  <div class="es-snav-h">Mobil &amp; Capture</div>
+  <div class="es-sn" data-essec="mobil" onclick="esShowSec('mobil')"><span class="es-sico">&#x1F4F1;</span>Mobil &amp; Capture</div>
   <div class="es-sn-sep"></div>
   <div class="es-snav-h">Protokoll</div>
   <div class="es-sn" data-essec="protokoll" onclick="esShowSec('protokoll')"><span class="es-sico">&#x2630;</span>Protokoll &amp; Logs<span class="es-scnt">{rl_total}</span></div>
@@ -9543,6 +9651,94 @@ function esInfoPopup(btn, text) {{
   </script>
 </div><!-- /es-sec-verbrauch -->
 
+<div class="es-sec-panel" id="es-sec-mobil">
+<div class="es-sec-h">&#x1F4F1; Mobil &amp; Capture</div>
+<div class="es-sec-sub">Mobile-Zugang, Schnellerfassung (Capture) und Verarbeitungsregeln konfigurieren.</div>
+
+<div class="es-grp">
+  <div class="es-grp-h">Capture-Modul</div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Capture aktiv</span><span class="es-hint">Schnellerfassung per Desktop und Mobile verwenden</span></div>
+    <label class="es-toggle"><input type="checkbox" id="cap-cfg-active" {'checked' if capture_cfg_es.get('active', True) else ''}><span class="es-slider"></span></label>
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Automatische Analyse</span><span class="es-hint">Kira analysiert neue Eintraege automatisch im Hintergrund</span></div>
+    <label class="es-toggle"><input type="checkbox" id="cap-cfg-auto-analyse" {'checked' if capture_cfg_es.get('auto_analyse', True) else ''}><span class="es-slider"></span></label>
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Automatische Zuordnung</span><span class="es-hint">Sicher erkannte Eintraege automatisch zuordnen (ohne Bestaetigung)</span></div>
+    <label class="es-toggle"><input type="checkbox" id="cap-cfg-auto-assign" {'checked' if capture_cfg_es.get('auto_assign', False) else ''}><span class="es-slider"></span></label>
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Konfidenz-Schwelle</span><span class="es-hint">Ab welcher Treffsicherheit wird automatisch zugeordnet (0.0–1.0)</span></div>
+    <input class="es-inp-sm" type="number" id="cap-cfg-threshold" min="0.1" max="1.0" step="0.05" value="{capture_cfg_es.get('confidence_threshold', 0.75)}">
+  </div>
+</div>
+
+<div class="es-grp">
+  <div class="es-grp-h">Datei-Uploads</div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Max. Dateien pro Eintrag</span><span class="es-hint">Standard: 5</span></div>
+    <input class="es-inp-sm" type="number" id="cap-cfg-upload-limit" min="1" max="20" value="{capture_cfg_es.get('upload_limit_per_item', 5)}">
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Max. Dateigroesse (MB)</span><span class="es-hint">Limit pro Datei, Standard: 10 MB</span></div>
+    <input class="es-inp-sm" type="number" id="cap-cfg-upload-size" min="1" max="100" value="{capture_cfg_es.get('upload_size_mb', 10)}">
+  </div>
+</div>
+
+<div class="es-grp">
+  <div class="es-grp-h">Mobile-Zugang</div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Mobile-Webapp aktiv</span><span class="es-hint">Zugang ueber /mobil erlauben</span></div>
+    <label class="es-toggle"><input type="checkbox" id="cap-cfg-mobile-access" {'checked' if capture_cfg_es.get('mobile_access', True) else ''}><span class="es-slider"></span></label>
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Session-Dauer (Stunden)</span><span class="es-hint">Wie lange bleibt das Mobile-Login gespeichert</span></div>
+    <input class="es-inp-sm" type="number" id="cap-cfg-session-hours" min="1" max="720" value="{capture_cfg_es.get('session_duration_hours', 24)}">
+  </div>
+  <div class="es-row">
+    <div class="es-row-left"><span class="es-lbl">Mobile-URL</span><span class="es-hint">Lokal erreichbare Adresse fuer das Handy</span></div>
+    <code style="font-size:12px;background:var(--bg);padding:4px 8px;border-radius:4px;border:1px solid var(--border)">http://localhost:8765/mobil</code>
+    <a href="/mobil" target="_blank" class="btn btn-sec btn-xs" style="margin-left:8px">Oeffnen &#x2197;</a>
+  </div>
+</div>
+
+<div class="es-grp">
+  <div class="es-grp-h">Abo-Faehigkeit <span class="es-badge es-badge-plan">In Planung</span></div>
+  <div style="font-size:12px;color:var(--muted);padding:4px 0 8px">
+    Folgende Feature-Flags sind strukturell vorbereitet und koennen spaeter abo-abhaengig geschaltet werden:
+    erweitertes-KI-Matching, Team-Freigaben, groessere Upload-Limits, Premium-Analysen, mehr Speicher.
+  </div>
+</div>
+
+<div style="margin-top:16px">
+  <button class="btn btn-primary" onclick="saveCaptureSettings()">Speichern</button>
+</div>
+
+<script>
+function saveCaptureSettings() {{
+  var payload = {{
+    capture: {{
+      active: !!(document.getElementById('cap-cfg-active')?.checked),
+      auto_analyse: !!(document.getElementById('cap-cfg-auto-analyse')?.checked),
+      auto_assign: !!(document.getElementById('cap-cfg-auto-assign')?.checked),
+      confidence_threshold: parseFloat(document.getElementById('cap-cfg-threshold')?.value)||0.75,
+      upload_limit_per_item: parseInt(document.getElementById('cap-cfg-upload-limit')?.value)||5,
+      upload_size_mb: parseInt(document.getElementById('cap-cfg-upload-size')?.value)||10,
+      mobile_access: !!(document.getElementById('cap-cfg-mobile-access')?.checked),
+      session_duration_hours: parseInt(document.getElementById('cap-cfg-session-hours')?.value)||24
+    }}
+  }};
+  fetch('/api/einstellungen',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+    .then(r=>r.json()).then(d=>{{
+      if(d.ok) showToast('Capture-Einstellungen gespeichert','ok');
+      else showToast(d.error||'Fehler beim Speichern','fehler');
+    }}).catch(()=>showToast('Fehler','fehler'));
+}}
+</script>
+</div><!-- /es-sec-mobil -->
+
 </div><!-- /es-main -->
 </div><!-- /es-ct -->
 </div><!-- /es-shell -->"""
@@ -10464,6 +10660,1006 @@ def _build_lexware_tabs_preview():
 </div>"""
 
 
+# ── CAPTURE / MOBILE MEMO MODUL (session-hhh) ────────────────────────────────
+
+import re as _re_cap, hashlib as _hashlib_cap, hmac as _hmac_cap, base64 as _b64_cap, time as _time_cap
+
+def _capture_hard_match(text):
+    """Stufe 1: Harte Treffer per ID/Nummer/Email/Telefon. Gibt Liste von {candidate_type,candidate_id,score,reason}."""
+    results = []
+    if not text:
+        return results
+    text_l = text.lower()
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        # Rechnungsnummer RE-XXXXXX
+        for m in _re_cap.finditer(r'\b(RE-[A-Z0-9]{4,12})\b', text, _re_cap.IGNORECASE):
+            num = m.group(1).upper()
+            row = db.execute("SELECT id FROM ausgangsrechnungen WHERE rechnungsnummer=? LIMIT 1", (num,)).fetchone()
+            if row:
+                results.append({"candidate_type":"rechnung","candidate_id":str(row["id"]),"score":1.0,"reason":f"Rechnungsnummer {num} exakt"})
+        # Angebotsnummer A-XXXXXX
+        for m in _re_cap.finditer(r'\b(A-[A-Z]{2}\d{6,10})\b', text, _re_cap.IGNORECASE):
+            num = m.group(1).upper()
+            row = db.execute("SELECT id FROM angebote WHERE angebotsnummer=? LIMIT 1", (num,)).fetchone()
+            if row:
+                results.append({"candidate_type":"angebot","candidate_id":str(row["id"]),"score":1.0,"reason":f"Angebotsnummer {num} exakt"})
+        # Task-ID
+        for m in _re_cap.finditer(r'\b(A-SB\d{8,10})\b', text, _re_cap.IGNORECASE):
+            tid = m.group(1).upper()
+            row = db.execute("SELECT id FROM tasks WHERE auftrags_nr=? LIMIT 1", (tid,)).fetchone()
+            if row:
+                results.append({"candidate_type":"aufgabe","candidate_id":str(row["id"]),"score":1.0,"reason":f"Auftrags-Nr {tid} exakt"})
+        # E-Mail-Adresse
+        for m in _re_cap.finditer(r'\b([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})\b', text):
+            email = m.group(1).lower()
+            row = db.execute("SELECT id FROM tasks WHERE kunden_email=? ORDER BY datum_mail DESC LIMIT 1", (email,)).fetchone()
+            if row:
+                results.append({"candidate_type":"aufgabe","candidate_id":str(row["id"]),"score":0.95,"reason":f"E-Mail {email} exakt"})
+        db.close()
+    except Exception:
+        pass
+    # Lexware-Kontakte (eigene DB)
+    try:
+        db2 = sqlite3.connect(str(TASKS_DB))
+        db2.row_factory = sqlite3.Row
+        for m in _re_cap.finditer(r'\b([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})\b', text):
+            email = m.group(1).lower()
+            row = db2.execute("SELECT id FROM lexware_kontakte WHERE LOWER(email)=? LIMIT 1", (email,)).fetchone()
+            if row:
+                results.append({"candidate_type":"lexware_kontakt","candidate_id":str(row["id"]),"score":0.95,"reason":f"Lexware E-Mail {email}"})
+        db2.close()
+    except Exception:
+        pass
+    return results
+
+
+def _capture_soft_match(text):
+    """Stufe 2: Weiche Treffer per unscharfem Namens-/Schlagwort-Abgleich. Score 0.3-0.89."""
+    results = []
+    if not text or len(text.strip()) < 3:
+        return results
+    # Tokens extrahieren, Stoppwoerter entfernen
+    stop = {'und','der','die','das','ist','ich','sie','wir','ein','eine','den','dem','des','von','fuer',
+            'mit','auf','an','in','im','am','bei','nach','vor','the','and','for','with','that','this'}
+    tokens = [t.lower() for t in _re_cap.findall(r'[A-Za-z\u00c0-\u024f]{3,}', text)]
+    tokens = [t for t in tokens if t not in stop and len(t) >= 3]
+    if not tokens:
+        return results
+    seen = set()
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        for tok in tokens[:8]:
+            # Aufgaben
+            rows = db.execute(
+                "SELECT id, kunden_name, titel FROM tasks WHERE LOWER(kunden_name) LIKE ? OR LOWER(titel) LIKE ? LIMIT 5",
+                (f'%{tok}%', f'%{tok}%')
+            ).fetchall()
+            for r in rows:
+                key = f"aufgabe:{r['id']}"
+                if key not in seen:
+                    seen.add(key)
+                    results.append({"candidate_type":"aufgabe","candidate_id":str(r['id']),"score":0.55,"reason":f"Namenstokenmatch: {tok}"})
+            # Angebote
+            rows2 = db.execute(
+                "SELECT id, kunde_name FROM angebote WHERE LOWER(kunde_name) LIKE ? LIMIT 3",
+                (f'%{tok}%',)
+            ).fetchall()
+            for r in rows2:
+                key = f"angebot:{r['id']}"
+                if key not in seen:
+                    seen.add(key)
+                    results.append({"candidate_type":"angebot","candidate_id":str(r['id']),"score":0.50,"reason":f"Angebot Kundenmatch: {tok}"})
+            # Lexware-Kontakte
+            try:
+                rows3 = db.execute(
+                    "SELECT id, name FROM lexware_kontakte WHERE LOWER(name) LIKE ? LIMIT 3",
+                    (f'%{tok}%',)
+                ).fetchall()
+                for r in rows3:
+                    key = f"lexware_kontakt:{r['id']}"
+                    if key not in seen:
+                        seen.add(key)
+                        results.append({"candidate_type":"lexware_kontakt","candidate_id":str(r['id']),"score":0.60,"reason":f"Lexware Kontaktmatch: {tok}"})
+            except Exception:
+                pass
+        db.close()
+    except Exception:
+        pass
+    # Top 5 nach Score sortiert
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:5]
+
+
+def _capture_analyse(capture_id):
+    """Hintergrund-Thread: fuehrt 3-Tier-Matching durch und aktualisiert capture_items."""
+    import sqlite3 as _sq3
+    try:
+        db = _sq3.connect(str(TASKS_DB))
+        db.row_factory = _sq3.Row
+        row = db.execute("SELECT * FROM capture_items WHERE id=?", (capture_id,)).fetchone()
+        if not row:
+            db.close()
+            return
+        text = row["normalized_text"] or row["raw_text"] or ""
+        db.execute("UPDATE capture_items SET processing_status='running', updated_at=datetime('now') WHERE id=?", (capture_id,))
+        db.commit()
+        # Config laden
+        try:
+            cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+            cap_cfg = cfg.get("capture", {})
+            threshold = float(cap_cfg.get("confidence_threshold", 0.75))
+            auto_assign = bool(cap_cfg.get("auto_assign", False))
+        except Exception:
+            threshold = 0.75
+            auto_assign = False
+        # Stufe 1 + 2
+        hard = _capture_hard_match(text)
+        soft = _capture_soft_match(text)
+        all_matches = hard + [m for m in soft if not any(h["candidate_id"]==m["candidate_id"] and h["candidate_type"]==m["candidate_type"] for h in hard)]
+        for m in all_matches:
+            try:
+                db.execute(
+                    "INSERT INTO capture_matches (capture_id, candidate_type, candidate_id, score, reason) VALUES (?,?,?,?,?)",
+                    (capture_id, m["candidate_type"], m["candidate_id"], m["score"], m["reason"])
+                )
+            except Exception:
+                pass
+        db.commit()
+        # Bestes Match ermitteln
+        best = max(all_matches, key=lambda x: x["score"]) if all_matches else None
+        best_score = best["score"] if best else 0.0
+        if best_score >= threshold:
+            new_status = "zugeordnet"
+            review_required = 0
+        elif best_score >= 0.4:
+            new_status = "pruefung"
+            review_required = 1
+        else:
+            new_status = "pruefung"
+            review_required = 1
+        if best and auto_assign and best_score >= threshold:
+            db.execute("UPDATE capture_matches SET accepted=1 WHERE capture_id=? AND candidate_id=? AND candidate_type=?",
+                       (capture_id, best["candidate_id"], best["candidate_type"]))
+            db.execute("""UPDATE capture_items SET status=?, processing_status='done', confidence=?,
+                          matched_entity_type=?, matched_entity_id=?, final_entity_type=?, final_entity_id=?,
+                          review_required=?, updated_at=datetime('now') WHERE id=?""",
+                       (new_status, best_score, best["candidate_type"], best["candidate_id"],
+                        best["candidate_type"], best["candidate_id"], review_required, capture_id))
+        else:
+            db.execute("""UPDATE capture_items SET status=?, processing_status='done', confidence=?,
+                          matched_entity_type=?, matched_entity_id=?, review_required=?,
+                          updated_at=datetime('now') WHERE id=?""",
+                       (new_status, best_score,
+                        best["candidate_type"] if best else None,
+                        best["candidate_id"] if best else None,
+                        review_required, capture_id))
+        db.commit()
+        db.close()
+        # Runtime-Log
+        try:
+            rlog('capture', 'analyse_done',
+                 f"Capture #{capture_id}: {len(all_matches)} Kandidaten, Konfidenz {best_score:.2f}, Status {new_status}",
+                 source='capture', modul='capture', status='ok')
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            _sq3.connect(str(TASKS_DB)).execute(
+                "UPDATE capture_items SET processing_status='failed', updated_at=datetime('now') WHERE id=?",
+                (capture_id,)
+            )
+        except Exception:
+            pass
+
+
+def _mobil_get_secret():
+    """Liest server_secret aus secrets.json. Fallback: festes Default (schwach, aber besser als leer)."""
+    try:
+        s = json.loads((SCRIPTS_DIR / "secrets.json").read_text('utf-8'))
+        sec = s.get("server_secret", "")
+        if sec and len(sec) >= 16:
+            return sec.encode('utf-8')
+    except Exception:
+        pass
+    return b"kira_mobil_default_secret_2026"
+
+
+def _mobil_generate_token(user_id="kai"):
+    """Erzeugt HMAC-basierten Session-Token fuer Mobile-Login."""
+    ts = str(int(_time_cap.time()))
+    msg = f"{user_id}:{ts}".encode('utf-8')
+    sig = _hmac_cap.new(_mobil_get_secret(), msg, _hashlib_cap.sha256).hexdigest()
+    payload = f"{user_id}:{ts}:{sig}"
+    return _b64_cap.urlsafe_b64encode(payload.encode('utf-8')).decode('utf-8')
+
+
+def _mobil_verify_token(token):
+    """Verifiziert Mobile-Session-Token. Gibt (ok:bool, user_id:str) zurueck."""
+    try:
+        payload = _b64_cap.urlsafe_b64decode(token.encode('utf-8')).decode('utf-8')
+        parts = payload.split(':')
+        if len(parts) != 3:
+            return False, ""
+        user_id, ts, sig = parts
+        # Ablauf pruefen
+        try:
+            cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+            hours = int(cfg.get("capture", {}).get("session_duration_hours", 24))
+        except Exception:
+            hours = 24
+        age = _time_cap.time() - int(ts)
+        if age > hours * 3600:
+            return False, ""
+        # HMAC pruefen
+        msg = f"{user_id}:{ts}".encode('utf-8')
+        expected = _hmac_cap.new(_mobil_get_secret(), msg, _hashlib_cap.sha256).hexdigest()
+        if not _hmac_cap.compare_digest(sig, expected):
+            return False, ""
+        return True, user_id
+    except Exception:
+        return False, ""
+
+
+def _capture_status_label(status):
+    labels = {
+        "eingegangen": "Eingegangen",
+        "gespeichert": "Gespeichert",
+        "an_kira": "Bei Kira",
+        "analysiert": "Analysiert",
+        "zugeordnet": "Zugeordnet",
+        "pruefung": "Pruefung",
+        "erledigt": "Erledigt",
+    }
+    return labels.get(status, status)
+
+
+def _capture_status_css(status):
+    m = {
+        "eingegangen": "cap-status-eingegangen",
+        "gespeichert": "cap-status-eingegangen",
+        "an_kira":     "cap-status-eingegangen",
+        "analysiert":  "cap-status-eingegangen",
+        "zugeordnet":  "cap-status-zugeordnet",
+        "pruefung":    "cap-status-pruefung",
+        "erledigt":    "cap-status-erledigt",
+    }
+    return m.get(status, "cap-status-eingegangen")
+
+
+def build_capture(db):
+    """Desktop-Panel fuer Capture / Mobile Memo (session-hhh)."""
+    # Statistiken laden
+    try:
+        stats = {}
+        stats["heute"] = db.execute(
+            "SELECT COUNT(*) FROM capture_items WHERE date(created_at)=date('now') AND archived=0"
+        ).fetchone()[0]
+        stats["pruefung"] = db.execute(
+            "SELECT COUNT(*) FROM capture_items WHERE status='pruefung' AND archived=0"
+        ).fetchone()[0]
+        stats["zugeordnet"] = db.execute(
+            "SELECT COUNT(*) FROM capture_items WHERE status='zugeordnet' AND archived=0"
+        ).fetchone()[0]
+        stats["archiviert"] = db.execute(
+            "SELECT COUNT(*) FROM capture_items WHERE archived=1"
+        ).fetchone()[0]
+    except Exception:
+        stats = {"heute": 0, "pruefung": 0, "zugeordnet": 0, "archiviert": 0}
+
+    # Letzte 20 Eintraege fuer Uebersicht
+    try:
+        recent_rows = db.execute(
+            "SELECT id, created_at, source_channel, raw_text, status, confidence, matched_entity_type FROM capture_items WHERE archived=0 ORDER BY created_at DESC LIMIT 20"
+        ).fetchall()
+        recent = [dict(r) for r in recent_rows]
+    except Exception:
+        recent = []
+
+    recent_rows_html = ""
+    for r in recent:
+        txt_preview = (r.get("raw_text") or "")[:80].replace('<', '&lt;').replace('>', '&gt;')
+        ts = format_datum(r.get("created_at", ""))
+        status = r.get("status", "eingegangen")
+        conf = r.get("confidence") or 0.0
+        match_typ = r.get("matched_entity_type") or ""
+        conf_bar = f'<span class="cap-conf-bar"><span class="cap-conf-fill" style="width:{int(conf*100)}%"></span></span>' if conf > 0 else ""
+        recent_rows_html += f"""
+        <div class="cap-row" onclick="capOpenDetail({r['id']})">
+          <span style="color:var(--muted);font-size:12px">{ts}</span>
+          <span style="font-size:11px;color:var(--muted)">{esc(r.get('source_channel',''))}</span>
+          <span style="font-size:13px">{txt_preview}&hellip;</span>
+          <span class="cap-status {_capture_status_css(status)}">{_capture_status_label(status)}</span>
+          {conf_bar}
+          <span style="font-size:11px;color:var(--muted)">{esc(match_typ)}</span>
+        </div>"""
+
+    mobile_url = "http://localhost:8765/mobil"
+
+    return f"""
+<div class="cap-shell">
+
+  <!-- Header KPIs -->
+  <div class="page-header" style="flex-wrap:wrap;gap:12px;margin-bottom:0">
+    <h1 class="page-title">&#x1F4E5; Capture &amp; Mobile Memo</h1>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+      <a href="{mobile_url}" target="_blank" class="btn btn-sec btn-xs" title="Mobile-Webapp oeffnen">&#x1F4F1; Mobil oeffnen</a>
+      <button class="btn btn-primary btn-xs" onclick="capShowQuickForm()">&#x2B; Schnell erfassen</button>
+      <button class="btn btn-sec btn-xs" onclick="capLoadList(1)">&#x21BB; Aktualisieren</button>
+    </div>
+  </div>
+
+  <!-- KPI-Leiste -->
+  <div style="display:flex;gap:10px;margin:14px 0 18px;flex-wrap:wrap">
+    <div class="cap-kpi" onclick="capShowView('eingang')" title="Heute erfasst" style="cursor:pointer">
+      <div class="cap-kpi-val" id="capKpiHeute">{stats['heute']}</div>
+      <div class="cap-kpi-lbl">Heute erfasst</div>
+    </div>
+    <div class="cap-kpi" onclick="capFilterStatus('pruefung')" title="Zu pruefen" style="cursor:pointer;border-color:rgba(220,74,74,.3)">
+      <div class="cap-kpi-val" style="color:var(--danger)" id="capKpiPruefung">{stats['pruefung']}</div>
+      <div class="cap-kpi-lbl">Zu prufen</div>
+    </div>
+    <div class="cap-kpi" onclick="capFilterStatus('zugeordnet')" title="Zugeordnet" style="cursor:pointer;border-color:rgba(40,180,80,.3)">
+      <div class="cap-kpi-val" style="color:#1a9e42" id="capKpiZugeordnet">{stats['zugeordnet']}</div>
+      <div class="cap-kpi-lbl">Zugeordnet</div>
+    </div>
+    <div class="cap-kpi" title="Archiviert">
+      <div class="cap-kpi-val" style="color:var(--muted)" id="capKpiArchiv">{stats['archiviert']}</div>
+      <div class="cap-kpi-lbl">Archiviert</div>
+    </div>
+  </div>
+
+  <!-- Schnell-Erfassen-Karte (initial versteckt) -->
+  <div class="cap-quick-form" id="capQuickForm" style="display:none">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">&#x1F4DD; Schnell erfassen</div>
+    <textarea class="cap-quick-textarea" id="capQuickText" placeholder="Notiz, Telefonmemo, Baustelleninfo... einfach schreiben." rows="4"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+      <label class="cap-file-zone" style="flex:0 0 auto;padding:8px 16px;font-size:12px">
+        <input type="file" id="capQuickFiles" multiple accept="image/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg" style="display:none" onchange="capUpdateFileList()">
+        &#x1F4CE; Dateien anhaengen (max. 5)
+      </label>
+      <span id="capFileList" style="font-size:11px;color:var(--muted)"></span>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn btn-sec btn-xs" onclick="capHideQuickForm()">Abbrechen</button>
+        <button class="btn btn-primary btn-xs" onclick="capSubmitNew()">Speichern &#x21AA;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="cap-nav" id="capNav">
+    <div class="cap-tab active" id="capTabUebersicht" onclick="capShowView('uebersicht')">&#x1F4CA; Uebersicht</div>
+    <div class="cap-tab" id="capTabEingang" onclick="capShowView('eingang');capLoadList(1)">&#x1F4E5; Eingang</div>
+    <div class="cap-tab" id="capTabDetail" id="capTabDetail" style="display:none">&#x1F4C4; Detail</div>
+  </div>
+
+  <!-- View: Uebersicht -->
+  <div id="capViewUebersicht" class="cap-view">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Letzte Eintraege</div>
+    <div class="cap-list" id="capRecentList">
+      <div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">
+        <span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span>
+      </div>
+      {recent_rows_html if recent_rows_html else '<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Eintraege. Jetzt erfassen!</div>'}
+    </div>
+  </div>
+
+  <!-- View: Eingang (Liste mit Filtern) -->
+  <div id="capViewEingang" class="cap-view" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <select id="capFilterSrc" class="proto-filter" onchange="capLoadList(1)">
+        <option value="">Alle Kanaele</option>
+        <option value="desktop">Desktop</option>
+        <option value="mobil">Mobil</option>
+      </select>
+      <select id="capFilterStat" class="proto-filter" onchange="capLoadList(1)">
+        <option value="">Alle Status</option>
+        <option value="eingegangen">Eingegangen</option>
+        <option value="pruefung">Zu pruefen</option>
+        <option value="zugeordnet">Zugeordnet</option>
+        <option value="erledigt">Erledigt</option>
+      </select>
+      <input type="date" id="capFilterDatum" class="proto-filter" onchange="capLoadList(1)" style="font-size:12px">
+      <span id="capListCount" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+    </div>
+    <div class="cap-list" id="capListContainer">
+      <div style="padding:32px;text-align:center;color:var(--muted)">Wird geladen&hellip;</div>
+    </div>
+    <div id="capListPager" style="display:flex;gap:6px;justify-content:center;padding:12px;display:none">
+      <button class="btn btn-sec btn-xs" id="capPrevBtn" onclick="capLoadList(window._capPage-1)">&#x276E; Vorher</button>
+      <span id="capPageInfo" style="font-size:12px;color:var(--muted);padding:6px 12px"></span>
+      <button class="btn btn-sec btn-xs" id="capNextBtn" onclick="capLoadList(window._capPage+1)">Weiter &#x276F;</button>
+    </div>
+  </div>
+
+  <!-- View: Detail -->
+  <div id="capViewDetail" class="cap-view" style="display:none">
+    <button class="btn btn-sec btn-xs" onclick="capShowView('eingang')" style="margin-bottom:12px">&#x2190; Zurueck</button>
+    <div id="capDetailContent"><div style="padding:40px;text-align:center;color:var(--muted)">Wird geladen&hellip;</div></div>
+  </div>
+
+</div>
+
+<script>
+window._capPage = 1;
+window._capFilterStat = '';
+
+window.capLoadStats = function() {{
+  fetch('/api/capture/stats').then(r=>r.json()).then(d=>{{
+    const h=document.getElementById('capKpiHeute');
+    const p=document.getElementById('capKpiPruefung');
+    const z=document.getElementById('capKpiZugeordnet');
+    const a=document.getElementById('capKpiArchiv');
+    if(h) h.textContent=d.heute||0;
+    if(p) p.textContent=d.pruefung||0;
+    if(z) z.textContent=d.zugeordnet||0;
+    if(a) a.textContent=d.archiviert||0;
+    // Sidebar badge aktualisieren
+    const badge = document.getElementById('nav-capture-badge');
+    if(badge) {{
+      const n = (d.pruefung||0)+(d.eingegangen||0);
+      if(n>0){{badge.style.display='';badge.textContent=n;}}else{{badge.style.display='none';}}
+    }}
+  }}).catch(()=>{{}});
+}};
+
+function capShowView(name) {{
+  ['uebersicht','eingang','detail'].forEach(n=>{{
+    const el=document.getElementById('capView'+n.charAt(0).toUpperCase()+n.slice(1));
+    if(el) el.style.display=n===name?'':'none';
+    const tab=document.getElementById('capTab'+n.charAt(0).toUpperCase()+n.slice(1));
+    if(tab) tab.classList.toggle('active',n===name);
+  }});
+  const dtab=document.getElementById('capTabDetail');
+  if(dtab) dtab.style.display=name==='detail'?'':'none';
+}}
+
+function capShowQuickForm() {{
+  const f=document.getElementById('capQuickForm');
+  if(f){{f.style.display='';f.querySelector('textarea').focus();}}
+}}
+function capHideQuickForm() {{
+  const f=document.getElementById('capQuickForm');
+  if(f) f.style.display='none';
+  const t=document.getElementById('capQuickText');
+  if(t) t.value='';
+  const fl=document.getElementById('capFileList');
+  if(fl) fl.textContent='';
+}}
+
+function capUpdateFileList() {{
+  const inp=document.getElementById('capQuickFiles');
+  const fl=document.getElementById('capFileList');
+  if(!inp||!fl) return;
+  if(inp.files.length>5) {{showToast('Maximal 5 Dateien erlaubt','fehler'); return;}}
+  fl.textContent=inp.files.length>0?Array.from(inp.files).map(f=>f.name).join(', '):'';
+}}
+
+function capSubmitNew() {{
+  const txt=document.getElementById('capQuickText');
+  const inp=document.getElementById('capQuickFiles');
+  if(!txt||!txt.value.trim()) {{showToast('Bitte Text eingeben','fehler'); return;}}
+  const text=txt.value.trim();
+  fetch('/api/capture/create',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{raw_text:text,source_channel:'desktop'}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{
+      const capId=d.id;
+      showToast('Capture erstellt #'+capId,'ok');
+      capHideQuickForm();
+      capLoadStats();
+      // Dateien hochladen falls vorhanden
+      if(inp&&inp.files.length>0) {{
+        capUploadFiles(capId, inp.files);
+      }}
+      // Letzte Eintraege neu laden
+      fetch('/api/capture/list?page=1&limit=20').then(r=>r.json()).then(ld=>capRenderRecentList(ld.items||[])).catch(()=>{{}});
+    }} else {{
+      showToast('Fehler: '+(d.error||'unbekannt'),'fehler');
+    }}
+  }}).catch(e=>showToast('Fehler: '+e,'fehler'));
+}}
+
+function capUploadFiles(capId, files) {{
+  const fd = new FormData();
+  fd.append('capture_id', capId);
+  Array.from(files).slice(0,5).forEach(f=>fd.append('files', f));
+  fetch('/api/capture/upload',{{method:'POST',body:fd}}).then(r=>r.json()).then(d=>{{
+    if(!d.ok) showToast('Upload-Fehler: '+(d.error||''),'fehler');
+  }}).catch(()=>{{}});
+}}
+
+function capLoadList(page) {{
+  if(!page||page<1) page=1;
+  window._capPage=page;
+  const src=document.getElementById('capFilterSrc');
+  const stat=document.getElementById('capFilterStat');
+  const datum=document.getElementById('capFilterDatum');
+  let qs='page='+page+'&limit=20';
+  if(src&&src.value) qs+='&source_channel='+encodeURIComponent(src.value);
+  if(stat&&stat.value) qs+='&status='+encodeURIComponent(stat.value);
+  if(datum&&datum.value) qs+='&datum='+encodeURIComponent(datum.value);
+  const cont=document.getElementById('capListContainer');
+  if(cont) cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Wird geladen&hellip;</div>';
+  fetch('/api/capture/list?'+qs).then(r=>r.json()).then(d=>{{
+    const items=d.items||[];
+    const total=d.total||0;
+    const cnt=document.getElementById('capListCount');
+    if(cnt) cnt.textContent=total+' Eintraege';
+    if(!cont) return;
+    if(items.length===0) {{
+      cont.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Keine Eintraege gefunden.</div>';
+    }} else {{
+      cont.innerHTML='<div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase"><span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span></div>'
+        + items.map(r=>capRenderRow(r)).join('');
+    }}
+    // Pager
+    const pager=document.getElementById('capListPager');
+    const pg=document.getElementById('capPageInfo');
+    const prev=document.getElementById('capPrevBtn');
+    const next=document.getElementById('capNextBtn');
+    if(pager) pager.style.display=total>20?'flex':'none';
+    if(pg) pg.textContent='Seite '+page+' von '+Math.ceil(total/20);
+    if(prev) prev.disabled=page<=1;
+    if(next) next.disabled=page>=Math.ceil(total/20);
+  }}).catch(e=>{{
+    if(cont) cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--danger)">Fehler: '+e+'</div>';
+  }});
+}}
+
+function capRenderRow(r) {{
+  const ts=r.created_at?r.created_at.substring(0,16).replace('T',' '):'';
+  const txt=(r.raw_text||'').substring(0,80).replace(/</g,'&lt;');
+  const st=r.status||'';
+  const conf=parseFloat(r.confidence||0);
+  const confBar=conf>0?'<span class="cap-conf-bar"><span class="cap-conf-fill" style="width:'+Math.round(conf*100)+'%"></span></span>':'';
+  const stCss={{'eingegangen':'cap-status-eingegangen','gespeichert':'cap-status-eingegangen','an_kira':'cap-status-eingegangen','analysiert':'cap-status-eingegangen','zugeordnet':'cap-status-zugeordnet','pruefung':'cap-status-pruefung','erledigt':'cap-status-erledigt'}}[st]||'cap-status-eingegangen';
+  const stLbl={{'eingegangen':'Eingegangen','gespeichert':'Gespeichert','zugeordnet':'Zugeordnet','pruefung':'Pruefen','erledigt':'Erledigt','an_kira':'Bei Kira'}}[st]||st;
+  return '<div class="cap-row" onclick="capOpenDetail('+r.id+')">'
+    +'<span style="color:var(--muted);font-size:12px">'+ts+'</span>'
+    +'<span style="font-size:11px;color:var(--muted)">'+(r.source_channel||'')+'</span>'
+    +'<span style="font-size:13px">'+txt+'&hellip;</span>'
+    +'<span class="cap-status '+stCss+'">'+stLbl+'</span>'
+    +confBar
+    +'<span style="font-size:11px;color:var(--muted)">'+(r.matched_entity_type||'')+'</span>'
+    +'</div>';
+}}
+
+function capRenderRecentList(items) {{
+  const cont=document.getElementById('capRecentList');
+  if(!cont) return;
+  if(items.length===0){{
+    cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Eintraege.</div>';
+    return;
+  }}
+  cont.innerHTML='<div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase"><span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span></div>'
+    + items.map(r=>capRenderRow(r)).join('');
+}}
+
+function capFilterStatus(st) {{
+  const sel=document.getElementById('capFilterStat');
+  if(sel) sel.value=st;
+  capShowView('eingang');
+  capLoadList(1);
+}}
+
+function capOpenDetail(id) {{
+  capShowView('detail');
+  const dtab=document.getElementById('capTabDetail');
+  if(dtab){{dtab.style.display='';dtab.classList.add('active');}}
+  const cont=document.getElementById('capDetailContent');
+  if(cont) cont.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Wird geladen&hellip;</div>';
+  fetch('/api/capture/item/'+id).then(r=>r.json()).then(d=>{{
+    if(!cont) return;
+    if(!d.id){{cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--danger)">Eintrag nicht gefunden.</div>';return;}}
+    const conf=parseFloat(d.confidence||0);
+    const matchHtml=(d.matches||[]).map(m=>
+      '<div class="cap-match-card">'
+      +'<span class="cap-conf-bar"><span class="cap-conf-fill" style="width:'+Math.round(m.score*100)+'%"></span></span>'
+      +'<span style="font-size:12px;color:var(--muted)">'+Math.round(m.score*100)+'%</span>'
+      +'<span style="font-size:12px;font-weight:600">'+m.candidate_type+'</span>'
+      +'<span style="font-size:12px;color:var(--muted)">#'+m.candidate_id+'</span>'
+      +'<span style="flex:1;font-size:11px;color:var(--muted)">'+m.reason+'</span>'
+      +(m.accepted?'<span style="color:#1a9e42;font-size:11px">&#x2713; Akzeptiert</span>':'<button class="btn btn-sec btn-xs" onclick="capAcceptMatch('+d.id+','+m.id+')">Zuordnen</button>')
+      +'</div>'
+    ).join('');
+    const filesHtml=(d.files||[]).map(f=>
+      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+      +'<span style="font-size:20px">'+(f.file_type==='image'?'&#x1F5BC;':'&#x1F4C4;')+'</span>'
+      +'<span style="font-size:13px;flex:1">'+f.original_name+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">'+Math.round((f.file_size||0)/1024)+' KB</span>'
+      +'<span style="font-size:11px;color:var(--muted)">'+f.upload_status+'</span>'
+      +'</div>'
+    ).join('');
+    const actionsHtml=(d.actions||[]).slice(0,5).map(a=>
+      '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">'
+      +a.created_at.substring(0,16)+' &mdash; <b>'+a.action+'</b>'+(a.result?' &rarr; '+a.result:'')+'</div>'
+    ).join('');
+    const stCss={{'eingegangen':'cap-status-eingegangen','gespeichert':'cap-status-eingegangen','an_kira':'cap-status-eingegangen','analysiert':'cap-status-eingegangen','zugeordnet':'cap-status-zugeordnet','pruefung':'cap-status-pruefung','erledigt':'cap-status-erledigt'}}[d.status]||'cap-status-eingegangen';
+    const stLbl={{'eingegangen':'Eingegangen','gespeichert':'Gespeichert','zugeordnet':'Zugeordnet','pruefung':'Zu pruefen','erledigt':'Erledigt','an_kira':'Bei Kira'}}[d.status]||d.status;
+    cont.innerHTML=
+      '<div class="cap-detail">'
+      +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">'
+      +'<span style="font-size:20px;font-weight:700;color:var(--text)">#'+d.id+'</span>'
+      +'<span class="cap-status '+stCss+'">'+stLbl+'</span>'
+      +'<span style="font-size:12px;color:var(--muted)">'+(d.created_at||'').substring(0,16).replace('T',' ')+'</span>'
+      +'<span style="font-size:12px;color:var(--muted)">Kanal: '+esc(d.source_channel||'')+'</span>'
+      +(d.confidence>0.05?'<span class="cap-conf-bar" style="width:80px"><span class="cap-conf-fill" style="width:'+Math.round(d.confidence*100)+'%"></span></span><span style="font-size:11px;color:var(--muted)">'+Math.round(d.confidence*100)+'% Konfidenz</span>':'')
+      +'<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button class="btn btn-primary btn-xs" onclick="capKiraOpen('+d.id+')">&#x1F916; Mit Kira</button>'
+      +'<button class="btn btn-sec btn-xs" onclick="capMarkErledigt('+d.id+')">&#x2713; Erledigt</button>'
+      +'<button class="btn btn-muted btn-xs" onclick="capArchivieren('+d.id+')">&#x1F4C2; Archivieren</button>'
+      +'</div></div>'
+      +'<div class="cap-detail-text">'+(d.raw_text||'').replace(/</g,'&lt;')+'</div>'
+      +(filesHtml?'<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">ANHAENGE ('+d.files.length+')</div>'+filesHtml+'</div>':'')
+      +(matchHtml?'<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">MATCH-KANDIDATEN</div>'+matchHtml+'</div>':'<div style="color:var(--muted);font-size:12px;margin-bottom:14px">Keine Matches gefunden.</div>')
+      +(actionsHtml?'<div><div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">AKTIONS-LOG</div>'+actionsHtml+'</div>':'')
+      +'</div>';
+  }}).catch(e=>{{if(cont) cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--danger)">Fehler: '+e+'</div>';}});
+}}
+
+function capAcceptMatch(capId, matchId) {{
+  fetch('/api/capture/assign',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{capture_id:capId,match_id:matchId}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok){{showToast('Zuordnung gespeichert','ok');capOpenDetail(capId);capLoadStats();}}
+    else showToast('Fehler: '+(d.error||''),'fehler');
+  }}).catch(()=>{{}});
+}}
+
+function capMarkErledigt(id) {{
+  fetch('/api/capture/action',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{capture_id:id,action:'erledigt'}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok){{showToast('Als erledigt markiert','ok');capOpenDetail(id);capLoadStats();}}
+    else showToast('Fehler','fehler');
+  }}).catch(()=>{{}});
+}}
+
+function capArchivieren(id) {{
+  fetch('/api/capture/action',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{capture_id:id,action:'archivieren'}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok){{showToast('Archiviert','ok');capShowView('eingang');capLoadStats();}}
+    else showToast('Fehler','fehler');
+  }}).catch(()=>{{}});
+}}
+
+function capKiraOpen(id) {{
+  fetch('/api/capture/item/'+id).then(r=>r.json()).then(d=>{{
+    const text='[Capture #'+id+']\\n'+(d.raw_text||'');
+    const match=d.matches&&d.matches.length>0?'\\nBeste Zuordnung: '+d.matches[0].candidate_type+' #'+d.matches[0].candidate_id:'';
+    openKiraWorkspace('capture','Capture #'+id+': '+(d.raw_text||'').substring(0,60));
+    setTimeout(()=>{{const inp=document.getElementById('kwInput');if(inp){{inp.value=text+match;inp.focus();}}}},600);
+  }}).catch(()=>{{}});
+}}
+</script>"""
+
+
+def build_mobil_page():
+    """Standalone Mobile-Webapp HTML fuer /mobil (session-hhh)."""
+    return """<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Kira Capture</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{--mob-accent:#7c3aed;--mob-accent-light:rgba(124,58,237,.12);--mob-bg:#f8f7ff;--mob-bg-card:#ffffff;--mob-text:#1a1535;--mob-muted:#6b6b80;--mob-border:rgba(0,0,0,.1);--mob-danger:#dc4a4a;--mob-success:#1a9e42;--mob-radius:12px;--mob-shadow:0 2px 12px rgba(124,58,237,.08);}
+@media(prefers-color-scheme:dark){:root{--mob-bg:#0e0c1a;--mob-bg-card:#1a1730;--mob-text:#e8e6f0;--mob-muted:#8888a0;--mob-border:rgba(255,255,255,.1);}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--mob-bg);color:var(--mob-text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+.mob-app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+.mob-header{background:var(--mob-bg-card);border-bottom:1px solid var(--mob-border);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;box-shadow:var(--mob-shadow);}
+.mob-header-logo{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mob-header-title{font-size:16px;font-weight:700;color:var(--mob-text);}
+.mob-header-sub{font-size:11px;color:var(--mob-muted);}
+.mob-status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:auto;flex-shrink:0;}
+.mob-status-dot.ok{background:var(--mob-success);}
+.mob-status-dot.err{background:var(--mob-danger);}
+.mob-main{flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.mob-card{background:var(--mob-bg-card);border:1px solid var(--mob-border);border-radius:var(--mob-radius);padding:16px;box-shadow:var(--mob-shadow);}
+.mob-card-title{font-size:13px;font-weight:700;color:var(--mob-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.mob-field{margin-bottom:12px;}
+.mob-label{font-size:12px;font-weight:600;color:var(--mob-muted);margin-bottom:4px;display:block;}
+.mob-textarea{width:100%;min-height:120px;resize:none;border:1.5px solid var(--mob-border);border-radius:8px;padding:12px;font-size:15px;font-family:inherit;background:var(--mob-bg);color:var(--mob-text);outline:none;-webkit-tap-highlight-color:transparent;}
+.mob-textarea:focus{border-color:var(--mob-accent);}
+.mob-input{width:100%;border:1.5px solid var(--mob-border);border-radius:8px;padding:11px 12px;font-size:14px;font-family:inherit;background:var(--mob-bg);color:var(--mob-text);outline:none;}
+.mob-input:focus{border-color:var(--mob-accent);}
+.mob-file-zone{border:2px dashed var(--mob-border);border-radius:8px;padding:14px;text-align:center;color:var(--mob-muted);font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.mob-file-zone:active{background:var(--mob-accent-light);}
+.mob-file-list{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.mob-file-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mob-muted);padding:4px 8px;background:var(--mob-accent-light);border-radius:6px;}
+.mob-btn{display:block;width:100%;padding:14px;font-size:16px;font-weight:700;color:#fff;background:var(--mob-accent);border:none;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:inherit;letter-spacing:.3px;}
+.mob-btn:active{opacity:.85;}
+.mob-btn.sec{background:transparent;color:var(--mob-accent);border:1.5px solid var(--mob-accent);}
+.mob-btn:disabled{opacity:.5;pointer-events:none;}
+.mob-log{display:flex;flex-direction:column;gap:4px;}
+.mob-log-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:12px;border:1px solid var(--mob-border);}
+.mob-log-item.ok{border-color:rgba(26,158,66,.25);background:rgba(26,158,66,.06);}
+.mob-log-item.err{border-color:rgba(220,74,74,.25);background:rgba(220,74,74,.06);}
+.mob-log-item.warn{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.06);}
+.mob-log-dot{width:6px;height:6px;border-radius:50%;background:var(--mob-muted);flex-shrink:0;}
+.mob-log-dot.ok{background:var(--mob-success);}
+.mob-log-dot.err{background:var(--mob-danger);}
+.mob-log-dot.warn{background:#f59e0b;}
+.mob-chip{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.mob-chip.ok{background:rgba(26,158,66,.12);color:var(--mob-success);}
+.mob-chip.warn{background:rgba(245,158,11,.12);color:#b45309;}
+.mob-chip.err{background:rgba(220,74,74,.12);color:var(--mob-danger);}
+.mob-toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--mob-text);color:var(--mob-bg);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
+.mob-toast.show{opacity:1;}
+#mobLogin{display:none;}
+#mobCapture{display:none;}
+</style>
+</head>
+<body>
+<div class="mob-app">
+  <header class="mob-header">
+    <div class="mob-header-logo">
+      <svg width="18" height="18" viewBox="0 0 30 30" fill="none">
+        <circle cx="15" cy="15" r="14" fill="#fff" opacity=".25"/>
+        <ellipse cx="11" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/>
+        <ellipse cx="19" cy="14" rx="2.2" ry="2.5" fill="#fff" opacity=".92"/>
+        <ellipse cx="11.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/>
+        <ellipse cx="19.4" cy="14.3" rx=".9" ry="1.1" fill="#4c1d95" opacity=".8"/>
+        <path d="M11 19.5 Q15 22 19 19.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="mob-header-title">Kira Capture</div>
+      <div class="mob-header-sub" id="mobSubline">Laden&hellip;</div>
+    </div>
+    <div class="mob-status-dot" id="mobDot"></div>
+  </header>
+
+  <main class="mob-main">
+    <!-- Login -->
+    <div id="mobLogin">
+      <div class="mob-card">
+        <div class="mob-card-title">Anmelden</div>
+        <div class="mob-field">
+          <label class="mob-label" for="mobPw">Passwort</label>
+          <input class="mob-input" type="password" id="mobPw" placeholder="Kira-Passwort" autocomplete="current-password">
+        </div>
+        <button class="mob-btn" id="mobLoginBtn" onclick="mobDoLogin()">Anmelden</button>
+        <div id="mobLoginErr" style="margin-top:10px;font-size:12px;color:var(--mob-danger);display:none"></div>
+      </div>
+    </div>
+
+    <!-- Capture Form -->
+    <div id="mobCapture">
+      <div class="mob-card">
+        <div class="mob-card-title">&#x1F4DD; Neue Erfassung</div>
+        <div class="mob-field">
+          <label class="mob-label" for="mobText">Notiz / Memo</label>
+          <textarea class="mob-textarea" id="mobText" placeholder="Freitext: Telefonmemo, Baustellennotiz, Beobachtung, Aufgabenhinweis&hellip;" rows="5"></textarea>
+        </div>
+        <div class="mob-field">
+          <label class="mob-label" for="mobBezug">Bezug (optional)</label>
+          <input class="mob-input" type="text" id="mobBezug" placeholder="Name, Projektnummer, Kundennummer...">
+        </div>
+        <div class="mob-field">
+          <label class="mob-file-zone" for="mobFiles" onclick="document.getElementById('mobFiles').click()">
+            <span style="font-size:24px">&#x1F4CE;</span><br>
+            Fotos oder Dokumente anhaengen<br>
+            <span style="font-size:11px">Max. 5 Dateien &middot; 10 MB pro Datei</span>
+          </label>
+          <input type="file" id="mobFiles" multiple accept="image/*,.pdf,.doc,.docx,.txt" style="display:none" onchange="mobUpdateFiles()">
+          <div class="mob-file-list" id="mobFileList"></div>
+        </div>
+        <button class="mob-btn" id="mobSendBtn" onclick="mobSend()">Erfassen &#x21AA;</button>
+        <button class="mob-btn sec" style="margin-top:8px" onclick="mobClear()">Leeren</button>
+      </div>
+
+      <!-- Status Log -->
+      <div class="mob-card" id="mobLogCard" style="display:none">
+        <div class="mob-card-title">&#x1F4CB; Verarbeitungsstatus</div>
+        <div class="mob-log" id="mobLog"></div>
+      </div>
+
+      <!-- Letzte Eintraege -->
+      <div class="mob-card" id="mobRecentCard">
+        <div class="mob-card-title">Letzte Eintraege</div>
+        <div id="mobRecentList" style="color:var(--mob-muted);font-size:13px">Wird geladen&hellip;</div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="mob-toast" id="mobToast"></div>
+
+<script>
+var _mobToken = null;
+var _mobPolling = {};
+
+function mobInit() {
+  _mobToken = localStorage.getItem('kira_mob_token');
+  if(_mobToken) {
+    mobCheckSession();
+  } else {
+    mobShowLogin();
+  }
+}
+
+function mobShowLogin() {
+  document.getElementById('mobLogin').style.display='';
+  document.getElementById('mobCapture').style.display='none';
+  document.getElementById('mobSubline').textContent='Bitte anmelden';
+  var dot=document.getElementById('mobDot');
+  if(dot) dot.className='mob-status-dot';
+}
+
+function mobShowCapture(user) {
+  document.getElementById('mobLogin').style.display='none';
+  document.getElementById('mobCapture').style.display='';
+  document.getElementById('mobSubline').textContent='Angemeldet';
+  var dot=document.getElementById('mobDot');
+  if(dot) dot.className='mob-status-dot ok';
+  mobLoadRecent();
+}
+
+function mobCheckSession() {
+  fetch('/mobil/api/status/0',{headers:{'X-Mob-Token':_mobToken}})
+    .then(r=>r.json()).then(d=>{
+      if(d.auth==='ok'){mobShowCapture('kai');}
+      else{localStorage.removeItem('kira_mob_token');_mobToken=null;mobShowLogin();}
+    }).catch(()=>{mobShowLogin();});
+}
+
+function mobDoLogin() {
+  var pw = document.getElementById('mobPw').value;
+  var err = document.getElementById('mobLoginErr');
+  var btn = document.getElementById('mobLoginBtn');
+  if(!pw){err.textContent='Bitte Passwort eingeben';err.style.display='';return;}
+  btn.disabled=true;
+  fetch('/mobil/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+    .then(r=>r.json()).then(d=>{
+      btn.disabled=false;
+      if(d.ok&&d.token){
+        _mobToken=d.token;
+        localStorage.setItem('kira_mob_token',_mobToken);
+        err.style.display='none';
+        document.getElementById('mobPw').value='';
+        mobShowCapture('kai');
+      } else {
+        err.textContent=d.error||'Anmeldung fehlgeschlagen';
+        err.style.display='';
+      }
+    }).catch(e=>{btn.disabled=false;err.textContent='Fehler: '+e;err.style.display='';});
+}
+
+function mobUpdateFiles() {
+  var inp=document.getElementById('mobFiles');
+  var list=document.getElementById('mobFileList');
+  if(!inp||!list) return;
+  var files=Array.from(inp.files);
+  if(files.length>5){mobToast('Maximal 5 Dateien');inp.value='';list.innerHTML='';return;}
+  list.innerHTML=files.map(f=>'<div class="mob-file-item"><span>'+(f.type.startsWith('image/')?'&#x1F5BC;':'&#x1F4C4;')+'</span><span style="flex:1">'+f.name+'</span><span>'+Math.round(f.size/1024)+' KB</span></div>').join('');
+}
+
+function mobSend() {
+  var text=document.getElementById('mobText').value.trim();
+  var bezug=document.getElementById('mobBezug').value.trim();
+  var inp=document.getElementById('mobFiles');
+  if(!text){mobToast('Bitte Text eingeben');return;}
+  var btn=document.getElementById('mobSendBtn');
+  btn.disabled=true;
+  var logCard=document.getElementById('mobLogCard');
+  var log=document.getElementById('mobLog');
+  if(logCard) logCard.style.display='';
+  if(log) log.innerHTML='';
+  mobLog('Sende an Kira&hellip;','warn');
+  var payload={raw_text:text,source_channel:'mobil'};
+  if(bezug) payload.bezug=bezug;
+  fetch('/mobil/api/capture',{method:'POST',headers:{'Content-Type':'application/json','X-Mob-Token':_mobToken},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        var capId=d.id;
+        mobLog('Erfasst #'+capId,'ok');
+        mobLog('Analyse gestartet&hellip;','warn');
+        // Dateien hochladen
+        if(inp&&inp.files.length>0){
+          var fd=new FormData();
+          fd.append('capture_id',capId);
+          Array.from(inp.files).forEach(f=>fd.append('files',f));
+          fetch('/api/capture/upload',{method:'POST',headers:{'X-Mob-Token':_mobToken},body:fd})
+            .then(r=>r.json()).then(ud=>{
+              if(ud.ok){mobLog(ud.count+' Datei(en) hochgeladen','ok');}
+              else{mobLog('Upload-Fehler: '+(ud.error||''),'err');}
+            }).catch(()=>mobLog('Upload fehlgeschlagen','err'));
+        }
+        // Polling starten
+        mobPollStatus(capId);
+        btn.disabled=false;
+        mobToast('Erfasst!');
+        mobClear();
+      } else {
+        mobLog('Fehler: '+(d.error||'Unbekannt'),'err');
+        btn.disabled=false;
+      }
+    }).catch(e=>{mobLog('Sende-Fehler: '+e,'err');btn.disabled=false;});
+}
+
+function mobPollStatus(capId) {
+  var attempts=0;
+  function poll(){
+    if(attempts++>20) return;
+    fetch('/api/capture/item/'+capId,{headers:{'X-Mob-Token':_mobToken}})
+      .then(r=>r.json()).then(d=>{
+        var st=d.processing_status;
+        var status=d.status;
+        if(st==='done'){
+          if(status==='zugeordnet'){
+            mobLog('Zugeordnet: '+d.matched_entity_type+' #'+d.matched_entity_id,'ok');
+          } else if(status==='pruefung'){
+            mobLog('Manuelle Pruefung erforderlich','warn');
+          } else {
+            mobLog('Verarbeitung abgeschlossen','ok');
+          }
+          mobLoadRecent();
+        } else if(st==='failed'){
+          mobLog('Analyse fehlgeschlagen','err');
+        } else {
+          setTimeout(poll,2500);
+        }
+      }).catch(()=>setTimeout(poll,3000));
+  }
+  setTimeout(poll,1500);
+}
+
+function mobLog(msg,type) {
+  var log=document.getElementById('mobLog');
+  if(!log) return;
+  var now=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var div=document.createElement('div');
+  div.className='mob-log-item '+(type||'');
+  div.innerHTML='<div class="mob-log-dot '+(type||'')+'"></div><span style="color:var(--mob-muted);flex-shrink:0;font-size:11px">'+now+'</span><span>'+msg+'</span>';
+  log.prepend(div);
+}
+
+function mobClear(){
+  var t=document.getElementById('mobText');var b=document.getElementById('mobBezug');
+  var f=document.getElementById('mobFiles');var fl=document.getElementById('mobFileList');
+  if(t)t.value='';if(b)b.value='';if(f)f.value='';if(fl)fl.innerHTML='';
+}
+
+function mobLoadRecent(){
+  var list=document.getElementById('mobRecentList');
+  if(!list) return;
+  fetch('/api/capture/list?page=1&limit=5&source_channel=mobil',{headers:{'X-Mob-Token':_mobToken||''}})
+    .then(r=>r.json()).then(d=>{
+      var items=d.items||[];
+      if(items.length===0){list.innerHTML='<span style="color:var(--mob-muted);font-size:13px">Noch keine Eintraege.</span>';return;}
+      list.innerHTML=items.map(r=>{
+        var st={eingegangen:'warn',pruefung:'err',zugeordnet:'ok',erledigt:'ok'}[r.status]||'';
+        var stl={eingegangen:'Eingegangen',pruefung:'Zu pruefen',zugeordnet:'Zugeordnet',erledigt:'Erledigt',an_kira:'Bei Kira'}[r.status]||r.status;
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--mob-border);display:flex;align-items:center;gap:8px">'
+          +'<span class="mob-chip '+st+'">'+stl+'</span>'
+          +'<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.raw_text||'').substring(0,60)+'</span>'
+          +'<span style="font-size:11px;color:var(--mob-muted)">'+(r.created_at||'').substring(0,10)+'</span>'
+          +'</div>';
+      }).join('');
+    }).catch(()=>{list.innerHTML='<span style="color:var(--mob-muted)">Fehler beim Laden.</span>';});
+}
+
+function mobToast(msg){
+  var t=document.getElementById('mobToast');
+  if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+mobInit();
+</script>
+</body>
+</html>"""
+
+
 # ── HAUPT-HTML ────────────────────────────────────────────────────────────────
 def generate_html() -> str:
     db = get_db()
@@ -10522,6 +11718,7 @@ def generate_html() -> str:
     wissen_html    = build_wissen(db)
     einstell_html  = build_einstellungen()
     lexware_html   = build_lexware(db)
+    capture_html   = build_capture(db)
     # Lexware Badge-Zaehler fuer Sidebar (session-fff)
     try:
         _lex_pruef_count = get_db().execute(
@@ -10529,6 +11726,13 @@ def generate_html() -> str:
         ).fetchone()[0]
     except Exception:
         _lex_pruef_count = 0
+    # Capture Badge-Zaehler fuer Sidebar (session-hhh)
+    try:
+        _cap_inbox_count = get_db().execute(
+            "SELECT COUNT(*) FROM capture_items WHERE status IN ('eingegangen','gespeichert','pruefung') AND archived=0"
+        ).fetchone()[0]
+    except Exception:
+        _cap_inbox_count = 0
     db.close()
 
     # Kira Launcher — SVG-Varianten
@@ -10621,6 +11825,10 @@ def generate_html() -> str:
       <div class="sidebar-item" id="nav-wissen" onclick="showPanel('wissen')" data-label="Wissen">
         <span class="si-icon">&#x1F4DA;</span><span class="si-label">Wissen</span>
       </div>
+      <div class="sidebar-item" id="nav-capture" onclick="showPanel('capture');capLoadStats()" data-label="Capture">
+        <span class="si-icon">&#x1F4E5;</span><span class="si-label">Capture</span>
+        {f'<span class="si-badge" id="nav-capture-badge" style="background:rgba(124,58,237,.12);color:#7c3aed;border-color:rgba(124,58,237,.25)">{_cap_inbox_count}</span>' if _cap_inbox_count > 0 else '<span class="si-badge" id="nav-capture-badge" style="display:none"></span>'}
+      </div>
       <div class="sidebar-item planned" id="nav-automationen" onclick="showPanel('automationen')" data-label="Automationen">
         <span class="si-icon">&#x26A1;</span><span class="si-label">Automationen</span>
         <span class="si-badge planned">Geplant</span>
@@ -10671,6 +11879,7 @@ def generate_html() -> str:
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
   <div class="panel" id="panel-lexware">{lexware_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
+  <div class="panel" id="panel-capture">{capture_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
   <div class="panel" id="panel-kira-aktivitaeten">
     <div class="page-header">
@@ -11286,7 +12495,8 @@ const PANEL_TITLES = {{
   dashboard:'Start', kommunikation:'Kommunikation', organisation:'Organisation',
   geschaeft:'Gesch\u00e4ft', lexware:'Lexware Office', wissen:'Wissen', einstellungen:'Einstellungen',
   kunden:'Kunden', marketing:'Marketing',
-  social:'Social / DMs', automationen:'Automationen', analysen:'Analysen'
+  social:'Social / DMs', automationen:'Automationen', analysen:'Analysen',
+  capture:'Capture'
 }};
 
 function showPanel(name) {{
@@ -11304,6 +12514,7 @@ function showPanel(name) {{
   if(name==='postfach' && typeof window.pfInit==='function') {{ window.pfInit(); }}
   if(name==='dashboard') {{ setTimeout(loadDashKalender, 400); }}
   if(name==='geschaeft') {{ setTimeout(loadGeschKiraSignale, 500); }}
+  if(name==='capture' && typeof window.capLoadStats==='function') {{ setTimeout(window.capLoadStats, 400); }}
 }}
 
 // === Lexware Office JS (session-eee) ===
@@ -16906,6 +18117,36 @@ footer{color:var(--muted);font-size:var(--fs-sm);text-align:center;padding:13px;
 .mobile-burger:hover{background:rgba(128,128,128,.08);}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:140;}
 .sidebar-overlay.active{display:block;}
+
+/* ═══ CAPTURE / MOBILE MEMO MODUL — cap-* prefix (session-hhh) ═══════════ */
+.cap-shell{display:flex;flex-direction:column;height:100%;}
+.cap-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:100px;cursor:default;transition:border-color .15s;}
+.cap-kpi:hover{border-color:var(--accent);}
+.cap-kpi-val{font-size:22px;font-weight:700;color:var(--text);}
+.cap-kpi-lbl{font-size:11px;color:var(--muted);}
+.cap-nav{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);}
+.cap-tab{padding:8px 16px;font-size:13px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;user-select:none;transition:color .12s;}
+.cap-tab:hover{color:var(--text);}
+.cap-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.cap-list{display:flex;flex-direction:column;gap:4px;}
+.cap-row{display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:8px 12px;border-radius:6px;align-items:center;border:1px solid var(--border);background:var(--bg-raised);cursor:pointer;font-size:13px;transition:border-color .12s;}
+.cap-row:hover{border-color:var(--accent);}
+.cap-status{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+.cap-status-eingegangen{background:rgba(100,100,200,.1);color:#6464c8;}
+.cap-status-pruefung{background:rgba(220,74,74,.1);color:var(--danger);}
+.cap-status-zugeordnet{background:rgba(40,200,80,.1);color:#1a9e42;}
+.cap-status-erledigt{background:rgba(100,100,100,.1);color:var(--muted);}
+.cap-detail{background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:0;}
+.cap-detail-text{font-size:15px;line-height:1.6;color:var(--text);white-space:pre-wrap;margin-bottom:16px;word-break:break-word;}
+.cap-match-card{border:1px solid var(--border);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+.cap-conf-bar{height:4px;border-radius:2px;background:var(--border);overflow:hidden;width:60px;display:inline-block;vertical-align:middle;}
+.cap-conf-fill{height:100%;background:var(--accent);transition:width .3s;}
+.cap-quick-form{background:var(--bg-raised);border:1px solid var(--accent);border-radius:10px;padding:16px;margin-bottom:20px;}
+.cap-quick-textarea{width:100%;min-height:80px;resize:vertical;font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;box-sizing:border-box;outline:none;}
+.cap-quick-textarea:focus{border-color:var(--accent);}
+.cap-file-zone{border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;margin-top:8px;display:block;transition:border-color .12s,color .12s;}
+.cap-file-zone:hover{border-color:var(--accent);color:var(--accent);}
+.cap-view{flex:1;}
 """
 
 
@@ -17367,6 +18608,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif re.match(r'^/api/kira/provider/(.+)/balance$', self.path):
             _m = re.match(r'^/api/kira/provider/(.+)/balance$', self.path)
             self._api_provider_balance(_m.group(1) if _m else "")
+
+        # Capture / Mobile Memo (session-hhh)
+        elif self.path.startswith('/api/capture/'):
+            self._api_capture_get()
+
+        elif self.path in ('/mobil', '/mobil/'):
+            self._html(build_mobil_page())
+
+        elif self.path == '/mobil/manifest.json':
+            manifest = json.dumps({"name":"Kira Capture","short_name":"Capture","start_url":"/mobil","display":"standalone","theme_color":"#7c3aed","background_color":"#f8f7ff","icons":[]}, ensure_ascii=False)
+            self._respond(200, 'application/json', manifest.encode('utf-8'))
 
         else:
             self._respond(404, 'text/plain', b'Not found')
@@ -20441,6 +21693,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length) or b'{}'
         self._raw_post_body = raw_body  # für HMAC-Prüfung (WhatsApp)
+        # Capture Datei-Upload: multipart/form-data VOR json.loads abfangen (session-hhh)
+        if self.path == '/api/capture/upload':
+            self._api_capture_upload(raw_body)
+            return
         body   = json.loads(raw_body)
 
         if self.path == '/api/mail/oauth/connect':
@@ -21603,6 +22859,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if _handle_lexware_post(self, self.path, body):
                 return
 
+        # Capture / Mobile Memo POST-Routing (session-hhh)
+        if self.path.startswith('/api/capture/') or self.path.startswith('/mobil/api/'):
+            self._api_capture_post(body)
+            return
+
         self._respond(404, 'text/plain', b'Not found')
 
     def _handle_whatsapp_webhook(self, raw_body: bytes, body: dict):
@@ -22541,6 +23802,316 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 
+    # ── Capture / Mobile Memo API (session-hhh) ───────────────────────────────
+
+    def _api_capture_get(self):
+        """GET /api/capture/* — Dispatcht Capture-Lese-Endpunkte."""
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        qs = urllib.parse.parse_qs(parsed.query)
+        def qp(k, d=""):
+            v = qs.get(k, [d])
+            return v[0] if v else d
+
+        if path == '/api/capture/stats':
+            try:
+                db = get_db()
+                heute = db.execute("SELECT COUNT(*) FROM capture_items WHERE date(created_at)=date('now') AND archived=0").fetchone()[0]
+                eingegangen = db.execute("SELECT COUNT(*) FROM capture_items WHERE status='eingegangen' AND archived=0").fetchone()[0]
+                pruefung = db.execute("SELECT COUNT(*) FROM capture_items WHERE status='pruefung' AND archived=0").fetchone()[0]
+                zugeordnet = db.execute("SELECT COUNT(*) FROM capture_items WHERE status='zugeordnet' AND archived=0").fetchone()[0]
+                archiviert = db.execute("SELECT COUNT(*) FROM capture_items WHERE archived=1").fetchone()[0]
+                db.close()
+                self._json({"heute": heute, "eingegangen": eingegangen, "pruefung": pruefung, "zugeordnet": zugeordnet, "archiviert": archiviert})
+            except Exception as e:
+                self._json({"heute": 0, "pruefung": 0, "zugeordnet": 0, "archiviert": 0, "error": str(e)})
+
+        elif path == '/api/capture/list':
+            try:
+                page = int(qp('page', '1'))
+                limit = min(int(qp('limit', '20')), 100)
+                offset = (page - 1) * limit
+                src = qp('source_channel')
+                stat = qp('status')
+                datum = qp('datum')
+                where_parts = ["archived=0"]
+                params = []
+                if src:
+                    where_parts.append("source_channel=?")
+                    params.append(src)
+                if stat:
+                    where_parts.append("status=?")
+                    params.append(stat)
+                if datum:
+                    where_parts.append("date(created_at)=?")
+                    params.append(datum)
+                where = " AND ".join(where_parts)
+                db = get_db()
+                total = db.execute(f"SELECT COUNT(*) FROM capture_items WHERE {where}", params).fetchone()[0]
+                rows = db.execute(
+                    f"SELECT id, created_at, source_channel, raw_text, status, confidence, matched_entity_type FROM capture_items WHERE {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    params + [limit, offset]
+                ).fetchall()
+                db.close()
+                self._json({"total": total, "page": page, "items": [dict(r) for r in rows]})
+            except Exception as e:
+                self._json({"total": 0, "items": [], "error": str(e)})
+
+        elif re.match(r'^/api/capture/item/(\d+)$', path):
+            m = re.match(r'^/api/capture/item/(\d+)$', path)
+            cap_id = int(m.group(1))
+            # Mobile-Session-Check (optional — public read for Desktop)
+            try:
+                db = get_db()
+                item = db.execute("SELECT * FROM capture_items WHERE id=?", (cap_id,)).fetchone()
+                if not item:
+                    db.close()
+                    # Auth-check fuer Mobile: status=0 liefert auth-Info
+                    mob_token = self.headers.get('X-Mob-Token', '')
+                    ok, _ = _mobil_verify_token(mob_token)
+                    self._json({"auth": "ok" if ok else "fail", "error": "not found"})
+                    return
+                files = [dict(r) for r in db.execute("SELECT * FROM capture_files WHERE capture_id=?", (cap_id,)).fetchall()]
+                matches = [dict(r) for r in db.execute("SELECT * FROM capture_matches WHERE capture_id=? ORDER BY score DESC", (cap_id,)).fetchall()]
+                actions = [dict(r) for r in db.execute("SELECT * FROM capture_actions WHERE capture_id=? ORDER BY created_at DESC LIMIT 10", (cap_id,)).fetchall()]
+                db.close()
+                result = dict(item)
+                result["files"] = files
+                result["matches"] = matches
+                result["actions"] = actions
+                # Mobile-Auth-Antwort einbetten
+                mob_token = self.headers.get('X-Mob-Token', '')
+                ok, _ = _mobil_verify_token(mob_token)
+                result["auth"] = "ok" if ok else "na"
+                self._json(result)
+            except Exception as e:
+                self._json({"error": str(e)})
+
+        else:
+            self._respond(404, 'application/json', b'{"error":"not found"}')
+
+
+    def _api_capture_post(self, body: dict):
+        """POST /api/capture/* und /mobil/api/* — Dispatcht Capture-Schreib-Endpunkte."""
+        path = urllib.parse.urlparse(self.path).path
+
+        if path == '/api/capture/create' or path == '/mobil/api/capture':
+            # Mobile-Auth pruefen
+            if path.startswith('/mobil/'):
+                tok = self.headers.get('X-Mob-Token', '')
+                ok, user = _mobil_verify_token(tok)
+                if not ok:
+                    self._json({"ok": False, "error": "Nicht authentifiziert"})
+                    return
+                source_channel = 'mobil'
+            else:
+                source_channel = body.get('source_channel', 'desktop')
+            raw_text = (body.get('raw_text') or '').strip()
+            if not raw_text:
+                self._json({"ok": False, "error": "raw_text fehlt"})
+                return
+            metadata = {}
+            if body.get('bezug'):
+                metadata['bezug'] = body['bezug']
+            try:
+                db = get_db()
+                cur = db.execute(
+                    "INSERT INTO capture_items (source_type, source_channel, raw_text, normalized_text, status, processing_status, metadata_json) VALUES (?,?,?,?,?,?,?)",
+                    ('manual', source_channel, raw_text, raw_text.strip(), 'eingegangen', 'pending',
+                     json.dumps(metadata, ensure_ascii=False) if metadata else None)
+                )
+                cap_id = cur.lastrowid
+                db.execute("INSERT INTO capture_actions (capture_id, actor_type, action) VALUES (?,?,?)",
+                           (cap_id, 'user', 'erstellt'))
+                db.commit()
+                db.close()
+                rlog('capture', 'item_created', f"Capture #{cap_id} erstellt ({source_channel})",
+                     source='capture', modul='capture', status='ok')
+                # Analyse im Hintergrund starten
+                try:
+                    cfg = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                    if cfg.get("capture", {}).get("auto_analyse", True):
+                        threading.Thread(target=_capture_analyse, args=(cap_id,), daemon=True, name=f"CapAnalyse-{cap_id}").start()
+                except Exception:
+                    pass
+                self._json({"ok": True, "id": cap_id})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+
+        elif path == '/api/capture/assign':
+            cap_id = int(body.get('capture_id', 0))
+            match_id = body.get('match_id')
+            entity_type = body.get('entity_type')
+            entity_id = body.get('entity_id')
+            if not cap_id:
+                self._json({"ok": False, "error": "capture_id fehlt"})
+                return
+            try:
+                db = get_db()
+                if match_id:
+                    m = db.execute("SELECT * FROM capture_matches WHERE id=?", (int(match_id),)).fetchone()
+                    if m:
+                        db.execute("UPDATE capture_matches SET accepted=1 WHERE id=?", (int(match_id),))
+                        db.execute("""UPDATE capture_items SET status='zugeordnet', final_entity_type=?,
+                                      final_entity_id=?, review_required=0, updated_at=datetime('now') WHERE id=?""",
+                                   (m['candidate_type'], m['candidate_id'], cap_id))
+                        db.execute("INSERT INTO capture_actions (capture_id, actor_type, action, result) VALUES (?,?,?,?)",
+                                   (cap_id, 'user', 'zugeordnet', f"{m['candidate_type']}#{m['candidate_id']}"))
+                elif entity_type and entity_id:
+                    db.execute("""UPDATE capture_items SET status='zugeordnet', final_entity_type=?,
+                                  final_entity_id=?, review_required=0, updated_at=datetime('now') WHERE id=?""",
+                               (entity_type, str(entity_id), cap_id))
+                    db.execute("INSERT INTO capture_actions (capture_id, actor_type, action, result) VALUES (?,?,?,?)",
+                               (cap_id, 'user', 'zugeordnet', f"{entity_type}#{entity_id}"))
+                db.commit()
+                db.close()
+                rlog('capture', 'item_assigned', f"Capture #{cap_id} manuell zugeordnet",
+                     source='capture', modul='capture', status='ok')
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+
+        elif path == '/api/capture/action':
+            cap_id = int(body.get('capture_id', 0))
+            action = body.get('action', '')
+            if not cap_id or not action:
+                self._json({"ok": False, "error": "capture_id oder action fehlt"})
+                return
+            try:
+                db = get_db()
+                if action == 'erledigt':
+                    db.execute("UPDATE capture_items SET status='erledigt', updated_at=datetime('now') WHERE id=?", (cap_id,))
+                elif action == 'archivieren':
+                    db.execute("UPDATE capture_items SET archived=1, updated_at=datetime('now') WHERE id=?", (cap_id,))
+                db.execute("INSERT INTO capture_actions (capture_id, actor_type, action) VALUES (?,?,?)",
+                           (cap_id, 'user', action))
+                db.commit()
+                db.close()
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+
+        elif path == '/mobil/api/login':
+            pw = body.get('password', '')
+            try:
+                # Passwort aus secrets.json lesen
+                secs = json.loads((SCRIPTS_DIR / "secrets.json").read_text('utf-8'))
+                correct = secs.get("mobil_password", secs.get("dashboard_password", ""))
+                if not correct:
+                    # Kein Passwort konfiguriert: Zugang offen (Entwicklungsmodus)
+                    tok = _mobil_generate_token("kai")
+                    self._json({"ok": True, "token": tok})
+                    return
+                if pw == correct:
+                    tok = _mobil_generate_token("kai")
+                    self._json({"ok": True, "token": tok})
+                else:
+                    self._json({"ok": False, "error": "Falsches Passwort"})
+            except Exception as e:
+                # secrets.json nicht lesbar oder kein Passwort: offen
+                tok = _mobil_generate_token("kai")
+                self._json({"ok": True, "token": tok})
+
+        else:
+            self._json({"ok": False, "error": "Unbekannter Endpunkt"})
+
+
+    def _api_capture_upload(self, raw_body: bytes):
+        """POST /api/capture/upload — Datei-Upload fuer Capture-Items (multipart/form-data)."""
+        import email.parser, email.policy
+        content_type = self.headers.get('Content-Type', '')
+        if 'multipart/form-data' not in content_type:
+            self._json({"ok": False, "error": "multipart/form-data erwartet"})
+            return
+        # Boundary extrahieren
+        boundary = None
+        for part in content_type.split(';'):
+            part = part.strip()
+            if part.startswith('boundary='):
+                boundary = part[9:].strip('"')
+                break
+        if not boundary:
+            self._json({"ok": False, "error": "Boundary fehlt"})
+            return
+        try:
+            # Capture-ID aus Formdata extrahieren (einfacher Text-Part)
+            cap_id = None
+            saved_files = []
+            # Manuelles Multipart-Parsing
+            sep = f'--{boundary}'.encode()
+            end = f'--{boundary}--'.encode()
+            parts = raw_body.split(sep)
+            for part in parts:
+                if not part or part == b'--\r\n' or part.startswith(b'--'):
+                    continue
+                # Header-Body trennen
+                if b'\r\n\r\n' in part:
+                    header_raw, body_data = part.split(b'\r\n\r\n', 1)
+                elif b'\n\n' in part:
+                    header_raw, body_data = part.split(b'\n\n', 1)
+                else:
+                    continue
+                body_data = body_data.rstrip(b'\r\n')
+                headers_text = header_raw.decode('utf-8', errors='replace')
+                # Content-Disposition parsen
+                cd_match = re.search(r'Content-Disposition:[^\r\n]*name="([^"]+)"', headers_text, re.IGNORECASE)
+                fn_match = re.search(r'filename="([^"]+)"', headers_text, re.IGNORECASE)
+                if not cd_match:
+                    continue
+                field_name = cd_match.group(1)
+                if field_name == 'capture_id':
+                    try:
+                        cap_id = int(body_data.decode('utf-8').strip())
+                    except Exception:
+                        pass
+                elif field_name == 'files' and fn_match:
+                    filename = fn_match.group(1)
+                    # Dateiname bereinigen (Path-Traversal vermeiden)
+                    filename = re.sub(r'[^\w.\-]', '_', filename)[:128]
+                    if not filename:
+                        continue
+                    # Groessengrenze 10 MB
+                    if len(body_data) > 10 * 1024 * 1024:
+                        continue
+                    if cap_id is None:
+                        saved_files.append({"name": filename, "pending": True})
+                        continue
+                    # Verzeichnis erstellen
+                    cap_dir = CAPTURE_FILES_DIR / str(cap_id)
+                    cap_dir.mkdir(parents=True, exist_ok=True)
+                    # Datei schreiben
+                    target = cap_dir / filename
+                    target.write_bytes(body_data)
+                    # MIME-Typ ermitteln
+                    mime = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+                    file_type = 'image' if mime.startswith('image/') else 'document'
+                    saved_files.append({"name": filename, "size": len(body_data), "mime": mime})
+                    # In DB eintragen
+                    db = get_db()
+                    db.execute(
+                        "INSERT INTO capture_files (capture_id, file_type, mime_type, original_name, storage_path, file_size, upload_status) VALUES (?,?,?,?,?,?,?)",
+                        (cap_id, file_type, mime, filename, str(target), len(body_data), 'ok')
+                    )
+                    db.execute("INSERT INTO capture_actions (capture_id, actor_type, action, result) VALUES (?,?,?,?)",
+                               (cap_id, 'user', 'datei_hochgeladen', filename))
+                    db.commit()
+                    db.close()
+            # Limit pruefen
+            if cap_id:
+                try:
+                    db = get_db()
+                    cnt = db.execute("SELECT COUNT(*) FROM capture_files WHERE capture_id=?", (cap_id,)).fetchone()[0]
+                    db.close()
+                    if cnt > 5:
+                        self._json({"ok": False, "error": "Maximale Dateianzahl (5) ueberschritten"})
+                        return
+                except Exception:
+                    pass
+            self._json({"ok": True, "count": len(saved_files), "files": saved_files})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+
     def _html(self, html: str):
         b = html.encode('utf-8', errors='replace')
         self._respond(200, 'text/html; charset=utf-8', b)
@@ -22822,6 +24393,9 @@ def run_server(open_browser=True):
     _kill_old_instances(port)
     _ensure_case_engine_tables()
     _ensure_lexware_tables()
+    _ensure_capture_tables()
+    _ensure_capture_config_defaults()
+    CAPTURE_FILES_DIR.mkdir(exist_ok=True)
     rlog_ensure_cfg()
     alog("Server", "Start", f"Port {port} | Python {__import__('sys').version.split()[0]}", "ok")
     rlog('system', 'server_started', f"Kira Dashboard gestartet auf Port {port}",
