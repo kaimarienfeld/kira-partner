@@ -5644,6 +5644,13 @@ def build_einstellungen():
 .adm-inp-wide{{width:300px;}}
 .adm-cf-card{{background:var(--primary-light,#f5f0ff);border:0.5px solid var(--primary-200,#ddd4f8);border-radius:8px;padding:12px 14px;margin-top:10px;}}
 .adm-cf-steps{{font-size:12px;color:var(--text-secondary);padding-left:16px;margin:8px 0 0;line-height:1.7;}}
+/* CF Step-Boxes (A-09 session-ooo) */
+.adm-cf-step-box{{display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--border);}}
+.adm-cf-step-box:last-of-type{{border-bottom:none;}}
+.adm-cf-step-num{{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}}
+.adm-cf-step-body{{flex:1;min-width:0;}}
+.adm-cf-step-title{{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}}
+.adm-cf-step-hint{{font-size:11px;color:var(--muted);line-height:1.4;}}
 .adm-sub-hd{{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}}
 .es-proto-tabs{{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);}}
 .es-proto-tab{{padding:8px 16px;font-size:var(--fs-xs);font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
@@ -10563,39 +10570,72 @@ def build_admin():
 
         <!-- Externer Zugang -->
         <div class="es-grp" style="margin-top:10px">
-          <div class="adm-sub-hd">Externer Zugang (Cloudflare Tunnel)</div>
-          <div class="es-grp-sub" style="margin-bottom:10px">Macht KIRA von ueberall erreichbar &mdash; kostenlos, HTTPS, kein VPS noetig. Fuer die Mobil-App (<code>/mobil</code>) benoetigt.</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div class="adm-sub-hd">Externer Zugang (Cloudflare Tunnel) <span id="adm-cf-status-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:4px;vertical-align:middle" title="Status pruefen"></span></div>
+          <div class="es-grp-sub" style="margin-bottom:8px">Macht KIRA von ueberall per HTTPS erreichbar &mdash; kostenlos, kein VPS noetig. Ben&#246;tigt fuer Mobil-App und Partner-View.</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <span id="adm-cf-chip" style="font-size:11px;padding:2px 9px;border-radius:10px;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)">Nicht konfiguriert &mdash; nur lokal erreichbar</span>
+            <button class="btn btn-sec btn-xs" onclick="admCfCheckStatus()" title="Cloudflared-Status pruefen">Status pruefen</button>
           </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Oeffentliche URL</div>
-              <div class="adm-field-hint">z.B. https://kira-raumkult.cfargotunnel.com &middot; nach Schritt 3 erhalten</div>
+
+          <!-- Schritt 1: cloudflared herunterladen -->
+          <div class="adm-cf-step-box">
+            <div class="adm-cf-step-num">1</div>
+            <div class="adm-cf-step-body">
+              <div class="adm-cf-step-title">cloudflared.exe herunterladen</div>
+              <div class="adm-cf-step-hint">Einmaliger Download des Cloudflare Tunnel Clients (~11 MB, von GitHub).</div>
+              <div id="adm-cf-dl-row" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                <button class="btn btn-sec btn-xs" id="adm-cf-dl-btn" onclick="admCfDownload()">&#x2B07; cloudflared.exe herunterladen</button>
+                <span id="adm-cf-dl-status" style="font-size:11px;color:var(--muted)"></span>
+              </div>
             </div>
-            <input id="adm-f-cf-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://...cfargotunnel.com">
           </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Tunnel-Token</div>
-              <div class="adm-field-hint">cloudflared-Token fuer automatischen Start als Windows-Dienst</div>
+
+          <!-- Schritt 2: Cloudflare-Konto & Tunnel-Token -->
+          <div class="adm-cf-step-box">
+            <div class="adm-cf-step-num">2</div>
+            <div class="adm-cf-step-body">
+              <div class="adm-cf-step-title">Tunnel-Token von Cloudflare holen</div>
+              <div class="adm-cf-step-hint">Im Cloudflare Zero Trust Dashboard einen neuen Tunnel anlegen und den Token kopieren.</div>
+              <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+                <a href="https://one.dash.cloudflare.com/" target="_blank" class="btn btn-sec btn-xs">&#x1F310; Cloudflare Zero Trust &rarr;</a>
+                <span style="font-size:11px;color:var(--muted);align-self:center">Networks &rarr; Tunnels &rarr; Create a tunnel &rarr; Cloudflared &rarr; Token kopieren</span>
+              </div>
+              <div class="adm-field" style="margin-top:8px">
+                <div class="adm-field-lbl">
+                  <div class="adm-field-key">Tunnel-Token</div>
+                  <div class="adm-field-hint">Beginnt mit eyJ... (base64 JWT)</div>
+                </div>
+                <input id="adm-f-cf-token" type="password" class="adm-inp adm-inp-wide" placeholder="eyJhIjoiO..." oninput="admCfUpdateInstallCmd()">
+                <button class="adm-show-btn" onclick="admToggle('adm-f-cf-token')">&#x1F441;</button>
+              </div>
             </div>
-            <input id="adm-f-cf-token" type="password" class="adm-inp adm-inp-wide" placeholder="eyJhIjoiO...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-cf-token')">&#x1F441;</button>
           </div>
-          <div style="margin-top:10px">
-            <button class="btn btn-sec btn-xs" onclick="admCfToggle()" id="adm-cf-anl-btn">&#x1F4D6; Einrichtungs-Anleitung anzeigen</button>
-            <div id="adm-cf-anl" style="display:none" class="adm-cf-card">
-              <div style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px">Cloudflare Tunnel einrichten (kostenlos, einmalig)</div>
-              <ol class="adm-cf-steps">
-                <li><b>cloudflared.exe herunterladen:</b> github.com/cloudflare/cloudflared/releases &rarr; cloudflared-windows-amd64.exe</li>
-                <li><b>Im Browser einloggen:</b> <code>cloudflared.exe login</code> &rarr; kostenloses Cloudflare-Konto erstellen oder nutzen</li>
-                <li><b>Tunnel erstellen:</b> <code>cloudflared.exe tunnel create kira</code> &rarr; Tunnel-ID &amp; Token werden angezeigt</li>
-                <li><b>Als Windows-Dienst starten:</b> <code>cloudflared.exe service install &lt;TOKEN&gt;</code> &rarr; laeuft ab sofort automatisch</li>
-                <li><b>URL in KIRA eintragen:</b> Oben &ldquo;Oeffentliche URL&rdquo; eingeben (aus Schritt 3) &rarr; Speichern</li>
-              </ol>
-              <div style="font-size:11px;color:var(--muted);margin-top:8px;border-top:0.5px solid var(--primary-200,#ddd4f8);padding-top:6px">
-                Zukuenftige KIRA-Installationspakete liefern cloudflared.exe direkt mit und richten den Tunnel beim Setup automatisch ein.
+
+          <!-- Schritt 3: Als Windows-Dienst installieren -->
+          <div class="adm-cf-step-box">
+            <div class="adm-cf-step-num">3</div>
+            <div class="adm-cf-step-body">
+              <div class="adm-cf-step-title">Als Windows-Dienst installieren (einmalig, Admin)</div>
+              <div class="adm-cf-step-hint">Folgenden Befehl <b>als Administrator</b> in PowerShell ausfuehren. Tunnel laeuft danach automatisch beim Windows-Start.</div>
+              <div style="margin-top:6px;position:relative">
+                <code id="adm-cf-install-cmd" style="display:block;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text);word-break:break-all">Token oben eintragen um den Befehl zu generieren</code>
+                <button class="btn btn-sec btn-xs" style="position:absolute;top:6px;right:6px" onclick="admCfCopyCmd()" title="Befehl kopieren">Kopieren</button>
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:var(--muted)">PowerShell als Administrator starten: Windows-Taste &rarr; "PowerShell" &rarr; Rechtsklick &rarr; Als Administrator ausf&#252;hren</div>
+            </div>
+          </div>
+
+          <!-- Schritt 4: URL eintragen -->
+          <div class="adm-cf-step-box">
+            <div class="adm-cf-step-num">4</div>
+            <div class="adm-cf-step-body">
+              <div class="adm-cf-step-title">&#214;ffentliche URL in KIRA hinterlegen</div>
+              <div class="adm-cf-step-hint">Die URL steht im Cloudflare Dashboard unter dem Tunnel (z.B. https://abc123.cfargotunnel.com oder deine eigene Domain).</div>
+              <div class="adm-field" style="margin-top:8px">
+                <div class="adm-field-lbl">
+                  <div class="adm-field-key">&#214;ffentliche URL</div>
+                </div>
+                <input id="adm-f-cf-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://kira.example.com">
               </div>
             </div>
           </div>
@@ -10680,6 +10720,65 @@ function admCfToggle() {
   } else {
     el.style.display = 'none';
     if (btn) btn.textContent = '\uD83D\uDCD6 Einrichtungs-Anleitung anzeigen';
+  }
+}
+
+// ── Cloudflare Tunnel 1-Klick-Setup (A-09 session-ooo) ──
+function admCfDownload() {
+  const btn = document.getElementById('adm-cf-dl-btn');
+  const st = document.getElementById('adm-cf-dl-status');
+  if(btn) { btn.disabled = true; btn.textContent = 'Lade...'; }
+  if(st) st.textContent = 'Download laeuft...';
+  fetch('/api/admin/cf/download', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(r=>r.json()).then(d=>{
+      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 cloudflared.exe herunterladen'; }
+      if(d.ok) {
+        if(st) st.innerHTML = '<span style="color:#28c850">\u2713 Heruntergeladen: ' + (d.path||'') + '</span>';
+        showToast('cloudflared.exe heruntergeladen', 'ok');
+      } else {
+        if(st) st.innerHTML = '<span style="color:#e84545">\u26A0 ' + (d.error||'Fehler') + '</span>';
+      }
+    }).catch(e=>{
+      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 cloudflared.exe herunterladen'; }
+      if(st) st.innerHTML = '<span style="color:#e84545">Netzwerkfehler</span>';
+    });
+}
+
+function admCfCheckStatus() {
+  const dot = document.getElementById('adm-cf-status-dot');
+  const chip = document.getElementById('adm-cf-chip');
+  fetch('/api/admin/cf/status', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(r=>r.json()).then(d=>{
+      if(d.running) {
+        if(dot) { dot.style.background='#28c850'; dot.title='cloudflared laeuft'; }
+        showToast('cloudflared laeuft \u2713', 'ok');
+      } else {
+        if(dot) { dot.style.background='#e84545'; dot.title='cloudflared nicht aktiv'; }
+        showToast('cloudflared nicht aktiv: ' + (d.info||'nicht gestartet'), 'warnung');
+      }
+    }).catch(()=>{ if(dot) dot.style.background='#ccc'; });
+}
+
+function admCfUpdateInstallCmd() {
+  const token = (document.getElementById('adm-f-cf-token')||{}).value||'';
+  const cmd = document.getElementById('adm-cf-install-cmd');
+  if(!cmd) return;
+  if(token.trim()) {
+    cmd.textContent = 'cloudflared.exe service install ' + token.trim();
+  } else {
+    cmd.textContent = 'Token oben eintragen um den Befehl zu generieren';
+  }
+}
+
+function admCfCopyCmd() {
+  const cmd = document.getElementById('adm-cf-install-cmd');
+  if(!cmd) return;
+  const text = cmd.textContent;
+  if(!text || text.includes('Token oben')) { showToast('Bitte Token zuerst eintragen', 'warnung'); return; }
+  if(navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(()=>showToast('Befehl kopiert', 'ok'));
+  } else {
+    try { const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('Befehl kopiert','ok'); } catch(e) {}
   }
 }
 
@@ -23294,6 +23393,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path == '/api/admin/save':
             self._api_admin_save(body)
             return
+        if self.path == '/api/admin/cf/download':
+            self._api_admin_cf_download()
+            return
+        if self.path == '/api/admin/cf/status':
+            self._api_admin_cf_status()
+            return
 
         if self.path == '/api/mail/oauth/connect':
             self._api_mail_oauth_connect(body)
@@ -26192,10 +26297,59 @@ def _method_api_admin_save(self, body):
     except Exception as e:
         self._json({"ok": False, "error": str(e)})
 
+def _method_api_admin_cf_download(self):
+    """POST /api/admin/cf/download — Laedt cloudflared.exe von GitHub Releases herunter."""
+    try:
+        import urllib.request as _ulr
+        import ssl as _ssl
+        dest = SCRIPTS_DIR / "cloudflared.exe"
+        if dest.exists():
+            self._json({"ok": True, "path": str(dest), "info": "Bereits vorhanden"})
+            return
+        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+        ctx = _ssl.create_default_context()
+        with _ulr.urlopen(url, timeout=60, context=ctx) as resp:
+            data = resp.read()
+        dest.write_bytes(data)
+        self._json({"ok": True, "path": str(dest), "size_kb": len(data)//1024})
+    except Exception as e:
+        self._json({"ok": False, "error": str(e)})
+
+def _method_api_admin_cf_status(self):
+    """POST /api/admin/cf/status — Prüft ob cloudflared als Prozess/Dienst läuft."""
+    try:
+        import subprocess as _sp
+        # Prozessliste nach cloudflared durchsuchen
+        result = _sp.run(
+            ["tasklist", "/FI", "IMAGENAME eq cloudflared.exe", "/FO", "CSV", "/NH"],
+            capture_output=True, text=True, timeout=5
+        )
+        running = "cloudflared.exe" in result.stdout
+        info = ""
+        if running:
+            lines = [l for l in result.stdout.strip().split('\n') if l.strip()]
+            info = f"{len(lines)} Prozess(e)"
+        else:
+            # Auch Windows-Dienst prüfen
+            svc = _sp.run(
+                ["sc", "query", "cloudflared"],
+                capture_output=True, text=True, timeout=5
+            )
+            if "RUNNING" in svc.stdout:
+                running = True
+                info = "Windows-Dienst laeuft"
+            else:
+                info = "Kein Prozess gefunden"
+        self._json({"ok": True, "running": running, "info": info})
+    except Exception as e:
+        self._json({"ok": False, "running": False, "error": str(e)})
+
 # Handler-Methoden an DashboardHandler binden
 DashboardHandler._api_admin_data_get = _method_api_admin_data_get
 DashboardHandler._api_admin_login    = _method_api_admin_login
 DashboardHandler._api_admin_save     = _method_api_admin_save
+DashboardHandler._api_admin_cf_download = _method_api_admin_cf_download
+DashboardHandler._api_admin_cf_status   = _method_api_admin_cf_status
 
 
 def run_server(open_browser=True):
