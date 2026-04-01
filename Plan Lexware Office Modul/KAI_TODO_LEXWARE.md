@@ -9,6 +9,20 @@ Session: session-eee (Lexware Office Nacht-Session)
 
 ---
 
+## ⚠️ WICHTIGER HINWEIS: API-Basis-URL
+
+Research-Agent-Befund (2026-04-01): `api.lexoffice.io` koennte seit Ende 2025 nicht mehr aktiv sein.
+Neue offizielle URL: `api.lexware.io`
+
+**Was du tun musst:**
+1. Nach Eintragen des API-Keys: Verbindung testen mit Default-URL `api.lexoffice.io`
+2. Wenn Verbindungstest fehlschlaegt: Einstellungen > Lexware Office > API-Basis-URL auf `https://api.lexware.io/v1` aendern
+3. Nochmal testen → gruen = korrekt
+
+Die URL ist jetzt in KIRA Einstellungen konfigurierbar ohne Codeaenderung.
+
+---
+
 ## PRIORITAET 1 — OHNE DAS FUNKTIONIERT NICHTS
 
 ### KAI-01: Lexware Office API-Key in KIRA hinterlegen
