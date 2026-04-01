@@ -10,7 +10,11 @@
     "arbeitszeit_bis": "18:00",
     "urlaub_modus": false,
     "urlaub_von": "2026-03-28T09:29",
-    "urlaub_bis": "2026-03-29T09:29"
+    "urlaub_bis": "2026-03-29T09:29",
+    "prioritaet": "default",
+    "urlaub_autoreply_aktiv": false,
+    "urlaub_autoreply_betreff": "Abwesenheitsnotiz: Ich bin derzeit im Urlaub",
+    "urlaub_autoreply_text": "Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rueckkehr bei Ihnen melden."
   },
   "email_notification": {
     "aktiv": false,
@@ -51,16 +55,16 @@
     "_kommentar": "0 = niemals löschen. Aktivitätsprotokoll (aktivitaeten-Tabelle in tasks.db). change_log.jsonl ist davon unabhängig und wird nie automatisch bereinigt."
   },
   "mail_monitor": {
-    "aktiv": true,
-    "intervall_sekunden": 1800,
+    "aktiv": false,
+    "intervall_sekunden": 300,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
   "mail_archiv": {
     "_pflicht": true,
     "_erklaerung": "KIRA benötigt ein lokales Archiv für vollständigen LLM-Kontext. IMAP zeigt nur aktuelle Mails — alle Aufgaben, Antworten und Anhänge liest Kira aus dem lokalen Archiv. Bei Software-Export ist der Archiv-Ordner deine exportierbare Datenbasis.",
-    "pfad": "C:/Users/kaimr/OneDrive - rauMKult Sichtbeton/0001_APPS_rauMKult/Mail Archiv/Archiv",
+    "pfad": "",
     "anhaenge_unterordner": "attachments",
-    "neue_mails_archivieren": true,
+    "neue_mails_archivieren": false,
     "_neue_mails_erklaerung": "Neue Mails die per IMAP empfangen werden, werden automatisch als JSON+EML im Archiv gespeichert",
     "sync_ordner": {
       "kaimrf@rauMKultSichtbeton.onmicrosoft.com": [
@@ -118,7 +122,9 @@
         "aktiv": true,
         "prioritaet": 1
       }
-    ]
+    ],
+    "antwort_laenge": "normal",
+    "temperatur": 0.7
   },
   "runtime_log": {
     "aktiv": true,
@@ -137,7 +143,37 @@
     "prox_radius": 1,
     "bounce_dist": 200,
     "idle_mode": true,
-    "idle_delay": 10
+    "idle_delay": 10,
+    "name": "Kira",
+    "persoenlichkeit": "direkt",
+    "sprache": "deutsch",
+    "chitchat_erlaubt": true,
+    "system_prompt_custom": "",
+    "kontext_aufgaben": "immer",
+    "kontext_mails": "immer",
+    "kontext_rechnungen": "immer",
+    "memory": {
+      "aktiv": true,
+      "sessions": 3,
+      "summary_aktiv": true,
+      "token_budget": 3200
+    },
+    "react": {
+      "aktiv": true,
+      "max_schritte": 5
+    },
+    "feedback": {
+      "buttons_aktiv": true,
+      "auto_lernregeln": true,
+      "stil_lernen": true
+    },
+    "sicherheit": {
+      "rate_limit_per_minute": 20,
+      "circuit_breaker_threshold": 3,
+      "circuit_breaker_dauer": 300,
+      "audit_log_tage": 90,
+      "nur_bestaetigt": false
+    }
   },
   "benachrichtigungen": {
     "inapp_mail": true,
@@ -173,13 +209,13 @@
     }
   },
   "mail_klassifizierung": {
-    "classify": true,
-    "auto_tasks": true,
-    "ignore_newsletter": true
+    "classify": false,
+    "auto_tasks": false,
+    "ignore_newsletter": false
   },
   "mail_postfach": {
     "refresh_intervall_min": 0,
-    "lese_markierung": "manuell"
+    "lese_markierung": "sofort"
   },
   "mail_konto_labels": {
     "kaimrf@rauMKultSichtbeton.onmicrosoft.com": "rauMKult Microsoft",
@@ -196,5 +232,42 @@
       "shop@sichtbeton-cire.de",
       "invoice@sichtbeton-cire.de"
     ]
+  },
+  "lexware": {
+    "status": "freigeschaltet",
+    "sync_intervall": 360,
+    "buchalt_pruefregel_aktiv": true,
+    "paypal_ausnahme_aktiv": true,
+    "dataverse_export_aktiv": false,
+    "api_key": "t-HYKTMeVeEg5w6boj7JUe5LqIyUUbPfqB480Zop6_cBw5BG",
+    "api_base_url": "https://api.lexware.io/v1"
+  },
+  "dashboard": {
+    "refresh_intervall_s": 300
+  },
+  "kira_proaktiv": {
+    "aktiv": true,
+    "scan_intervall_min": 15,
+    "angebot_followup_tage": 7,
+    "mahnung_eskalation_tage": 14,
+    "konfidenz_stufe_a": 0.85,
+    "konfidenz_stufe_b": 0.6,
+    "morgen_briefing_aktiv": false,
+    "morgen_briefing_uhrzeit": "07:00"
+  },
+  "backup": {
+    "aktiv": false,
+    "pfad": "",
+    "keep_n": 7
+  },
+  "capture": {
+    "active": true,
+    "auto_analyse": true,
+    "auto_assign": false,
+    "confidence_threshold": 0.75,
+    "upload_limit_per_item": 5,
+    "upload_size_mb": 10,
+    "session_duration_hours": 24,
+    "mobile_access": true
   }
 }

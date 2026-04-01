@@ -735,3 +735,25 @@
 ## 2026-04-01 08:00 -- session-fff: Lexware UI Komplettausbau — Autonome Nacht-Session
 **Auftrag:** Vollstaendige autonome Bearbeitung Arbeitsanweisung_Lexware_UI_Komplettausbau_ClaudeCode.md. Phasen 0-6: Session-Start, Plan-Agent, Repo-Audit, Gap-Analyse, Pflicht-Plandateien, Implementierung (Pakete A-F), Abschluss. Ausnahmeregeln: kein Blockieren, autonom entscheiden, Kai-Todos dokumentieren.
 **Status:** offen
+
+---
+
+## 2026-04-01 12:45 -- session-hhh: Lexware Bugfixes + Dataverse
+**Auftrag:** Lexware-Modul: (1) Verbindungstest HTTP 404 beheben, (2) aktiver Reiter nicht erkennbar, (3) Spaltenmenü wie Mail & Konten, (4) Dataverse vollständige Credentials-Einrichtung + dataverse_client.py
+**Status:** offen
+
+### 2026-04-01 13:15 -- Implementierung abgeschlossen
+1. **Verbindungstest-Fix:** lexEsTestConnection() sendet jetzt api_key + api_base_url aus Inputs; /api/lexware/test akzeptiert Override-Params -- kein Speichern nötig vor Test
+2. **URL-Hinweis:** Zeigt jetzt explizit /v1 an (https://api.lexware.io/v1 | https://api.lexoffice.io/v1)
+3. **Tab-Highlighting-Fix:** esShowLexSec() aktualisiert inline-styles (color/fontWeight/background) + CSS-Klasse -- inline styles können CSS-Klasse nicht mehr überschreiben
+4. **Pane-2 Spaltenmenü:** lexware in _esSectionsWithPane2 + es-p2-lexware mit 9 Sub-Items, esP2Select/esShowSec verdrahtet, lx-es-subnav bei p2vis versteckt
+5. **Dataverse UI:** Vollständige Credentials-Karte (Tenant-ID/Client-ID/Secret/Org-URL/Tabelle/Duplikat-Prueffeld) + Verbindungstest-Button + dvEsTestConnection() JS
+6. **dataverse_client.py:** Neues Modul mit DataverseClient (OAuth2 token-cache, record_exists mit OData-$filter, create/update/upsert_record, test_connection/WhoAmI)
+7. **Backend /api/lexware/dataverse/test:** WhoAmI + optionaler Tabellen-Zugriff
+8. **config/save erweitert:** Dataverse-Felder (tenant_id/client_id/secret/org_url/table_name/dedup_field) werden gespeichert
+9. **Commit:** f82863c
+
+## 2026-04-01 13:15 -- Session-Ende (session-hhh)
+**Erledigt:** Alle 4 Punkte aus Kais Auftrag implementiert und committed
+**Offen geblieben:** Playwright-Test der neuen Dataverse-Sektion; Kai muss org_url (/v1 korrekt) + Dataverse-Credentials einpflegen
+**Status:** erledigt
