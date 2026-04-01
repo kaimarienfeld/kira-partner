@@ -5291,6 +5291,11 @@ def build_einstellungen():
     lex_buchalt_aktiv = bool(lex_cfg.get("buchalt_pruefregel_aktiv", True))
     lex_paypal_aktiv  = bool(lex_cfg.get("paypal_ausnahme_aktiv", True))
     lex_dataverse_aktiv = bool(lex_cfg.get("dataverse_export_aktiv", False))
+    lex_dv_tenant_id   = lex_cfg.get("dataverse_tenant_id", "")
+    lex_dv_client_id   = lex_cfg.get("dataverse_client_id", "")
+    lex_dv_org_url     = lex_cfg.get("dataverse_org_url", "")
+    lex_dv_table_name  = lex_cfg.get("dataverse_table_name", "")
+    lex_dv_dedup_field = lex_cfg.get("dataverse_dedup_field", "")
     _lex_status_colors = {
         "nicht_gebucht": ("#888", "Nicht gebucht"),
         "gesperrt":      ("#e84545", "Gesperrt"),
@@ -5540,6 +5545,7 @@ def build_einstellungen():
 /* Hide horizontal tab bars when pane2 is active */
 .es-ct.p2vis .es-mail-tabs{{display:none!important;}}
 .es-ct.p2vis .es-proto-tabs{{display:none!important;}}
+.es-ct.p2vis .lx-es-subnav{{display:none!important;}}
 .es-main{{flex:1;overflow-y:auto;padding:24px 28px;background:var(--bg);}}
 .es-sec-panel{{display:none;}}
 .es-sec-panel.es-active{{display:block;}}
@@ -5596,7 +5602,7 @@ def build_einstellungen():
 </style>
 <script>
 // Sektionen mit Pane-2 Sub-Navigation
-var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll'}};
+var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll', lexware:'es-p2-lexware'}};
 
 function esFilterSuche(q) {{
   q = (q||'').trim().toLowerCase();
@@ -5652,6 +5658,7 @@ function esShowSec(id) {{
   }}
   if(id==='integrationen') {{ esIntegLoad(); }}
   if(id==='protokoll') {{ esShowProtoTab('runtime'); }}
+  if(id==='lexware') {{ if(window.esShowLexSec) window.esShowLexSec('verbindung'); }}
 }}
 
 function esP2Select(sec, subId, el) {{
@@ -5674,6 +5681,8 @@ function esP2Select(sec, subId, el) {{
     }}
   }} else if(sec === 'protokoll') {{
     if(window.esShowProtoTab) window.esShowProtoTab(subId);
+  }} else if(sec === 'lexware') {{
+    if(window.esShowLexSec) window.esShowLexSec(subId);
   }}
 }}
 function esShowProtoTab(id) {{
@@ -5799,6 +5808,23 @@ function esInfoPopup(btn, text) {{
     <div class="es-p2n act" data-p2id="runtime" onclick="esP2Select('protokoll','runtime',this)"><span class="es-p2n-ico">&#x2630;</span>Runtime-Log</div>
     <div class="es-p2n" data-p2id="changelog" onclick="esP2Select('protokoll','changelog',this)"><span class="es-p2n-ico">&#x1F4DD;</span>&Auml;nderungsverlauf</div>
     <div class="es-p2n" data-p2id="konfiguration" onclick="esP2Select('protokoll','konfiguration',this)"><span class="es-p2n-ico">&#x2699;</span>Konfiguration</div>
+  </div>
+  <!-- Lexware Office -->
+  <div id="es-p2-lexware" style="display:none">
+    <div class="es-p2grp">Lexware Office</div>
+    <div class="es-p2n act" data-p2id="verbindung" onclick="esP2Select('lexware','verbindung',this)"><span class="es-p2n-ico">&#x1F517;</span>Verbindung</div>
+    <div class="es-p2n" data-p2id="sync" onclick="esP2Select('lexware','sync',this)"><span class="es-p2n-ico">&#x21BB;</span>Sync</div>
+    <div class="es-p2n" data-p2id="kategorien" onclick="esP2Select('lexware','kategorien',this)"><span class="es-p2n-ico">&#x1F3F7;</span>Kategorien</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2grp">Buchhaltung</div>
+    <div class="es-p2n" data-p2id="eingangsbelege" onclick="esP2Select('lexware','eingangsbelege',this)"><span class="es-p2n-ico">&#x1F4C4;</span>Eingangsbelege</div>
+    <div class="es-p2n" data-p2id="vollautomatik" onclick="esP2Select('lexware','vollautomatik',this)"><span class="es-p2n-ico">&#x26A1;</span>Vollautomatik</div>
+    <div class="es-p2n" data-p2id="regeln" onclick="esP2Select('lexware','regeln',this)"><span class="es-p2n-ico">&#x1F4DD;</span>Regeln</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2grp">Export &amp; Diagnose</div>
+    <div class="es-p2n" data-p2id="dataverse" onclick="esP2Select('lexware','dataverse',this)"><span class="es-p2n-ico">&#x1F4CA;</span>Dataverse</div>
+    <div class="es-p2n" data-p2id="diagnose_es" onclick="esP2Select('lexware','diagnose_es',this)"><span class="es-p2n-ico">&#x1F50E;</span>Diagnose</div>
+    <div class="es-p2n" data-p2id="freischaltung" onclick="esP2Select('lexware','freischaltung',this)"><span class="es-p2n-ico">&#x1F511;</span>Freischaltung</div>
   </div>
 </div>
 
@@ -8690,7 +8716,7 @@ function esInfoPopup(btn, text) {{
       <input id="cfg-lex-api-base" type="text" class="es-input" style="max-width:340px"
              value="{esc(lex_cfg.get('api_base_url','https://api.lexoffice.io/v1'))}"
              placeholder="https://api.lexoffice.io/v1">
-      <span class="es-grp-sub" style="margin:0;font-size:10px">Neu: api.lexware.io | Alt: api.lexoffice.io</span>
+      <span class="es-grp-sub" style="margin:0;font-size:10px">Neu: https://api.lexware.io/v1 &nbsp;|&nbsp; Alt: https://api.lexoffice.io/v1 &nbsp;&mdash;&nbsp; <b>/v1 am Ende ben&#246;tigt!</b></span>
     </div>
     <div class="es-row" style="gap:8px;align-items:center">
       <button class="btn btn-sec" id="lex-test-btn" onclick="lexEsTestConnection()" style="min-width:160px">&#x26A1; Verbindung testen</button>
@@ -8830,13 +8856,66 @@ function esInfoPopup(btn, text) {{
   <!-- ── DATAVERSE ── -->
   <div class="lx-es-subpanel" id="lx-es-sub-dataverse" style="display:none">
   <div class="es-grp">
-    <div class="es-grp-h">Dataverse-Export <span style="font-size:11px;color:var(--muted);font-weight:400">(optional)</span></div>
-    <div class="es-grp-sub">Exportiert Rechnungen zus&#228;tzlich nach Microsoft Dataverse (CRM/Power Platform). Erfordert Azure App-Credentials. Prio C.</div>
+    <div class="es-grp-h">Dataverse-Export <span style="font-size:11px;color:var(--muted);font-weight:400">(Microsoft Power Platform)</span></div>
+    <div class="es-grp-sub">Exportiert Datens&#228;tze direkt in Microsoft Dataverse-Tabellen. Ben&#246;tigt eine Azure Entra ID App-Registrierung mit Dataverse-Berechtigungen (Rolle: Dataverse Service User oder Basic User).</div>
     <div class="es-row">
       <label class="es-label">Dataverse-Export aktiv</label>
       <label class="es-toggle"><input id="cfg-lex-dataverse" type="checkbox" {'checked' if lex_dataverse_aktiv else ''}><span class="es-slider"></span></label>
     </div>
-    <div class="es-grp-sub">&#x2139; F&#252;r Dataverse-Credentials: Azure Entra ID App mit Dataverse-Berechtigungen einrichten.</div>
+  </div>
+  <div class="es-grp">
+    <div class="es-grp-h">Azure App-Credentials</div>
+    <div class="es-grp-sub">Azure Portal &rarr; Entra ID &rarr; App-Registrierungen &rarr; App-Name &rarr; &Uuml;bersicht (Tenant-ID + Client-ID) und Zertifikate &amp; Geheimnisse (Client-Secret).</div>
+    <div class="es-row">
+      <label class="es-label">Tenant-ID (Verzeichnis-ID)</label>
+      <input id="cfg-dv-tenant-id" type="text" class="es-input" style="max-width:320px"
+             value="{esc(lex_dv_tenant_id)}"
+             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    </div>
+    <div class="es-row">
+      <label class="es-label">Client-ID (App-ID)</label>
+      <input id="cfg-dv-client-id" type="text" class="es-input" style="max-width:320px"
+             value="{esc(lex_dv_client_id)}"
+             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    </div>
+    <div class="es-row">
+      <label class="es-label">Client-Secret</label>
+      <input id="cfg-dv-client-secret" type="password" class="es-input" style="max-width:320px"
+             placeholder="(leer lassen um bestehendes Secret nicht zu &#228;ndern)" autocomplete="off">
+      <span style="font-size:10px;color:var(--muted)">{'&#x2713;&nbsp;Secret&nbsp;hinterlegt' if lex_cfg.get('dataverse_client_secret','').strip() else '&#x26A0;&nbsp;Kein Secret'}</span>
+    </div>
+  </div>
+  <div class="es-grp">
+    <div class="es-grp-h">Dataverse-Umgebung &amp; Tabelle</div>
+    <div class="es-grp-sub">Organisations-URL aus Power Apps &rarr; Einstellungen &rarr; Sitzungsdetails, oder Tabellen-Werkzeuge &rarr; API-Link (nur Basis-URL ohne Pfad).</div>
+    <div class="es-row">
+      <label class="es-label">Organisations-URL</label>
+      <input id="cfg-dv-org-url" type="text" class="es-input" style="max-width:320px"
+             value="{esc(lex_dv_org_url)}"
+             placeholder="https://orgXXXX.crm16.dynamics.com">
+    </div>
+    <div class="es-row">
+      <label class="es-label">Tabellen-Name (plural, logisch)</label>
+      <input id="cfg-dv-table-name" type="text" class="es-input" style="max-width:240px"
+             value="{esc(lex_dv_table_name)}"
+             placeholder="z.B. a_btb_arbeiten_vorlagen">
+      <span style="font-size:10px;color:var(--muted)">Plural-Logikname aus Power Apps</span>
+    </div>
+    <div class="es-row">
+      <label class="es-label">Duplikat-Pr&#252;ffeld</label>
+      <input id="cfg-dv-dedup-field" type="text" class="es-input" style="max-width:240px"
+             value="{esc(lex_dv_dedup_field)}"
+             placeholder="z.B. vorl_arb_BEZEICHNUNG">
+      <span style="font-size:10px;color:var(--muted)">Spalte zum Pr&#252;fen auf Duplikate vor dem Import</span>
+    </div>
+  </div>
+  <div class="es-grp">
+    <div class="es-grp-h">Verbindungstest</div>
+    <div class="es-row" style="gap:8px;align-items:center">
+      <button class="btn btn-sec" id="dv-test-btn" onclick="dvEsTestConnection()">&#x26A1; Dataverse testen</button>
+      <span id="dv-test-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="es-grp-sub">Testet Token-Abruf (WhoAmI) + optionalen Tabellen-Zugriff ($top=1). Aktuelle Eingaben werden verwendet &mdash; nicht gespeicherte Werte werden direkt getestet.</div>
   </div>
   <div style="margin-top:12px"><button class="btn btn-primary" onclick="lexEsSaveConfig()">&#x1F4BE; Speichern</button></div>
   </div><!-- /lx-es-sub-dataverse -->
@@ -8901,23 +8980,74 @@ function esInfoPopup(btn, text) {{
     }};
     if(apiKey) payload.api_key = apiKey;
     if(apiBase) payload.api_base_url = apiBase;
+    // Dataverse-Credentials
+    const _dvTenant = (document.getElementById('cfg-dv-tenant-id')||{{}}).value||'';
+    const _dvClient = (document.getElementById('cfg-dv-client-id')||{{}}).value||'';
+    const _dvSecret = (document.getElementById('cfg-dv-client-secret')||{{}}).value||'';
+    const _dvOrg    = (document.getElementById('cfg-dv-org-url')||{{}}).value||'';
+    const _dvTable  = (document.getElementById('cfg-dv-table-name')||{{}}).value||'';
+    const _dvDedup  = (document.getElementById('cfg-dv-dedup-field')||{{}}).value||'';
+    if(_dvTenant.trim()) payload.dataverse_tenant_id = _dvTenant.trim();
+    if(_dvClient.trim()) payload.dataverse_client_id = _dvClient.trim();
+    if(_dvSecret.trim()) payload.dataverse_client_secret = _dvSecret.trim();
+    if(_dvOrg.trim())    payload.dataverse_org_url = _dvOrg.trim();
+    if(_dvTable.trim())  payload.dataverse_table_name = _dvTable.trim();
+    if(_dvDedup.trim())  payload.dataverse_dedup_field = _dvDedup.trim();
     fetch('/api/lexware/config/save', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
       .then(r=>r.json()).then(d=>{{
         if(d.ok) showToast('Lexware Einstellungen gespeichert \u2713','ok');
         else showToast('Fehler: '+(d.error||'?'),'fehler');
       }}).catch(()=>showToast('Speichern fehlgeschlagen','fehler'));
   }}
+  function dvEsTestConnection() {{
+    const btn = document.getElementById('dv-test-btn');
+    const st  = document.getElementById('dv-test-status');
+    if(btn) btn.disabled = true;
+    if(st) st.textContent = 'Teste\u2026';
+    const payload = {{
+      tenant_id:     (document.getElementById('cfg-dv-tenant-id')||{{}}).value||'',
+      client_id:     (document.getElementById('cfg-dv-client-id')||{{}}).value||'',
+      client_secret: (document.getElementById('cfg-dv-client-secret')||{{}}).value||'',
+      org_url:       (document.getElementById('cfg-dv-org-url')||{{}}).value||'',
+      table_name:    (document.getElementById('cfg-dv-table-name')||{{}}).value||'',
+    }};
+    fetch('/api/lexware/dataverse/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
+      .then(r=>r.json()).then(d=>{{
+        if(btn) btn.disabled = false;
+        if(d.ok) {{
+          const _info = d.info||{{}};
+          let _msg = '\u2713 Verbunden';
+          if(_info.user_id) _msg += ' &mdash; UserId: ' + _info.user_id.substring(0,8) + '...';
+          if(_info.table_ok===true) _msg += ' | Tabelle OK';
+          else if(_info.table_ok===false) _msg += ' | Tabelle: ' + (_info.table_error||'Fehler');
+          if(st) st.innerHTML = '<span style="color:#28c850;font-weight:600">' + _msg + '</span>';
+          showToast('Dataverse Verbindung OK \u2713','ok');
+        }} else {{
+          if(st) st.innerHTML = '<span style="color:#e84545;font-weight:600">\u26A0 ' + (d.error||'Fehler') + '</span>';
+          showToast('Dataverse Test fehlgeschlagen','fehler');
+        }}
+      }}).catch(e=>{{
+        if(btn) btn.disabled = false;
+        if(st) st.innerHTML = '<span style="color:#e84545">Netzwerkfehler</span>';
+      }});
+  }}
   function lexEsTestConnection() {{
     const btn = document.getElementById('lex-test-btn');
     const st  = document.getElementById('lex-test-status');
     if(btn) btn.disabled = true;
     if(st) st.textContent = 'Teste\u2026';
-    fetch('/api/lexware/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
+    const _tk = {{}};
+    const _k = (document.getElementById('cfg-lex-api-key')||{{}}).value||'';
+    const _b = (document.getElementById('cfg-lex-api-base')||{{}}).value||'';
+    if(_k.trim()) _tk.api_key = _k.trim();
+    if(_b.trim()) _tk.api_base_url = _b.trim();
+    fetch('/api/lexware/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(_tk)}})
       .then(r=>r.json()).then(d=>{{
         if(btn) btn.disabled = false;
         if(d.ok) {{
           if(st) st.innerHTML = '<span style="color:#28c850;font-weight:600">\u2713 Verbunden</span>';
-          if(d.company) st.innerHTML += ' &mdash; ' + d.company;
+          const _info = d.info||{{}};
+          if(_info.companyName) st.innerHTML += ' &mdash; ' + _info.companyName;
           showToast('Lexware Verbindung OK \u2713','ok');
         }} else {{
           if(st) st.innerHTML = '<span style="color:#e84545;font-weight:600">\u26A0 ' + (d.error||'Fehler') + '</span>';
@@ -12899,11 +13029,28 @@ function lxFilterRegeln() {{
 
 function esShowLexSec(subsecId) {{
   document.querySelectorAll('.lx-es-subpanel').forEach(el => el.style.display = 'none');
-  document.querySelectorAll('.lx-es-subbtn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.lx-es-subbtn').forEach(btn => {{
+    btn.classList.remove('active');
+    btn.style.color = 'var(--muted)';
+    btn.style.fontWeight = '500';
+    btn.style.background = 'none';
+  }});
   const panel = document.getElementById('lx-es-sub-' + subsecId);
   if(panel) panel.style.display = 'block';
   const btn = document.querySelector('.lx-es-subbtn[data-lxessec="' + subsecId + '"]');
-  if(btn) btn.classList.add('active');
+  if(btn) {{
+    btn.classList.add('active');
+    btn.style.color = 'var(--accent)';
+    btn.style.fontWeight = '600';
+    btn.style.background = 'var(--bg-raised)';
+  }}
+  // Pane-2 sync
+  var p2lx = document.getElementById('es-p2-lexware');
+  if(p2lx) {{
+    p2lx.querySelectorAll('.es-p2n').forEach(n => n.classList.remove('act'));
+    var p2item = p2lx.querySelector('.es-p2n[data-p2id="' + subsecId + '"]');
+    if(p2item) p2item.classList.add('act');
+  }}
 }}
 
 // Helper fuer String-Escaping im JS-Kontext
@@ -24185,7 +24332,15 @@ def _handle_lexware_post(handler, path, body):
     if path == '/api/lexware/test':
         try:
             from lexware_client import get_client, LexwareAuthError
-            client = get_client(cfg)
+            # Aktuelle UI-Werte als Override der gespeicherten Config verwenden
+            test_cfg = dict(cfg)
+            lex = dict(cfg.get("lexware", {}))
+            if body.get("api_key", "").strip():
+                lex["api_key"] = body["api_key"].strip()
+            if body.get("api_base_url", "").strip():
+                lex["api_base_url"] = body["api_base_url"].strip()
+            test_cfg["lexware"] = lex
+            client = get_client(test_cfg)
             result = client.test_connection()
             handler._json(result)
         except Exception as e:
@@ -24217,6 +24372,27 @@ def _handle_lexware_post(handler, path, body):
             rlog('system', 'lexware_sync', f"Sync abgeschlossen: {stats}",
                  source='server', modul='lexware', actor_type='system', status='ok')
             handler._json({"ok": True, "stats": stats, "ts": ts})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/dataverse/test — Dataverse-Verbindung testen
+    if path == '/api/lexware/dataverse/test':
+        try:
+            from dataverse_client import DataverseClient, DataverseAuthError
+            lex_cfg2 = cfg.get("lexware", {})
+            tenant_id   = (body.get("tenant_id")   or lex_cfg2.get("dataverse_tenant_id",   "")).strip()
+            client_id   = (body.get("client_id")   or lex_cfg2.get("dataverse_client_id",   "")).strip()
+            client_secret=(body.get("client_secret")or lex_cfg2.get("dataverse_client_secret","")).strip()
+            org_url     = (body.get("org_url")      or lex_cfg2.get("dataverse_org_url",     "")).strip()
+            table_name  = (body.get("table_name")   or lex_cfg2.get("dataverse_table_name",  "")).strip()
+            dedup_field = (body.get("dedup_field")  or lex_cfg2.get("dataverse_dedup_field", "")).strip()
+            if not all([tenant_id, client_id, client_secret, org_url]):
+                handler._json({"ok": False, "error": "Fehlende Credentials (Tenant-ID, Client-ID, Client-Secret, Org-URL benoetigt)"})
+                return True
+            dv = DataverseClient(tenant_id, client_id, client_secret, org_url, table_name, dedup_field)
+            result = dv.test_connection()
+            handler._json(result)
         except Exception as e:
             handler._json({"ok": False, "error": str(e)})
         return True
@@ -24287,15 +24463,21 @@ def _handle_lexware_post(handler, path, body):
             for k in ("status", "sync_intervall", "buchalt_pruefregel_aktiv",
                       "paypal_ausnahme_aktiv", "dataverse_export_aktiv",
                       "vollautomatik_aktiv", "vollautomatik_confidence",
-                      "eingangsbelege_pruefqueue_aktiv", "kategorien"):
+                      "eingangsbelege_pruefqueue_aktiv", "kategorien",
+                      "dataverse_tenant_id", "dataverse_client_id",
+                      "dataverse_org_url", "dataverse_table_name",
+                      "dataverse_dedup_field"):
                 if k in body:
                     lex[k] = body[k]
             # API-Key nur wenn vorhanden und nicht leer
             if body.get("api_key", "").strip():
                 lex["api_key"] = body["api_key"].strip()
-            # API-Basis-URL (konfigurierbar fuer Migration api.lexoffice.io → api.lexware.io)
+            # API-Basis-URL (konfigurierbar fuer Migration api.lexoffice.io -> api.lexware.io)
             if body.get("api_base_url", "").strip():
                 lex["api_base_url"] = body["api_base_url"].strip()
+            # Dataverse Client-Secret nur wenn nicht leer
+            if body.get("dataverse_client_secret", "").strip():
+                lex["dataverse_client_secret"] = body["dataverse_client_secret"].strip()
             cur_cfg["lexware"] = lex
             cfg_path.write_text(json.dumps(cur_cfg, ensure_ascii=False, indent=2), 'utf-8')
             handler._json({"ok": True})
