@@ -8575,6 +8575,13 @@ function esInfoPopup(btn, text) {{
       <label class="es-label">API-Key</label>
       <input id="cfg-lex-api-key" type="password" class="es-input" style="max-width:340px" placeholder="M_Dxx... (leer lassen um nicht zu &auml;ndern)" autocomplete="off">
     </div>
+    <div class="es-row">
+      <label class="es-label">API-Basis-URL</label>
+      <input id="cfg-lex-api-base" type="text" class="es-input" style="max-width:340px"
+             value="{esc(lex_cfg.get('api_base_url','https://api.lexoffice.io/v1'))}"
+             placeholder="https://api.lexoffice.io/v1">
+      <span class="es-grp-sub" style="margin:0;font-size:10px">Neu: api.lexware.io | Alt: api.lexoffice.io</span>
+    </div>
     <div class="es-row" style="gap:8px;align-items:center">
       <button class="btn btn-sec" onclick="lexEsSaveConfig()" style="min-width:120px">&#x1F4BE; Speichern</button>
       <button class="btn btn-sec" id="lex-test-btn" onclick="lexEsTestConnection()" style="min-width:160px">&#x26A1; Verbindung testen</button>
@@ -8635,6 +8642,7 @@ function esInfoPopup(btn, text) {{
   <script>
   function lexEsSaveConfig() {{
     const apiKey = document.getElementById('cfg-lex-api-key').value.trim();
+    const apiBase = document.getElementById('cfg-lex-api-base').value.trim();
     const payload = {{
       status: document.getElementById('cfg-lex-status').value,
       sync_intervall: parseInt(document.getElementById('cfg-lex-sync-intervall').value),
@@ -8643,6 +8651,7 @@ function esInfoPopup(btn, text) {{
       dataverse_export_aktiv: document.getElementById('cfg-lex-dataverse').checked,
     }};
     if(apiKey) payload.api_key = apiKey;
+    if(apiBase) payload.api_base_url = apiBase;
     fetch('/api/lexware/config/save', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
       .then(r=>r.json()).then(d=>{{
         if(d.ok) showToast('Lexware Einstellungen gespeichert \u2713','ok');
@@ -21695,6 +21704,9 @@ def _handle_lexware_post(handler, path, body):
             # API-Key nur wenn vorhanden und nicht leer
             if body.get("api_key", "").strip():
                 lex["api_key"] = body["api_key"].strip()
+            # API-Basis-URL (konfigurierbar fuer Migration api.lexoffice.io → api.lexware.io)
+            if body.get("api_base_url", "").strip():
+                lex["api_base_url"] = body["api_base_url"].strip()
             cur_cfg["lexware"] = lex
             cfg_path.write_text(json.dumps(cur_cfg, ensure_ascii=False, indent=2), 'utf-8')
             handler._json({"ok": True})

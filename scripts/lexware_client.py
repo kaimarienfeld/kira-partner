@@ -6,7 +6,11 @@ Lexware Office API Dokumentation:
   https://developers.lexware.io/docs/
 
 Endpunkte (aktuelle API-Version: v1):
-  Basis: https://api.lexoffice.io/v1/   (Lexware Office = LexOffice-Nachfolger, gleicher Endpunkt)
+  Alt:  https://api.lexoffice.io/v1/   (PHP-Altstrecke, laut Research-Agent tot seit Ende 2025)
+  Neu:  https://api.lexware.io/v1/     (neue offizielle Domain nach Rebranding)
+
+  Konfigurierbar via config.json["lexware"]["api_base_url"].
+  Default: api.lexoffice.io (da PHP-Altstrecke damit lief — Kai muss ggf. auf api.lexware.io wechseln)
 
 Auth: Bearer Token (API-Key aus Einstellungen)
 """
@@ -22,8 +26,12 @@ from datetime import datetime
 
 logger = logging.getLogger("lexware_client")
 
-# API-Basis (Stand 2026-04 — Lexware Office nutzt noch api.lexoffice.io)
-LEXWARE_API_BASE = "https://api.lexoffice.io/v1"
+# API-Basis — konfigurierbar via config.json["lexware"]["api_base_url"]
+# Research-Agent (2026-04-01): api.lexoffice.io koennte tot sein, neue URL: api.lexware.io
+# → Kai soll beide testen und config anpassen
+LEXWARE_API_BASE_DEFAULT = "https://api.lexoffice.io/v1"
+LEXWARE_API_BASE_NEW = "https://api.lexware.io/v1"
+LEXWARE_API_BASE = LEXWARE_API_BASE_DEFAULT  # Fallback wenn config nicht gelesen
 
 # Rate-Limit Handling
 _RATE_LIMIT_DELAY = 1.0   # Sekunden zwischen Requests
@@ -58,12 +66,14 @@ class LexwareClient:
     NIEMALS hardcoded oder aus secrets.json.
     """
 
-    def __init__(self, api_key: str, db_path: Path = None):
+    def __init__(self, api_key: str, db_path: Path = None, api_base: str = None):
         if not api_key:
             raise LexwareAuthError("Lexware API-Key nicht gesetzt. Bitte in Einstellungen > Lexware Office eintragen.")
         self.api_key = api_key
         self.db_path = db_path
         self._last_request_ts = 0.0
+        # Konfigurierbare API-Basis (Kai kann auf api.lexware.io umstellen)
+        self._api_base = (api_base or LEXWARE_API_BASE_DEFAULT).rstrip("/")
 
     # ------------------------------------------------------------------
     # Interner HTTP-Request mit Rate-Limit und Retry
@@ -92,7 +102,7 @@ class LexwareClient:
         if elapsed < _RATE_LIMIT_DELAY:
             time.sleep(_RATE_LIMIT_DELAY - elapsed)
 
-        url = LEXWARE_API_BASE + path
+        url = self._api_base + path
         if params:
             url += "?" + urllib.parse.urlencode(params)
 
@@ -375,7 +385,7 @@ class LexwareClient:
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + file_bytes + f"\r\n--{boundary}--\r\n".encode()
 
-        url = f"{LEXWARE_API_BASE}/files"
+        url = f"{self._api_base}/files"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": f"multipart/form-data; boundary={boundary}",
@@ -648,7 +658,9 @@ def get_client(config: dict, db_path: Path = None) -> "LexwareClient":
             "Lexware API-Key nicht konfiguriert. "
             "Bitte in KIRA > Einstellungen > Lexware Office eintragen."
         )
-    return LexwareClient(api_key=api_key, db_path=db_path)
+    # API-Basis aus config (Kai kann auf api.lexware.io umstellen falls api.lexoffice.io tot)
+    api_base = lex_cfg.get("api_base_url", LEXWARE_API_BASE_DEFAULT).strip() or LEXWARE_API_BASE_DEFAULT
+    return LexwareClient(api_key=api_key, db_path=db_path, api_base=api_base)
 
 
 def is_lexware_configured(config: dict) -> bool:
