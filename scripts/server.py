@@ -11327,11 +11327,11 @@ function kalKiraAngebot() {{
   kiraSetQuickActions('angebot');
   var input=document.getElementById('kiraInput');
   if(input){{
-    input.value=(projekt?'Projekt: '+projekt+'\n':'')
-      +'Erstelle ein professionelles Angebot auf Basis dieser Kalkulation:\n'
-      +positions.join('\n')
-      +'\n\nKalkulierter Nettopreis: '+netto.toFixed(2)+' EUR'
-      +'\n\nBitte formuliere ein hoefliches, professionelles Angebot fuer ein Sichtbeton-Unternehmen.';
+    input.value=(projekt?'Projekt: '+projekt+'\\n':'')
+      +'Erstelle ein professionelles Angebot auf Basis dieser Kalkulation:\\n'
+      +positions.join('\\n')
+      +'\\n\\nKalkulierter Nettopreis: '+netto.toFixed(2)+' EUR'
+      +'\\n\\nBitte formuliere ein hoefliches, professionelles Angebot fuer ein Sichtbeton-Unternehmen.';
     input.style.height='auto';
     input.style.height=Math.min(input.scrollHeight,160)+'px';
     input.focus();
