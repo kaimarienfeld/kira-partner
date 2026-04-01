@@ -1,6 +1,6 @@
 {
-  "last_session": "session-fff",
-  "date": "2026-04-01 12:00",
+  "last_session": "session-ggg",
+  "date": "2026-04-01 09:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -156,7 +156,8 @@
     "lexware-ui-regeln-aus-pruefqueue-abgeleitet",
     "lexware-ui-5-neue-get-endpoints",
     "lexware-ui-2-neue-post-endpoints",
-    "lexware-ui-kira-kontext-integration"
+    "lexware-ui-kira-kontext-integration",
+    "lexware-js-syntaxerrors-alle-behoben"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -173,7 +174,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "session-fff vollstaendig abgeschlossen. Commit 34d01cb. Kai-Aktionen (KAI-01 bis KAI-07): (1) Server neustarten (neustart_kira.vbs). (2) Einstellungen > Lexware Office > Verbindung: API-Key eintragen + Verbindung testen. (3) Modul-Status auf 'Freigeschaltet' setzen. (4) Cockpit aufrufen > Jetzt synchronisieren klicken. (5) Optional: Auto-Sync-Intervall setzen (60 Min empfohlen). Naechste Session: KIRA_SYSTEM_ANALYSE.md Sektion 15 (Lexware UI session-fff) aktualisieren, Playwright-Test des neuen Lexware-Panels, evtl. Dokumente-Modul-Planung beginnen.",
+  "next_step": "session-ggg: JS-Fehler behoben (Commit d7fadd2). App laeuft mit 0 JS-Fehlern. Kai kann jetzt normal in der App arbeiten. Naechste Schritte: (1) Einstellungen > Lexware Office > Verbindung: API-Key eintragen + Verbindung testen. (2) Modul-Status auf Freigeschaltet setzen. (3) Cockpit > Jetzt synchronisieren. Optional: KIRA_SYSTEM_ANALYSE.md Sektion 15 aktualisieren.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
