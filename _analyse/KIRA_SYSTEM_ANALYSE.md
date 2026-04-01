@@ -1,7 +1,7 @@
 # KIRA — Vollstaendige System-Analyse & Masterdatei
 
-**Erstellt:** 2026-03-30 | **Konsolidiert:** 2026-03-31 (session-xx)
-**Analysiert:** 34 Python-Module (35.439 Zeilen), 7 SQLite-Datenbanken (46 Tabellen), 96 API-Endpunkte
+**Erstellt:** 2026-03-30 | **Konsolidiert:** 2026-03-31 (session-xx) | **Aktualisiert:** 2026-04-01 (session-hhh)
+**Analysiert:** 37 Python-Module (~39.000 Zeilen), 7 SQLite-Datenbanken (46 Tabellen), 115+ API-Endpunkte
 **Projektpfad:** `memory/` (Git-Repo)
 
 > **Diese Datei ist die einzige Wahrheitsquelle fuer KIRA-Architektur, Status und Planung.**
@@ -22,6 +22,9 @@
 > - session-vv: Global-Badge-Polling, Spaeter-Dialog, Sidebar-Logo Kira-Orb, Favicon, Modal-BG-Fix.
 > - session-ww: Vorgaenge-Uebersicht Panel, Launcher Drag-to-Move, Geloeschte-Protokoll-UI.
 > - **session-xx (2026-03-31): KONSOLIDIERUNG — alle Planungsdokumente integriert, Status-Tabelle, offene Posten.**
+> - session-fff (2026-04-01): Lexware UI Komplettausbau — 9 Einstellungs-Unterbereiche (Verbindung/Sync/Kategorien/Eingangsbelege/Vollautomatik/Regeln/Dataverse/Diagnose/Freischaltung), build_lexware() Seiten-Komplett-Umbau, Einstellungen-Subnav als horizontale Tab-Bar.
+> - session-ggg (2026-04-01): JS-Syntaxfehler behoben (\\' in HTML-Attributen, unquoted Strings im Lexware-Panel).
+> - session-hhh (2026-04-01): Lexware Bugfixes + Dataverse — Pane-2-Spaltenmenü (3-Spalten-Layout wie Mail & Konten), Tab-Highlighting-Fix (inline-style-Override), Verbindungstest-Fix (api_key aus Input + api_base_url /v1 korrigiert), Dataverse-Credentials-UI (Tenant-ID/Client-ID/Secret/Org-URL/Tabelle/Duplikat-Prueffeld), dataverse_client.py neu, /api/lexware/dataverse/test Endpoint.
 
 ---
 
@@ -89,11 +92,11 @@ kira_llm  mail_monitor  daily_check  kira_proaktiv
 
 ## 2. Modul-Inventar
 
-### Python-Module (34 Dateien, 35.439 Zeilen)
+### Python-Module (37 Dateien, ~39.000 Zeilen)
 
 | Datei | Zeilen | Zweck |
 |---|---|---|
-| `server.py` | 17.941 | Haupt-Dashboard, 96 API-Endpunkte, 8 build_*-Funktionen, 133 Funktionen total |
+| `server.py` | 24.502 | Haupt-Dashboard, 115+ API-Endpunkte, 8 build_*-Funktionen — Lexware-Panel + Dataverse-UI + Pane-2 |
 | `kira_llm.py` | 3.341 | Multi-LLM Chat, 23 Tools, Modell-Validierung, ReAct-Schleife, Circuit Breaker |
 | `mail_monitor.py` | 1.576 | IMAP-Polling (5 Konten), Mail-Klassifizierung, Task-Erstellung, OAuth2 |
 | `kira_proaktiv.py` | 1.107 | Autonomer Business-Scanner (11 Scans, alle 15 Min) |
@@ -127,6 +130,8 @@ kira_llm  mail_monitor  daily_check  kira_proaktiv
 | `reclassify_existing.py` | 107 | Re-Klassifizierung bestehender Mails |
 | `task_manager.py` | 105 | Task-CRUD fuer tasks.db |
 | `presence_detector.py` | 35 | Windows-Idle-Detection (GetLastInputInfo) |
+| `lexware_client.py` | 680 | Lexware Office REST-Client — Bearer Auth, Rate-Limit, Voucher/Kontakt/Artikel-API, Sync-Methoden |
+| `dataverse_client.py` | 260 | Microsoft Dataverse Web API Client — OAuth2 Client-Credentials, WhoAmI, record_exists (OData $filter), create/update/upsert mit Duplikat-Schutz |
 
 ### Konfigurationsdateien
 
@@ -211,8 +216,9 @@ memory/                          <- Git-Repo Root
 - CRUD + Timestamps
 - Direkt in Kira-Kontext injiziert
 
-**Einstellungen (55+ KB HTML, 3-Spalten-Architektur)**
-- 12 Sektionen: Design, Benachrichtigungen, Aufgabenlogik, Nachfass, Dashboard, Provider/LLM, Mail & Konten, Integrationen, Automationen, Sicherheit & Audit, Protokoll
+**Einstellungen (80+ KB HTML, 3-Spalten-Architektur)**
+- 13 Sektionen inkl. Lexware Office: Design, Benachrichtigungen, Aufgabenlogik, Nachfass, Dashboard, Provider/LLM, Mail & Konten, Integrationen, Lexware Office, Automationen, Sicherheit & Audit, Protokoll
+- 3 Sektionen mit Pane-2 (3-Spalten): Mail & Konten, Kira/LLM/Provider, Protokoll, **Lexware Office** (session-hhh)
 - 5 Provider-Gruppen: Konversations-Gedaechtnis, Proaktive Automatisierung, ReAct & Multi-Step, Feedback & Lernen, Sicherheit & Limits
 - Signatur-Editor, Mail-Klassifizierung, Archiv-Panel
 - 5 Design-Einstellungen: Schriftfamilie, Sidebar-Breite, Toast-Position (6 Optionen), Tabellen-Zeilenhoehe, Zebrastreifen
@@ -221,6 +227,7 @@ memory/                          <- Git-Repo Root
 - Config-Reset mit Backup, Config-Export/Import, DB-VACUUM
 - Logo-Upload (max 512KB), Logo-Groesse
 - Geloeschte-Mails-Protokoll in Mail & Konten
+- **Lexware Office Einstellungen (session-fff/hhh):** 9 Unterbereiche als Pane-2-Navigation: Verbindung (API-Key/URL + Test), Sync (Intervall, Modus, manuell), Kategorien, Eingangsbelege (Pruefregel/PayPal/Bodyonly), Vollautomatik (Schwelle, Verhalten), Regeln (Lernmodus), Dataverse (Credentials-Karte: Tenant-ID/Client-ID/Secret/Org-URL/Tabelle/Duplikat-Prueffeld + Test-Button), Diagnose, Freischaltung
 
 ### 3.2 Kira-Workspace (Chat + Tools)
 
@@ -692,7 +699,7 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | Feature / Komponente | Status | Prioritaet | Hinweis |
 |---|---|---|---|
 | Azure Calendars.ReadWrite | ⏳ Offen (Kai) | Mittel | Entra Portal: Permission hinzufuegen (Kalender-Widget dann voll aktiv) |
-| Lexware-Anbindung | ✅ Erledigt (session-eee) | — | Vollstaendig implementiert — API-Client, 5 DB-Tabellen, Panel, Einstellungen, Mail-Monitor, 2 Kira-Tools |
+| Lexware-Anbindung | ✅ Erledigt (session-eee/fff/hhh) | — | Vollstaendig — API-Client, 5 DB-Tabellen, Panel, 9-Tab-Einstellungen (Pane-2), Mail-Monitor, 2 Kira-Tools, Dataverse-Client |
 | WhatsApp-Token | ⏳ Offen (Kai) | Niedrig | Kai muss Token eintragen |
 | Leni Draft-2 Passwort | ⏳ Offen (Kai) | Niedrig | Gmail-Draft Platzhalter ersetzen |
 | Multi-Agent-Architektur | ⏳ Langfristig | — | Spezialisierte Sub-Agenten |
@@ -823,7 +830,7 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 - is_body_only Flag: Erkennung wenn Rechnung im Mail-Text (kein Anhang) + Betrag-Extraktion
 - Idempotenter Eintrag via `INSERT OR IGNORE` auf `mail_id` UNIQUE — kein Doppel-Processing
 
-**Neue API-Endpunkte (12):**
+**Neue API-Endpunkte (13):**
 - `GET /api/lexware/status` — Modul-Status + KPI-Daten fuer Cockpit
 - `POST /api/lexware/sync` — Manueller Sync-Start (belege/kontakte/artikel)
 - `GET /api/lexware/belege` — Liste aller Belege (mit Filter-Params)
@@ -834,8 +841,23 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 - `GET /api/lexware/eingangsbeleg/{id}` — Pruefqueue-Detail
 - `POST /api/lexware/eingangsbeleg/{id}/status` — Status setzen (klassifiziert/abgelegt/unklar)
 - `POST /api/lexware/eingangsbeleg/neu` — Manuellen Eintrag hinzufuegen
-- `POST /api/lexware/config/save` — Einstellungen speichern (inkl. api_base_url)
-- `POST /api/lexware/test` — Verbindungstest (Bearer Token gegen /api/v1/profile)
+- `POST /api/lexware/config/save` — Einstellungen speichern (inkl. api_base_url + Dataverse-Felder, session-hhh)
+- `POST /api/lexware/test` — Verbindungstest mit Override-Params (session-hhh: api_key + api_base_url aus Body-Override statt gespeicherter Config)
+- `POST /api/lexware/dataverse/test` — Dataverse-Verbindungstest: Token-Abruf + WhoAmI + optionaler Tabellen-Zugriff (session-hhh)
+
+**Ergänzungen session-fff (Lexware UI Komplettausbau):**
+- Einstellungen `es-sec-lexware`: 9 Unterbereiche als horizontale Tab-Bar (ersetzt Simple-Layout)
+- `esShowLexSec(subsecId)`: Sub-Sektion anzeigen/verstecken, tab-highlighting
+- `lexEsSaveConfig()`: Speichert alle 9 Bereiche inkl. api_key/api_base_url
+- `lexEsTestConnection()`: Verbindungstest mit aktuellem Button-Status
+
+**Ergänzungen session-hhh (Bugfixes + Pane-2 + Dataverse):**
+- `esShowLexSec()`: Inline-Style-Update (color/fontWeight/background) + Pane-2-Sync
+- Lexware als 4. Pane-2-Sektion in `_esSectionsWithPane2` (3-Spalten-Layout)
+- `es-p2-lexware`: Pane-2-Div mit 9 Items in 3 Gruppen (Lexware Office / Buchhaltung / Export & Diagnose)
+- `dvEsTestConnection()`: Dataverse-Test JS-Funktion
+- `dataverse_client.py` (neu): OAuth2 client-credentials, WhoAmI, `record_exists()`, `create_record()`, `update_record()`, `upsert_record()` mit Duplikat-Schutz via OData `$filter`
+- config.json: `api_base_url` automatisch von `https://api.lexware.io` auf `https://api.lexware.io/v1` korrigiert
 
 ---
 
@@ -845,11 +867,12 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 - **WhatsApp Business:** Token eintragen (Einstellungen > Integrationen)
 - **Google OAuth App:** Cloud Console Project erstellen, Client ID/Secret in Einstellungen eintragen
 - **Leni Gmail-Draft:** Draft-2 Passwort-Platzhalter ersetzen
-- **Lexware API-Key:** In KIRA Einstellungen > Lexware Office eintragen (Details: KAI_TODO_LEXWARE.md)
+- **Lexware API-Key:** In KIRA Einstellungen > Lexware Office > Verbindung eintragen (api_base_url auf https://api.lexware.io/v1 bereits gesetzt)
+- **Dataverse-Credentials:** Einstellungen > Lexware Office > Dataverse — Tenant-ID, Client-ID, Client-Secret, Organisations-URL, Tabellen-Name, Duplikat-Prueffeld eintragen (dataverse_client.py ist bereit)
 
 ### Bekannte technische Schulden
 
-- `server.py` hat jetzt **19.600+ Zeilen** → server_map.md vor groesserer Arbeit lesen
+- `server.py` hat jetzt **24.502 Zeilen** → server_map.md vor groesserer Arbeit lesen
 - Zeilen-Angaben in server_map.md sind veraltete ca.-Werte
 - Gmail-IMAP via google_oauth.py: braucht Gmail API aktiviert in Google Cloud Console
 - Outlook-Kalender iframe-Embed: nur sinnvoll ohne Entra-Setup
@@ -887,4 +910,4 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-04-01 (session-ddd+eee) | 36 Module, 7 DBs, 115 Endpunkte, 25 Tools, 12 Scans*
+*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-04-01 (session-hhh) | 37 Module, 7 DBs, 115+ Endpunkte, 25 Tools, 12 Scans*
