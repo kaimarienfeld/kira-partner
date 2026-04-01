@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-04-01 13:30 — Session-Ende (session-iii)
+
+**Erledigt:** Admin-Login-Panel vollstaendig implementiert (build_admin, Login-Wall, 6 Sektionen, 3 API-Endpoints, Sidebar-Eintrag). CSS-Compat-Aliase fuer .es-label/.es-input/.es-toggle etc. behoben Lexware+Mobil Typo-Uebergroesse. 2 JS-Fixes (Capture \\n + Mobil Emoji). Playwright-Verifikation: 0 JS-Fehler, Login-Wall ✓, Admin-Dashboard ✓, Lexware-Typo-Fix ✓. Commit e7717c3.
+**Offen geblieben:** KIRA_SYSTEM_ANALYSE.md session-iii Sektion. admin_password in secrets.json setzen.
+**Status:** erledigt
+
+---
+
+## 2026-04-01 11:15 — Session-Start (session-iii / Admin-Login + Typo-Fix)
+
+**Auftrag:** (1) Admin-Login-Panel mit passwortgeschuetztem Dashboard fuer secrets.json-Einstellungen, Mehrspaltenmenu, KIRA-UI. (2) Lexware und Mobil Capture Einstellungen Typo-Fix (zu grosse Labels, falsche Darstellung vs. Rest der Einstellungen).
+**Status:** erledigt
+
+---
+
 ## 2026-04-01 11:00 — Session-Ende (session-hhh)
 
 **Erledigt:** Capture/Mobile-Memo Modul vollstaendig implementiert und getestet. 4 neue DB-Tabellen, Desktop-Panel, Mobile-Webapp /mobil, 3-Stufen-Matching, 2 Kira-Tools, 11 API-Endpoints, Einstellungen-Sektion. 2 JS-Bugs behoben (\n-in-String-Literal + Surrogate-Emoji). 0 JS-Fehler. Commit 31e8d7f.
