@@ -7313,6 +7313,46 @@ function esInfoPopup(btn, text) {{
       }},3000);
     }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='\u26A1 Verbindung testen';}}showToast('Fehler','fehler');}});
   }};
+  window._esMkLastErr = {{}};
+  window.esMkCopyLastErr = function(key) {{ copyErrorDetails(window._esMkLastErr[key]||{{}}); }};
+  window.esMkSmtpTest = function(email, btn) {{
+    const safe = email.replace(/[@.]/g,'_');
+    const res = document.getElementById('es-mk-smtp-res-'+safe);
+    if(btn){{btn.disabled=true;btn.textContent='Sende\u2026';}}
+    if(res){{res.innerHTML='';res.style.display='none';}}
+    fetch('/api/mail/konto/smtp-test',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn){{btn.disabled=false;btn.textContent='SMTP testen';}}
+      const key=email+'_smtp'; window._esMkLastErr[key]=d;
+      if(res){{
+        if(d.ok){{res.innerHTML='<span style="color:var(--success)">\u2713 Testmail gesendet ('+d.dauer_ms+'ms)</span>';}}
+        else{{res.innerHTML='<span style="color:var(--danger)">\u2717 '+escH(d.error||'?')+'</span>\u00a0<button class="es-mk-btn sec" style="padding:2px 6px;font-size:var(--fs-xs)" onclick="esMkCopyLastErr(this.dataset.k)" data-k="'+key+'">Details</button>';}}
+        res.style.display='block';
+      }}
+    }}).catch(e=>{{
+      if(btn){{btn.disabled=false;btn.textContent='SMTP testen';}}
+      if(res){{res.innerHTML='<span style="color:var(--danger)">\u2717 Netzwerkfehler</span>';res.style.display='block';}}
+    }});
+  }};
+  window.esMkImapTest = function(email, btn) {{
+    const safe = email.replace(/[@.]/g,'_');
+    const res = document.getElementById('es-mk-imap-res-'+safe);
+    if(btn){{btn.disabled=true;btn.textContent='Pr\u00fcfe\u2026';}}
+    if(res){{res.innerHTML='';res.style.display='none';}}
+    fetch('/api/mail/konto/imap-test',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email}})}})
+    .then(r=>r.json()).then(d=>{{
+      if(btn){{btn.disabled=false;btn.textContent='IMAP pr\u00fcfen';}}
+      const key=email+'_imap'; window._esMkLastErr[key]=d;
+      if(res){{
+        if(d.ok){{res.innerHTML='<span style="color:var(--success)">\u2713 '+d.ordner_anzahl+' Ordner ('+d.dauer_ms+'ms)</span>';}}
+        else{{res.innerHTML='<span style="color:var(--danger)">\u2717 '+escH(d.error||'?')+'</span>\u00a0<button class="es-mk-btn sec" style="padding:2px 6px;font-size:var(--fs-xs)" onclick="esMkCopyLastErr(this.dataset.k)" data-k="'+key+'">Details</button>';}}
+        res.style.display='block';
+      }}
+    }}).catch(e=>{{
+      if(btn){{btn.disabled=false;btn.textContent='IMAP pr\u00fcfen';}}
+      if(res){{res.innerHTML='<span style="color:var(--danger)">\u2717 Netzwerkfehler</span>';res.style.display='block';}}
+    }});
+  }};
   function esLoadMailKonten() {{
     fetch('/api/mail/konten').then(r=>r.json()).then(data=>{{
       const list = document.getElementById('es-mail-konten-list');
@@ -7398,6 +7438,10 @@ function esInfoPopup(btn, text) {{
                 ? `<button class="es-mk-btn sec" onclick="esMkToggleAktiv('${{k.email}}',true,this)">&#x25B6; Aktivieren</button>`
                 : `<button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
                    <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
+                   <button class="es-mk-btn sec" onclick="esMkSmtpTest('${{k.email}}',this)" title="SMTP-Verbindung testen und Testmail senden">SMTP testen</button>
+                   <button class="es-mk-btn sec" onclick="esMkImapTest('${{k.email}}',this)" title="IMAP-Verbindung pruefen und Ordner abrufen">IMAP pruefen</button>
+                   <div id="es-mk-smtp-res-${{safe}}" style="display:none;font-size:var(--fs-xs);margin-top:4px;padding:2px 0"></div>
+                   <div id="es-mk-imap-res-${{safe}}" style="display:none;font-size:var(--fs-xs);margin-top:4px;padding:2px 0"></div>
                    <span id="es-mk-recon-${{safe}}" style="${{needsReconnect?'':'display:none'}}"><button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button></span>
                    <button class="es-mk-btn warn" onclick="esMkToggleAktiv('${{k.email}}',false,this)" title="Konto deaktivieren — Archiv bleibt erhalten">&#x23F8; Deaktivieren</button>`
               }}
@@ -9119,7 +9163,7 @@ function esInfoPopup(btn, text) {{
   }}
   function lexEsSync(mode) {{
     const el = document.getElementById('lex-sync-status');
-    if(el) el.textContent = 'Sync läuft\u2026';
+    if(el) el.textContent = 'Sync l\u00e4uft\u2026';
     fetch('/api/lexware/sync', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mode:mode}})}})
       .then(r=>r.json()).then(d=>{{
         if(d.ok) {{
@@ -9132,10 +9176,20 @@ function esInfoPopup(btn, text) {{
           showToast('Sync abgeschlossen','ok');
         }} else {{
           if(el) el.textContent = '\u26A0 ' + (d.error||'Fehler');
-          showToast('Sync fehlgeschlagen: '+(d.error||'?'),'fehler');
+          window._lexLastErr = d;
+          showSimpleModal('Sync-Fehler',
+            '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Synchronisierung fehlgeschlagen</p>' +
+            '<pre style="white-space:pre-wrap;font-size:var(--fs-xs);background:var(--bg-raised);padding:8px;border-radius:4px;max-height:180px;overflow-y:auto">' + escH(d.error||'Unbekannter Fehler') + '</pre>' +
+            '<div style="margin-top:8px"><button class="btn-primary" onclick="copyErrorDetails(window._lexLastErr);closeModal()" style="font-size:var(--fs-xs)">Details kopieren</button></div>'
+          );
         }}
-      }}).catch(()=>{{
+      }}).catch(e=>{{
         if(el) el.textContent = 'Netzwerkfehler';
+        window._lexLastErr = {{error: String(e)}};
+        showSimpleModal('Sync-Fehler',
+          '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Netzwerkfehler</p>' +
+          '<pre style="white-space:pre-wrap;font-size:var(--fs-xs)">' + escH(String(e)) + '</pre>'
+        );
       }});
   }}
   </script>
@@ -13326,9 +13380,26 @@ function lexSync(mode) {{
     headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{mode: mode || 'belege'}})
   }}).then(r => r.json()).then(d => {{
-    if(log) log.textContent = d.ok ? ('Sync abgeschlossen: ' + JSON.stringify(d.stats)) : ('Fehler: ' + d.error);
-    if(d.ok) setTimeout(() => location.reload(), 1500);
-  }}).catch(e => {{ if(log) log.textContent = 'Netzwerkfehler: ' + e; }});
+    if(d.ok) {{
+      if(log) log.textContent = 'Sync abgeschlossen: ' + JSON.stringify(d.stats);
+      setTimeout(() => location.reload(), 1500);
+    }} else {{
+      if(log) log.textContent = 'Fehler: ' + (d.error||'?');
+      window._lexLastErr = d;
+      showSimpleModal('Sync-Fehler',
+        '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Synchronisierung fehlgeschlagen</p>' +
+        '<pre style="white-space:pre-wrap;font-size:var(--fs-xs);background:var(--bg-raised);padding:8px;border-radius:4px;max-height:180px;overflow-y:auto">' + escH(d.error||'Unbekannter Fehler') + '</pre>' +
+        '<div style="margin-top:8px"><button class="btn-primary" onclick="copyErrorDetails(window._lexLastErr);closeModal()" style="font-size:var(--fs-xs)">Details kopieren</button></div>'
+      );
+    }}
+  }}).catch(e => {{
+    if(log) log.textContent = 'Netzwerkfehler: ' + e;
+    window._lexLastErr = {{error: String(e)}};
+    showSimpleModal('Sync-Fehler',
+      '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Netzwerkfehler</p>' +
+      '<pre style="white-space:pre-wrap;font-size:var(--fs-xs)">' + escH(String(e)) + '</pre>'
+    );
+  }});
 }}
 
 function lexTestConnection() {{
@@ -17366,6 +17437,14 @@ function showToast(msg, typ){{
   t._toastTimer=setTimeout(()=>{{t.classList.remove('show');t.className='status-toast';}},sek*1000);
 }}
 function showKiraToast(msg){{showToast('Kira: '+msg,'info');}}
+function copyErrorDetails(details) {{
+  const text = typeof details === 'object' ? JSON.stringify(details,null,2) : String(details||'');
+  if(navigator.clipboard) {{ navigator.clipboard.writeText(text).then(()=>showToast('Details kopiert','ok')).catch(()=>_copyFallback(text)); }}
+  else {{ _copyFallback(text); }}
+}}
+function _copyFallback(text) {{
+  try{{const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('Details kopiert','ok');}}catch(e){{showToast('Kopieren fehlgeschlagen','fehler');}}
+}}
 // Später-Dialog
 function openSpaeterDialog(tid){{
   document.getElementById('sp-tid').value=tid;
@@ -21758,6 +21837,53 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_konto_smtp_test(self, body):
+        """POST /api/mail/konto/smtp-test — Testet SMTP-Verbindung und sendet Testmail."""
+        email = body.get('email', '')
+        smtp_server = '?'
+        try:
+            import sys as _sys, smtplib, time as _time, datetime as _dt
+            from email.mime.text import MIMEText
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            konten = _mm._load_accounts()
+            konto = next((k for k in konten if k['email'] == email), None)
+            if not konto:
+                self._json({'ok': False, 'error': 'Konto nicht gefunden'})
+                return
+            smtp_cfg = _mm.get_smtp_settings(konto)
+            smtp_server = smtp_cfg.get('server', '?')
+            auth_methode = konto.get('auth_methode', 'oauth2')
+            use_password = auth_methode in ('imap_password', 'imap', 'password') or \
+                           'password' in auth_methode or smtp_cfg.get('auth') == 'password'
+            t0 = _time.monotonic()
+            msg = MIMEText(f'KIRA SMTP-Test {_dt.datetime.utcnow().isoformat()}', 'plain', 'utf-8')
+            msg['Subject'] = 'KIRA SMTP-Test'
+            msg['From'] = email
+            msg['To'] = email
+            smtp = smtplib.SMTP(smtp_cfg['server'], smtp_cfg['port'], timeout=15)
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            if use_password:
+                import base64 as _b64
+                passwort = konto.get('passwort', '') or konto.get('password', '')
+                if passwort.startswith('enc:'):
+                    passwort = _b64.b64decode(passwort[4:]).decode('utf-8', errors='ignore')
+                smtp.login(konto.get('login', email), passwort)
+            else:
+                import base64 as _b64
+                token = _mm._get_access_token(konto)
+                auth_str = f'user={email}\x01auth=Bearer {token}\x01\x01'
+                smtp.docmd('AUTH', 'XOAUTH2 ' + _b64.b64encode(auth_str.encode()).decode())
+            smtp.sendmail(email, [email], msg.as_bytes())
+            smtp.quit()
+            ms = int((_time.monotonic() - t0) * 1000)
+            self._json({'ok': True, 'dauer_ms': ms, 'server': smtp_cfg['server']})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)[:300], 'server': smtp_server})
+
     def _api_mail_konto_abrufen(self, body):
         """POST /api/mail/konto/abrufen — Manuellen Poll für ein/alle Konten starten."""
         import threading as _t, sys as _sys
@@ -22558,6 +22684,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/konto/imap-test':
             self._api_mail_konto_imap_test(body)
+            return
+
+        if self.path == '/api/mail/konto/smtp-test':
+            self._api_mail_konto_smtp_test(body)
             return
 
         if self.path in ('/api/mail/konto/abrufen', '/api/mail/monitor/trigger'):
