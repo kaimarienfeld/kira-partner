@@ -9771,7 +9771,7 @@ def build_lexware(db):
       </div>
     </div>
   </div>
-  <button class="btn btn-primary" style="font-size:var(--fs-sm);padding:10px 24px" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'verbindung\\')}},200)">
+  <button class="btn btn-primary" style="font-size:var(--fs-sm);padding:10px 24px" onclick="showPanel('einstellungen');setTimeout(()=>{{esShowSec('lexware');esShowLexSec('verbindung')}},200)">
     &#x2699; Einstellungen &ouml;ffnen
   </button>
 </div>
@@ -9789,7 +9789,7 @@ def build_lexware(db):
     </div>
   </div>
   <div class="lx-header-right">
-    <button class="btn btn-primary" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'freischaltung\\')}},200)" style="font-size:var(--fs-sm)">
+    <button class="btn btn-primary" onclick="showPanel('einstellungen');setTimeout(()=>{{esShowSec('lexware');esShowLexSec('freischaltung')}},200)" style="font-size:var(--fs-sm)">
       &#x1F513; Modul freischalten
     </button>
   </div>
@@ -9885,7 +9885,7 @@ def build_lexware(db):
         return (
             f'<tr class="lx-tr" onclick="lxBuchDetailFull({pid})" style="cursor:pointer">'
             f'<td>{absender}</td>'
-            f'<td>{betreff}{"<span class=\\'lx-kira-frage\\' title=\\'" + esc(kira_frage) + "\\'>&#x1F916; Kira-Frage</span>" if kira_frage else ""}</td>'
+            f'<td>{betreff}{"<span class='lx-kira-frage' title='" + esc(kira_frage) + "'>&#x1F916; Kira-Frage</span>" if kira_frage else ""}</td>'
             f'<td><span class="lx-konto-chip">{konto or "—"}</span></td>'
             f'<td style="text-align:right;font-weight:600">{betrag:,.2f}</td>'
             f'<td style="text-align:center"><span class="lx-st-chip lx-st-{st}">{st_label}</span></td>'
@@ -9916,10 +9916,10 @@ def build_lexware(db):
   </div>
   <div class="lx-header-right">
     <input id="lx-global-search" type="text" placeholder="&#x2315; Suche..." oninput="lxGlobalSearch(this.value)" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm);width:180px">
-    <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'buchhaltung\\')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
+    <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
     <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Synchronisieren">&#x21BB; Sync</button>
-    <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'diagnose\\')" title="Diagnose">&#x1F527;</button>
-    <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext(\\'cockpit\\',\\'\\')">&#x1F916; Mit Kira</button>
+    <button class="btn btn-sec btn-xs" onclick="showLexSec('diagnose')" title="Diagnose">&#x1F527;</button>
+    <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira</button>
   </div>
 </div>"""
 
@@ -9943,26 +9943,26 @@ def build_lexware(db):
         return ""
     nav_html = '<div class="lx-nav-sec" id="lx-nav-sec">'
     for sec_id, icon, label in nav_items:
-        nav_html += f'<button class="lx-nav-btn{"  active" if sec_id == "cockpit" else ""}" data-lxsec="{sec_id}" onclick="showLexSec(\\\'{sec_id}\\\')">{icon} {label}{_nav_badge(sec_id)}</button>'
+        nav_html += f'<button class="lx-nav-btn{"  active" if sec_id == "cockpit" else ""}" data-lxsec="{sec_id}" onclick="showLexSec(\'{sec_id}\')">{icon} {label}{_nav_badge(sec_id)}</button>'
     # In-Planung-Bereiche
     planned_items = [("auswertung","&#x1F4C8;","Auswertung"),("kunden360","&#x1F464;","Kunden-360"),("cashflow","&#x1F4B0;","Cashflow"),("kalkulation","&#x1F9EE;","Kalkulation")]
     for sec_id, icon, label in planned_items:
-        nav_html += f'<button class="lx-nav-btn lx-nav-planned" data-lxsec="{sec_id}" onclick="showLexSec(\\\'{sec_id}\\\')">{icon} {label} <span style="font-size:9px;opacity:.7">Geplant</span></button>'
+        nav_html += f'<button class="lx-nav-btn lx-nav-planned" data-lxsec="{sec_id}" onclick="showLexSec(\'{sec_id}\')">{icon} {label} <span style="font-size:9px;opacity:.7">Geplant</span></button>'
     nav_html += '</div>'
 
     # ── COCKPIT Unterbereich ──
     # Warnungen zusammenstellen
     warnungen = []
     if not has_key:
-        warnungen.append(("err", "API-Key fehlt — Verbindung nicht moeglich", "showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'verbindung\\')}},200)"))
+        warnungen.append(("err", "API-Key fehlt — Verbindung nicht moeglich", "showPanel('einstellungen');setTimeout(()=>{{esShowSec('lexware');esShowLexSec('verbindung')}},200)"))
     if n_pruef > 0:
-        warnungen.append(("warn", f"{n_pruef} Eingangsbeleg(e) warten auf Pr&#252;fung", "showLexSec(\\'buchhaltung\\')"))
+        warnungen.append(("warn", f"{n_pruef} Eingangsbeleg(e) warten auf Pr&#252;fung", "showLexSec('buchhaltung')"))
     if n_unklar > 0:
-        warnungen.append(("err", f"{n_unklar} unklar(e) Buchungsfall — Kira-R&#252;ckfrage noetig", "showLexSec(\\'buchhaltung\\')"))
+        warnungen.append(("err", f"{n_unklar} unklar(e) Buchungsfall — Kira-R&#252;ckfrage noetig", "showLexSec('buchhaltung')"))
     if n_ueberfaellig > 0:
-        warnungen.append(("err", f"{n_ueberfaellig} &#252;berf&#228;llige Rechnung(en)", "showLexSec(\\'belege\\')"))
+        warnungen.append(("err", f"{n_ueberfaellig} &#252;berf&#228;llige Rechnung(en)", "showLexSec('belege')"))
     if n_kira_frage > 0:
-        warnungen.append(("info", f"{n_kira_frage} Kira-R&#252;ckfrage(n) ausstehend", "showLexSec(\\'buchhaltung\\')"))
+        warnungen.append(("info", f"{n_kira_frage} Kira-R&#252;ckfrage(n) ausstehend", "showLexSec('buchhaltung')"))
 
     warn_items_html = ""
     warn_colors = {"err": "#dc2626", "warn": "#f59e0b", "info": "var(--accent)"}
@@ -9990,22 +9990,22 @@ def build_lexware(db):
 <div style="display:flex;gap:16px;flex-wrap:wrap">
   <div style="flex:1;min-width:0">
     <div class="lx-kpi-row">
-      <div class="lx-kpi{'  lx-kpi-warn' if n_offen > 0 else ''}" onclick="showLexSec(\\'belege\\')" style="cursor:pointer">
+      <div class="lx-kpi{'  lx-kpi-warn' if n_offen > 0 else ''}" onclick="showLexSec('belege')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_offen}</div><div class="lx-kpi-lbl">Offen / F&#228;llig</div>
       </div>
-      <div class="lx-kpi{'  lx-kpi-warn' if n_pruef > 0 else ''}" onclick="showLexSec(\\'buchhaltung\\')" style="cursor:pointer">
+      <div class="lx-kpi{'  lx-kpi-warn' if n_pruef > 0 else ''}" onclick="showLexSec('buchhaltung')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_pruef}</div><div class="lx-kpi-lbl">Zu pr&#252;fen</div>
       </div>
-      <div class="lx-kpi" onclick="showLexSec(\\'belege\\')" style="cursor:pointer">
+      <div class="lx-kpi" onclick="showLexSec('belege')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_belege}</div><div class="lx-kpi-lbl">Belege gesamt</div>
       </div>
-      <div class="lx-kpi" onclick="showLexSec(\\'kontakte\\')" style="cursor:pointer">
+      <div class="lx-kpi" onclick="showLexSec('kontakte')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_kontakte}</div><div class="lx-kpi-lbl">Kontakte</div>
       </div>
-      <div class="lx-kpi" onclick="showLexSec(\\'artikel\\')" style="cursor:pointer">
+      <div class="lx-kpi" onclick="showLexSec('artikel')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_artikel}</div><div class="lx-kpi-lbl">Artikel</div>
       </div>
-      <div class="lx-kpi{'  lx-kpi-warn' if n_unklar > 0 else ''}" onclick="showLexSec(\\'buchhaltung\\')" style="cursor:pointer">
+      <div class="lx-kpi{'  lx-kpi-warn' if n_unklar > 0 else ''}" onclick="showLexSec('buchhaltung')" style="cursor:pointer">
         <div class="lx-kpi-n">{n_unklar}</div><div class="lx-kpi-lbl">Unklar</div>
       </div>
     </div>
@@ -10013,10 +10013,10 @@ def build_lexware(db):
       <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">SCHNELLAKTIONEN</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-primary btn-xs" onclick="lexSync()">&#x21BB; Jetzt synchronisieren</button>
-        <button class="btn btn-sec btn-xs" onclick="lexSync(\\'full\\')">Vollsync</button>
+        <button class="btn btn-sec btn-xs" onclick="lexSync('full')">Vollsync</button>
         <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">Verbindung testen</button>
-        <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'buchhaltung\\')">Eingangsbelege pr&#252;fen</button>
-        <button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext(\\'cockpit\\',\\'\\')">&#x1F916; Mit Kira besprechen</button>
+        <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')">Eingangsbelege pr&#252;fen</button>
+        <button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira besprechen</button>
       </div>
       <div id="lx-sync-log" style="font-size:var(--fs-sm);color:var(--muted);margin-top:8px;min-height:20px"></div>
     </div>
@@ -10097,7 +10097,7 @@ def build_lexware(db):
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
-        <button class="btn btn-sec btn-xs" onclick="document.getElementById(\\'lx-bel-detail\\').style.display=\\'none\\'">&#x2715;</button>
+        <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-bel-detail').style.display='none'">&#x2715;</button>
       </div>
       <div id="lx-bel-detail-content" style="font-size:var(--fs-sm)"></div>
     </div>
@@ -10157,7 +10157,7 @@ def build_lexware(db):
     kontakte_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-kon-search" type="text" placeholder="Suche Name / E-Mail..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync(\\'kontakte\\')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync('kontakte')">&#x21BB; Sync</button>
 </div>
 <div style="display:flex;gap:12px">
   <div style="flex:1;overflow-x:auto">
@@ -10170,7 +10170,7 @@ def build_lexware(db):
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-weight:600;font-size:var(--fs-sm)">Kontakt-Details</div>
-        <button class="btn btn-sec btn-xs" onclick="document.getElementById(\\'lx-kon-detail\\').style.display=\\'none\\'">&#x2715;</button>
+        <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-kon-detail').style.display='none'">&#x2715;</button>
       </div>
       <div id="lx-kon-detail-content" style="font-size:var(--fs-sm)"></div>
     </div>
@@ -10188,14 +10188,14 @@ def build_lexware(db):
   <td style="font-size:var(--fs-xs)">{esc(a.get("steuer_satz",""))}</td>
   <td><span class="lx-chip lx-chip-muted" style="font-size:9px">{herkunft}</span></td>
   <td>
-    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'artikel\\',\\'{esc(a.get("lexware_id",""))}\\')">&#x1F916;</button>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext('artikel','{esc(a.get("lexware_id",""))}')">&#x1F916;</button>
   </td>
 </tr>"""
     artikel_rows = "".join(_artikel_row(a) for a in artikel) if artikel else "<tr><td colspan='7' style='text-align:center;color:var(--muted);padding:24px'>Keine Artikel geladen</td></tr>"
     artikel_html = f"""
 <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
   <input id="lx-art-search" type="text" placeholder="Suche Artikel..." oninput="lxFilterArtikel()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync(\\'artikel\\')">&#x21BB; Sync</button>
+  <button class="btn btn-primary btn-xs" onclick="lexSync('artikel')">&#x21BB; Sync</button>
 </div>
 <div style="overflow-x:auto">
 <table class="lx-table">
@@ -10215,7 +10215,7 @@ def build_lexware(db):
   <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("datum_beleg","") or "—")}</td>
   <td>
     <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lexPruefDetail({p['id']})">Details</button>
-    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'datei\\',{p['id']})">&#x1F916;</button>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext('datei',{p['id']})">&#x1F916;</button>
   </td>
 </tr>"""
     datei_rows = "".join(_datei_row(p) for p in dateien_list[:50]) if dateien_list else ""
@@ -10279,12 +10279,12 @@ def build_lexware(db):
 
     buchalt_html = f"""
 <div class="lx-buch-nav">
-  <button class="lx-buch-tab active" data-buchtab="zu_pruefen" onclick="showLexBuchTab(\\'zu_pruefen\\')">Zu pr&#252;fen {('<span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">'+str(n_pruef)+'</span>') if n_pruef > 0 else ''}</button>
-  <button class="lx-buch-tab" data-buchtab="klassifiziert" onclick="showLexBuchTab(\\'klassifiziert\\')">Klassifiziert {('<span class="si-badge">'+str(n_klassifiziert)+'</span>') if n_klassifiziert > 0 else ''}</button>
-  <button class="lx-buch-tab" data-buchtab="abgelegt" onclick="showLexBuchTab(\\'abgelegt\\')">Abgelegt {('<span class="si-badge">'+str(n_abgelegt)+'</span>') if n_abgelegt > 0 else ''}</button>
-  <button class="lx-buch-tab" data-buchtab="unklar" onclick="showLexBuchTab(\\'unklar\\')">Unklar {('<span class="si-badge" style="background:rgba(220,38,38,.12);color:#dc2626;border-color:rgba(220,38,38,.25)">'+str(n_unklar)+'</span>') if n_unklar > 0 else ''}</button>
-  <button class="lx-buch-tab" data-buchtab="vollautomatik" onclick="showLexBuchTab(\\'vollautomatik\\')">Vollautomatik {('<span class="si-badge">'+str(len(pruef_auto))+'</span>') if pruef_auto else ''}</button>
-  <button class="lx-buch-tab" data-buchtab="alle" onclick="showLexBuchTab(\\'alle\\')">Alle ({len(pruefqueue)})</button>
+  <button class="lx-buch-tab active" data-buchtab="zu_pruefen" onclick="showLexBuchTab('zu_pruefen')">Zu pr&#252;fen {('<span class="si-badge" style="background:rgba(200,100,0,.12);color:#c86400;border-color:rgba(200,100,0,.25)">'+str(n_pruef)+'</span>') if n_pruef > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="klassifiziert" onclick="showLexBuchTab('klassifiziert')">Klassifiziert {('<span class="si-badge">'+str(n_klassifiziert)+'</span>') if n_klassifiziert > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="abgelegt" onclick="showLexBuchTab('abgelegt')">Abgelegt {('<span class="si-badge">'+str(n_abgelegt)+'</span>') if n_abgelegt > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="unklar" onclick="showLexBuchTab('unklar')">Unklar {('<span class="si-badge" style="background:rgba(220,38,38,.12);color:#dc2626;border-color:rgba(220,38,38,.25)">'+str(n_unklar)+'</span>') if n_unklar > 0 else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="vollautomatik" onclick="showLexBuchTab('vollautomatik')">Vollautomatik {('<span class="si-badge">'+str(len(pruef_auto))+'</span>') if pruef_auto else ''}</button>
+  <button class="lx-buch-tab" data-buchtab="alle" onclick="showLexBuchTab('alle')">Alle ({len(pruefqueue)})</button>
 </div>
 <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;margin-top:12px">
   <select id="lx-pruef-status" onchange="lxFilterPruef()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
@@ -10307,7 +10307,7 @@ def build_lexware(db):
 <div id="lx-buch-vollautomatik" class="lx-buch-content" style="display:none">
   <div style="background:linear-gradient(135deg,rgba(34,197,94,.06),rgba(34,197,94,.02));border:1px solid rgba(34,197,94,.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:var(--fs-sm)">
     &#x2705; Vollautomatik: Faelle die von KIRA erkannt und kontiert wurden — keine manuelle Pruefung noetig.
-    <br><span style="color:var(--muted)">Confidence-Schwelle und Vollautomatik-Einstellungen: <a href="#" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'vollautomatik\\')}},200)" style="color:var(--accent)">Einstellungen &rarr; Vollautomatik</a></span>
+    <br><span style="color:var(--muted)">Confidence-Schwelle und Vollautomatik-Einstellungen: <a href="#" onclick="showPanel('einstellungen');setTimeout(()=>{{esShowSec('lexware');esShowLexSec('vollautomatik')}},200)" style="color:var(--accent)">Einstellungen &rarr; Vollautomatik</a></span>
   </div>
   <div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_auto, "Noch keine vollautomatisch verarbeiteten Faelle")}</tbody></table></div>
 </div>
@@ -10332,7 +10332,7 @@ def build_lexware(db):
   <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(r['letzte_verwendung'][:16] if r.get('letzte_verwendung') and len(r['letzte_verwendung']) > 10 else (r.get('letzte_verwendung') or "—"))}</td>
   <td style="text-align:center">{r['count']}</td>
   <td>
-    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext(\\'regel\\','{esc(dom)}')">&#x1F916;</button>
+    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxOpenKiraWithContext('regel','{esc(dom)}')">&#x1F916;</button>
   </td>
 </tr>"""
     regeln_rows = "".join(_regel_row(dom, r) for dom, r in regeln_by_domain.items()) if regeln_by_domain else ""
@@ -10401,7 +10401,7 @@ def build_lexware(db):
 </div>
 <div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);padding:12px 16px;font-size:var(--fs-sm)">
   &#x2139; Dataverse-Zusatzexport (Microsoft Power Platform) ist als optionale Erweiterung vorbereitet.
-  Aktivierung in <a href="#" onclick="showPanel(\\'einstellungen\\');setTimeout(()=>{{esShowSec(\\'lexware\\');esShowLexSec(\\'dataverse\\')}},200)" style="color:var(--accent)">Einstellungen &rarr; Dataverse</a>.
+  Aktivierung in <a href="#" onclick="showPanel('einstellungen');setTimeout(()=>{{esShowSec('lexware');esShowLexSec('dataverse')}},200)" style="color:var(--accent)">Einstellungen &rarr; Dataverse</a>.
 </div>"""
 
     # ── In-Planung-Bereiche ──
@@ -11310,395 +11310,395 @@ function showPanel(name) {{
 function showLexTab(tabId) {{
   document.querySelectorAll('.lx-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.lx-tab-content').forEach(c => c.classList.remove('active'));
-  const btn = document.querySelector(\\'[data-tab=\\'' + tabId + '\\']\\');
-  if(btn) btn.classList.add(\\'active\\');
-  const content = document.getElementById(\\'lx-tab-\\' + tabId);
-  if(content) content.classList.add(\\'active\\');
+  const btn = document.querySelector('[data-tab=' + tabId + ']');
+  if(btn) btn.classList.add('active');
+  const content = document.getElementById('lx-tab-' + tabId);
+  if(content) content.classList.add('active');
 }}
 
 function lexSync(mode) {{
-  const log = document.getElementById(\\'lx-sync-log\\');
-  if(log) log.textContent = \\'Synchronisierung laeuft...\\';
-  fetch(\\'/api/lexware/sync\\', {{
-    method: \\'POST\\',
-    headers: {{\\'Content-Type\\':\\'application/json\\'}},
-    body: JSON.stringify({{mode: mode || \\'belege\\'}})
+  const log = document.getElementById('lx-sync-log');
+  if(log) log.textContent = 'Synchronisierung laeuft...';
+  fetch('/api/lexware/sync', {{
+    method: 'POST',
+    headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify({{mode: mode || 'belege'}})
   }}).then(r => r.json()).then(d => {{
-    if(log) log.textContent = d.ok ? (\\'Sync abgeschlossen: \\' + JSON.stringify(d.stats)) : (\\'Fehler: \\' + d.error);
+    if(log) log.textContent = d.ok ? ('Sync abgeschlossen: ' + JSON.stringify(d.stats)) : ('Fehler: ' + d.error);
     if(d.ok) setTimeout(() => location.reload(), 1500);
-  }}).catch(e => {{ if(log) log.textContent = \\'Netzwerkfehler: \\' + e; }});
+  }}).catch(e => {{ if(log) log.textContent = 'Netzwerkfehler: ' + e; }});
 }}
 
 function lexTestConnection() {{
-  const log = document.getElementById(\\'lx-diag-log\\');
-  if(log) log.textContent = \\'Verbindungstest laeuft...\\';
-  fetch(\\'/api/lexware/test\\', {{method:\\'POST\\',headers:{{\\'Content-Type\\':\\'application/json\\'}},body:\\'{{}}\\'}})
+  const log = document.getElementById('lx-diag-log');
+  if(log) log.textContent = 'Verbindungstest laeuft...';
+  fetch('/api/lexware/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
     .then(r => r.json()).then(d => {{
-      if(log) log.textContent = d.ok ? (\\'OK: \\' + JSON.stringify(d.info, null, 2)) : (\\'FEHLER: \\' + d.error);
-      const dot = document.getElementById(\\'lx-status-dot\\');
-      if(dot) dot.style.background = d.ok ? \\'#22c55e\\' : \\'#dc2626\\';
-    }}).catch(e => {{ if(log) log.textContent = \\'Fehler: \\' + e; }});
+      if(log) log.textContent = d.ok ? ('OK: ' + JSON.stringify(d.info, null, 2)) : ('FEHLER: ' + d.error);
+      const dot = document.getElementById('lx-status-dot');
+      if(dot) dot.style.background = d.ok ? '#22c55e' : '#dc2626';
+    }}).catch(e => {{ if(log) log.textContent = 'Fehler: ' + e; }});
 }}
 
 function lexLoadSyncLog() {{
-  const log = document.getElementById(\\'lx-diag-log\\');
-  if(log) log.textContent = \\'Lade Sync-Log...\\';
-  fetch(\\'/api/lexware/status\\').then(r => r.json()).then(d => {{
+  const log = document.getElementById('lx-diag-log');
+  if(log) log.textContent = 'Lade Sync-Log...';
+  fetch('/api/lexware/status').then(r => r.json()).then(d => {{
     if(log) log.textContent = JSON.stringify(d, null, 2);
-  }}).catch(e => {{ if(log) log.textContent = \\'Fehler: \\' + e; }});
+  }}).catch(e => {{ if(log) log.textContent = 'Fehler: ' + e; }});
 }}
 
 function lexBelegDetail(lexId, typ) {{
-  showToast(\\'Belegdetail wird geladen...\\');
-  fetch(\\'/api/lexware/beleg/\\' + encodeURIComponent(lexId))
+  showToast('Belegdetail wird geladen...');
+  fetch('/api/lexware/beleg/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
-      const html = \\'<pre style="white-space:pre-wrap;font-size:12px">\\' + JSON.stringify(d, null, 2) + \\'</pre>\\';
-      showSimpleModal(\\'Beleg-Detail\\', html);
-    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+      const html = '<pre style="white-space:pre-wrap;font-size:12px">' + JSON.stringify(d, null, 2) + '</pre>';
+      showSimpleModal('Beleg-Detail', html);
+    }}).catch(e => showToast('Fehler: ' + e, true));
 }}
 
 function lexKontaktDetail(lexId) {{
-  fetch(\\'/api/lexware/kontakt/\\' + encodeURIComponent(lexId))
+  fetch('/api/lexware/kontakt/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
-      const html = \\'<pre style="white-space:pre-wrap;font-size:12px">\\' + JSON.stringify(d, null, 2) + \\'</pre>\\';
-      showSimpleModal(\\'Kontakt-Detail\\', html);
-    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+      const html = '<pre style="white-space:pre-wrap;font-size:12px">' + JSON.stringify(d, null, 2) + '</pre>';
+      showSimpleModal('Kontakt-Detail', html);
+    }}).catch(e => showToast('Fehler: ' + e, true));
 }}
 
 function lexPruefDetail(id) {{
-  fetch(\\'/api/lexware/eingangsbeleg/\\' + id)
+  fetch('/api/lexware/eingangsbeleg/' + id)
     .then(r => r.json()).then(d => {{
       const p = d.beleg || {{}};
-      const html = \\'<div style="font-size:var(--fs-sm)">\\' +
-        \\'<b>Absender:</b> \\' + (p.absender||\\'-\\') + \\'<br>\\' +
-        \\'<b>Betreff:</b> \\' + (p.betreff||\\'-\\') + \\'<br>\\' +
-        \\'<b>Betrag:</b> \\' + (p.betrag||0) + \\'\\' + (p.waehrung||\\'\\'\\') + \\'<br>\\' +
-        \\'<b>Datum:</b> \\' + (p.datum_beleg||\\'-\\') + \\'<br>\\' +
-        \\'<b>Status:</b> \\' + (p.status||\\'-\\') + \\'<br>\\' +
-        (p.kira_frage ? (\\'<br><b>Kira-Frage:</b> \\' + p.kira_frage) : \\'\\') +
-        (p.nutzer_antwort ? (\\'<br><b>Nutzer-Antwort:</b> \\' + p.nutzer_antwort) : \\'\\') +
-        (p.konto_vorschlag ? (\\'<br><b>Konto-Vorschlag:</b> \\' + p.konto_vorschlag) : \\'\\') +
-        \\'<br><br><b>Auszug:</b><br><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:120px;overflow-y:auto;font-size:11px;white-space:pre-wrap">\\' + (p.body_excerpt||\\'-\\') + \\'</div>\\' +
-        \\'<br><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">\\' +
-        \\'<button class="btn btn-primary" onclick=\\\\\\'lexPruefSetStatus(\\' + id + \\',\\\\\\\\'klassifiziert\\\\\\')\\\\\\'>Klassifizieren</button>\\' +
-        \\'<button class="btn btn-sec" onclick=\\\\\\'lexPruefSetStatus(\\' + id + \\',\\\\\\\\'abgelegt\\\\\\')\\\\\\'>Ablegen</button>\\' +
-        \\'<button class="btn btn-sec" onclick=\\\\\\'openKiraWorkspace(\\\\\\\\'buchaltung\\\\\\', \\' + id + \\')\\\\\\'>Mit Kira besprechen</button>\\' +
-        \\'</div></div>\\';
-      showSimpleModal(\\'Eingangsbeleg pr\\u00fcfen\\', html);
-    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+      const html = '<div style="font-size:var(--fs-sm)">' +
+        '<b>Absender:</b> ' + (p.absender||'-') + '<br>' +
+        '<b>Betreff:</b> ' + (p.betreff||'-') + '<br>' +
+        '<b>Betrag:</b> ' + (p.betrag||0) + ' ' + (p.waehrung||'EUR') + '<br>' +
+        '<b>Datum:</b> ' + (p.datum_beleg||'-') + '<br>' +
+        '<b>Status:</b> ' + (p.status||'-') + '<br>' +
+        (p.kira_frage ? ('<br><b>Kira-Frage:</b> ' + p.kira_frage) : '') +
+        (p.nutzer_antwort ? ('<br><b>Nutzer-Antwort:</b> ' + p.nutzer_antwort) : '') +
+        (p.konto_vorschlag ? ('<br><b>Konto-Vorschlag:</b> ' + p.konto_vorschlag) : '') +
+        '<br><br><b>Auszug:</b><br><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:120px;overflow-y:auto;font-size:11px;white-space:pre-wrap">' + (p.body_excerpt||'-') + '</div>' +
+        '<br><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+        `<button class="btn btn-primary" onclick="lexPruefSetStatus(${{id}},'klassifiziert')">Klassifizieren</button>` +
+        `<button class="btn btn-sec" onclick="lexPruefSetStatus(${{id}},'abgelegt')">Ablegen</button>` +
+        `<button class="btn btn-sec" onclick="openKiraWorkspace('buchhaltung',${{id}})">Mit Kira besprechen</button>` +
+        '</div></div>';
+      showSimpleModal('Eingangsbeleg pr\\u00fcfen', html);
+    }}).catch(e => showToast('Fehler: ' + e, true));
 }}
 
 function lexPruefSetStatus(id, status) {{
-  fetch(\\'/api/lexware/eingangsbeleg/\\' + id + \\'/status\\', {{
-    method: \\'POST\\',
-    headers: {{\\'Content-Type\\':\\'application/json\\'}},
+  fetch('/api/lexware/eingangsbeleg/' + id + '/status', {{
+    method: 'POST',
+    headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{status}})
   }}).then(r => r.json()).then(d => {{
-    if(d.ok) {{ showToast(\\'Status gesetzt: \\' + status); setTimeout(() => location.reload(), 800); }}
-    else showToast(\\'Fehler: \\' + d.error, true);
+    if(d.ok) {{ showToast('Status gesetzt: ' + status); setTimeout(() => location.reload(), 800); }}
+    else showToast('Fehler: ' + d.error, true);
   }});
 }}
 
 function lxFilterBelege() {{
-  const typ = document.getElementById(\\'lx-bel-typ\\')?.value || \\'\\';
-  const status = document.getElementById(\\'lx-bel-status\\')?.value || \\'\\';
-  const q = (document.getElementById(\\'lx-bel-search\\')?.value || \\'\\').toLowerCase();
-  const rows = document.querySelectorAll(\\'#lx-belege-tbody tr.lx-tr\\');
+  const typ = document.getElementById('lx-bel-typ')?.value || '';
+  const status = document.getElementById('lx-bel-status')?.value || '';
+  const q = (document.getElementById('lx-bel-search')?.value || '').toLowerCase();
+  const rows = document.querySelectorAll('#lx-belege-tbody tr.lx-tr');
   rows.forEach(r => {{
-    const cells = r.querySelectorAll(\\'td\\');
-    const num = cells[0]?.textContent || \\'\\';
-    const t   = cells[1]?.textContent || \\'\\';
-    const k   = cells[2]?.textContent || \\'\\';
-    const st  = cells[4]?.textContent || \\'\\';
+    const cells = r.querySelectorAll('td');
+    const num = cells[0]?.textContent || '';
+    const t   = cells[1]?.textContent || '';
+    const k   = cells[2]?.textContent || '';
+    const st  = cells[4]?.textContent || '';
     const match = (!typ || t.includes(typ)) && (!status || st.toLowerCase().includes(status)) &&
                   (!q || num.toLowerCase().includes(q) || k.toLowerCase().includes(q));
-    r.style.display = match ? \\'\\' : \\'none\\';
+    r.style.display = match ? '' : 'none';
   }});
 }}
 
 function lxFilterKontakte() {{
-  const q = (document.getElementById(\\'lx-kon-search\\')?.value || \\'\\').toLowerCase();
-  document.querySelectorAll(\\'#lx-kontakte-tbody tr.lx-tr\\').forEach(r => {{
+  const q = (document.getElementById('lx-kon-search')?.value || '').toLowerCase();
+  document.querySelectorAll('#lx-kontakte-tbody tr.lx-tr').forEach(r => {{
     const txt = r.textContent.toLowerCase();
-    r.style.display = !q || txt.includes(q) ? \\'\\' : \\'none\\';
+    r.style.display = !q || txt.includes(q) ? '' : 'none';
   }});
 }}
 
 function lxFilterArtikel() {{
-  const q = (document.getElementById(\\'lx-art-search\\')?.value || \\'\\').toLowerCase();
-  document.querySelectorAll(\\'#lx-artikel-tbody tr\\').forEach(r => {{
+  const q = (document.getElementById('lx-art-search')?.value || '').toLowerCase();
+  document.querySelectorAll('#lx-artikel-tbody tr').forEach(r => {{
     const txt = r.textContent.toLowerCase();
-    r.style.display = !q || txt.includes(q) ? \\'\\' : \\'none\\';
+    r.style.display = !q || txt.includes(q) ? '' : 'none';
   }});
 }}
 
 function lxFilterPruef() {{
-  const status = document.getElementById(\\'lx-pruef-status\\')?.value || \\'\\';
-  const q = (document.getElementById(\\'lx-pruef-search\\')?.value || \\'\\').toLowerCase();
-  document.querySelectorAll(\\'#lx-pruef-tbody tr.lx-tr\\').forEach(r => {{
-    const cells = r.querySelectorAll(\\'td\\');
-    const absender = cells[0]?.textContent.toLowerCase() || \\'\\';
-    const betreff  = cells[1]?.textContent.toLowerCase() || \\'\\';
-    const st = cells[4]?.textContent.toLowerCase() || \\'\\';
+  const status = document.getElementById('lx-pruef-status')?.value || '';
+  const q = (document.getElementById('lx-pruef-search')?.value || '').toLowerCase();
+  document.querySelectorAll('#lx-pruef-tbody tr.lx-tr').forEach(r => {{
+    const cells = r.querySelectorAll('td');
+    const absender = cells[0]?.textContent.toLowerCase() || '';
+    const betreff  = cells[1]?.textContent.toLowerCase() || '';
+    const st = cells[4]?.textContent.toLowerCase() || '';
     const match = (!status || st.includes(status)) && (!q || absender.includes(q) || betreff.includes(q));
-    r.style.display = match ? \\'\\' : \\'none\\';
+    r.style.display = match ? '' : 'none';
   }});
 }}
 
 // === Lexware Office JS (session-fff — UI Komplettausbau) ===
 
 function showLexSec(secId) {{
-  document.querySelectorAll(\\'.lx-sec-content\\').forEach(el => el.style.display = \\'none\\');
-  document.querySelectorAll(\\'.lx-nav-btn\\').forEach(btn => btn.classList.remove(\\'active\\'));
-  const sec = document.getElementById(\\'lx-sec-\\' + secId);
-  if(sec) sec.style.display = \\'block\\';
-  const btn = document.querySelector(\\'[data-lxsec="\\' + secId + \\'"]\\');
-  if(btn) btn.classList.add(\\'active\\');
-  if(secId === \\'cockpit\\') lxUpdateCockpitDot();
+  document.querySelectorAll('.lx-sec-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.lx-nav-btn').forEach(btn => btn.classList.remove('active'));
+  const sec = document.getElementById('lx-sec-' + secId);
+  if(sec) sec.style.display = 'block';
+  const btn = document.querySelector('[data-lxsec="' + secId + '"]');
+  if(btn) btn.classList.add('active');
+  if(secId === 'cockpit') lxUpdateCockpitDot();
 }}
 
 function showLexBuchTab(tabId) {{
-  document.querySelectorAll(\\'.lx-buch-content\\').forEach(el => el.style.display = \\'none\\');
-  document.querySelectorAll(\\'.lx-buch-tab\\').forEach(btn => btn.classList.remove(\\'active\\'));
-  const el = document.getElementById(\\'lx-buch-\\' + tabId);
-  if(el) el.style.display = \\'block\\';
-  const btn = document.querySelector(\\'.lx-buch-tab[data-buchtab="\\' + tabId + \\'"]\\');
-  if(btn) btn.classList.add(\\'active\\');
+  document.querySelectorAll('.lx-buch-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.lx-buch-tab').forEach(btn => btn.classList.remove('active'));
+  const el = document.getElementById('lx-buch-' + tabId);
+  if(el) el.style.display = 'block';
+  const btn = document.querySelector('.lx-buch-tab[data-buchtab="' + tabId + '"]');
+  if(btn) btn.classList.add('active');
 }}
 
 function lxUpdateCockpitDot() {{
-  fetch(\\'/api/lexware/status\\').then(r => r.json()).then(d => {{
-    const dot = document.getElementById(\\'lx-status-dot\\');
+  fetch('/api/lexware/status').then(r => r.json()).then(d => {{
+    const dot = document.getElementById('lx-status-dot');
     if(!dot) return;
     if(d.verbunden) {{
-      dot.className = \\'lx-chip lx-chip-ok\\';
-      dot.textContent = \\'&#x25CF; Verbunden\\';
+      dot.className = 'lx-chip lx-chip-ok';
+      dot.textContent = '&#x25CF; Verbunden';
     }} else {{
-      dot.className = \\'lx-chip lx-chip-warn\\';
-      dot.textContent = \\'&#x25CF; \\'  + (d.fehler || \\'Nicht verbunden\\');
+      dot.className = 'lx-chip lx-chip-warn';
+      dot.textContent = '&#x25CF; '  + (d.fehler || 'Nicht verbunden');
     }}
   }}).catch(()=>{{}});
 }}
 
 function lxGlobalSearch(q) {{
-  const lq = (q || \\'\\').toLowerCase();
+  const lq = (q || '').toLowerCase();
   // In allen aktiven Tabellen suchen
-  document.querySelectorAll(\\'.lx-table tbody tr.lx-tr\\').forEach(r => {{
-    r.style.display = (!lq || r.textContent.toLowerCase().includes(lq)) ? \\'\\' : \\'none\\';
+  document.querySelectorAll('.lx-table tbody tr.lx-tr').forEach(r => {{
+    r.style.display = (!lq || r.textContent.toLowerCase().includes(lq)) ? '' : 'none';
   }});
 }}
 
 function lxBelegDetail(lexId) {{
-  const panel = document.getElementById(\\'lx-bel-detail\\');
-  const content = document.getElementById(\\'lx-bel-detail-content\\');
+  const panel = document.getElementById('lx-bel-detail');
+  const content = document.getElementById('lx-bel-detail-content');
   if(!panel || !content) return;
-  content.innerHTML = \\'<div style="color:var(--muted)">Lade...</div>\\';
-  panel.style.display = \\'block\\';
-  fetch(\\'/api/lexware/beleg/\\' + encodeURIComponent(lexId))
+  content.innerHTML = '<div style="color:var(--muted)">Lade...</div>';
+  panel.style.display = 'block';
+  fetch('/api/lexware/beleg/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
       const b = d.beleg || d;
-      const st_labels = {{open:\\'Offen\\',overdue:\\'Ueberfaellig\\',paid:\\'Bezahlt\\',draft:\\'Entwurf\\',voided:\\'Storniert\\'}};
-      const typ_labels = {{invoice:\\'Rechnung\\',creditnote:\\'Gutschrift\\',quotation:\\'Angebot\\',reminder:\\'Mahnung\\'}};
+      const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert'}};
+      const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung'}};
       content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
-        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(b.nummer||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">Typ:</span> ${{typ_labels[b.typ]||b.typ||\\'-\\'}}</div>
-        <div><span style="color:var(--muted)">Kontakt:</span> ${{esc_js(b.kontakt_name||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">Datum:</span> ${{esc_js(b.datum||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{esc_js(b.faelligkeit||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">Status:</span> <b>${{st_labels[b.status]||b.status||\\'-\\'}}</b></div>
-        <div><span style="color:var(--muted)">Betrag:</span> <b style="font-size:var(--fs-md)">${{parseFloat(b.brutto||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}})}}&nbsp;${{b.waehrung||'EUR'}}</b></div>
+        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(b.nummer||'-')}}</div>
+        <div><span style="color:var(--muted)">Typ:</span> ${{typ_labels[b.typ]||b.typ||'-'}}</div>
+        <div><span style="color:var(--muted)">Kontakt:</span> ${{esc_js(b.kontakt_name||'-')}}</div>
+        <div><span style="color:var(--muted)">Datum:</span> ${{esc_js(b.datum||'-')}}</div>
+        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{esc_js(b.faelligkeit||'-')}}</div>
+        <div><span style="color:var(--muted)">Status:</span> <b>${{st_labels[b.status]||b.status||'-'}}</b></div>
+        <div><span style="color:var(--muted)">Betrag:</span> <b style="font-size:var(--fs-md)">${{parseFloat(b.brutto||0).toLocaleString('de-DE',{{minimumFractionDigits:2}})}}&nbsp;${{b.waehrung||'EUR'}}</b></div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
           <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">DOKUMENT-BEZUG</div>
           <div style="color:var(--muted);font-size:var(--fs-xs)">&#x1F4C2; Dokumente-Modul-Verzahnung in Vorbereitung</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn btn-primary btn-xs" onclick="lxBelegKira(\\\'${{esc_js(b.lexware_id)}}\\\',\\\'${{esc_js(b.nummer||\\'-\\')}}\\\',\\\'${{esc_js(b.kontakt_name||\\'-\\\')}}\\\')">&#x1F916; Mit Kira besprechen</button>
-          <button class="btn btn-sec btn-xs" onclick="showLexSec(\\'zahlungen\\')">&#x1F4B3; Zahlungen</button>
+          <button class="btn btn-primary btn-xs" onclick="lxBelegKira('${{esc_js(b.lexware_id)}}','${{esc_js(b.nummer||'-')}}','${{esc_js(b.kontakt_name||'-')}}')">&#x1F916; Mit Kira besprechen</button>
+          <button class="btn btn-sec btn-xs" onclick="showLexSec('zahlungen')">&#x1F4B3; Zahlungen</button>
         </div>
       </div>`;
     }}).catch(e => {{
-      if(content) content.innerHTML = \\'<div style="color:var(--muted)">Fehler: \\' + e + \\'</div>\\';
+      if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
     }});
 }}
 
 function lxBelegKira(lexId, nummer, kontakt) {{
-  const prompt = \\'Lexware Beleg pr&#252;fen\\\\n\\\\nBeleg: \\' + (nummer||lexId) + \\'\\\\nKontakt: \\' + (kontakt||\\'\\') + \\'\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschaetzung.\\';
-  openKiraWorkspace(\\'lexware_beleg\\', prompt);
+  const prompt = 'Lexware Beleg pr&#252;fen\\\\n\\\\nBeleg: ' + (nummer||lexId) + '\\\\nKontakt: ' + (kontakt||'') + '\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschaetzung.';
+  openKiraWorkspace('lexware_beleg', prompt);
 }}
 
 function lxKontaktDetail(lexId, name) {{
-  const panel = document.getElementById(\\'lx-kon-detail\\');
-  const content = document.getElementById(\\'lx-kon-detail-content\\');
+  const panel = document.getElementById('lx-kon-detail');
+  const content = document.getElementById('lx-kon-detail-content');
   if(!panel || !content) return;
-  content.innerHTML = \\'<div style="color:var(--muted)">Lade...</div>\\';
-  panel.style.display = \\'block\\';
-  fetch(\\'/api/lexware/kontakt/\\' + encodeURIComponent(lexId))
+  content.innerHTML = '<div style="color:var(--muted)">Lade...</div>';
+  panel.style.display = 'block';
+  fetch('/api/lexware/kontakt/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
       const k = d.kontakt || d;
       content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
-        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(k.name||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">E-Mail:</span> ${{esc_js(k.email||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">Telefon:</span> ${{esc_js(k.telefon||\\'-\\')}}</div>
-        <div><span style="color:var(--muted)">Letzte Sync:</span> ${{esc_js(k.last_sync||\\'-\\')}}</div>
+        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(k.name||'-')}}</div>
+        <div><span style="color:var(--muted)">E-Mail:</span> ${{esc_js(k.email||'-')}}</div>
+        <div><span style="color:var(--muted)">Telefon:</span> ${{esc_js(k.telefon||'-')}}</div>
+        <div><span style="color:var(--muted)">Letzte Sync:</span> ${{esc_js(k.last_sync||'-')}}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-primary btn-xs" onclick="lxKontaktKira(\\\'${{esc_js(k.lexware_id)}}\\\',\\\'${{esc_js(k.name||\\'-\\\')}}\\\')">&#x1F916; Kira</button>
+          <button class="btn btn-primary btn-xs" onclick="lxKontaktKira('${{esc_js(k.lexware_id)}}','${{esc_js(k.name||'-')}}')">&#x1F916; Kira</button>
         </div>
       </div>`;
     }}).catch(e => {{
-      if(content) content.innerHTML = \\'<div style="color:var(--muted)">Fehler: \\' + e + \\'</div>\\';
+      if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
     }});
 }}
 
 function lxKontaktKira(lexId, name) {{
-  const prompt = \\'Lexware Kontakt: \\' + (name||lexId) + \\'\\\\n\\\\nBitte gib mir eine Uebersicht zu diesem Kontakt und oeffne relevante Vorgaenge.\\';
-  openKiraWorkspace(\\'lexware_kontakt\\', prompt);
+  const prompt = 'Lexware Kontakt: ' + (name||lexId) + '\\\\n\\\\nBitte gib mir eine Uebersicht zu diesem Kontakt und oeffne relevante Vorgaenge.';
+  openKiraWorkspace('lexware_kontakt', prompt);
 }}
 
 function lxArtikelDetail(lexId) {{
   if(!lexId) return;
-  showToast(\\'Artikel-Details werden geladen...\\');
-  fetch(\\'/api/lexware/artikel/\\' + encodeURIComponent(lexId))
+  showToast('Artikel-Details werden geladen...');
+  fetch('/api/lexware/artikel/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
       const a = d.artikel || d;
-      const html = \\'<div style="font-size:var(--fs-sm);line-height:1.8">\\' +
-        \\'<div style="font-weight:700;margin-bottom:8px">\\' + esc_js(a.name||\\'-\\') + \\'</div>\\' +
-        \\'<div>Typ: \\' + esc_js(a.typ||\\'-\\') + \\'</div>\\' +
-        \\'<div>Netto: <b>\\' + parseFloat(a.netto_preis||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}}) + \\'&nbsp;&#x20AC;</b></div>\\' +
-        \\'<div>Einheit: \\' + esc_js(a.einheit||\\'-\\') + \\'</div>\\' +
-        \\'<div>Steuer: \\' + esc_js(a.steuer_satz||\\'-\\') + \\'</div>\\' +
-        \\'<div style="margin-top:12px;display:flex;gap:6px"><button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext(\\\\\\'artikel\\\\\\',\\\\\\'\\' + encodeURIComponent(lexId) + \\'\\\\\\')">&#x1F916; Kira</button></div>\\' +
-        \\'</div>\\';
-      showSimpleModal(\\'Artikel\\', html);
-    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+      const html = '<div style="font-size:var(--fs-sm);line-height:1.8">' +
+        '<div style="font-weight:700;margin-bottom:8px">' + esc_js(a.name||'-') + '</div>' +
+        '<div>Typ: ' + esc_js(a.typ||'-') + '</div>' +
+        '<div>Netto: <b>' + parseFloat(a.netto_preis||0).toLocaleString('de-DE',{{minimumFractionDigits:2}}) + '&nbsp;&#x20AC;</b></div>' +
+        '<div>Einheit: ' + esc_js(a.einheit||'-') + '</div>' +
+        '<div>Steuer: ' + esc_js(a.steuer_satz||'-') + '</div>' +
+        '<div style="margin-top:12px;display:flex;gap:6px"><button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext(\\'artikel\\',\\'' + encodeURIComponent(lexId) + '\\')">&#x1F916; Kira</button></div>' +
+        '</div>';
+      showSimpleModal('Artikel', html);
+    }}).catch(e => showToast('Fehler: ' + e, true));
 }}
 
 function lxBuchDetailFull(id) {{
-  fetch(\\'/api/lexware/eingangsbeleg/\\' + id)
+  fetch('/api/lexware/eingangsbeleg/' + id)
     .then(r => r.json()).then(d => {{
       const p = d.beleg || {{}};
-      const kira_section = p.kira_frage ? (\\'<div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px;margin-top:12px">\\' +
-        \\'<div style="font-size:10px;font-weight:700;color:#7c3aed;margin-bottom:4px">KIRA-FRAGE</div>\\' +
-        \\'<div style="font-size:var(--fs-sm)">\\' + esc_js(p.kira_frage) + \\'</div>\\' +
-        (p.nutzer_antwort ? (\\'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-top:6px">DEINE ANTWORT</div><div style="font-size:var(--fs-sm)">\\' + esc_js(p.nutzer_antwort) + \\'</div>\\') : \\'\\') +
-        \\'</div>\\') : \\'\\';
-      const konto_section = p.konto_vorschlag ? (\\'<div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:var(--fs-sm)"><span style="color:var(--muted);font-size:10px">KONTIERUNGSVORSCHLAG:</span> <b>\\' + esc_js(p.konto_vorschlag) + \\'</b></div>\\') : \\'\\';
-      const html = \\'<div style="font-size:var(--fs-sm)">\\' +
-        \\'<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-bottom:12px">\\' +
-        \\'<span style="color:var(--muted)">Absender:</span><b>\\' + esc_js(p.absender||\\'-\\') + \\'</b>\\' +
-        \\'<span style="color:var(--muted)">Betreff:</span><span>\\' + esc_js(p.betreff||\\'-\\') + \\'</span>\\' +
-        \\'<span style="color:var(--muted)">Betrag:</span><b style="font-size:var(--fs-md)">\\' + parseFloat(p.betrag||0).toLocaleString(\\'de-DE\\',{{minimumFractionDigits:2}}) + \\'&nbsp;\\' + esc_js(p.waehrung||\\'\\'\\') + \\'</b>\\' +
-        \\'<span style="color:var(--muted)">Datum:</span>\\' + esc_js(p.datum_beleg||\\'-\\') +
-        \\'<span style="color:var(--muted)">Status:</span>\\' + esc_js(p.status||\\'-\\') +
-        \\'</div>\\' +
+      const kira_section = p.kira_frage ? ('<div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px;margin-top:12px">' +
+        '<div style="font-size:10px;font-weight:700;color:#7c3aed;margin-bottom:4px">KIRA-FRAGE</div>' +
+        '<div style="font-size:var(--fs-sm)">' + esc_js(p.kira_frage) + '</div>' +
+        (p.nutzer_antwort ? ('<div style="font-size:10px;font-weight:700;color:var(--muted);margin-top:6px">DEINE ANTWORT</div><div style="font-size:var(--fs-sm)">' + esc_js(p.nutzer_antwort) + '</div>') : '') +
+        '</div>') : '';
+      const konto_section = p.konto_vorschlag ? ('<div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:var(--fs-sm)"><span style="color:var(--muted);font-size:10px">KONTIERUNGSVORSCHLAG:</span> <b>' + esc_js(p.konto_vorschlag) + '</b></div>') : '';
+      const html = '<div style="font-size:var(--fs-sm)">' +
+        '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-bottom:12px">' +
+        '<span style="color:var(--muted)">Absender:</span><b>' + esc_js(p.absender||'-') + '</b>' +
+        '<span style="color:var(--muted)">Betreff:</span><span>' + esc_js(p.betreff||'-') + '</span>' +
+        '<span style="color:var(--muted)">Betrag:</span><b style="font-size:var(--fs-md)">' + parseFloat(p.betrag||0).toLocaleString('de-DE',{{minimumFractionDigits:2}}) + '&nbsp;' + esc_js(p.waehrung||'EUR') + '</b>' +
+        '<span style="color:var(--muted)">Datum:</span>' + esc_js(p.datum_beleg||'-') +
+        '<span style="color:var(--muted)">Status:</span>' + esc_js(p.status||'-') +
+        '</div>' +
         kira_section + konto_section +
-        (p.body_excerpt ? (\\'<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">INHALT-AUSZUG</div><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:100px;overflow-y:auto;font-size:11px;white-space:pre-wrap;font-family:monospace">\\' + esc_js(p.body_excerpt) + \\'</div></div>\\') : \\'\\') +
-        \\'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">\\' +
-        \\'<button class="btn btn-primary btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'klassifiziert\\\\\\')">&#x2705; Klassifizieren</button>\\' +
-        \\'<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'abgelegt\\\\\\')">&#x1F4C2; Ablegen</button>\\' +
-        \\'<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(\\' + id + \\',\\\\\\'unklar\\\\\\')">&#x2753; Unklar</button>\\' +
-        \\'<button class="btn btn-primary btn-xs" style="background:var(--accent)" onclick="lxBuchKira(\\' + id + \\',\\\\\\'\\' + esc_js(p.absender||\\'\\'\\') + \\\\\\'\\')">&#x1F916; Mit Kira besprechen</button>\\' +
-        \\'</div></div>\\';
-      showSimpleModal(\\'Eingangsbeleg pr&#252;fen\\', html);
-    }}).catch(e => showToast(\\'Fehler: \\' + e, true));
+        (p.body_excerpt ? ('<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">INHALT-AUSZUG</div><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:100px;overflow-y:auto;font-size:11px;white-space:pre-wrap;font-family:monospace">' + esc_js(p.body_excerpt) + '</div></div>') : '') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' +
+        `<button class="btn btn-primary btn-xs" onclick="lxBuchBestaetigen(${{id}},'klassifiziert')">&#x2705; Klassifizieren</button>` +
+        `<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(${{id}},'abgelegt')">&#x1F4C2; Ablegen</button>` +
+        `<button class="btn btn-sec btn-xs" onclick="lxBuchBestaetigen(${{id}},'unklar')">&#x2753; Unklar</button>` +
+        `<button class="btn btn-primary btn-xs" style="background:var(--accent)" onclick="lxBuchKira(${{id}},'${{esc_js(p.absender||"EUR")}}')">&#x1F916; Mit Kira besprechen</button>` +
+        '</div></div>';
+      showSimpleModal('Eingangsbeleg pr&#252;fen', html);
+    }}).catch(e => showToast('Fehler: ' + e, true));
 }}
 
 function lxBuchKira(id, absender) {{
-  fetch(\\'/api/lexware/eingangsbeleg/\\' + id).then(r => r.json()).then(d => {{
+  fetch('/api/lexware/eingangsbeleg/' + id).then(r => r.json()).then(d => {{
     const p = d.beleg || {{}};
-    const prompt = \\'Eingangsbeleg klassifizieren\\\\n\\\\n\\' +
-      \\'Absender: \\' + (p.absender||\\'-\\') + \\'\\\\n\\' +
-      \\'Betreff: \\' + (p.betreff||\\'-\\') + \\'\\\\n\\' +
-      \\'Betrag: \\' + (p.betrag||0) + \\'\\' + (p.waehrung||\\'EUR\\') + \\'\\\\n\\' +
-      \\'Datum: \\' + (p.datum_beleg||\\'-\\') + \\'\\\\n\\' +
-      (p.konto_vorschlag ? (\\'Bisheriger Vorschlag: \\' + p.konto_vorschlag + \\'\\\\n\\') : \\'\\') +
-      (p.body_excerpt ? (\\'\\\\nInhalt:\\\\n\\' + p.body_excerpt.substring(0,400)) : \\'\\') +
-      \\'\\\\n\\\\nBitte klassifiziere diesen Eingangsbeleg: Welche Lexware-Kategorie? Gibt es ein passendes Konto? Muss ich das selbst pruefen?\\';
-    openKiraWorkspace(\\'lexware_buchaltung\\', prompt);
-  }}).catch(() => openKiraWorkspace(\\'lexware_buchaltung\\', \\'Eingangsbeleg ID \\' + id + \\' pruefen\\'));
+    const prompt = 'Eingangsbeleg klassifizieren\\\\n\\\\n' +
+      'Absender: ' + (p.absender||'-') + '\\\\n' +
+      'Betreff: ' + (p.betreff||'-') + '\\\\n' +
+      'Betrag: ' + (p.betrag||0) + ' ' + (p.waehrung||'EUR') + '\\\\n' +
+      'Datum: ' + (p.datum_beleg||'-') + '\\\\n' +
+      (p.konto_vorschlag ? ('Bisheriger Vorschlag: ' + p.konto_vorschlag + '\\\\n') : '') +
+      (p.body_excerpt ? ('\\\\nInhalt:\\\\n' + p.body_excerpt.substring(0,400)) : '') +
+      '\\\\n\\\\nBitte klassifiziere diesen Eingangsbeleg: Welche Lexware-Kategorie? Gibt es ein passendes Konto? Muss ich das selbst pruefen?';
+    openKiraWorkspace('lexware_buchaltung', prompt);
+  }}).catch(() => openKiraWorkspace('lexware_buchaltung', 'Eingangsbeleg ID ' + id + ' pruefen'));
 }}
 
 function lxBuchBestaetigen(id, status) {{
-  fetch(\\'/api/lexware/eingangsbeleg/\\' + id + \\'/status\\', {{
-    method: \\'POST\\',
-    headers: {{\\'Content-Type\\':\\'application/json\\'}},
+  fetch('/api/lexware/eingangsbeleg/' + id + '/status', {{
+    method: 'POST',
+    headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{status}})
   }}).then(r => r.json()).then(d => {{
-    if(d.ok) {{ showToast(\\'Status gesetzt: \\' + status); setTimeout(() => location.reload(), 800); }}
-    else showToast(\\'Fehler: \\' + d.error, true);
+    if(d.ok) {{ showToast('Status gesetzt: ' + status); setTimeout(() => location.reload(), 800); }}
+    else showToast('Fehler: ' + d.error, true);
   }});
 }}
 
 function lxBuchManuellesPruefen() {{
-  const html = \\'<div style="font-size:var(--fs-sm);display:flex;flex-direction:column;gap:10px">\\' +
-    \\'<input id="lx-man-absender" class="es-input" placeholder="Absender / Lieferant">\\' +
-    \\'<input id="lx-man-betreff" class="es-input" placeholder="Betreff / Beschreibung">\\' +
-    \\'<input id="lx-man-betrag" class="es-input" placeholder="Betrag (z.B. 119.00)" type="number" step="0.01">\\' +
-    \\'<input id="lx-man-datum" class="es-input" placeholder="Datum (YYYY-MM-DD)" type="date">\\' +
-    \\'<button class="btn btn-primary" onclick="lxBuchManuellSpeichern()">Hinzuf&#252;gen</button>\\' +
-    \\'</div>\\';
-  showSimpleModal(\\'Eingangsbeleg manuell hinzuf&#252;gen\\', html);
+  const html = '<div style="font-size:var(--fs-sm);display:flex;flex-direction:column;gap:10px">' +
+    '<input id="lx-man-absender" class="es-input" placeholder="Absender / Lieferant">' +
+    '<input id="lx-man-betreff" class="es-input" placeholder="Betreff / Beschreibung">' +
+    '<input id="lx-man-betrag" class="es-input" placeholder="Betrag (z.B. 119.00)" type="number" step="0.01">' +
+    '<input id="lx-man-datum" class="es-input" placeholder="Datum (YYYY-MM-DD)" type="date">' +
+    '<button class="btn btn-primary" onclick="lxBuchManuellSpeichern()">Hinzuf&#252;gen</button>' +
+    '</div>';
+  showSimpleModal('Eingangsbeleg manuell hinzuf&#252;gen', html);
 }}
 
 function lxBuchManuellSpeichern() {{
   const payload = {{
-    absender: document.getElementById(\\'lx-man-absender\\')?.value || \\'\\',
-    betreff:  document.getElementById(\\'lx-man-betreff\\')?.value || \\'\\',
-    betrag:   parseFloat(document.getElementById(\\'lx-man-betrag\\')?.value || 0),
-    datum_beleg: document.getElementById(\\'lx-man-datum\\')?.value || \\'\\',
-    source: \\'manuell\\'
+    absender: document.getElementById('lx-man-absender')?.value || '',
+    betreff:  document.getElementById('lx-man-betreff')?.value || '',
+    betrag:   parseFloat(document.getElementById('lx-man-betrag')?.value || 0),
+    datum_beleg: document.getElementById('lx-man-datum')?.value || '',
+    source: 'manuell'
   }};
-  fetch(\\'/api/lexware/eingangsbeleg/neu\\', {{method:\\'POST\\',headers:{{\\'Content-Type\\':\\'application/json\\'}},body:JSON.stringify(payload)}})
+  fetch('/api/lexware/eingangsbeleg/neu', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}})
     .then(r => r.json()).then(d => {{
-      if(d.ok) {{ showToast(\\'Eingangsbeleg hinzugef&#252;gt &#x2713;\\'); setTimeout(() => location.reload(), 800); }}
-      else showToast(\\'Fehler: \\' + d.error, true);
+      if(d.ok) {{ showToast('Eingangsbeleg hinzugef&#252;gt &#x2713;'); setTimeout(() => location.reload(), 800); }}
+      else showToast('Fehler: ' + d.error, true);
     }});
 }}
 
 function lxOpenKiraWithContext(typ, id) {{
-  let prompt = \\'\\';
-  if(typ === \\'cockpit\\') {{
-    prompt = \\'Lexware Office Cockpit-Uebersicht\\\\n\\\\nBitte gib mir eine kurze Zusammenfassung des aktuellen Lexware-Status: offene Rechnungen, Eingangsbelege in Pruefung, und was heute zu tun ist.\\';
-  }} else if(typ === \\'zahlung\\') {{
-    prompt = \\'Zahlung (Eingangsbeleg ID \\' + id + \\') pruefen\\\\nBitte analysiere diesen Zahlungseingang.\\';
-  }} else if(typ === \\'artikel\\') {{
-    prompt = \\'Artikel / Preisposition analysieren (ID: \\' + id + \\').\\';
-  }} else if(typ === \\'regel\\') {{
-    prompt = \\'Buchungsregel fuer Domain \\' + id + \\' pruefen und Empfehlung geben.\\';
-  }} else if(typ === \\'diagnose\\') {{
-    prompt = \\'Lexware Verbindungsprobleme diagnostizieren. Modul-Status und API-Verbindung pruefen.\\';
-  }} else if(typ === \\'datei\\') {{
-    prompt = \\'Belegdatei (Eingangsbeleg ID \\' + id + \\') klassifizieren und Konto vorschlagen.\\';
+  let prompt = '';
+  if(typ === 'cockpit') {{
+    prompt = 'Lexware Office Cockpit-Uebersicht\\\\n\\\\nBitte gib mir eine kurze Zusammenfassung des aktuellen Lexware-Status: offene Rechnungen, Eingangsbelege in Pruefung, und was heute zu tun ist.';
+  }} else if(typ === 'zahlung') {{
+    prompt = 'Zahlung (Eingangsbeleg ID ' + id + ') pruefen\\\\nBitte analysiere diesen Zahlungseingang.';
+  }} else if(typ === 'artikel') {{
+    prompt = 'Artikel / Preisposition analysieren (ID: ' + id + ').';
+  }} else if(typ === 'regel') {{
+    prompt = 'Buchungsregel fuer Domain ' + id + ' pruefen und Empfehlung geben.';
+  }} else if(typ === 'diagnose') {{
+    prompt = 'Lexware Verbindungsprobleme diagnostizieren. Modul-Status und API-Verbindung pruefen.';
+  }} else if(typ === 'datei') {{
+    prompt = 'Belegdatei (Eingangsbeleg ID ' + id + ') klassifizieren und Konto vorschlagen.';
   }} else {{
-    prompt = \\'Lexware Office: \\' + typ + \\'\\\\n\\\\nBitte hilf mir bei diesem Thema.\\';
+    prompt = 'Lexware Office: ' + typ + '\\\\n\\\\nBitte hilf mir bei diesem Thema.';
   }}
-  openKiraWorkspace(\\'lexware_\\' + typ, prompt);
+  openKiraWorkspace('lexware_' + typ, prompt);
 }}
 
 function lxRegelDetail(domain) {{
-  const prompt = \\'Lexware Buchungsregel fuer Domain: \\' + domain + \\'\\\\n\\\\nBitte analysiere das bisherige Muster und empfehle eine Buchungskategorie.\\';
-  showSimpleModal(\\'Regel fuer \\' + domain, \\'<div style="font-size:var(--fs-sm)">Domain: <b>\\' + domain + \\'</b><br><br><button class="btn btn-primary btn-xs" onclick="openKiraWorkspace(\\\\\\'lexware_regel\\\\\\',\\\\\\'\\' + prompt + \\'\\\\\\')">&#x1F916; Mit Kira besprechen</button></div>\\');
+  const prompt = 'Lexware Buchungsregel fuer Domain: ' + domain + '\\\\n\\\\nBitte analysiere das bisherige Muster und empfehle eine Buchungskategorie.';
+  showSimpleModal('Regel fuer ' + domain, `<div style="font-size:var(--fs-sm)">Domain: <b>${{domain}}</b><br><br><button class="btn btn-primary btn-xs" onclick="openKiraWorkspace('lexware_regel','${{prompt}}')">&#x1F916; Mit Kira besprechen</button></div>`);
 }}
 
 function lxFilterRegeln() {{
-  const q = (document.getElementById(\\'lx-reg-search\\')?.value || \\'\\').toLowerCase();
-  document.querySelectorAll(\\'#lx-regeln-tbody tr.lx-tr\\').forEach(r => {{
-    r.style.display = (!q || r.textContent.toLowerCase().includes(q)) ? \\'\\' : \\'none\\';
+  const q = (document.getElementById('lx-reg-search')?.value || '').toLowerCase();
+  document.querySelectorAll('#lx-regeln-tbody tr.lx-tr').forEach(r => {{
+    r.style.display = (!q || r.textContent.toLowerCase().includes(q)) ? '' : 'none';
   }});
 }}
 
 function esShowLexSec(subsecId) {{
-  document.querySelectorAll(\\'.lx-es-subpanel\\').forEach(el => el.style.display = \\'none\\');
-  document.querySelectorAll(\\'.lx-es-subbtn\\').forEach(btn => btn.classList.remove(\\'active\\'));
-  const panel = document.getElementById(\\'lx-es-sub-\\' + subsecId);
-  if(panel) panel.style.display = \\'block\\';
-  const btn = document.querySelector(\\'.lx-es-subbtn[data-lxessec="\\' + subsecId + \\'"]\\');
-  if(btn) btn.classList.add(\\'active\\');
+  document.querySelectorAll('.lx-es-subpanel').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.lx-es-subbtn').forEach(btn => btn.classList.remove('active'));
+  const panel = document.getElementById('lx-es-sub-' + subsecId);
+  if(panel) panel.style.display = 'block';
+  const btn = document.querySelector('.lx-es-subbtn[data-lxessec="' + subsecId + '"]');
+  if(btn) btn.classList.add('active');
 }}
 
 // Helper fuer String-Escaping im JS-Kontext
 function esc_js(s) {{
-  if(!s) return \\'\\';
-  return String(s).replace(/&/g,\\'&amp;\\').replace(/</g,\\'&lt;\\').replace(/>/g,\\'&gt;\\').replace(/"/g,\\'&quot;\\').replace(/\\'/g,\\'&#x27;\\');
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }}
 
 // Prio-Karte Kebab-Menu
