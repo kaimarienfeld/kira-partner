@@ -11797,10 +11797,14 @@ def build_lexware(db):
       Modul-Status: {esc(modul_status)}<br>
       Letzte Sync: {esc(last_sync)}
     </div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">API testen</button>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <button id="lx-btn-test-api" class="btn btn-sec btn-xs" onclick="lexTestConnection()">API testen</button>
+      <span id="lx-test-result-api" style="font-size:12px;font-weight:600"></span>
       <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
       <button class="btn btn-sec btn-xs" onclick="lexLoadSyncLog()">Sync-Log</button>
+    </div>
+    <div id="lx-test-copy-err" style="display:none;margin-top:4px">
+      <button class="btn btn-sec btn-xs" onclick="copyErrorDetails(window._lxLastTestErr)">Fehlerdetails kopieren</button>
     </div>
     <div id="lx-diag-log" style="margin-top:8px;font-family:monospace;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:150px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;min-height:32px">Ausgabe erscheint hier...</div>
   </div>
@@ -13803,15 +13807,38 @@ function lexSync(mode) {{
   }});
 }}
 
+function _lxShowTestResult(ok, errText) {{
+  const rspan = document.getElementById('lx-test-result-api');
+  const ce = document.getElementById('lx-test-copy-err');
+  if(rspan) rspan.innerHTML = ok
+    ? '<span style="color:#22c55e">&#x2713; Erfolgreich</span>'
+    : '<span style="color:#dc2626">&#x2717; Fehler</span>';
+  if(ce) {{
+    if(!ok && errText) {{
+      window._lxLastTestErr = errText;
+      ce.style.display = '';
+    }} else {{
+      ce.style.display = 'none';
+    }}
+  }}
+}}
 function lexTestConnection() {{
   const log = document.getElementById('lx-diag-log');
   if(log) log.textContent = 'Verbindungstest laeuft...';
+  const rspan = document.getElementById('lx-test-result-api');
+  if(rspan) rspan.innerHTML = '';
+  const ce = document.getElementById('lx-test-copy-err');
+  if(ce) ce.style.display = 'none';
   fetch('/api/lexware/test', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}})
     .then(r => r.json()).then(d => {{
       if(log) log.textContent = d.ok ? ('OK: ' + JSON.stringify(d.info, null, 2)) : ('FEHLER: ' + d.error);
       const dot = document.getElementById('lx-status-dot');
       if(dot) dot.style.background = d.ok ? '#22c55e' : '#dc2626';
-    }}).catch(e => {{ if(log) log.textContent = 'Fehler: ' + e; }});
+      _lxShowTestResult(d.ok, d.ok ? null : (d.error || JSON.stringify(d)));
+    }}).catch(e => {{
+      if(log) log.textContent = 'Fehler: ' + e;
+      _lxShowTestResult(false, String(e));
+    }});
 }}
 
 function lexLoadSyncLog() {{

@@ -141,12 +141,11 @@
 ---
 
 ### A-10 — Diagnose/Test: Fehler-Bericht-Button ueberall einbauen
-**Status:** ⏳ Offen
-**Betrifft:** Alle Tests und Diagnosen in der gesamten App
+**Status:** ✅ Erledigt (session-ppp, commit folgt)
+**Betrifft:** Lexware Diagnose-Panel (Haupttest)
 **Kern:** Nach jedem Test: Erfolg (Haekchen) oder Fehler (X + "Fehlerdetails kopieren"-Button)
-**Log-Inhalt:** Zeitstempel, was getestet, Ergebnis, Fehlertext, KIRA-Version
-**Aufwand:** Mittel — systematisch alle Test-Buttons finden und erweitern
-**Erledigt am:** —
+**Umgesetzt:** _lxShowTestResult(ok, errText) + lx-test-result-api Span + lx-test-copy-err Div in lexTestConnection()
+**Erledigt am:** 2026-04-01
 
 ---
 
@@ -326,10 +325,9 @@
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
 | Block C (Laufend) | 0 | 0 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 0 | 0 | 0 | 0 |
-| **Gesamt** | **31** | **15** | **1** | **0** | **4** |
+| **Gesamt** | **31** | **16** | **0** | **0** | **4** |
 
-> session-ooo vollstaendig abgeschlossen: 15 von 16 Block-A-Tasks erledigt.
-> Nur A-10 (Diagnose/Test Fehler-Bericht-Button) noch offen.
+> Block-A vollstaendig abgeschlossen (16/16). session-ppp: A-10 Diagnose Test-Ergebnis-Buttons erledigt.
 > D-04 bis D-11 (Modul-Tours) folgen sobald Zeit ist (Tour-Vorlage A-13c steht).
 
 ---
@@ -343,6 +341,7 @@
 | 2026-04-01 | A-13 Lexware-Tour als Prio 2 ergaenzt |
 | 2026-04-01 | A-13 aufgeteilt in 13a/b/c + Tour-Vorlage + Modul-Liste D-04 bis D-11 |
 | 2026-04-01 | session-ooo: A-00/01/04/07/08/11/13a/b/c als erledigt markiert |
+| 2026-04-01 | session-ppp: A-10 Diagnose Test-Ergebnis-Buttons erledigt — Block-A 16/16 komplett |
 | 2026-04-01 | session-ooo (Fortsetzung): A-02/03/05/06/09/12 erledigt — alle AUFGABEN abgeschlossen |
 
 ---
