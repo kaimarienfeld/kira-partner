@@ -1706,8 +1706,9 @@ def build_postfach():
 .pf-left{width:var(--pf-left-w);min-width:160px;max-width:380px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0}
 .pf-left-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-left-title{font-weight:700;font-size:14px;color:var(--text)}
-.pf-compose-btn{background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-weight:600}
-.pf-compose-btn:hover{background:#2563eb}
+.pf-compose-btn{background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-weight:600}
+.pf-compose-btn:hover{background:#28282e}
+[data-theme="light"] .pf-compose-btn{background:#18181c;color:#fff;border-color:transparent}
 /* Favoriten */
 .pf-fav-section{padding:10px 14px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
 .pf-fav-item{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;cursor:pointer;font-size:12px;color:var(--text);transition:background .12s;border-left:3px solid transparent}
@@ -1919,8 +1920,9 @@ def build_postfach():
 .pf-snooze-cancel{color:#ef4444;margin-top:4px;border-top:1px solid var(--border);padding-top:9px}
 .pf-snooze-custom-row{display:flex;gap:5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
 .pf-snooze-custom-inp{flex:1;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
-.pf-snooze-custom-btn{padding:5px 10px;font-size:12px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer}
-.pf-snooze-custom-btn:hover{background:#2563eb}
+.pf-snooze-custom-btn{padding:5px 10px;font-size:12px;background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:6px;cursor:pointer}
+.pf-snooze-custom-btn:hover{background:#28282e}
+[data-theme="light"] .pf-snooze-custom-btn{background:#18181c;color:#fff;border-color:transparent}
 .pf-bulk-cnt{font-weight:600;color:#3b82f6;flex:1}
 .pf-bulk-btn{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text);transition:.1s}
 .pf-bulk-btn:hover{background:var(--bg-hover)}
@@ -2732,7 +2734,7 @@ function pfRenderFolders(data, onReady) {
     const allKonten=(data.konten||[]).map(k=>k.email);
     cfgDiv.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-muted)">Konten im Gemeinsamen Postfach:</div>'
       +allKonten.map(e=>`<label><input type="checkbox" value="${e}" ${_pfCombinedKonten.includes(e)?'checked':''}> ${e}</label>`).join('')
-      +'<div style="margin-top:8px"><button onclick="pfSaveCombinedKonten()" style="font-size:11px;padding:3px 10px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer">Speichern</button></div>';
+      +'<div style="margin-top:8px"><button onclick="pfSaveCombinedKonten()" style="font-size:11px;padding:3px 10px;background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:5px;cursor:pointer">Speichern</button></div>';
     tree.appendChild(cfgDiv);
 
     // ── Favoriten ─────────────────────────────────────────────────────────────
@@ -3051,7 +3053,7 @@ function pfShowKiraMail(item) {
     (isPending ?
       '<div style="padding:14px 0 4px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
         '<button class="btn btn-muted btn-sm" onclick="pfKiraMaillAblehnen('+item.id+')">&#x274C; Ablehnen</button>'+
-        '<button class="btn btn-sm" style="background:#1e3a5f;color:#93c5fd;border-color:#2563eb" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
+        '<button class="btn btn-sm" style="background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1)" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
         '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
       '</div>'
     : '');
@@ -6913,8 +6915,9 @@ function esInfoPopup(btn, text) {{
   .es-mk-stat-sub{{font-size:11px;color:var(--text-muted);margin-top:2px}}
   /* ── Button-Gruppen ── */
   .es-mk-actions{{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}}
-  .es-mk-btn{{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600}}
-  .es-mk-btn:hover{{opacity:.85}}
+  .es-mk-btn{{background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600}}
+  .es-mk-btn:hover{{background:#28282e;opacity:1}}
+  [data-theme="light"] .es-mk-btn{{background:#18181c;color:#fff;border-color:transparent}}
   .es-mk-btn.sec{{background:var(--bg-card);color:var(--text);border:1px solid var(--border)}}
   .es-mk-btn.danger{{background:rgba(200,60,60,.15);color:#c84444;border:1px solid rgba(200,60,60,.3)}}
   .es-mk-btn.warn{{background:rgba(255,140,0,.15);color:#e07800;border:1px solid rgba(255,140,0,.35)}}
@@ -6956,8 +6959,9 @@ function esInfoPopup(btn, text) {{
   .kira-wiz-spinner{{width:56px;height:56px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:kira-spin .85s linear infinite;margin:0 auto 20px}}
   .kira-wiz-success-icon{{font-size:56px;margin-bottom:16px}}
   @keyframes kira-spin{{to{{transform:rotate(360deg)}}}}
-  .kira-wiz-btn-primary{{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s}}
-  .kira-wiz-btn-primary:hover{{opacity:.88}}
+  .kira-wiz-btn-primary{{background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}}
+  .kira-wiz-btn-primary:hover{{background:#28282e}}
+  [data-theme="light"] .kira-wiz-btn-primary{{background:#18181c;color:#fff;border-color:transparent}}
   .kira-wiz-btn-sec{{background:transparent;color:var(--text-muted);border:1.5px solid var(--border);border-radius:9px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}}
   .kira-wiz-btn-sec:hover{{border-color:var(--accent);color:var(--text)}}
   .kira-wiz-import-card{{display:flex;align-items:center;gap:14px;background:var(--bg-raised);border:1.5px dashed var(--border);border-radius:12px;padding:16px 20px;margin-top:12px;cursor:pointer;transition:border-color .2s;text-align:left}}
@@ -18491,8 +18495,10 @@ a:hover{text-decoration:underline;}
 /* ═══ Buttons ═══ */
 .btn{padding:6px 12px;border-radius:var(--radius);font-size:var(--fs-sm);font-weight:700;cursor:pointer;
   border:none;display:inline-block;transition:all .15s;text-decoration:none;line-height:1.4;font-family:inherit;}
-.btn-primary{background:var(--accent);color:#fff;}
-.btn-primary:hover{opacity:.88;}
+.btn-primary{background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1);}
+.btn-primary:hover{background:#28282e;opacity:1;}
+[data-theme="light"] .btn-primary{background:#18181c;color:#fff;border-color:transparent;}
+[data-theme="light"] .btn-primary:hover{background:#2e2e34;}
 .btn-kira{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
 .btn-kira:hover{background:rgba(79,125,249,.18);}
 .btn-sec{background:rgba(128,128,128,.08);color:var(--text);border:1px solid var(--border);}
