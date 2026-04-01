@@ -863,6 +863,43 @@ def _save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2), 'utf-8')
 
 
+# ── Anthropic Billing Push (session-oo) ──────────────────────────────────────
+def _check_anthropic_billing(absender: str, betreff: str, text: str):
+    """Erkennt Anthropic-Zahlungsmails und sendet Pushover-Benachrichtigung."""
+    try:
+        absender_lower = absender.lower()
+        if 'anthropic.com' not in absender_lower:
+            return
+        betreff_lower = betreff.lower()
+        text_lower    = (text or '').lower()
+        billing_keywords = ('invoice', 'payment', 'receipt', 'charged', 'subscription',
+                            'rechnung', 'zahlung', 'abrechnung', 'abbuchung')
+        if not any(kw in betreff_lower or kw in text_lower for kw in billing_keywords):
+            return
+        # Betrag extrahieren
+        betrag_str = ""
+        betrag_m = re.search(r'(?:USD|EUR|CHF|[\$€£])\s*([\d,]+\.?\d{0,2})'
+                             r'|(\d{1,6}[.,]\d{2})\s*(?:USD|EUR|CHF|[\$€£])',
+                             text or betreff)
+        if betrag_m:
+            betrag_str = " | Betrag: " + (betrag_m.group(1) or betrag_m.group(2))
+        push_msg = "Anthropic Zahlung ausgefuehrt" + betrag_str
+        # Pushover via PowerShell
+        ps_script = r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\notivy.ps1"
+        import subprocess
+        subprocess.Popen(
+            ['powershell', '-NonInteractive', '-File', ps_script,
+             '-Message', push_msg, '-Priority', '1'],
+            creationflags=0x08000000  # CREATE_NO_WINDOW
+        )
+        _elog('system', 'anthropic_billing_push',
+              f'Anthropic Zahlung erkannt: {betreff[:80]}{betrag_str}',
+              source='mail_monitor', modul='billing', actor_type='system', status='ok')
+    except Exception as _e:
+        _elog('system', 'anthropic_billing_fehler', f'Billing-Check Fehler: {_e}',
+              source='mail_monitor', modul='billing', actor_type='system', status='fehler')
+
+
 # ── Eingangsrechnungs-Auto-Scan (session-bbb) ─────────────────────────────────
 def _auto_scan_eingangsrechnung(mail_data: dict, konto_label: str, kategorie: str,
                                  msg_id: str, absender: str, betreff: str, text: str):
@@ -1069,6 +1106,9 @@ def _process_mail(mail_data, konto_label, folder_name):
 
     # ── Eingangsrechnungs-Auto-Scan ───────────────────────────────────────────
     _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+
+    # ── Anthropic Billing Push ────────────────────────────────────────────────
+    _check_anthropic_billing(absender, betreff, text)
 
     # In kunden.db speichern
     try:
