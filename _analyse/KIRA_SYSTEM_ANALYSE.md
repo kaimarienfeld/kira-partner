@@ -692,7 +692,7 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | Feature / Komponente | Status | Prioritaet | Hinweis |
 |---|---|---|---|
 | Azure Calendars.ReadWrite | ⏳ Offen (Kai) | Mittel | Entra Portal: Permission hinzufuegen (Kalender-Widget dann voll aktiv) |
-| Lexware-Anbindung | ⏳ Offen | — | Eigene Arbeitsanweisung kommt von Kai |
+| Lexware-Anbindung | ✅ Erledigt (session-eee) | — | Vollstaendig implementiert — API-Client, 5 DB-Tabellen, Panel, Einstellungen, Mail-Monitor, 2 Kira-Tools |
 | WhatsApp-Token | ⏳ Offen (Kai) | Niedrig | Kai muss Token eintragen |
 | Leni Draft-2 Passwort | ⏳ Offen (Kai) | Niedrig | Gmail-Draft Platzhalter ersetzen |
 | Multi-Agent-Architektur | ⏳ Langfristig | — | Spezialisierte Sub-Agenten |
@@ -771,12 +771,81 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 | "Zu Kira hinzufuegen"-Button im Postfach | ✅ Erledigt — `pfAddFolderToKira()` + "+" Button auf Ordner die noch nicht in sync_ordner |
 | SMTP-Passwort-Auth im Volltest | ✅ Erledigt — `run_full_connection_test()` brancht jetzt zwischen XOAUTH2 + Passwort-Auth |
 
+### Erledigt (session-eee, 2026-04-01)
+
+#### F-LEX-01 — Lexware Office Modul (Vollimplementierung)
+**Status:** ✅ Implementiert
+**Dateien:** `scripts/lexware_client.py` (neu), `scripts/server.py` (Panel + Einstellungen + 12 Endpoints), `scripts/kira_llm.py` (2 Tools + Kontext), `scripts/mail_monitor.py` (Eingangsbeleg-Scanner), `scripts/build_databases.py` (5 neue Tabellen)
+
+**DB-Schema (tasks.db):**
+- `lexware_belege` — Ausgangsrechnungen/Angebote/Gutschriften aus Lexware (lex_id, typ, kontakt_name, brutto, datum, faellig, status, pdf_url, raw_json)
+- `lexware_kontakte` — Kunden/Lieferanten (lex_id, name, email, strasse, ort, plz, land, raw_json)
+- `lexware_artikel` — Artikel-/Leistungsstamm (lex_id, name, einheit, preis, steuersatz, raw_json)
+- `eingangsbelege_pruefqueue` — Eingehende Rechnungen zur manuellen Pruefung (mail_id UNIQUE, absender, betreff, betrag, waehrung, kategorie, is_paypal, is_body_only, status, konto_label, erkannt_am, bearbeitet_am, notiz, konto_nr, steuerkonto, buchungstext)
+- `lexware_config` — Modul-Konfiguration (key/value, zuletzt_sync, api_fehler_count)
+
+**Python-Client (lexware_client.py):**
+- `LexwareClient` Klasse — Bearer Token Auth, konfigurierbarer API-Base-URL (`api.lexoffice.io` Default / `api.lexware.io` neu)
+- `_request()` — Rate-Limit Handler: 429 → 60s Retry, max 3 Versuche
+- Voucher-API: `get_vouchers`, `get_all_vouchers` (alle Seiten), `get_voucher`, `create_invoice`, `create_quotation`, `create_credit_note`
+- Kontakt-API: `get_contacts`, `get_all_contacts`, `get_contact`, `create_contact`, `update_contact`
+- Artikel-API: `get_articles`, `get_all_articles`, `create_article`
+- Datei-API: `get_files`, `upload_file` (multipart)
+- Sync-Methoden: `sync_belege_to_db`, `sync_kontakte_to_db`, `sync_artikel_to_db`
+- Factory `get_client()` — liest api_key + api_base_url aus config.json, nie hardcoded
+
+**Panel + Sidebar (server.py):**
+- Sidebar-Eintrag `nav-lexware` nach `nav-geschaeft`
+- `build_lexware(db)` → Panel `id="panel-lexware"` mit 6 Tabs: Cockpit / Belege / Kontakte / Artikel / Buchhaltung / Diagnose
+- Cockpit: 6 KPI-Kacheln (Offene Rechnungen, Ueberfaellig, Kontakte, Artikel, Pruefqueue, Sync-Status), API-Statusdot, Sync-Buttons
+- 3-Zustand-System: nicht_gebucht (Info-Box), gesperrt (CSS-Sperrbanner + graue Tabs), freigeschaltet (voll funktional)
+- Beleg-Center: Tabelle mit Typ/Status-Filter + Suchfeld, Detail-Modal via `lexBelegDetail()`
+- Kontakte-Tab: Kontaktliste mit Suche, Detail-Modal via `lexKontaktDetail()`
+- Buchhaltung-Tab: Eingangsbelege-Pruefqueue, Filter Status/Suche, Detail-Modal mit Status-Buttons
+
+**Einstellungen (server.py `es-sec-lexware`):**
+- API-Key Feld (password type) + Test-Button + Status-Span
+- API-Basis-URL Feld (konfigurierbar — kein Hardcoding notwendig)
+- Modul-Status Dropdown: nicht_gebucht / gesperrt / freigeschaltet
+- Sync-Intervall Dropdown: 15/30/60/360/1440 Min
+- Buchhaltungs-Pruefregel Toggle + PayPal-Ausnahmen Toggle
+- Dataverse-Export Toggle (Prio C, vorbereitet)
+
+**Kira-Tools (kira_llm.py):**
+- `lexware_belege_laden` — laedt offene Posten aus lexware_belege (nur wenn freigeschaltet)
+- `lexware_eingangsbeleg_klassifizieren` — setzt Konto, Steuerkonto, Buchungstext, Status in eingangsbelege_pruefqueue
+- `_build_data_context()` Lexware-Sektion: offene Posten + Pruefqueue-Counter (nur bei freigeschaltet)
+
+**Mail-Monitor (mail_monitor.py):**
+- `_scan_eingangsbeleg_lexware()` — intelligente Eingangsbeleg-Erkennung aus Mails
+- `_is_paypal_mail()` — PayPal-Unterscheidung via Domain + Bestaetigungs-Patterns
+- `_LEX_INVOICE_SIGNALS` — Regex-Liste fuer Rechnungserkennung (rechnung, invoice, lieferant, etc.)
+- is_body_only Flag: Erkennung wenn Rechnung im Mail-Text (kein Anhang) + Betrag-Extraktion
+- Idempotenter Eintrag via `INSERT OR IGNORE` auf `mail_id` UNIQUE — kein Doppel-Processing
+
+**Neue API-Endpunkte (12):**
+- `GET /api/lexware/status` — Modul-Status + KPI-Daten fuer Cockpit
+- `POST /api/lexware/sync` — Manueller Sync-Start (belege/kontakte/artikel)
+- `GET /api/lexware/belege` — Liste aller Belege (mit Filter-Params)
+- `GET /api/lexware/beleg/{id}` — Beleg-Detail
+- `GET /api/lexware/kontakte` — Kontakt-Liste (mit Suche)
+- `GET /api/lexware/kontakt/{id}` — Kontakt-Detail
+- `GET /api/lexware/eingangsbelege` — Pruefqueue-Liste (mit Status/Suche-Filter)
+- `GET /api/lexware/eingangsbeleg/{id}` — Pruefqueue-Detail
+- `POST /api/lexware/eingangsbeleg/{id}/status` — Status setzen (klassifiziert/abgelegt/unklar)
+- `POST /api/lexware/eingangsbeleg/neu` — Manuellen Eintrag hinzufuegen
+- `POST /api/lexware/config/save` — Einstellungen speichern (inkl. api_base_url)
+- `POST /api/lexware/test` — Verbindungstest (Bearer Token gegen /api/v1/profile)
+
+---
+
 ### Kai-Aktionen erforderlich
 
 - **Azure Entra:** Calendars.ReadWrite Permission hinzufuegen (dann ist Kalender-Widget voll funktional)
 - **WhatsApp Business:** Token eintragen (Einstellungen > Integrationen)
 - **Google OAuth App:** Cloud Console Project erstellen, Client ID/Secret in Einstellungen eintragen
 - **Leni Gmail-Draft:** Draft-2 Passwort-Platzhalter ersetzen
+- **Lexware API-Key:** In KIRA Einstellungen > Lexware Office eintragen (Details: KAI_TODO_LEXWARE.md)
 
 ### Bekannte technische Schulden
 
@@ -818,4 +887,4 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-04-01 (session-ddd) | 35 Module, 7 DBs, 103 Endpunkte, 23 Tools, 11 Scans*
+*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-04-01 (session-ddd+eee) | 36 Module, 7 DBs, 115 Endpunkte, 25 Tools, 12 Scans*

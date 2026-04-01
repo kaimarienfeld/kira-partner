@@ -1,6 +1,6 @@
 {
-  "last_session": "session-eee",
-  "date": "2026-04-01 07:30",
+  "last_session": "session-eee (Abschluss)",
+  "date": "2026-04-01 09:15",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -164,7 +164,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "Lexware Office Modul implementiert (session-eee). Naechster Schritt fuer Kai: KAI-02 (alten API-Key widerrufen) + KAI-01 (neuen Key in KIRA Einstellungen > Lexware Office eintragen) + Einstellungen > Lexware Office > Verbindung testen + Modul-Status auf 'freigeschaltet' setzen. Dann: KIRA_SYSTEM_ANALYSE.md Lexware-Sektion aktualisieren. Optional: Playwright-Test des Lexware-Panels.",
+  "next_step": "session-eee vollstaendig abgeschlossen. Alle 3 Restpunkte erledigt: KIRA_SYSTEM_ANALYSE.md (Lexware F-LEX-01 Sektion), Server-Test via curl (data-essec=lexware + /api/lexware/status bestaetigt), generate_partner_view.py (40 done / 2 partial / 1 planned). Kai-Aktionen: KAI-02 (alten API-Key widerrufen) + KAI-01 (neuen Key in KIRA Einstellungen > Lexware Office eintragen) + Verbindung testen + Modul-Status 'freigeschaltet'. Server-Neustart via neustart_kira.vbs empfohlen (stellt sicher dass neuer Code aktiv).",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
