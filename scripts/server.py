@@ -5589,6 +5589,36 @@ def build_einstellungen():
 .es-intg-name{{font-size:var(--fs-sm);font-weight:600;color:var(--text);}}
 .es-intg-sub{{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}}
 .es-save-bar{{margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px;}}
+/* ── Compat-Aliase: Lexware + Capture-Mobil nutzen leicht andere Klassennamen als Standard (session-iii) ── */
+.es-label{{font-size:13px;color:var(--text);font-weight:500;flex-shrink:0;min-width:0;line-height:1.3;}}
+.es-input{{background:var(--bg-raised,var(--bg));border:0.5px solid var(--border-strong);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;flex-shrink:0;transition:border-color .15s;}}
+.es-input:focus{{outline:none;border-color:var(--primary);}}
+.es-select{{background:var(--bg-raised,var(--bg));border:0.5px solid var(--border-strong);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;flex-shrink:0;}}
+.es-toggle{{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;}}
+.es-toggle input{{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}}
+.es-slider{{display:inline-block;width:38px;height:20px;background:var(--border-strong,#ccc);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0;}}
+.es-slider::after{{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}}
+.es-toggle input:checked ~ .es-slider{{background:#1D9E75;}}
+.es-toggle input:checked ~ .es-slider::after{{transform:translateX(18px);}}
+.es-row-left{{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;}}
+.es-lbl{{font-size:13px;color:var(--text);font-weight:500;line-height:1.3;}}
+.es-hint{{font-size:11px;color:var(--muted,var(--text-muted));line-height:1.4;margin-top:1px;}}
+.es-badge-plan{{background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border);}}
+/* ── Admin-Panel CSS (session-iii) ── */
+.adm-sec{{display:none;}}.adm-sec.active{{display:block;}}
+.adm-nav-item{{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;font-size:13px;color:var(--text-secondary);cursor:pointer;user-select:none;transition:background .12s;margin-bottom:2px;}}
+.adm-nav-item:hover{{background:var(--bg-overlay);}}
+.adm-nav-item.act{{background:var(--primary-light,#f0ebff);color:var(--primary);font-weight:600;}}
+.adm-nav-ico{{font-size:15px;flex-shrink:0;width:20px;text-align:center;}}
+.adm-field{{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border);}}
+.adm-field:last-child{{border-bottom:none;}}
+.adm-field-lbl{{flex:1;min-width:0;}}
+.adm-field-key{{font-size:13px;font-weight:500;color:var(--text);}}
+.adm-field-hint{{font-size:11px;color:var(--muted);margin-top:1px;}}
+.adm-inp{{background:var(--bg-raised,var(--bg));border:0.5px solid var(--border-strong);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:220px;flex-shrink:0;}}
+.adm-inp:focus{{outline:none;border-color:var(--primary);}}
+.adm-show-btn{{background:none;border:0.5px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer;flex-shrink:0;transition:border-color .12s;}}
+.adm-show-btn:hover{{border-color:var(--primary);color:var(--primary);}}
 .es-proto-tabs{{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--border);}}
 .es-proto-tab{{padding:8px 16px;font-size:var(--fs-xs);font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color 0.12s;user-select:none;}}
 .es-proto-tab.act{{color:var(--accent,#444441);border-bottom-color:var(--accent,#444441);}}
@@ -9874,6 +9904,372 @@ function saveCaptureSettings() {{
 </div><!-- /es-shell -->"""
     return html
 
+# ── ADMIN Panel (session-iii) ─────────────────────────────────────────────────
+def build_admin():
+    """Admin-Dashboard: Passwort-Login + Secrets/Config-Verwaltung."""
+    return """
+<div class="page-header" style="border-bottom:0.5px solid var(--border);padding-bottom:14px;margin-bottom:0">
+  <h1 class="page-title">&#x1F512; Admin-Bereich</h1>
+  <span style="font-size:12px;color:var(--muted);margin-left:auto">Nur lokal zugaenglich &middot; localhost</span>
+</div>
+
+<!-- Login-Wall -->
+<div id="adm-login-wall" style="display:flex;align-items:center;justify-content:center;min-height:65vh;padding:20px">
+  <div class="es-grp" style="width:360px">
+    <div style="text-align:center;font-size:40px;margin-bottom:12px">&#x1F512;</div>
+    <div style="font-size:17px;font-weight:600;color:var(--text);text-align:center;margin-bottom:4px">Admin-Zugang</div>
+    <div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px">Bitte Admin-Passwort eingeben</div>
+    <div style="display:flex;gap:8px">
+      <input id="adm-pw" type="password" class="adm-inp" style="width:100%;flex:1"
+             placeholder="Passwort..."
+             onkeydown="if(event.key==='Enter')admLogin()">
+      <button class="btn btn-primary" onclick="admLogin()">Anmelden</button>
+    </div>
+    <div id="adm-login-err" style="font-size:12px;color:var(--danger,#e84545);min-height:18px;margin-top:8px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- Admin-Content (nach Login sichtbar) -->
+<div id="adm-content" style="display:none;height:calc(100vh - 112px);overflow:hidden">
+  <div style="display:grid;grid-template-columns:210px 1fr;height:100%">
+
+    <!-- Linke Nav -->
+    <div style="border-right:0.5px solid var(--border);padding:14px 10px;overflow-y:auto;background:var(--bg)">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 6px 6px">Bereiche</div>
+      <div class="adm-nav-item act" id="adm-nav-api" onclick="admShowSec('api')"><span class="adm-nav-ico">&#x1F511;</span>API-Schluessel</div>
+      <div class="adm-nav-item" id="adm-nav-smtp" onclick="admShowSec('smtp')"><span class="adm-nav-ico">&#x2709;</span>E-Mail SMTP</div>
+      <div class="adm-nav-item" id="adm-nav-whatsapp" onclick="admShowSec('whatsapp')"><span class="adm-nav-ico">&#x1F4AC;</span>WhatsApp</div>
+      <div class="adm-nav-item" id="adm-nav-lexware" onclick="admShowSec('lexware')"><span class="adm-nav-ico">&#x1F4CA;</span>Lexware</div>
+      <div class="adm-nav-item" id="adm-nav-passwoerter" onclick="admShowSec('passwoerter')"><span class="adm-nav-ico">&#x1F510;</span>Passwoerter</div>
+      <div class="adm-nav-item" id="adm-nav-system" onclick="admShowSec('system')"><span class="adm-nav-ico">&#x2699;</span>System</div>
+      <div style="margin-top:auto;padding-top:20px">
+        <button class="btn btn-sec btn-xs" style="width:100%;margin-top:12px" onclick="admLogout()">&#x21A9; Abmelden</button>
+      </div>
+    </div>
+
+    <!-- Rechter Content -->
+    <div style="overflow-y:auto;padding:24px 32px;background:var(--bg-raised,var(--bg))">
+
+      <!-- API-Schluessel -->
+      <div class="adm-sec" id="adm-sec-api" style="display:block">
+        <div class="es-grp-h" style="margin-bottom:4px">API-Schluessel</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer KI-Provider und externe Dienste. Werden in <code>secrets.json</code> gespeichert.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Anthropic API-Key</div><div class="adm-field-hint">Pflichtfeld fuer KIRA KI-Funktionen &middot; sk-ant-...</div></div>
+            <input id="adm-f-anthropic" type="password" class="adm-inp" placeholder="sk-ant-...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-anthropic')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">GitHub Personal Access Token</div><div class="adm-field-hint">Fuer Partner-View GitHub-Sync &middot; ghp_...</div></div>
+            <input id="adm-f-github" type="password" class="adm-inp" placeholder="ghp_...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-github')">&#x1F441;</button>
+          </div>
+        </div>
+        <div class="es-grp" style="margin-top:12px">
+          <div class="es-grp-h" style="font-size:13px;margin-bottom:8px">Provider API-Keys (OpenAI, Ollama, etc.)</div>
+          <div id="adm-provider-keys-list"></div>
+          <button class="es-btn es-btn-green" style="margin-top:8px" onclick="admAddProviderKey()">&#x2B; Provider-Key hinzufuegen</button>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('api')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-api-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- E-Mail SMTP -->
+      <div class="adm-sec" id="adm-sec-smtp">
+        <div class="es-grp-h" style="margin-bottom:4px">E-Mail SMTP</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende E-Mails: Benachrichtigungen, Partnereinladungen. Gespeichert in <code>config.json &rarr; email_notification</code>.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">SMTP-Server</div><div class="adm-field-hint">z.B. smtp.gmail.com oder smtp.ionos.de</div></div>
+            <input id="adm-f-smtp-server" type="text" class="adm-inp" placeholder="smtp.gmail.com">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Port</div><div class="adm-field-hint">Standard: 587 (STARTTLS) oder 465 (SSL)</div></div>
+            <input id="adm-f-smtp-port" type="number" class="adm-inp" placeholder="587" style="width:100px">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Absender E-Mail</div><div class="adm-field-hint">Von-Adresse fuer ausgehende Mails</div></div>
+            <input id="adm-f-smtp-email" type="email" class="adm-inp" placeholder="kira@raumkult.eu">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">SMTP-Passwort / App-Passwort</div><div class="adm-field-hint">Bei Gmail: App-Passwort verwenden (2FA noetig)</div></div>
+            <input id="adm-f-smtp-passwort" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-smtp-passwort')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Empfaenger E-Mail</div><div class="adm-field-hint">Wohin sollen System-Benachrichtigungen gehen</div></div>
+            <input id="adm-f-smtp-empf" type="email" class="adm-inp" placeholder="kai@raumkult.eu">
+          </div>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('smtp')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-smtp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- WhatsApp -->
+      <div class="adm-sec" id="adm-sec-whatsapp">
+        <div class="es-grp-h" style="margin-bottom:4px">WhatsApp Business</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Meta Business Cloud API Zugangsdaten. Gespeichert in <code>secrets.json</code>.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Verify-Token</div><div class="adm-field-hint">Webhook-Verifizierung (frei waehlbar, muss mit Meta-Einstellung uebereinstimmen)</div></div>
+            <input id="adm-f-wa-verify" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-verify')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">App Secret</div><div class="adm-field-hint">HMAC-Signaturpruefung von Webhook-Events</div></div>
+            <input id="adm-f-wa-secret" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-wa-secret')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Phone Number ID</div><div class="adm-field-hint">Meta Business Manager &rarr; WhatsApp &rarr; Phone Number ID</div></div>
+            <input id="adm-f-wa-phone-id" type="text" class="adm-inp" placeholder="1234567890">
+          </div>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('whatsapp')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-whatsapp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- Lexware -->
+      <div class="adm-sec" id="adm-sec-lexware">
+        <div class="es-grp-h" style="margin-bottom:4px">Lexware Office</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">API-Zugangsdaten fuer Lexware Office. Gespeichert in <code>config.json &rarr; lexware</code>.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">API-Key</div><div class="adm-field-hint">Lexware Office &rarr; Mein Konto &rarr; API-Zugang &rarr; Token erstellen</div></div>
+            <input id="adm-f-lex-key" type="password" class="adm-inp" placeholder="t-...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-lex-key')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">API Basis-URL</div><div class="adm-field-hint">Standard: https://api.lexware.io</div></div>
+            <input id="adm-f-lex-url" type="text" class="adm-inp" placeholder="https://api.lexware.io">
+          </div>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('lexware')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-lexware-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- Passwoerter -->
+      <div class="adm-sec" id="adm-sec-passwoerter">
+        <div class="es-grp-h" style="margin-bottom:4px">System-Passwoerter</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Login-Passwoerter fuer Admin und Mobile-App. Gespeichert in <code>secrets.json</code>.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Admin-Passwort</div><div class="adm-field-hint">Schutzt diesen Admin-Bereich. Fallback: kira2026</div></div>
+            <input id="adm-f-admin-pw" type="password" class="adm-inp" placeholder="Neues Passwort...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-admin-pw')">&#x1F441;</button>
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Admin-Passwort bestaetigen</div><div class="adm-field-hint">Zur Sicherheit zweimal eingeben</div></div>
+            <input id="adm-f-admin-pw2" type="password" class="adm-inp" placeholder="Wiederholung...">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Mobile-App Passwort</div><div class="adm-field-hint">Login-Schutz fuer /mobil &middot; Kira Capture App</div></div>
+            <input id="adm-f-mobil-pw" type="password" class="adm-inp" placeholder="...">
+            <button class="adm-show-btn" onclick="admToggle('adm-f-mobil-pw')">&#x1F441;</button>
+          </div>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('passwoerter')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-passwoerter-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- System -->
+      <div class="adm-sec" id="adm-sec-system">
+        <div class="es-grp-h" style="margin-bottom:4px">System-Einstellungen</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Server-Konfiguration und Pfade. Gespeichert in <code>config.json</code>.</div>
+        <div class="es-grp">
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Server-Port</div><div class="adm-field-hint">Standard: 8765 &middot; Aenderung erfordert Neustart</div></div>
+            <input id="adm-f-port" type="number" class="adm-inp" placeholder="8765" style="width:100px">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Mail-Archiv Pfad</div><div class="adm-field-hint">Absoluter Pfad zum Mail-Archiv-Verzeichnis</div></div>
+            <input id="adm-f-archiv-pfad" type="text" class="adm-inp" style="width:300px" placeholder="C:/Pfad/zum/Archiv">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl"><div class="adm-field-key">Backup-Pfad</div><div class="adm-field-hint">Zielverzeichnis fuer automatische Backups</div></div>
+            <input id="adm-f-backup-pfad" type="text" class="adm-inp" style="width:300px" placeholder="C:/Pfad/zum/Backup">
+          </div>
+        </div>
+        <div class="es-save-bar">
+          <button class="btn btn-primary" onclick="admSaveSection('system')">&#x1F4BE; Speichern</button>
+          <span id="adm-save-system-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /grid -->
+</div><!-- /adm-content -->
+
+<script>
+var _admAuth = false;
+var _admData = {};
+
+function admLogin() {
+  var pw = document.getElementById('adm-pw').value;
+  if (!pw) { document.getElementById('adm-login-err').textContent = 'Bitte Passwort eingeben'; return; }
+  fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({password: pw})})
+  .then(function(r){return r.json();}).then(function(d){
+    if (d.ok) {
+      _admAuth = true;
+      document.getElementById('adm-login-wall').style.display = 'none';
+      document.getElementById('adm-content').style.display = 'block';
+      document.getElementById('adm-login-err').textContent = '';
+      admLoadData();
+    } else {
+      document.getElementById('adm-login-err').textContent = d.error || 'Falsches Passwort';
+    }
+  }).catch(function(e){
+    document.getElementById('adm-login-err').textContent = 'Verbindungsfehler';
+  });
+}
+
+function admLogout() {
+  _admAuth = false;
+  _admData = {};
+  document.getElementById('adm-content').style.display = 'none';
+  document.getElementById('adm-login-wall').style.display = 'flex';
+  document.getElementById('adm-pw').value = '';
+}
+
+function admShowSec(name) {
+  document.querySelectorAll('.adm-sec').forEach(function(s){s.style.display='none';});
+  document.querySelectorAll('.adm-nav-item').forEach(function(n){n.classList.remove('act');});
+  var sec = document.getElementById('adm-sec-'+name);
+  if (sec) sec.style.display = 'block';
+  var nav = document.getElementById('adm-nav-'+name);
+  if (nav) nav.classList.add('act');
+}
+
+function admToggle(id) {
+  var inp = document.getElementById(id);
+  if (!inp) return;
+  inp.type = (inp.type === 'password') ? 'text' : 'password';
+}
+
+function admLoadData() {
+  fetch('/api/admin/data-get').then(function(r){return r.json();}).then(function(d){
+    if (!d.ok) return;
+    _admData = d;
+    var s = d.secrets || {};
+    var c = d.config || {};
+    // API-Keys
+    var setVal = function(id, v) { var el=document.getElementById(id); if(el&&v!==undefined) el.value=v; };
+    setVal('adm-f-anthropic', s.anthropic_api_key);
+    setVal('adm-f-github', s.github_pat);
+    // WhatsApp
+    setVal('adm-f-wa-verify', s.whatsapp_verify_token);
+    setVal('adm-f-wa-secret', s.whatsapp_app_secret);
+    setVal('adm-f-wa-phone-id', s.whatsapp_phone_number_id);
+    // SMTP
+    var smtp = (c.email_notification || {});
+    setVal('adm-f-smtp-server', smtp.smtp_server);
+    setVal('adm-f-smtp-port', smtp.smtp_port);
+    setVal('adm-f-smtp-email', smtp.absender_email);
+    setVal('adm-f-smtp-passwort', smtp.absender_passwort);
+    setVal('adm-f-smtp-empf', smtp.empfaenger_email);
+    // Lexware
+    var lx = (c.lexware || {});
+    setVal('adm-f-lex-key', lx.api_key);
+    setVal('adm-f-lex-url', lx.api_base_url);
+    // Passwoerter
+    setVal('adm-f-admin-pw', s.admin_password || '');
+    setVal('adm-f-admin-pw2', s.admin_password || '');
+    setVal('adm-f-mobil-pw', s.mobil_password || '');
+    // System
+    setVal('adm-f-port', (c.server||{}).port);
+    setVal('adm-f-archiv-pfad', (c.mail_archiv||{}).pfad);
+    setVal('adm-f-backup-pfad', (c.backup||{}).pfad);
+    // Provider keys
+    admRenderProviderKeys(s.provider_keys || {});
+  }).catch(function(){});
+}
+
+function admRenderProviderKeys(keys) {
+  var list = document.getElementById('adm-provider-keys-list');
+  if (!list) return;
+  list.innerHTML = '';
+  Object.keys(keys).forEach(function(provider_id) {
+    var row = document.createElement('div');
+    row.className = 'adm-field';
+    row.dataset.provId = provider_id;
+    row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+provider_id+'</div>'
+      +'<div class="adm-field-hint">Provider API-Key</div></div>'
+      +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+provider_id+'" value="'+String(keys[provider_id]).substring(0,60)+'">'
+      +'<button class="adm-show-btn" onclick="admToggleThis(this)">&#x1F441;</button>';
+    list.appendChild(row);
+  });
+}
+
+function admToggleThis(btn) {
+  var inp = btn.previousElementSibling;
+  if (inp) inp.type = (inp.type==='password'?'text':'password');
+}
+
+function admAddProviderKey() {
+  var list = document.getElementById('adm-provider-keys-list');
+  var row = document.createElement('div');
+  row.className = 'adm-field';
+  var newId = prompt('Provider-ID (z.B. openai-main oder ollama-lokal):');
+  if (!newId) return;
+  row.dataset.provId = newId;
+  row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+newId+'</div>'
+    +'<div class="adm-field-hint">Neuer Provider API-Key</div></div>'
+    +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+newId+'" placeholder="sk-... oder leer fuer Ollama">'
+    +'<button class="adm-show-btn" onclick="admToggleThis(this)">&#x1F441;</button>';
+  list.appendChild(row);
+}
+
+function admSaveSection(section) {
+  var payload = {section: section};
+  var g = function(id){ var el=document.getElementById(id); return el ? el.value : ''; };
+  if (section === 'api') {
+    var provKeys = {};
+    document.querySelectorAll('.adm-prov-key').forEach(function(inp){
+      if (inp.dataset.prov) provKeys[inp.dataset.prov] = inp.value;
+    });
+    payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'), provider_keys: provKeys};
+  } else if (section === 'smtp') {
+    payload.data = {smtp_server: g('adm-f-smtp-server'), smtp_port: parseInt(g('adm-f-smtp-port'))||587,
+      absender_email: g('adm-f-smtp-email'), absender_passwort: g('adm-f-smtp-passwort'), empfaenger_email: g('adm-f-smtp-empf')};
+  } else if (section === 'whatsapp') {
+    payload.data = {whatsapp_verify_token: g('adm-f-wa-verify'), whatsapp_app_secret: g('adm-f-wa-secret'), whatsapp_phone_number_id: g('adm-f-wa-phone-id')};
+  } else if (section === 'lexware') {
+    payload.data = {api_key: g('adm-f-lex-key'), api_base_url: g('adm-f-lex-url')};
+  } else if (section === 'passwoerter') {
+    var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
+    if (pw1 && pw1 !== pw2) { showToast('Admin-Passwoerter stimmen nicht ueberein', 'fehler'); return; }
+    payload.data = {};
+    if (pw1) payload.data.admin_password = pw1;
+    var mp = g('adm-f-mobil-pw'); if (mp) payload.data.mobil_password = mp;
+  } else if (section === 'system') {
+    payload.data = {port: parseInt(g('adm-f-port'))||8765, archiv_pfad: g('adm-f-archiv-pfad'), backup_pfad: g('adm-f-backup-pfad')};
+  }
+  fetch('/api/admin/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+  .then(function(r){return r.json();}).then(function(d){
+    var msgEl = document.getElementById('adm-save-'+section+'-msg');
+    if (d.ok) {
+      showToast('Admin: '+section+' gespeichert', 'ok');
+      if (msgEl) { msgEl.textContent = 'Gespeichert'; setTimeout(function(){msgEl.textContent='';}, 3000); }
+    } else {
+      showToast(d.error || 'Fehler beim Speichern', 'fehler');
+    }
+  }).catch(function(){ showToast('Verbindungsfehler', 'fehler'); });
+}
+</script>
+"""
+
 # ── WISSEN Panel ──────────────────────────────────────────────────────────────
 def build_wissen(db):
     try:
@@ -11849,6 +12245,7 @@ def generate_html() -> str:
     einstell_html  = build_einstellungen()
     lexware_html   = build_lexware(db)
     capture_html   = build_capture(db)
+    admin_html     = build_admin()
     # Lexware Badge-Zaehler fuer Sidebar (session-fff)
     try:
         _lex_pruef_count = get_db().execute(
@@ -11980,6 +12377,9 @@ def generate_html() -> str:
     <div class="sidebar-item" id="nav-einstellungen" onclick="showPanel('einstellungen')" data-label="Einstellungen">
       <span class="si-icon">&#x2699;</span><span class="si-label">Einstellungen</span>
     </div>
+    <div class="sidebar-item" id="nav-admin" onclick="showPanel('admin')" data-label="Admin" style="opacity:.7">
+      <span class="si-icon">&#x1F512;</span><span class="si-label">Admin</span>
+    </div>
   </div>
 </aside>
 
@@ -12010,6 +12410,7 @@ def generate_html() -> str:
   <div class="panel" id="panel-lexware">{lexware_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
   <div class="panel" id="panel-capture">{capture_html}</div>
+  <div class="panel" id="panel-admin">{admin_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
   <div class="panel" id="panel-kira-aktivitaeten">
     <div class="page-header">
@@ -12626,7 +13027,7 @@ const PANEL_TITLES = {{
   geschaeft:'Gesch\u00e4ft', lexware:'Lexware Office', wissen:'Wissen', einstellungen:'Einstellungen',
   kunden:'Kunden', marketing:'Marketing',
   social:'Social / DMs', automationen:'Automationen', analysen:'Analysen',
-  capture:'Capture'
+  capture:'Capture', admin:'Admin'
 }};
 
 function showPanel(name) {{
@@ -18756,6 +19157,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _m = re.match(r'^/api/kira/provider/(.+)/balance$', self.path)
             self._api_provider_balance(_m.group(1) if _m else "")
 
+        # Admin Panel (session-iii)
+        elif self.path == '/api/admin/data-get':
+            self._api_admin_data_get()
+
         # Capture / Mobile Memo (session-hhh)
         elif self.path.startswith('/api/capture/'):
             self._api_capture_get()
@@ -21846,6 +22251,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         body   = json.loads(raw_body)
 
+        # Admin Panel (session-iii)
+        if self.path == '/api/admin/login':
+            self._api_admin_login(body)
+            return
+        if self.path == '/api/admin/save':
+            self._api_admin_save(body)
+            return
+
         if self.path == '/api/mail/oauth/connect':
             self._api_mail_oauth_connect(body)
             return
@@ -24561,6 +24974,126 @@ def _handle_lexware_post(handler, path, body):
         return True
 
     return False  # Pfad nicht behandelt
+
+
+# ── Admin Panel Handler (session-iii) ─────────────────────────────────────────
+def _admin_get_secret(key: str, default: str = "") -> str:
+    """Liest einen Wert aus secrets.json (ohne Exception)."""
+    try:
+        secs = json.loads((SCRIPTS_DIR / "secrets.json").read_bytes())
+        return str(secs.get(key, default))
+    except Exception:
+        return default
+
+# Methoden werden als Klassenmethoden registriert (Monkey-Patch-Muster wie in server.py)
+def _method_api_admin_data_get(self):
+    """GET /api/admin/data-get — Liefert alle Secrets + Admin-Config."""
+    try:
+        secs_path = SCRIPTS_DIR / "secrets.json"
+        secs = json.loads(secs_path.read_bytes()) if secs_path.exists() else {}
+        # Kommentar-Schluessel entfernen
+        secs_clean = {k: v for k, v in secs.items() if not k.startswith("_")}
+        cfg_path = SCRIPTS_DIR / "config.json"
+        cfg = json.loads(cfg_path.read_bytes()) if cfg_path.exists() else {}
+        # Nur Admin-relevante Config-Abschnitte liefern
+        admin_cfg = {
+            "email_notification": cfg.get("email_notification", {}),
+            "lexware": {k: v for k, v in cfg.get("lexware", {}).items() if not k.startswith("_")},
+            "server": cfg.get("server", {}),
+            "mail_archiv": {"pfad": cfg.get("mail_archiv", {}).get("pfad", "")},
+            "backup": cfg.get("backup", {}),
+        }
+        self._json({"ok": True, "secrets": secs_clean, "config": admin_cfg})
+    except Exception as e:
+        self._json({"ok": False, "error": str(e)})
+
+def _method_api_admin_login(self, body):
+    """POST /api/admin/login — Prueft Admin-Passwort gegen secrets.json."""
+    try:
+        secs = {}
+        secs_path = SCRIPTS_DIR / "secrets.json"
+        if secs_path.exists():
+            secs = json.loads(secs_path.read_bytes())
+        correct = secs.get("admin_password", "") or "kira2026"
+        if body.get("password", "") == correct:
+            self._json({"ok": True})
+        else:
+            self._json({"ok": False, "error": "Falsches Passwort"})
+    except Exception as e:
+        self._json({"ok": False, "error": str(e)})
+
+def _method_api_admin_save(self, body):
+    """POST /api/admin/save — Speichert Aenderungen in secrets.json oder config.json."""
+    try:
+        section = body.get("section", "")
+        data = body.get("data", {})
+        secs_path = SCRIPTS_DIR / "secrets.json"
+        cfg_path  = SCRIPTS_DIR / "config.json"
+        secs = json.loads(secs_path.read_bytes()) if secs_path.exists() else {}
+        cfg  = json.loads(cfg_path.read_bytes()) if cfg_path.exists() else {}
+
+        if section == "api":
+            if data.get("anthropic_api_key"):
+                secs["anthropic_api_key"] = data["anthropic_api_key"]
+            if data.get("github_pat"):
+                secs["github_pat"] = data["github_pat"]
+            if "provider_keys" in data and isinstance(data["provider_keys"], dict):
+                old_prov = secs.get("provider_keys", {})
+                old_prov.update({k: v for k, v in data["provider_keys"].items() if v})
+                secs["provider_keys"] = old_prov
+            secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
+
+        elif section == "smtp":
+            smtp = cfg.get("email_notification", {})
+            for k, v in data.items():
+                if v is not None and v != "":
+                    smtp[k] = v
+            cfg["email_notification"] = smtp
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+
+        elif section == "whatsapp":
+            for k in ("whatsapp_verify_token", "whatsapp_app_secret", "whatsapp_phone_number_id"):
+                if data.get(k):
+                    secs[k] = data[k]
+            secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
+
+        elif section == "lexware":
+            lx = cfg.get("lexware", {})
+            if data.get("api_key"):
+                lx["api_key"] = data["api_key"]
+            if data.get("api_base_url"):
+                lx["api_base_url"] = data["api_base_url"]
+            cfg["lexware"] = lx
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+
+        elif section == "passwoerter":
+            if data.get("admin_password"):
+                secs["admin_password"] = data["admin_password"]
+            if data.get("mobil_password"):
+                secs["mobil_password"] = data["mobil_password"]
+            secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
+
+        elif section == "system":
+            if data.get("port"):
+                cfg.setdefault("server", {})["port"] = int(data["port"])
+            if "archiv_pfad" in data:
+                cfg.setdefault("mail_archiv", {})["pfad"] = data["archiv_pfad"]
+            if "backup_pfad" in data:
+                cfg.setdefault("backup", {})["pfad"] = data["backup_pfad"]
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+
+        else:
+            self._json({"ok": False, "error": f"Unbekannte Sektion: {section}"})
+            return
+
+        self._json({"ok": True})
+    except Exception as e:
+        self._json({"ok": False, "error": str(e)})
+
+# Handler-Methoden an DashboardHandler binden
+DashboardHandler._api_admin_data_get = _method_api_admin_data_get
+DashboardHandler._api_admin_login    = _method_api_admin_login
+DashboardHandler._api_admin_save     = _method_api_admin_save
 
 
 def run_server(open_browser=True):
