@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ccc",
-  "date": "2026-04-01 00:15",
+  "last_session": "session-ddd",
+  "date": "2026-04-01 01:30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -42,7 +42,8 @@
     "session-zz (2026-03-31 Nacht): Nacht-Abarbeitung §14 Offene Posten. (1) P1: Kira Live-Chip + Activity-Drawer bereits vorhanden — verifiziert, kein Doppelbau. (2) P2: Mail-Vorlagen Editor komplett: DB-Tabelle mail_vorlagen, GET/POST/DELETE Endpoints, Tab in Einstellungen > Mail > Vorlagen, Modal-Editor mit Kategorien/Signatur/Kira-Aktiv. (3) P2: Kalender-Widget Dashboard + Tab: GET /api/kira/termine (graph_calendar.liste_terme), cal_panel in Dashboard (rechte Spalte), Organisation Kalender-Tab ersetzt In-Planung durch echten Kalender mit Tage-Filter, loadDashKalender()/loadOrgKalender() AJAX. (4) P2: Kira-Postfach Einstellungen: neuer Tab Einstellungen > Mail > Kira-Postfach, Absender-Konto Dropdown, Graph-Verbindung Pruefen-Button, _resolve_graph_konto() Resolver-Kette. (5) P2: Geschaeft Signale-Panel live: loadGeschKiraSignale() laedt /api/vorgang/signals?alle=1, #gesch-kira-signals Container in Signale & Warnungen Zone, OK-Button markiert Signale. (6) P3: Wissen Von-Kira-gelernt Badge: _wissen_card() zeigt Badge bei quelle=auto_gelernt/mail_stil_diff. (7) P3: Chat Kontext-Menu: + Button oeffnet Dropdown (Offene Aufgaben/Aktive Vorgaenge/Aktueller Kontext) → in Chat-Input einfuegen. Commits: 2710a60, 2695819, 7491163, fdd194f.",
     "session-aaa (2026-03-31): Google OAuth 2.0 fuer Gmail vollstaendig implementiert. (1) google_oauth.py: neues Modul - Authorization Code Flow, Token Exchange, Refresh, XOAUTH2 fuer IMAP, In-Memory Job-Tracking. (2) server.py: GET /oauth/google/callback (HTML-Bestaetigung), POST /api/mail/konto/google-oauth-start, GET google-oauth-status, GET /api/google-oauth/test. (3) Wizard Step 5 dynamisch (Google vs Microsoft Label + Hinweis). _wizStep4Next -> _wizStartGoogleOAuth + _wizPollGoogleOAuth. (4) Einstellungen > Integrationen: Google OAuth Credentials-Gruppe (Client ID/Secret, Speichern, Test). (5) KIRA_SYSTEM_ANALYSE.md §13+14 vollstaendig aktualisiert: alle session-zz done markiert, session-aaa Google OAuth als done. (6) feature_registry.json: 64 Features, google-oauth-gmail (done). Commit 4fb0a68.",
     "session-bbb (2026-03-31): Nacht-Abarbeitung KIRA_SYSTEM_ANALYSE §14 Offene Posten. (1) Geschaeft-Modul 5 neue Tabs: Belegvorlagen (CRUD-Editor, Vorschau, Kira-Button), Zeiterfassung (Timer, Eintrag-Modal, Monatsuebersicht, SQLite auto), Cashflow (Monatsbalken aus ausgangsrechnungen), CRM Pipeline (Kanban 5 Spalten aus vorgaenge), Angebots-Kalkulation (Material/Arbeit/Fremd, GK/Marge/MwSt, _kalLastNetto). (2) Foto-Analyse Frontend: FileReader-Upload, _kiraAttachment global, sendKiraMsg schickt bild-Payload. (3) Foto-Analyse Backend: kira_llm.chat(bild=) Parameter, Anthropic vision content-list (image+text Block). (4) daily_check.py Step 8: DB-Autopflege (alte Tasks, wissen_regeln Dedup, VACUUM). (5) mail_monitor.py: Urlaubsmodus Auto-Reply + Eingangsrechnungen-Auto-Scan. (6) Alle Python SyntaxWarnings (Regex-Escapes in f-strings) behoben. Commit b63c876.",
-    "session-ccc (2026-04-01): Foto-Analyse Backend-Vervollstaendigung. kira_llm.chat() bild-Parameter — Anthropic vision content-list (image+text block) korrekt verdrahtet. server.py /api/kira/chat: bild=body.get('bild') -> kira_chat(..., bild=bild). feature_registry.json foto-analyse -> done. Commit b63c876 (teil von session-bbb batch)."
+    "session-ccc (2026-04-01): Foto-Analyse Backend-Vervollstaendigung. kira_llm.chat() bild-Parameter — Anthropic vision content-list (image+text block) korrekt verdrahtet. server.py /api/kira/chat: bild=body.get('bild') -> kira_chat(..., bild=bild). feature_registry.json foto-analyse -> done. Commit b63c876 (teil von session-bbb batch).",
+    "session-ddd (2026-04-01): Alle verbleibenden open_tasks aus session_handoff.json abgearbeitet. (1) Google OAuth Persistierung: _wizPollGoogleOAuth() ruft jetzt health-check + esLoadMailKonten() nach Erfolg (parity mit MS-OAuth-Flow). (2) 'Zu Kira hinzufuegen'-Button im Postfach: '+'-Button auf allen Ordnern die NICHT in kira sync_ordner sind, pfAddFolderToKira() POST /api/mail/archiv/sync-ordner + Folder-Reload. (3) SMTP-Passwort-Auth im Volltest: run_full_connection_test() brancht jetzt use_password_smtp vs XOAUTH2, base64-Passwort wird dekodiert. Verifiziert: Tagesbriefing/geloeschte_protokoll/bereinigung-UI/polling-intervall/kira-FAB-drag waren bereits implementiert. Commits: f87c0de. KIRA_SYSTEM_ANALYSE.md §14 session-ddd Erledigt-Block."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -141,7 +142,10 @@
     "geschaeft-belegvorlagen-zeiterfassung-cashflow-crm-kalkulation",
     "foto-analyse-frontend-backend-anthropic-vision",
     "daily-check-db-autopflege-step8",
-    "mail-monitor-urlaub-autoreply-eingangsrechnungen-scan"
+    "mail-monitor-urlaub-autoreply-eingangsrechnungen-scan",
+    "google-oauth-health-check-after-login",
+    "zu-kira-ordner-button-postfach-pfAddFolderToKira",
+    "smtp-passwort-auth-volltest"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -158,7 +162,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "Alle §14 Offene Posten abgearbeitet (ausser Lexware + Kai-Aktionen). Naechster Schritt: Playwright-Test der neuen Features (Belegvorlagen, Zeiterfassung, Cashflow, CRM, Kalkulation, Foto-Analyse). Lexware: wartet auf separate Arbeitsanweisung von Kai.",
+  "next_step": "Alle implementierbaren open_tasks erledigt. Nur noch Kai-Aktionen (Azure/WhatsApp/Leni) + Lexware (separate Anweisung) + Langfristig (Multi-Agent/Lokales LLM) offen. Empfehlung: Playwright-Test der neuen Geschaeft-Tabs + Postfach-Verbesserungen.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

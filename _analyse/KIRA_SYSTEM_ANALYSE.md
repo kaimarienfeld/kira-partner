@@ -763,6 +763,14 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 - `GET /api/mail/konto/google-oauth-status?job_id=` — Status abfragen
 - `GET /api/google-oauth/test` — Credentials-Validierung
 
+### Erledigt (session-ddd, 2026-04-01)
+
+| Feature / Komponente | Status |
+|---|---|
+| Google OAuth health-check nach Login | ✅ Erledigt — `_wizPollGoogleOAuth()` ruft health-check + esLoadMailKonten() nach status=done |
+| "Zu Kira hinzufuegen"-Button im Postfach | ✅ Erledigt — `pfAddFolderToKira()` + "+" Button auf Ordner die noch nicht in sync_ordner |
+| SMTP-Passwort-Auth im Volltest | ✅ Erledigt — `run_full_connection_test()` brancht jetzt zwischen XOAUTH2 + Passwort-Auth |
+
 ### Kai-Aktionen erforderlich
 
 - **Azure Entra:** Calendars.ReadWrite Permission hinzufuegen (dann ist Kalender-Widget voll funktional)
@@ -772,10 +780,9 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ### Bekannte technische Schulden
 
-- `server.py` hat jetzt **19.400+ Zeilen** → server_map.md vor groesserer Arbeit lesen
+- `server.py` hat jetzt **19.600+ Zeilen** → server_map.md vor groesserer Arbeit lesen
 - Zeilen-Angaben in server_map.md sind veraltete ca.-Werte
 - Gmail-IMAP via google_oauth.py: braucht Gmail API aktiviert in Google Cloud Console
-- SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2 fuer Office365)
 - Outlook-Kalender iframe-Embed: nur sinnvoll ohne Entra-Setup
 
 ---
@@ -811,4 +818,4 @@ API-Keys: anthropic_api_key, openai_api_key, openrouter_api_key, github_pat.
 
 ---
 
-*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-03-31 (session-aaa) | 35 Module, 7 DBs, 100 Endpunkte, 23 Tools, 11 Scans*
+*Analyse erstellt 2026-03-30 (session-jj) | Konsolidiert 2026-03-31 (session-xx) | Aktualisiert 2026-04-01 (session-ddd) | 35 Module, 7 DBs, 103 Endpunkte, 23 Tools, 11 Scans*

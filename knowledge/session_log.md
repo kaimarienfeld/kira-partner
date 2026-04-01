@@ -612,3 +612,22 @@
 - session_handoff.json + session_log.md aktualisiert
 
 ---
+
+## 2026-04-01 01:30 -- session-ddd: Verbleibende open_tasks abgearbeitet
+**Auftrag:** Autonome Weiterfuehrung -- alle offenen Posten aus session_handoff.json abarbeiten
+**Status:** erledigt
+
+### Verifiziert (bereits implementiert):
+- Tagesbriefing Dashboard-Widget: build_dashboard() enthaelt briefing_html, refreshBriefing() vorhanden
+- geloeschte_protokoll-Anzeige: esLadeProtokoll() + #es-protokoll-container vorhanden
+- bereinigung_frist_tage + geloeschte_bereinigung_aktiv: Einstellungen-UI vorhanden
+- Mail-Monitor Polling-Intervall: #cfg-mail-intervall Select (2/5/10/15/30/60 Minuten)
+- Kira-FAB draggable: vollstaendige Drag+Corner-Snap Implementierung vorhanden
+
+### Neu implementiert:
+- Google OAuth health-check + esLoadMailKonten() nach Wizard-Erfolg (commit f87c0de)
+- pfAddFolderToKira(): '+'-Button im Postfach-Ordner-Baum fuer nicht-synced Ordner
+- SMTP-Passwort-Auth im Volltest: run_full_connection_test() jetzt auth-methoden-bewusst
+- KIRA_SYSTEM_ANALYSE.md §14: session-ddd Erledigt-Block + Schulden-Update
+
+---
