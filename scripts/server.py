@@ -452,6 +452,13 @@ def _ensure_lexware_tables():
             );
         """)
         db.commit()
+        # Migration A-05: neue Felder fuer lexware_kontakte
+        _existing = {r[1] for r in db.execute("PRAGMA table_info(lexware_kontakte)").fetchall()}
+        for _col, _typ in [("telefon","TEXT"),("mobil","TEXT"),("kundennummer","TEXT"),
+                           ("ustid","TEXT"),("steuernummer","TEXT"),("notiz","TEXT")]:
+            if _col not in _existing:
+                db.execute(f"ALTER TABLE lexware_kontakte ADD COLUMN {_col} {_typ}")
+        db.commit()
     except Exception as _e:
         pass
     finally:
@@ -11195,35 +11202,71 @@ def build_lexware(db):
 
     # ── KONTAKTE Unterbereich ──
     def _kontakt_row(k):
-        return f"""<tr class="lx-tr" onclick="lxKontaktDetail('{esc(k["lexware_id"])}','{esc(k.get("name",""))}')">
-  <td style="font-weight:600">{esc(k.get("name",""))}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("email",""))}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("telefon","") or "—")}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("last_sync",""))}</td>
-  <td>
-    <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxKontaktKira('{esc(k["lexware_id"])}','{esc(k.get("name",""))}')">&#x1F916; Kira</button>
-  </td>
+        typ_raw = ""
+        try:
+            p = json.loads(k.get("payload_json","") or "{{}}")
+            roles = p.get("roles") or {{}}
+            typen = []
+            if roles.get("customer"): typen.append("Kunde")
+            if roles.get("vendor"): typen.append("Lieferant")
+            typ_raw = "/".join(typen) or "Kontakt"
+        except Exception:
+            typ_raw = "Kontakt"
+        return f"""<tr class="lx-tr" onclick="lxKontaktDetail('{esc(k["lexware_id"])}')">
+  <td style="font-weight:600;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{esc(k.get("name",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted);max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{esc(k.get("email",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(k.get("telefon","") or k.get("mobil","") or "—")}</td>
+  <td><span class="lx-chip lx-chip-muted" style="font-size:9px">{esc(typ_raw)}</span></td>
 </tr>"""
-    kontakte_rows = "".join(_kontakt_row(k) for k in kontakte) if kontakte else "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:24px'>Keine Kontakte geladen</td></tr>"
+    def _kontakt_typ(k):
+        p = k.get("payload_json","")
+        try:
+            payload = json.loads(p) if p else {{}}
+        except Exception:
+            payload = {{}}
+        roles = payload.get("roles") or {{}}
+        typen = []
+        if roles.get("customer"): typen.append("Kunde")
+        if roles.get("vendor"): typen.append("Lieferant")
+        return ", ".join(typen) or "Kontakt"
+    kontakte_rows = "".join(_kontakt_row(k) for k in kontakte) if kontakte else "<tr><td colspan='4' style='text-align:center;color:var(--muted);padding:24px'>Keine Kontakte — Bitte synchronisieren.</td></tr>"
     kontakte_html = f"""
-<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-  <input id="lx-kon-search" type="text" placeholder="Suche Name / E-Mail..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-primary btn-xs" onclick="lexSync('kontakte')" title="Kontakte von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
-</div>
-<div style="display:flex;gap:12px">
-  <div style="flex:1;overflow-x:auto">
-  <table class="lx-table">
-    <thead><tr><th>Name / Firma</th><th>E-Mail</th><th>Telefon</th><th>Letzte Sync</th><th></th></tr></thead>
-    <tbody id="lx-kontakte-tbody">{kontakte_rows}</tbody>
-  </table>
+<div class="lx-kon-layout">
+  <!-- Linke Spalte: Liste -->
+  <div class="lx-kon-list-col">
+    <div style="display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <input id="lx-kon-search" type="text" placeholder="&#x1F50D; Suche..." oninput="lxFilterKontakte()" style="flex:1;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;font-size:var(--fs-sm)">
+      <button class="btn btn-sec btn-xs" onclick="lexSync('kontakte')" title="Kontakte von Lexware laden (Lexware &rarr; KIRA)">&#x2190; Sync</button>
+    </div>
+    <div class="lx-table-wrap" style="overflow-x:auto">
+    <table class="lx-table">
+      <thead><tr><th>Name / Firma</th><th>E-Mail</th><th>Tel.</th><th>Typ</th></tr></thead>
+      <tbody id="lx-kontakte-tbody">{kontakte_rows}</tbody>
+    </table>
+    </div>
   </div>
-  <div id="lx-kon-detail" class="lx-detail-panel" style="display:none;width:300px;flex-shrink:0">
-    <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-weight:600;font-size:var(--fs-sm)">Kontakt-Details</div>
-        <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-kon-detail').style.display='none'">&#x2715;</button>
+  <!-- Rechte Spalte: Detail -->
+  <div class="lx-kon-detail-col">
+    <div id="lx-kon-detail-placeholder" class="lx-kon-placeholder">
+      <div class="lx-kon-placeholder-icon">&#x1F465;</div>
+      <div>Kontakt auswaehlen</div>
+    </div>
+    <div id="lx-kon-detail-panel" style="display:none;height:100%;display:flex;flex-direction:column">
+      <div class="lx-kon-detail-head">
+        <div id="lx-kon-detail-name" class="lx-kon-detail-name">—</div>
+        <button class="btn btn-sec btn-xs" id="lx-kon-edit-btn" onclick="lxKonToggleEdit()">Bearbeiten</button>
+        <button class="btn btn-sec btn-xs" onclick="lxKontaktKiraById()">&#x1F916; Kira</button>
       </div>
-      <div id="lx-kon-detail-content" style="font-size:var(--fs-sm)"></div>
+      <div class="lx-kon-sec-nav" id="lx-kon-sec-nav">
+        <button class="lx-kon-sec-btn active" onclick="lxKonShowSec('stamm')">Stammdaten</button>
+        <button class="lx-kon-sec-btn" onclick="lxKonShowSec('adresse')">Adresse</button>
+        <button class="lx-kon-sec-btn" onclick="lxKonShowSec('komm')">Kommunikation</button>
+        <button class="lx-kon-sec-btn" onclick="lxKonShowSec('finanzen')">Finanzen</button>
+        <button class="lx-kon-sec-btn" onclick="lxKonShowSec('notiz')">Notizen</button>
+      </div>
+      <div class="lx-kon-sec-content" id="lx-kon-sec-body">
+        <div style="color:var(--muted)">Lade...</div>
+      </div>
     </div>
   </div>
 </div>"""
@@ -13620,27 +13663,159 @@ function lxBelegKira(lexId, nummer, kontakt) {{
   openKiraWorkspace('lexware_beleg', prompt);
 }}
 
-function lxKontaktDetail(lexId, name) {{
-  const panel = document.getElementById('lx-kon-detail');
-  const content = document.getElementById('lx-kon-detail-content');
-  if(!panel || !content) return;
-  content.innerHTML = '<div style="color:var(--muted)">Lade...</div>';
-  panel.style.display = 'block';
+// Kontakte Detail-Panel (A-06 session-ooo)
+let _lxKonData = null;
+let _lxKonEditMode = false;
+let _lxKonSec = 'stamm';
+
+function lxKontaktDetail(lexId) {{
+  _lxKonEditMode = false;
+  const placeholder = document.getElementById('lx-kon-detail-placeholder');
+  const panel = document.getElementById('lx-kon-detail-panel');
+  const body = document.getElementById('lx-kon-sec-body');
+  const nameEl = document.getElementById('lx-kon-detail-name');
+  // Aktive Zeile markieren
+  document.querySelectorAll('#lx-kontakte-tbody tr.lx-tr').forEach(r => r.classList.remove('lx-selected'));
+  const selRow = document.querySelector('#lx-kontakte-tbody tr.lx-tr[onclick*="' + lexId + '"]');
+  if(selRow) selRow.classList.add('lx-selected');
+  if(placeholder) placeholder.style.display = 'none';
+  if(panel) {{ panel.style.display = 'flex'; panel.style.flexDirection = 'column'; }}
+  if(body) body.innerHTML = '<div style="color:var(--muted)">Lade...</div>';
+  if(nameEl) nameEl.textContent = '...';
   fetch('/api/lexware/kontakt/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
-      const k = d.kontakt || d;
-      content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
-        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(k.name||'-')}}</div>
-        <div><span style="color:var(--muted)">E-Mail:</span> ${{esc_js(k.email||'-')}}</div>
-        <div><span style="color:var(--muted)">Telefon:</span> ${{esc_js(k.telefon||'-')}}</div>
-        <div><span style="color:var(--muted)">Letzte Sync:</span> ${{esc_js(k.last_sync||'-')}}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-primary btn-xs" onclick="lxKontaktKira('${{esc_js(k.lexware_id)}}','${{esc_js(k.name||'-')}}')">&#x1F916; Kira</button>
-        </div>
-      </div>`;
+      _lxKonData = d;
+      if(nameEl) nameEl.textContent = d.name || '—';
+      const editBtn = document.getElementById('lx-kon-edit-btn');
+      if(editBtn) editBtn.textContent = 'Bearbeiten';
+      _lxKonEditMode = false;
+      lxKonShowSec(_lxKonSec);
     }}).catch(e => {{
-      if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
+      if(body) body.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
     }});
+}}
+
+function lxKonShowSec(sec) {{
+  _lxKonSec = sec;
+  document.querySelectorAll('.lx-kon-sec-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(sec.substring(0,4))));
+  const body = document.getElementById('lx-kon-sec-body');
+  if(!body || !_lxKonData) return;
+  const k = _lxKonData;
+  let payload = {{}};
+  try {{ payload = JSON.parse(k.payload_json||'{{}}'); }} catch(e) {{}}
+  const edit = _lxKonEditMode;
+  const fld = (lbl, val, key, full, inputType) => {{
+    const v = edit
+      ? `<input type="${{inputType||'text'}}" data-key="${{key}}" value="${{esc_js(String(val||''))}}" placeholder="${{lbl}}">`
+      : `<span class="lx-kon-field-val">${{val ? (inputType==='email' ? `<a href="mailto:${{esc_js(val)}}">${{esc_js(val)}}</a>` : inputType==='tel' ? `<a href="tel:${{esc_js(val)}}">${{esc_js(val)}}</a>` : esc_js(String(val))) : '<span style="color:var(--muted)">—</span>'}}</span>`;
+    return `<div class="lx-kon-field${{full?' lx-kon-field-full':''}}"><div class="lx-kon-field-lbl">${{lbl}}</div>${{v}}</div>`;
+  }};
+  const fldTxt = (lbl, val, key) => {{
+    const v = edit
+      ? `<textarea data-key="${{key}}">${{esc_js(String(val||''))}}</textarea>`
+      : `<span class="lx-kon-field-val">${{val ? esc_js(String(val)) : '<span style="color:var(--muted)">—</span>'}}</span>`;
+    return `<div class="lx-kon-field lx-kon-field-full"><div class="lx-kon-field-lbl">${{lbl}}</div>${{v}}</div>`;
+  }};
+  const addr = (payload.addresses||{{}}).billing || [];
+  const a = addr[0] || {{}};
+  const company = payload.company || {{}};
+  const person = payload.person || {{}};
+  const phones = payload.phoneNumbers || {{}};
+  const emails = payload.emailAddresses || {{}};
+  const contacts = company.contactPersons || [];
+  let html = '';
+  if(sec === 'stamm') {{
+    const ansprechpartner = contacts.map(c => [c.salutation,c.titlePrefix,c.firstName,c.lastName].filter(Boolean).join(' ')).join(', ');
+    html = `<div class="lx-kon-fields${{edit?' lx-kon-edit':''}}">
+      ${{fld('Firmenname', company.name||'', 'company_name', false)}}
+      ${{fld('Kundenr.', k.kundennummer||'', 'kundennummer', false)}}
+      ${{fld('Vorname', person.firstName||'', 'person_firstName', false)}}
+      ${{fld('Nachname', person.lastName||'', 'person_lastName', false)}}
+      ${{fld('Anrede', person.salutation||'', 'person_salutation', false)}}
+      ${{fld('Titel', person.titlePrefix||'', 'person_title', false)}}
+      ${{fld('Ansprechpartner', ansprechpartner, '', true)}}
+    </div>`;
+  }} else if(sec === 'adresse') {{
+    html = `<div class="lx-kon-fields${{edit?' lx-kon-edit':''}}">
+      ${{fld('Strasse', a.street||'', 'addr_street', true)}}
+      ${{fld('PLZ', a.zip||'', 'addr_zip', false)}}
+      ${{fld('Stadt', a.city||'', 'addr_city', false)}}
+      ${{fld('Land', a.countryCode||'', 'addr_country', false)}}
+      ${{fld('Zusatz', a.supplement||'', 'addr_supplement', true)}}
+    </div>`;
+  }} else if(sec === 'komm') {{
+    const emailBiz = (emails.business||[])[0]||'';
+    const emailPriv = (emails.private||[])[0]||'';
+    const telBiz = (phones.business||[])[0]||'';
+    const telMob = (phones.mobile||[])[0]||'';
+    const telFax = (phones.fax||[])[0]||'';
+    html = `<div class="lx-kon-fields${{edit?' lx-kon-edit':''}}">
+      ${{fld('E-Mail (Geschaeft)', emailBiz, 'email_biz', true, 'email')}}
+      ${{fld('E-Mail (Privat)', emailPriv, 'email_priv', true, 'email')}}
+      ${{fld('Telefon (Geschaeft)', telBiz, 'tel_biz', false, 'tel')}}
+      ${{fld('Mobil', telMob, 'tel_mob', false, 'tel')}}
+      ${{fld('Fax', telFax, 'tel_fax', false, 'tel')}}
+    </div>`;
+  }} else if(sec === 'finanzen') {{
+    html = `<div class="lx-kon-fields${{edit?' lx-kon-edit':''}}">
+      ${{fld('USt-ID', k.ustid||company.vatRegistrationId||'', 'ustid', false)}}
+      ${{fld('Steuernummer', k.steuernummer||company.taxNumber||'', 'steuernummer', false)}}
+      ${{fld('Kundennummer', k.kundennummer||'', 'kundennummer', false)}}
+      ${{fld('Lieferantennr.', (payload.roles||{{}}).vendor ? String((payload.roles.vendor||{{}}).number||'') : '', '', false)}}
+    </div>`;
+  }} else if(sec === 'notiz') {{
+    html = `<div class="lx-kon-fields${{edit?' lx-kon-edit':''}}">
+      ${{fldTxt('Notiz', k.notiz||payload.note||'', 'notiz')}}
+      ${{fld('Letzte Sync', k.last_sync||'', '', true)}}
+    </div>`;
+  }}
+  if(edit) {{
+    html += `<div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-sec btn-xs" onclick="lxKonSaveEdit()">Speichern</button>
+      <button class="btn btn-sec btn-xs" onclick="lxKonToggleEdit()">Abbrechen</button>
+    </div>`;
+  }}
+  body.innerHTML = html;
+}}
+
+function lxKonToggleEdit() {{
+  _lxKonEditMode = !_lxKonEditMode;
+  const btn = document.getElementById('lx-kon-edit-btn');
+  if(btn) btn.textContent = _lxKonEditMode ? 'Abbrechen' : 'Bearbeiten';
+  lxKonShowSec(_lxKonSec);
+}}
+
+function lxKonSaveEdit() {{
+  if(!_lxKonData) return;
+  const body = document.getElementById('lx-kon-sec-body');
+  if(!body) return;
+  const patch = {{}};
+  body.querySelectorAll('[data-key]').forEach(el => {{
+    const k = el.dataset.key;
+    if(k) patch[k] = el.value;
+  }});
+  fetch('/api/lexware/kontakt/' + encodeURIComponent(_lxKonData.lexware_id) + '/update', {{
+    method: 'POST',
+    headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify(patch)
+  }}).then(r => r.json()).then(d => {{
+    if(d.ok) {{
+      showToast('Kontakt gespeichert');
+      Object.assign(_lxKonData, d.kontakt || patch);
+      _lxKonEditMode = false;
+      const nameEl = document.getElementById('lx-kon-detail-name');
+      if(nameEl && _lxKonData.name) nameEl.textContent = _lxKonData.name;
+      const btn = document.getElementById('lx-kon-edit-btn');
+      if(btn) btn.textContent = 'Bearbeiten';
+      lxKonShowSec(_lxKonSec);
+      _rtlog('ui','kontakt_gespeichert','Lexware-Kontakt bearbeitet',{{id:_lxKonData.lexware_id,status:'ok'}});
+    }} else showToast(d.error||'Fehler', true);
+  }}).catch(e => showToast('Fehler: '+e, true));
+}}
+
+function lxKontaktKiraById() {{
+  if(!_lxKonData) return;
+  lxKontaktKira(_lxKonData.lexware_id, _lxKonData.name);
 }}
 
 function lxKontaktKira(lexId, name) {{
@@ -18384,6 +18559,7 @@ a:hover{text-decoration:underline;}
 .lx-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
 .lx-tr{cursor:pointer;transition:background .1s;}
 .lx-tr:hover{background:var(--bg-raised);}
+.lx-tr.lx-selected{background:rgba(79,125,249,.08);}
 /* KPI Kacheln */
 .lx-kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
 .lx-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;min-width:90px;flex:1;transition:border-color .15s;}
@@ -18398,6 +18574,28 @@ a:hover{text-decoration:underline;}
 .lx-signal-item:last-child{border-bottom:none;}
 /* Detail-Flaeche */
 .lx-detail-panel{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px;}
+/* Kontakte 2-Spalten-Layout (A-05/A-06 session-ooo) */
+.lx-kon-layout{display:flex;gap:0;height:calc(100vh - 220px);min-height:380px;}
+.lx-kon-list-col{width:42%;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;}
+.lx-kon-list-col .lx-table-wrap{flex:1;overflow-y:auto;}
+.lx-kon-detail-col{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.lx-kon-detail-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0;}
+.lx-kon-detail-name{font-weight:700;font-size:var(--fs-md);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lx-kon-sec-nav{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;background:var(--bg-raised);}
+.lx-kon-sec-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 12px;cursor:pointer;font-size:var(--fs-xs);font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s;}
+.lx-kon-sec-btn:hover{color:var(--text);}
+.lx-kon-sec-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.lx-kon-sec-content{flex:1;overflow-y:auto;padding:14px 16px;}
+.lx-kon-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;}
+.lx-kon-field{display:flex;flex-direction:column;gap:3px;}
+.lx-kon-field-lbl{font-size:var(--fs-xs);color:var(--muted);font-weight:500;}
+.lx-kon-field-val{font-size:var(--fs-sm);color:var(--text);min-height:20px;}
+.lx-kon-field-full{grid-column:1/-1;}
+.lx-kon-field-val a{color:var(--accent);text-decoration:none;}
+.lx-kon-edit input,.lx-kon-edit textarea{width:100%;box-sizing:border-box;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:var(--fs-sm);font-family:inherit;}
+.lx-kon-edit textarea{resize:vertical;min-height:60px;}
+.lx-kon-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:8px;font-size:var(--fs-sm);}
+.lx-kon-placeholder-icon{font-size:32px;opacity:.3;}
 /* Status-Chips */
 .lx-st-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
 .lx-st-open{background:rgba(245,158,11,.12);color:#b45309;}
@@ -19446,7 +19644,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             lex_id = urllib.parse.unquote(self.path.split('/api/lexware/beleg/')[1])
             self._api_lexware_beleg(lex_id)
 
-        elif self.path.startswith('/api/lexware/kontakt/'):
+        elif self.path.startswith('/api/lexware/kontakt/') and not self.path.endswith('/update'):
             lex_id = urllib.parse.unquote(self.path.split('/api/lexware/kontakt/')[1])
             self._api_lexware_kontakt(lex_id)
 
@@ -25363,6 +25561,48 @@ def _handle_lexware_post(handler, path, body):
             client = get_client(test_cfg)
             result = client.test_connection()
             handler._json(result)
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/kontakt/{id}/update — Kontakt lokal aktualisieren (A-06 session-ooo)
+    if path.startswith('/api/lexware/kontakt/') and path.endswith('/update'):
+        lex_id = urllib.parse.unquote(path.split('/api/lexware/kontakt/')[1].replace('/update',''))
+        try:
+            db = get_db()
+            _ensure_lexware_tables()
+            row = db.execute("SELECT * FROM lexware_kontakte WHERE lexware_id=?", (lex_id,)).fetchone()
+            if not row:
+                handler._json({"ok": False, "error": "Kontakt nicht gefunden"})
+                db.close()
+                return True
+            # Felder aktualisieren (nur bekannte, sichere Felder)
+            _safe = {"kundennummer","ustid","steuernummer","notiz","telefon","mobil"}
+            updates = {k: v for k, v in body.items() if k in _safe}
+            # Adressfelder aus addr_* Keys zusammenbauen
+            addr_keys = {k: v for k, v in body.items() if k.startswith("addr_")}
+            if addr_keys:
+                try:
+                    existing_addr = json.loads(row["adresse_json"] or "{}")
+                    billing = existing_addr.get("billing", [{}])
+                    if not billing: billing = [{}]
+                    a = dict(billing[0])
+                    if "addr_street" in addr_keys: a["street"] = addr_keys["addr_street"]
+                    if "addr_zip" in addr_keys: a["zip"] = addr_keys["addr_zip"]
+                    if "addr_city" in addr_keys: a["city"] = addr_keys["addr_city"]
+                    if "addr_country" in addr_keys: a["countryCode"] = addr_keys["addr_country"]
+                    if "addr_supplement" in addr_keys: a["supplement"] = addr_keys["addr_supplement"]
+                    existing_addr["billing"] = [a]
+                    updates["adresse_json"] = json.dumps(existing_addr, ensure_ascii=False)
+                except Exception: pass
+            if updates:
+                set_clause = ", ".join(f"{k}=?" for k in updates)
+                vals = list(updates.values()) + [lex_id]
+                db.execute(f"UPDATE lexware_kontakte SET {set_clause} WHERE lexware_id=?", vals)
+                db.commit()
+            updated = dict(db.execute("SELECT * FROM lexware_kontakte WHERE lexware_id=?", (lex_id,)).fetchone())
+            db.close()
+            handler._json({"ok": True, "kontakt": updated})
         except Exception as e:
             handler._json({"ok": False, "error": str(e)})
         return True

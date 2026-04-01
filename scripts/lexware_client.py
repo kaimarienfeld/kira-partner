@@ -550,14 +550,20 @@ class LexwareClient:
                     p = k["person"]
                     name = f"{p.get('firstName','')} {p.get('lastName','')}".strip()
                 # E-Mail aus erster Kontaktperson oder Email-Adresse
-                email = ""
-                for addr in k.get("emailAddresses", {}).get("business", []):
-                    email = addr
-                    break
+                phones = k.get("phoneNumbers") or {}
+                email = next(iter(k.get("emailAddresses", {}).get("business", [])), "") or \
+                        next(iter(k.get("emailAddresses", {}).get("private", [])), "")
+                company = k.get("company") or {}
                 row = {
                     "lexware_id":   lex_id,
                     "name":         name,
                     "email":        email,
+                    "telefon":      next(iter(phones.get("business", [])), ""),
+                    "mobil":        next(iter(phones.get("mobile", [])), ""),
+                    "kundennummer": str((k.get("roles") or {}).get("customer", {}).get("number", "") or ""),
+                    "ustid":        company.get("vatRegistrationId", "") or "",
+                    "steuernummer": company.get("taxNumber", "") or "",
+                    "notiz":        k.get("note", "") or "",
                     "adresse_json": json.dumps(k.get("addresses", {}), ensure_ascii=False),
                     "last_sync":    datetime.now().isoformat(timespec="seconds"),
                     "payload_json": json.dumps(k, ensure_ascii=False),
@@ -565,7 +571,9 @@ class LexwareClient:
                 if existing:
                     db.execute("""
                         UPDATE lexware_kontakte SET
-                            name=:name, email=:email, adresse_json=:adresse_json,
+                            name=:name, email=:email, telefon=:telefon, mobil=:mobil,
+                            kundennummer=:kundennummer, ustid=:ustid, steuernummer=:steuernummer,
+                            notiz=:notiz, adresse_json=:adresse_json,
                             last_sync=:last_sync, payload_json=:payload_json
                         WHERE lexware_id=:lexware_id
                     """, row)
@@ -573,9 +581,11 @@ class LexwareClient:
                 else:
                     db.execute("""
                         INSERT INTO lexware_kontakte
-                            (lexware_id, name, email, adresse_json, last_sync, payload_json)
+                            (lexware_id, name, email, telefon, mobil, kundennummer, ustid,
+                             steuernummer, notiz, adresse_json, last_sync, payload_json)
                         VALUES
-                            (:lexware_id, :name, :email, :adresse_json, :last_sync, :payload_json)
+                            (:lexware_id, :name, :email, :telefon, :mobil, :kundennummer, :ustid,
+                             :steuernummer, :notiz, :adresse_json, :last_sync, :payload_json)
                     """, row)
                     stats["neu"] += 1
             db.commit()
