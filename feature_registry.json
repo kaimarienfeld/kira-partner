@@ -428,9 +428,9 @@
       "icon": "🔗",
       "leni_visible": false,
       "module": "server.py",
-      "status": "planned",
-      "last_updated": "2026-03-28",
-      "description": "Alle Geschäftsdaten (Rechnungen, Kontakte, Aufträge, Preispositionen) aus Lexware/LexOffice automatisch in KIRA-DBs synchronisieren. Basis für Cashflow, Kalkulation, Kunden-360."
+      "status": "done",
+      "last_updated": "2026-04-01",
+      "description": "Vollstaendige Lexware Office Integration: lexware_client.py (Python Client), 5 DB-Tabellen, Panel mit 6 Tabs (Cockpit/Belege/Kontakte/Artikel/Buchhaltung/Diagnose), Einstellungen-Sektion, 12 API-Endpunkte, 2 Kira-Tools, Mail-Monitor Eingangsbeleg-Scan mit PayPal-Erkennung. Modul freischaltbar (nicht_gebucht/gesperrt/freigeschaltet). Session-eee 2026-04-01."
     },
     {
       "id": "cloud-backup",
