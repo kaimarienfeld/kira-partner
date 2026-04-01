@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-04-01 — Session-Ende (session-ooo — Kontext-Fortsetzung)
+
+**Erledigt:**
+- AUFGABE-5 (A-07): Mikro-Logging aktiviert — _rtlog in saveSettings/lexSync/lexEsSync/esMkAbrufen/SMTP/IMAP, rtLogCopyAll(), Filter-Typen mail/hintergrund/tour (commit f052320)
+- AUFGABE-2 (A-02+A-03): Lexware Seitenleisten-Navigation — lx-body/lx-sidebar, border-left Aktiv-Indikator, lx-nav-sep (commit 35f434d)
+- AUFGABE-4 (A-05+A-06): Lexware Kontakte — DB-Migration, 6 neue Felder, 2-Spalten-Layout, 5 Sektions-Tabs, Bearbeitungsmodus + PUT-Endpoint (commit 36f402f)
+- AUFGABE-10 (A-12): Dataverse Tooltips — ? Help-Buttons, dvHelp() Modal-System, 5-Schritt-Einrichtungsassistent, dvTestDedupField (commit e0e5841)
+- AUFGABE-7 (A-09): Cloudflare Tunnel — 4-Schritt-Anleitung, 1-Klick-Download, PowerShell-Befehl-Generator, Status-Check (commit 9e899a1)
+- Alle Tracking-Dateien aktualisiert: 15/16 Block-A-Tasks erledigt
+
+**Offen geblieben:** A-10 (Diagnose/Test Fehler-Bericht-Button ueberall)
+**Status:** erledigt
+
+---
+
 ## 2026-04-01 18:45 — Session-Ende (session-jjj)
 
 **Erledigt:** Admin-Komplett-Umbau — 3-Gruppen-Nav (ZUGANGSDATEN/DIENSTE/SYSTEM), SMTP 17 Provider-Presets, API-Schluessel Sub-Cards mit Integrationen (Lexware+GitHub), Pfade mit Ordner-Picker, Cloudflare-Tunnel-Karte im System-Bereich. Einstellungen: Lexware/Archiv/Backup disabled + Im-Admin-Buttons. Mobile-Sektion: Externer-Zugang-Info-Block. Commit c64f205.
@@ -772,3 +787,10 @@
 **Erledigt:** Alle 4 Punkte aus Kais Auftrag implementiert und committed
 **Offen geblieben:** Playwright-Test der neuen Dataverse-Sektion; Kai muss org_url (/v1 korrekt) + Dataverse-Credentials einpflegen
 **Status:** erledigt
+
+---
+
+## 2026-04-01 — Session-Start: UI-Verbesserungen & Bug-Fixes Nachtlauf
+**Auftrag:** Strukturierte Abarbeitung aller Punkte aus Kai-Feedback 2026-04-01 (session-ooo). 12 Aufgaben (A-00 bis A-11) in Prioritaetsreihenfolge. Pflichtdateien gelesen: AGENT.md, session_handoff.json, KIRA_MASTERCHECKLISTE_LAUFEND.md, change_log.jsonl (Stichwortsuche archiv/admin_sender/button/sync/log). config.json gecheckt: mail_archiv.pfad korrekt gesetzt. Plan-Agent intern (change_log.jsonl Auswertung): A-00 Pfad in config.json vorhanden aber saveSettings() ueberschreibt pfad durch disabled Input. A-11 Tour-System nicht vorhanden. A-09 blaue Buttons nicht vorher behoben. A-05 Mikro-Logging war vorhanden (runtime_log.py) aber UI-Click-Events nicht aktiv.
+**Status:** offen
+
