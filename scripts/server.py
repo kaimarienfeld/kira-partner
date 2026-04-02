@@ -12104,15 +12104,6 @@ def build_lexware(db):
     <tbody id="lx-belege-tbody">{belege_rows}</tbody>
   </table>
   </div>
-  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:380px;flex-shrink:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
-    <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding-bottom:8px;border-bottom:1px solid var(--border);z-index:1">
-        <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
-        <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-bel-detail').style.display='none'">&#x2715;</button>
-      </div>
-      <div id="lx-bel-detail-content" style="font-size:var(--fs-sm)"></div>
-    </div>
-  </div>
 </div>"""
 
     # ── ZAHLUNGEN Unterbereich (In Planung) ──
@@ -12490,7 +12481,17 @@ def build_lexware(db):
         active = " style='display:block'" if sec_id == "cockpit" else " style='display:none'"
         sections_html += f'<div class="lx-sec-content" id="lx-sec-{sec_id}" data-lxsec="{sec_id}"{active}>{sec_html}</div>'
 
-    return f"""<div class="lx-module">{header_html}<div class="lx-body"><div class="lx-sidebar">{nav_html}</div><div class="lx-content"><div class="lx-sec-wrap">{sections_html}</div></div></div></div>"""
+    # Detail-Panel als Geschwister von lx-sec-wrap (nicht darin!) — bleibt sticky beim Scrollen
+    detail_panel = """<div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:380px;overflow-y:auto;border-left:1px solid var(--border);background:var(--bg)">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding-bottom:8px;border-bottom:1px solid var(--border);z-index:1">
+        <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
+        <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-bel-detail').style.display='none'">&#x2715;</button>
+      </div>
+      <div id="lx-bel-detail-content" style="font-size:var(--fs-sm)"></div>
+    </div>
+  </div>"""
+    return f"""<div class="lx-module">{header_html}<div class="lx-body"><div class="lx-sidebar">{nav_html}</div><div class="lx-content"><div class="lx-sec-wrap">{sections_html}</div>{detail_panel}</div></div></div>"""
 
 
 def _build_lexware_tabs_preview():
@@ -14716,7 +14717,7 @@ function lxBelegDetail(lexId) {{
       const det = b.detail || {{}};
       const pl = b.payload || {{}};
       const st_labels = {{open:'Offen',overdue:'Überfällig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert',accepted:'Angenommen',rejected:'Abgelehnt',paidoff:'Abgezahlt',sepadebit:'SEPA-Lastschrift'}};
-      const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung',orderconfirmation:'Auftragsbestaetigung',deliverynote:'Lieferschein'}};
+      const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung',orderconfirmation:'Auftragsbestätigung',deliverynote:'Lieferschein'}};
       function _fmtDat(d){{ if(!d||String(d).length<10) return d||'—'; var p=String(d).substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
       function _fmtEur(v,w){{ return parseFloat(v||0).toLocaleString('de-DE',{{minimumFractionDigits:2,maximumFractionDigits:2}})+' '+(w||'EUR'); }}
       function _esc(s){{ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }}
@@ -19880,7 +19881,7 @@ a:hover{text-decoration:underline;}
 .lx-nav-sub-btn:hover{color:var(--text);background:var(--bg-card);}
 .lx-nav-sub-btn.active{color:var(--accent);font-weight:600;border-left-color:var(--accent);background:rgba(79,125,249,.04);}
 /* Content */
-.lx-content{flex:1;overflow:hidden;padding:0;display:flex;flex-direction:column;}
+.lx-content{flex:1;overflow:hidden;padding:0;display:flex;flex-direction:row;}
 .lx-sec-wrap{flex:1;overflow-y:auto;padding:16px 20px;min-height:0;}
 .lx-sec-content{display:none;flex-direction:column;flex:1;min-height:0;}
 /* Tabellen */
@@ -19903,7 +19904,7 @@ a:hover{text-decoration:underline;}
 .lx-signal-item{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);color:var(--text);font-size:var(--fs-xs);line-height:1.4;}
 .lx-signal-item:last-child{border-bottom:none;}
 /* Detail-Flaeche */
-.lx-detail-panel{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px;}
+.lx-detail-panel{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;flex-shrink:0;}
 /* Kontakte 2-Spalten-Layout (A-05/A-06 session-ooo) */
 .lx-kon-layout{display:flex;gap:0;height:calc(100vh - 220px);min-height:380px;}
 .lx-kon-list-col{width:42%;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;}
