@@ -177,7 +177,8 @@
     "admin-system-pfade-ordnerpicker-admPickFolder",
     "admin-cloudflare-tunnel-card-externer-zugang",
     "einstellungen-admin-goto-buttons-keine-doppelten-felder",
-    "mobil-sektion-externer-zugang-info-admin-link"
+    "mobil-sektion-externer-zugang-info-admin-link",
+    "session-ttt (2026-04-02): Mail-Verbindungs-Fixes Komplett. (1) C-08 ARCHIVER_DIR kritischer Pfad-Bug: config.json → mail_archiv.pfad zeigte auf .../Mail Archiv/Archiv (Unterordner), raumkult_config.json + tokens/ liegen aber im Parent. mail_monitor.py prueft jetzt Parent-Ordner automatisch → 5/6 Konten status=ok nach Neustart. (2) C-09 MS-OAuth Konto-Liste: _wizPollOAuth() done-Branch ergaenzt mit esLoadMailKonten()-Aufruf nach 3s Delay. (3) C-10 Reconnect-Flow: 'Konto bereits vorhanden'-Fehler setzt jetzt automatisch isReconnect=true statt abzubrechen. (4) C-11 SMTP-Migration: _migrate_konto_smtp() + migrate_all_smtp_settings() in mail_monitor.py — fehlende smtp_server/port/ssl aus Provider-Defaults ergaenzt, wird beim Server-Start ausgefuehrt. (5) C-12 Case-insensitive Email-Lookup in check_account_health() + run_full_connection_test() + neues_konto Duplikat-Check. (6) C-13 Admin SMTP Status-Badge: adm-smtp-status-badge im Admin-Header, 3 Zustaende (verbunden/ungetestet/nicht konfiguriert), letzter_test_ok in config.json via POST /api/admin/save section=smtp_test_ok persistiert. (7) C-14 Quill CDN-Warnung: quill.min.js + quill.snow.css lokal nach scripts/static/ kopiert, neuer /static/ Route-Handler in do_GET. Commit: f0cb6a4."
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -194,7 +195,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
   ],
-  "next_step": "Server laeuft. Block-A 16/16. Block-C 1/1. Block-D: D-04..D-10 fertig, D-11 (Partner-View Tour) offen. Empfohlen: Kai-TODO-DOCX erstellen (Ausgabe-Ordner) + KIRA_SYSTEM_ANALYSE.md Aktualisierung. Block-B Kai-Aktionen: B-01 Cloudflare, B-02 Azure Calendars.ReadWrite, B-03 WhatsApp Token, B-04 Leni-Draft Passwort.",
+  "next_step": "Server laeuft. Block-A 16/16. Block-C 14/14 (C-08..C-14 mit session-ttt behoben). Block-D: D-04..D-10 fertig, D-11 (Partner-View Tour) offen. Empfohlen naechster Schritt: Block-B Kai-Aktionen (B-01 Cloudflare, B-02 Azure Calendars.ReadWrite, B-03 WhatsApp Token, B-04 Leni-Draft Passwort) ODER Belege-Sync Fehler-Details API-Erweiterung.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

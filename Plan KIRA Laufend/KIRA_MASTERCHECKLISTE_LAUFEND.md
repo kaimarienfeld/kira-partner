@@ -336,6 +336,75 @@
 **Fix:** Beide Stellen (Zeile 17567 + 17594) auf `esShowSec('mail')` korrigiert.
 **Behoben am:** 2026-04-02
 
+### C-08 — ARCHIVER_DIR falscher Pfad: OAuth-Tokens nicht gefunden nach Server-Neustart
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `config.json → mail_archiv.pfad` zeigte auf `.../Mail Archiv/Archiv` (Unterordner).
+  `mail_monitor.py` leitete daraus `ARCHIVER_DIR`, `TOKEN_DIR` und `ARCHIVER_CFG` ab.
+  Tatsaechlicher Speicherort: `raumkult_config.json` und `tokens/` liegen im Elternordner
+  `.../Mail Archiv/`. Folge: Alle Tokens wurden beim Start nicht gefunden → scheinbar verloren.
+**Fix:** `mail_monitor.py` prueft jetzt ob `raumkult_config.json` im Parent-Ordner liegt und
+  korrigiert `ARCHIVER_DIR` automatisch. 5/6 Konten zeigen nach Neustart `status=ok`.
+**Behoben am:** 2026-04-02
+
+### C-09 — Microsoft OAuth: Konto erscheint nach Login nicht in der Liste
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `_wizPollOAuth()` done-Branch rief `esLoadMailKonten()` nicht auf nach Abschluss.
+  Liste blieb veraltet bis manuelles Neu-Laden.
+**Fix:** `setTimeout(()=>{{if(typeof esLoadMailKonten==='function')esLoadMailKonten();}},3000);`
+  im done-Branch von `_wizPollOAuth()` ergaenzt (analog zu Google-OAuth-Flow).
+**Behoben am:** 2026-04-02
+
+### C-10 — Microsoft OAuth: "Konto bereits vorhanden" blockiert Reconnect-Flow
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** Wizard zeigte Fehler "Konto bereits vorhanden" und blieb stehen wenn das
+  Konto bereits in `raumkult_config.json` eingetragen war (Reconnect-Szenario).
+**Fix:** Wenn `saved.error` den String "bereits vorhanden" enthaelt und `!_wiz.isReconnect`,
+  wird `_wiz.isReconnect=true` automatisch gesetzt und der Flow weitergemacht.
+**Behoben am:** 2026-04-02
+
+### C-11 — Bestehende Mail-Konten ohne smtp_server: SMTP-Test schlug fehl
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** Aeltere Konten in `raumkult_config.json` hatten kein `smtp_server`-Feld.
+  SMTP-Test meldete "Konto nicht gefunden" oder verwendete leeren Server-String.
+**Fix:** `_migrate_konto_smtp()` + `migrate_all_smtp_settings()` in `mail_monitor.py` ergaenzt.
+  Wird beim Server-Start automatisch aufgerufen (run_server()). Alle 5 aktiven Konten
+  erhalten jetzt `smtp.office365.com:587` als Default.
+**Behoben am:** 2026-04-02
+
+### C-12 — Health-Check Konto-Suche case-sensitive (Email-Gross-/Kleinschreibung)
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `check_account_health()` und `run_full_connection_test()` suchten Konto
+  per `k["email"] == email_addr` (exakter Vergleich). Kleinschreibung-Unterschied → Konto nicht gefunden.
+  Duplikat-Check in `neues_konto`-Handler ebenfalls case-sensitive.
+**Fix:** Alle drei Stellen auf `.lower()`-Vergleich umgestellt.
+**Behoben am:** 2026-04-02
+
+### C-13 — Admin SMTP: Kein persistenter Verbindungsstatus-Indikator
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** Admin > E-Mail SMTP zeigte keinen Status ob SMTP getestet/verbunden war.
+  Nach Server-Neustart kein Hinweis ob Test zuletzt erfolgreich war.
+**Fix:** Badge `adm-smtp-status-badge` im Admin-Header. `admLoadData()` liest `letzter_test_ok`
+  aus `config.json → email_notification`. Drei Zustaende: gruenes "Verbunden" / gelbes "Ungetestet"
+  / graues "Nicht konfiguriert". Nach erfolgreichem Test: Badge sofort aktualisiert + Timestamp
+  via POST `/api/admin/save` mit `section='smtp_test_ok'` in `config.json` gespeichert.
+**Behoben am:** 2026-04-02
+
+### C-14 — Quill CDN-Ladung loest Browser-Sicherheitswarnung aus
+**Status:** 🐛✅ Behoben (session-ttt, commit f0cb6a4)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** Quill.js v1.3.7 wurde von `cdn.quilljs.com` geladen. Browser-Extension
+  zeigte Warnung "nicht autorisiertes Bibliotheken-Flag" (externe CDN-Anfrage von localhost-App).
+**Fix:** Quill `quill.min.js` (216 KB) und `quill.snow.css` (24 KB) nach `scripts/static/`
+  kopiert. Neuer `/static/` Route-Handler in `do_GET`. HTML-Loader aendert `src`/`href`
+  auf `/static/quill.min.js` bzw. `/static/quill.snow.css`.
+**Behoben am:** 2026-04-02
+
 ---
 
 ## BLOCK D — Zukunft / Spaetere Sessions
@@ -384,14 +453,15 @@
 |---------|--------|----------|-------|-----------|------------|
 | Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
-| Block C (Laufend) | 7 | 7 | 0 | 0 | 0 |
+| Block C (Laufend) | 14 | 14 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **38** | **30** | **1** | **0** | **4** |
+| **Gesamt** | **45** | **37** | **1** | **0** | **4** |
 
-> Block-A 16/16 komplett. Block-C 7/7 (C-01..C-07 alle behoben).
+> Block-A 16/16 komplett. Block-C 14/14 (C-01..C-14 alle behoben).
 > session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
 > Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
 > session-sss: C-02..C-07 (Lexware Full-Width, Chip, Sync-Pagination, SMTP-Admin, GitHub-Token, esNavTo).
+> session-ttt: C-08..C-14 (ARCHIVER_DIR-Pfad, OAuth-Konto-Liste, Reconnect-Flow, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN).
 
 ---
 
@@ -409,6 +479,7 @@
 | 2026-04-01 | session-ooo (Fortsetzung): A-02/03/05/06/09/12 erledigt — alle AUFGABEN abgeschlossen |
 | 2026-04-01 | session-rrr: C-01 f-string ERR_EMPTY_RESPONSE Crash behoben (3 Tour-Button-Stellen) |
 | 2026-04-02 | session-sss: C-02..C-07 eingetragen + behoben (Lexware Full-Width/Chip/Sync, SMTP-Admin, GitHub-Token, esNavTo) |
+| 2026-04-02 | session-ttt: C-08..C-14 eingetragen + behoben (ARCHIVER_DIR-Pfad, OAuth-Liste, Reconnect, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN) |
 
 ---
 
