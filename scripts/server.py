@@ -19338,15 +19338,21 @@ function _pollServerUpdate() {{
       banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 2px 12px rgba(220,38,38,.3);';
       banner.innerHTML = '<span style="font-size:18px">&#x26A0;</span>'
         + '<span>Server-Neustart erforderlich — Geändert: ' + files + '</span>'
-        + '<button onclick="location.reload()" style="background:#fff;color:#dc2626;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">&#x21bb; Seite neu laden</button>'
-        + '<span style="font-size:11px;opacity:.8">(Server muss manuell neu gestartet werden)</span>';
+        + '<button onclick="var b=document.getElementById(\\x27restart-banner\\x27);if(b)b.remove();var ma=document.querySelector(\\x27.main-area\\x27);if(ma)ma.style.marginTop=\\x27\\x27;var sb=document.querySelector(\\x27.sidebar\\x27);if(sb)sb.style.top=\\x27\\x27;" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">&#x2715; Ausblenden</button>'
+        + '<span style="font-size:11px;opacity:.8">(Server manuell neu starten, dann Seite laden)</span>';
       document.body.prepend(banner);
-      // Alle Panels nach unten schieben
       var ma = document.querySelector('.main-area');
       if(ma) ma.style.marginTop = '42px';
       var sb = document.querySelector('.sidebar');
       if(sb) sb.style.top = '42px';
-      showToast('⚠ Server-Code wurde geändert — Neustart erforderlich!', 'fehler');
+      // Toast nur einmal pro Browser-Session
+      if(!sessionStorage.getItem('_kiraRestartNotified')) {{
+        showToast('Server-Code wurde geändert — Neustart erforderlich!', 'fehler');
+        sessionStorage.setItem('_kiraRestartNotified', '1');
+      }}
+    }} else if(!d.restart_needed) {{
+      // Server wurde neu gestartet — State zuruecksetzen
+      sessionStorage.removeItem('_kiraRestartNotified');
     }}
   }}).catch(()=>{{}});
 }}
