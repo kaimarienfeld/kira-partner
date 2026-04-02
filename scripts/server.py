@@ -1625,6 +1625,7 @@ def build_postfach():
           <span class="pf-state-chip pf-chip-html" id="pf-chip-html" style="display:none">HTML</span>
           <span class="pf-state-chip pf-chip-text" id="pf-chip-text" style="display:none">Nur Text</span>
           <span class="pf-state-chip pf-chip-blocked" id="pf-chip-blocked" style="display:none">Externe Bilder blockiert</span>
+          <button id="pf-btn-lexware" onclick="pfQualifyLexware()" style="display:none;margin-left:auto;background:#059669;color:#fff;border:1px solid #047857;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer" title="Als Beleg fuer Lexware Buchhaltung qualifizieren">&#x1F4B2; Lexware</button>
         </div>
       </div>
       <div class="pf-trust-banner" id="pf-trust-banner" style="display:none">
@@ -1924,6 +1925,10 @@ def build_postfach():
 .pf-item-flag-badge{color:#f59e0b;font-size:12px;flex-shrink:0;line-height:1}
 .pf-item-pin-badge{color:#3b82f6;font-size:11px;flex-shrink:0;line-height:1;margin-left:2px}
 .pf-item-kira-badge{background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid rgba(139,92,246,.3);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4}
+.pf-thread-badge{background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);border-radius:10px;font-size:10px;padding:0 6px;font-weight:700;flex-shrink:0;line-height:1.6;cursor:pointer}
+.pf-thread-child{margin-left:28px;border-left:2px solid var(--border);opacity:.85;transition:all .2s}
+.pf-thread-child:hover{opacity:1}
+.pf-thread-collapsed{display:none}
 /* Aktionsleiste (single + bulk) */
 #pf-bulk-bar{display:none;align-items:center;gap:4px;padding:5px 10px;background:var(--bg-raised);border-bottom:1px solid var(--border);font-size:12px;flex-shrink:0}
 #pf-bulk-bar.visible{display:flex}
@@ -3017,7 +3022,52 @@ function pfLoadList(reset) {
       return;
     }
     document.getElementById('pf-list-empty').style.display='none';
-    data.mails.forEach(m=>pfRenderMailItem(m, list));
+    // Thread-Gruppierung: nur neueste Mail pro Thread anzeigen, Rest einklappbar
+    var threadSeen = {};
+    var threadChildren = {};
+    data.mails.forEach(function(m){
+      var tid = m.thread_id;
+      if(tid && m.hat_thread && m.thread_count>1) {
+        if(!threadSeen[tid]) {
+          threadSeen[tid] = m;
+          threadChildren[tid] = [];
+        } else {
+          threadChildren[tid].push(m);
+        }
+      }
+    });
+    data.mails.forEach(function(m){
+      var tid = m.thread_id;
+      // Skip child mails (already grouped under parent)
+      if(tid && threadSeen[tid] && threadSeen[tid] !== m && threadChildren[tid] && threadChildren[tid].indexOf(m)>=0) {
+        return;
+      }
+      pfRenderMailItem(m, list);
+      // Render collapsed children right after parent
+      if(tid && threadChildren[tid] && threadChildren[tid].length>0) {
+        var parentEl = list.lastElementChild;
+        if(parentEl) {
+          parentEl.dataset.threadparent = '1';
+          // Click on thread badge toggles children
+          var badge = parentEl.querySelector('.pf-thread-badge');
+          if(badge) {
+            badge.addEventListener('click', function(ev){
+              ev.stopPropagation();
+              var children = list.querySelectorAll('.pf-thread-child[data-threadid="'+tid+'"]');
+              var collapsed = children.length>0 && children[0].classList.contains('pf-thread-collapsed');
+              children.forEach(function(c){ c.classList.toggle('pf-thread-collapsed', !collapsed); });
+            });
+          }
+        }
+        threadChildren[tid].forEach(function(child){
+          pfRenderMailItem(child, list);
+          var childEl = list.lastElementChild;
+          if(childEl) {
+            childEl.classList.add('pf-thread-child', 'pf-thread-collapsed');
+          }
+        });
+      }
+    });
     _pfOffset+=data.mails.length;
     document.getElementById('pf-load-more').style.display=_pfOffset<_pfTotal?'':'none';
   });
@@ -3396,14 +3446,29 @@ window.pfKiraRejectSubmit = function(id, btn) {
     if(d.ok) {
       pfLoadKiraList(true);
       // Bestaetigung zeigen was Kira gelernt hat
+      var confirmParts = [];
       if(d.learned && d.learned.titel) {
-        showSimpleModal('&#x2705; Kira hat gelernt',
-          '<div style="padding:4px 0">' +
+        confirmParts.push(
+          '<div style="margin-bottom:12px">' +
+            '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Neue Lernregel</div>' +
             '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">'+_esc(d.learned.titel)+'</div>' +
             '<div style="font-size:13px;color:var(--text-muted);line-height:1.5;padding:10px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+_esc(d.learned.inhalt)+'</div>' +
-            '<div style="font-size:11px;color:var(--text-muted);margin-top:10px">Gespeichert in: Wissens-Datenbank (Regel #'+d.learned.regel_id+')</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Gespeichert in: Wissens-Datenbank (Regel #'+d.learned.regel_id+')</div>' +
           '</div>'
         );
+      }
+      if(d.reclassified) {
+        var rc = d.reclassified;
+        confirmParts.push(
+          '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:12px;margin-top:8px">' +
+            '<div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:6px">Nachklassifizierung</div>' +
+            '<div style="font-size:13px"><b>'+_esc(rc.alte_kategorie||'')+'</b> &rarr; <b>'+_esc(rc.neue_kategorie||'')+'</b></div>' +
+            '<div style="font-size:11px;color:var(--muted);margin-top:4px">Task #'+rc.task_id+' '+(rc.aktion==='neu_erstellt'?'neu erstellt':'aktualisiert')+'</div>' +
+          '</div>'
+        );
+      }
+      if(confirmParts.length > 0) {
+        showSimpleModal('&#x2705; Kira hat gelernt', '<div style="padding:4px 0">' + confirmParts.join('') + '</div>');
       } else {
         showToast('Entwurf abgelehnt','ok');
       }
@@ -3505,8 +3570,10 @@ function pfRenderMailItem(m, container) {
       +'<span class="pf-item-absender">'+esc(absender)+'</span>'
       +(m.flagged?'<span class="pf-item-flag-badge" title="Gekennzeichnet">&#x2691;</span>':'<span class="pf-item-flag-badge" style="display:none" title="Gekennzeichnet">&#x2691;</span>')
       +(m.pinned?'<span class="pf-item-pin-badge" title="Angeheftet">&#x1F4CD;</span>':'<span class="pf-item-pin-badge" style="display:none" title="Angeheftet">&#x1F4CD;</span>')
+      +(m.ist_buchhaltung?'<span style="background:#059669;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px" title="Buchhaltung / Lexware">&#x1F4B2;</span>':'')
       +(m.kira_verwendet?'<span class="pf-item-kira-badge" title="Von Kira verwendet">Kira</span>':'')
       +(m.snooze_until?'<span class="pf-item-snooze-badge" title="Erneut erinnern: '+esc(m.snooze_until)+'">&#x23F0;</span>':'')
+      +(m.hat_thread&&m.thread_count>1?'<span class="pf-thread-badge" title="'+m.thread_count+' Nachrichten in diesem Thread">'+m.thread_count+'</span>':'')
       +'<span class="pf-item-datum">'+esc(datum)+'</span>'
     +'</div>'
     +'<div class="pf-item-betreff">'+esc(m.betreff||'(kein Betreff)')+'</div>'
@@ -3689,6 +3756,42 @@ window.pfTrustSender = function() {
   if (banner) banner.style.display = 'none';
   showToast('Absender als vertrauenswürdig markiert', 'ok');
 };
+
+// ── Lexware Nachqualifizierung ────────────────────────────
+window.pfQualifyLexware = function() {
+  const m = _pfCurrentMail;
+  if(!m || !m.message_id) { showToast('Keine Mail ausgewaehlt','fehler'); return; }
+  if(!confirm('Diese Mail als Eingangsbeleg fuer Lexware Buchhaltung qualifizieren?')) return;
+  fetch('/api/mail/qualify-lexware', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message_id: m.message_id})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      showToast('Als Beleg fuer Lexware qualifiziert (ID #'+(d.beleg_id||'?')+')','ok');
+      // Badge im Item nachtraeglich setzen
+      var item = document.querySelector('[data-msgid="'+m.message_id+'"] .pf-item-row1');
+      if(item && !item.querySelector('.pf-buch-badge')) {
+        var badge = document.createElement('span');
+        badge.className = 'pf-buch-badge';
+        badge.style.cssText = 'background:#059669;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px';
+        badge.title = 'Buchhaltung / Lexware';
+        badge.innerHTML = '&#x1F4B2;';
+        item.insertBefore(badge, item.querySelector('.pf-item-datum'));
+      }
+    } else {
+      showToast('Fehler: '+(d.error||'?'),'fehler');
+    }
+  }).catch(e=>showToast('Netzwerkfehler: '+e,'fehler'));
+};
+
+// Lexware-Button in Toolbar anzeigen wenn Mail geladen
+function pfUpdateLexwareBtn(m) {
+  var btn = document.getElementById('pf-btn-lexware');
+  if(!btn) return;
+  // Immer anzeigen — erlaubt Nachqualifizierung jeder Mail
+  btn.style.display = m ? '' : 'none';
+}
 
 // ── Hints section ─────────────────────────────────────────
 function pfRenderHints(m, d) {
@@ -3879,6 +3982,7 @@ window.pfOpenMail = function(m, el) {
     }
     if (d.anhaenge && d.anhaenge.length > 0) pfRenderAttachments(d.anhaenge);
     pfRenderHints(m, d);
+    pfUpdateLexwareBtn(m);
   }).catch(() => {
     const body = document.getElementById('pf-prev-body');
     body.textContent = 'Fehler beim Laden.';
@@ -11628,6 +11732,25 @@ def build_lexware(db):
     except Exception:
         last_sync = "—"
 
+    def _fmt_eur(val, waehrung="EUR"):
+        """Deutsches Zahlenformat: 1.234,56 EUR"""
+        try:
+            n = float(val or 0)
+        except (ValueError, TypeError):
+            n = 0.0
+        s = f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{s}&nbsp;{esc(waehrung)}"
+
+    def _fmt_datum(d):
+        """ISO-Datum → deutsches Format DD.MM.YYYY"""
+        if not d or len(str(d)) < 10:
+            return esc(str(d or "—"))
+        ds = str(d)[:10]
+        parts = ds.split("-")
+        if len(parts) == 3:
+            return f"{parts[2]}.{parts[1]}.{parts[0]}"
+        return esc(ds)
+
     n_belege   = len(belege)
     n_offen    = sum(1 for b in belege if b.get("status") in ("open","overdue","draft"))
     n_ueberfaellig = sum(1 for b in belege if b.get("status") == "overdue")
@@ -11648,9 +11771,9 @@ def build_lexware(db):
             f'<tr class="lx-tr" onclick="showLexSec(\'belege\')" style="cursor:pointer">'
             f'<td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>'
             f'<td>{esc(b.get("kontakt_name",""))}</td>'
-            f'<td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("datum",""))}</td>'
+            f'<td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("datum",""))}</td>'
             f'<td><span class="lx-st-chip lx-st-{st}">{st_label}</span></td>'
-            f'<td style="text-align:right;font-weight:600">{b.get("brutto",0):,.2f}&nbsp;{esc(b.get("waehrung","EUR"))}</td>'
+            f'<td style="text-align:right;font-weight:600">{_fmt_eur(b.get("brutto",0), b.get("waehrung","EUR"))}</td>'
             f'</tr>'
         )
 
@@ -11670,7 +11793,8 @@ def build_lexware(db):
             f'<td>{absender}</td>'
             f'<td>{betreff}{"<span class='lx-kira-frage' title='" + esc(kira_frage) + "'>&#x1F916; Kira-Frage</span>" if kira_frage else ""}</td>'
             f'<td><span class="lx-konto-chip">{konto or "—"}</span></td>'
-            f'<td style="text-align:right;font-weight:600">{betrag:,.2f}</td>'
+            f'<td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else ""))}</td>'
+            f'<td style="text-align:right;font-weight:600">{_fmt_eur(betrag, p.get("waehrung","EUR"))}</td>'
             f'<td style="text-align:center"><span class="lx-st-chip lx-st-{st}">{st_label}</span></td>'
             f'<td style="text-align:right"><button class="btn btn-xs btn-sec" onclick="event.stopPropagation();lxBuchKira({pid})">&#x1F916;</button></td>'
             f'</tr>'
@@ -11691,7 +11815,7 @@ def build_lexware(db):
       <span id="lx-status-dot" class="lx-chip {'lx-chip-ok' if has_key else 'lx-chip-warn'}" style="cursor:pointer" onclick="lexTestConnection()">
         &#x25CF; {api_status_text}
       </span>
-      <span class="lx-chip lx-chip-muted">Sync: {esc(last_sync[:16] if len(last_sync) > 10 else last_sync)}</span>
+      <span class="lx-chip lx-chip-muted">Sync: {_fmt_datum(last_sync[:10]) + " " + last_sync[11:16] if len(last_sync) > 16 else esc(last_sync)}</span>
       {'<span class="lx-chip lx-chip-warn">&#x26A0; ' + str(n_pruef) + ' zu pr&#252;fen</span>' if n_pruef > 0 else ''}
       {'<span class="lx-chip lx-chip-err">&#x26A0; ' + str(n_unklar) + ' unklar</span>' if n_unklar > 0 else ''}
       {'<span class="lx-chip lx-chip-err">&#x26A0; ' + str(n_ueberfaellig) + ' &#252;berf&#228;llig</span>' if n_ueberfaellig > 0 else ''}
@@ -11841,10 +11965,10 @@ def build_lexware(db):
   <td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>
   <td><span style="font-size:var(--fs-xs);color:var(--muted)">{typ_label}</span></td>
   <td>{esc(b.get("kontakt_name",""))}{kira_badge}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("datum",""))}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(b.get("faelligkeit","") or "—")}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("datum",""))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("faelligkeit","") or "—")}</td>
   <td><span class="{st_cls}">{st_label}</span></td>
-  <td style="text-align:right;font-weight:600">{b.get("brutto",0):,.2f}&nbsp;{esc(b.get("waehrung","EUR"))}</td>
+  <td style="text-align:right;font-weight:600">{_fmt_eur(b.get("brutto",0), b.get("waehrung","EUR"))}</td>
   <td style="white-space:nowrap">
     <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBelegKira('{esc(b["lexware_id"])}','{esc(b.get("nummer",""))}','{esc(b.get("kontakt_name",""))}')">&#x1F916;</button>
   </td>
@@ -11878,7 +12002,7 @@ def build_lexware(db):
     <tbody id="lx-belege-tbody">{belege_rows}</tbody>
   </table>
   </div>
-  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:340px;flex-shrink:0">
+  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:340px;flex-shrink:0;position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 160px);overflow-y:auto">
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
@@ -11896,12 +12020,12 @@ def build_lexware(db):
         _z_st_map = {"zu_pruefen":"Zu pr&#252;fen","klassifiziert":"Klassifiziert","abgelegt":"Abgelegt"}
         z_st = p.get("status","")
         z_st_label = _z_st_map.get(z_st, z_st)
-        z_datum = esc(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else "—"))
+        z_datum = _fmt_datum(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else ""))
         z_pid = p.get("id","")
         return (
             f'<tr class="lx-tr" onclick="lxOpenKiraWithContext(\'zahlung\',{z_pid})">'
             f'<td style="font-size:var(--fs-xs);color:var(--muted)">{z_datum}</td>'
-            f'<td style="font-weight:600;text-align:right">{(p.get("betrag") or 0):,.2f}&nbsp;{esc(p.get("waehrung","EUR"))}</td>'
+            f'<td style="font-weight:600;text-align:right">{_fmt_eur(p.get("betrag",0), p.get("waehrung","EUR"))}</td>'
             f'<td>Eingang</td>'
             f'<td>{esc(p.get("absender",""))}</td>'
             f'<td><span class="lx-st-chip lx-st-{z_st}">{z_st_label}</span></td>'
@@ -12075,8 +12199,8 @@ def build_lexware(db):
         return f"""<tr class="lx-tr" onclick="lxBuchDetailFull({p['id']})">
   <td style="font-weight:600">{esc(p.get("absender",""))}{paypal_badge}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("betreff",""))[:50]}{body_badge}</td>
-  <td style="text-align:right;font-weight:600">{(p.get("betrag") or 0):,.2f}&nbsp;{esc(p.get("waehrung","EUR"))}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{esc(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else "—"))}</td>
+  <td style="text-align:right;font-weight:600">{_fmt_eur(p.get("betrag",0), p.get("waehrung","EUR"))}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(p.get("datum_beleg","") or (p.get("datum_eingang","")[:10] if p.get("datum_eingang") else ""))}</td>
   <td>{status_html} {kira_badge} {konto_chip}</td>
   <td style="white-space:nowrap">
     <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBuchDetailFull({p['id']})">Details</button>
@@ -14447,12 +14571,13 @@ function lxBelegDetail(lexId) {{
       const b = d.beleg || d;
       const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert'}};
       const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung'}};
+      function _fmtDat(d){{ if(!d||d.length<10) return d||'-'; var p=d.substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
       content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
         <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(b.nummer||'-')}}</div>
         <div><span style="color:var(--muted)">Typ:</span> ${{typ_labels[b.typ]||b.typ||'-'}}</div>
         <div><span style="color:var(--muted)">Kontakt:</span> ${{esc_js(b.kontakt_name||'-')}}</div>
-        <div><span style="color:var(--muted)">Datum:</span> ${{esc_js(b.datum||'-')}}</div>
-        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{esc_js(b.faelligkeit||'-')}}</div>
+        <div><span style="color:var(--muted)">Datum:</span> ${{_fmtDat(b.datum)}}</div>
+        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{_fmtDat(b.faelligkeit)}}</div>
         <div><span style="color:var(--muted)">Status:</span> <b>${{st_labels[b.status]||b.status||'-'}}</b></div>
         <div><span style="color:var(--muted)">Betrag:</span> <b style="font-size:var(--fs-md)">${{parseFloat(b.brutto||0).toLocaleString('de-DE',{{minimumFractionDigits:2}})}}&nbsp;${{b.waehrung||'EUR'}}</b></div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
@@ -14667,8 +14792,8 @@ function lxBuchDetailFull(id) {{
         '<span style="color:var(--muted)">Absender:</span><b>' + esc_js(p.absender||'-') + '</b>' +
         '<span style="color:var(--muted)">Betreff:</span><span>' + esc_js(p.betreff||'-') + '</span>' +
         '<span style="color:var(--muted)">Betrag:</span><b style="font-size:var(--fs-md)">' + parseFloat(p.betrag||0).toLocaleString('de-DE',{{minimumFractionDigits:2}}) + '&nbsp;' + esc_js(p.waehrung||'EUR') + '</b>' +
-        '<span style="color:var(--muted)">Datum:</span>' + esc_js(p.datum_beleg||'-') +
-        '<span style="color:var(--muted)">Status:</span>' + esc_js(p.status||'-') +
+        '<span style="color:var(--muted)">Datum:</span>' + (function(d){{ if(!d||d.length<10)return d||'-'; var ps=d.substring(0,10).split('-'); return ps.length===3?ps[2]+'.'+ps[1]+'.'+ps[0]:d; }})(p.datum_beleg||'') +
+        '<span style="color:var(--muted)">Status:</span>' + ({{'zu_pruefen':'Zu pruefen','klassifiziert':'Klassifiziert','abgelegt':'Abgelegt','unklar':'Unklar'}}[p.status]||esc_js(p.status||'-')) +
         '</div>' +
         kira_section + konto_section +
         (p.body_excerpt ? ('<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">INHALT-AUSZUG</div><div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px;max-height:100px;overflow-y:auto;font-size:11px;white-space:pre-wrap;font-family:monospace">' + esc_js(p.body_excerpt) + '</div></div>') : '') +
@@ -19451,6 +19576,10 @@ a:hover{text-decoration:underline;}
 .lx-st-paid{background:rgba(34,197,94,.12);color:#16a34a;}
 .lx-st-draft{background:var(--bg-raised);color:var(--muted);border:1px solid var(--border);}
 .lx-st-voided{background:rgba(107,114,128,.12);color:#6b7280;}
+.lx-st-zu_pruefen{background:rgba(245,158,11,.12);color:#b45309;}
+.lx-st-klassifiziert{background:rgba(34,197,94,.12);color:#16a34a;}
+.lx-st-abgelegt{background:var(--bg-raised);color:var(--muted);border:1px solid var(--border);}
+.lx-st-unklar{background:rgba(220,38,38,.12);color:#dc2626;}
 /* Buchhaltung Unterbereich-Tabs */
 .lx-buch-nav{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;margin-bottom:0;}
 .lx-buch-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 12px;cursor:pointer;font-size:var(--fs-xs);font-family:inherit;white-space:nowrap;font-weight:500;transition:color .15s;}
@@ -22013,6 +22142,52 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
 
+    def _api_mail_qualify_lexware(self, body):
+        """POST /api/mail/qualify-lexware — Mail manuell als Eingangsbeleg qualifizieren."""
+        msg_id = body.get('message_id', '')
+        if not msg_id:
+            self._json({'ok': False, 'error': 'message_id fehlt'})
+            return
+        try:
+            # Mail-Daten aus mail_index.db laden
+            conn = sqlite3.connect(str(MAIL_INDEX_DB))
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM mails WHERE message_id=?", (msg_id,)).fetchone()
+            conn.close()
+            if not row:
+                self._json({'ok': False, 'error': 'Mail nicht gefunden'})
+                return
+            absender = row['absender'] or ''
+            absender_domain = absender.split('@')[-1].lower() if '@' in absender else ''
+            betreff = row['betreff'] or ''
+            body_text = row['body_plain'] or ''
+            body_excerpt = body_text[:500].strip()
+
+            # Idempotent — kein Doppeleintrag
+            tdb = sqlite3.connect(str(TASKS_DB))
+            existing = tdb.execute(
+                'SELECT id FROM eingangsbelege_pruefqueue WHERE mail_id=?', (msg_id,)
+            ).fetchone()
+            if existing:
+                tdb.close()
+                self._json({'ok': True, 'beleg_id': existing[0], 'hinweis': 'Bereits vorhanden'})
+                return
+            cur = tdb.execute("""
+                INSERT INTO eingangsbelege_pruefqueue
+                    (mail_id, source, absender, absender_domain, betreff,
+                     datum_beleg, body_excerpt, status)
+                VALUES (?,?,?,?,?,?,?,'zu_pruefen')
+            """, (
+                msg_id, 'manuell_postfach', absender, absender_domain,
+                betreff[:500], (row['datum'] or '')[:10], body_excerpt,
+            ))
+            tdb.commit()
+            beleg_id = cur.lastrowid
+            tdb.close()
+            self._json({'ok': True, 'beleg_id': beleg_id})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_combined(self):
         """GET /api/mail/combined?q=&offset=&limit=&folder_type= — Gemeinsames Postfach aus mehreren Konten."""
         import re as _re
@@ -22132,6 +22307,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params + [limit, offset]
             ).fetchall()
 
+            # Buchhaltungs-Flag aus tasks.db (message_id → typ)
+            _buch_msgids = set()
+            try:
+                _tdb = sqlite3.connect(str(TASKS_DB))
+                _tdb.row_factory = sqlite3.Row
+                _buch_rows = _tdb.execute(
+                    "SELECT message_id FROM tasks WHERE typ IN "
+                    "('eingangsrechnung','rechnung','beleg','routine_zahlung','zahlungserinnerung') "
+                    "AND message_id IS NOT NULL"
+                ).fetchall()
+                _buch_msgids = {r['message_id'] for r in _buch_rows}
+                _tdb.close()
+            except Exception:
+                pass
+
             # Thread-Counts berechnen
             thread_counts = {}
             for r in rows:
@@ -22164,6 +22354,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'pinned':        bool(r['pinned']),
                     'kira_verwendet': bool(r['kira_verwendet']),
                     'snooze_until':  r['snooze_until'] or '',
+                    'ist_buchhaltung': r['message_id'] in _buch_msgids,
                 })
 
             conn.close()
@@ -22455,9 +22646,79 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                      modul="server", source="mail_rejection", actor_type="kira_autonom", status="ok")
                     except Exception as _le:
                         log.warning(f"Lern-Regel aus Ablehnung fehlgeschlagen: {_le}")
+
+                # Nachklassifizierung bei falscher Klassifizierung
+                reclassified = None
+                if not class_correct and row.get("in_reply_to"):
+                    try:
+                        _orig_msgid = row["in_reply_to"]
+                        _mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+                        _mdb.row_factory = sqlite3.Row
+                        _orig = _mdb.execute(
+                            "SELECT * FROM mails WHERE message_id=?", (_orig_msgid,)
+                        ).fetchone()
+                        _mdb.close()
+                        if _orig:
+                            _tdb = sqlite3.connect(str(TASKS_DB))
+                            _tdb.row_factory = sqlite3.Row
+                            _existing_task = _tdb.execute(
+                                "SELECT id, kategorie, typ FROM tasks WHERE message_id=?", (_orig_msgid,)
+                            ).fetchone()
+                            if correct_class:
+                                # Kategorie-zu-Typ Mapping
+                                from mail_classifier import kategorie_to_task_typ
+                                _new_typ = kategorie_to_task_typ(correct_class)
+                                if _existing_task:
+                                    # Task aktualisieren
+                                    _tdb.execute(
+                                        "UPDATE tasks SET kategorie=?, typ=?, status='offen' WHERE id=?",
+                                        (correct_class, _new_typ, _existing_task["id"])
+                                    )
+                                    _tdb.commit()
+                                    reclassified = {
+                                        "task_id": _existing_task["id"],
+                                        "alte_kategorie": _existing_task["kategorie"],
+                                        "neue_kategorie": correct_class,
+                                        "aktion": "aktualisiert"
+                                    }
+                                else:
+                                    # Neuen Task erstellen (Mail war vorher Newsletter/Ignorieren)
+                                    _tdb.execute("""INSERT INTO tasks
+                                        (typ, kategorie, titel, beschreibung,
+                                         kunden_email, betreff, konto,
+                                         datum_mail, message_id,
+                                         status, prioritaet, antwort_noetig)
+                                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                        (_new_typ, correct_class,
+                                         (_orig["betreff"] or "")[:200],
+                                         (_orig["body_plain"] or "")[:2000],
+                                         _orig["absender"] or "",
+                                         _orig["betreff"] or "",
+                                         _orig.get("konto", ""),
+                                         _orig.get("datum", ""),
+                                         _orig_msgid,
+                                         "offen", "mittel", 1))
+                                    _tdb.commit()
+                                    _new_tid = _tdb.execute("SELECT last_insert_rowid()").fetchone()[0]
+                                    reclassified = {
+                                        "task_id": _new_tid,
+                                        "alte_kategorie": "Ignorieren/Newsletter",
+                                        "neue_kategorie": correct_class,
+                                        "aktion": "neu_erstellt"
+                                    }
+                            _tdb.close()
+                            if reclassified:
+                                rlog("server", "mail_reclassified",
+                                     f"Mail {_orig_msgid[:40]} nachklassifiziert: {reclassified.get('alte_kategorie','')} -> {correct_class}",
+                                     modul="server", source="mail_rejection", actor_type="nutzer", status="ok")
+                    except Exception as _re:
+                        log.warning(f"Nachklassifizierung fehlgeschlagen: {_re}")
+
                 resp = {"ok": True, "message": f"Mail #{queue_id} abgelehnt."}
                 if learned:
                     resp["learned"] = learned
+                if reclassified:
+                    resp["reclassified"] = reclassified
                 self._json(resp)
                 return
 
@@ -24327,6 +24588,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/kira-markieren':
             self._api_mail_kira_markieren(body)
+            return
+
+        if self.path == '/api/mail/qualify-lexware':
+            self._api_mail_qualify_lexware(body)
             return
 
         if self.path == '/api/mail/combined/konten':

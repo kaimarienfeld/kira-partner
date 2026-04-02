@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-04-02 17:00 — Session-Ende (session-xxx)
+
+**Auftrag:** Nachtlauf — ISS-028..031 + Lexware UI + Thread-Gruppierung + Commit. Alle nacheinander, ohne Stopp.
+**Erledigt:**
+- ISS-028: Betraege-Formatierung fix — _parseBetrag()/_fmtBetrag() JS + Python deutsches Format
+- ISS-029: Postfach Buchhaltungs-Badge + pfQualifyLexware() + POST /api/mail/qualify-lexware
+- ISS-030: Lexware Belege UI — _fmt_eur()/_fmt_datum() Python, 4 CSS-Status-Klassen, sticky Detail, JS-Datum
+- ISS-031: Kira-Ablehnung Nachklassifizierung — Task Update/Erstellung bei falsch-klassifiziert
+- Task C: Thread-Gruppierung — pf-thread-badge, pf-thread-child CSS, JS thread-aware Rendering
+- Tracking: known_issues ISS-028..031 fixed, session_handoff, session_log
+
+**Offen geblieben:** —
+**Status:** erledigt
+
+---
+
 ## 2026-04-01 — Session-Ende (session-ooo — Kontext-Fortsetzung)
 
 **Erledigt:**

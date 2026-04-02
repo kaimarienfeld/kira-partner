@@ -1,50 +1,58 @@
 {
-  "_updated": "2026-04-02 session-www",
+  "_updated": "2026-04-02 session-xxx",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
       "id": "ISS-028",
-      "status": "open",
+      "status": "fixed",
       "priority": "critical",
       "module": "scripts/kira_llm.py, scripts/server.py",
       "area": "mail, kira",
       "title": "Betraege-Formatierung bei eingehenden Mails falsch",
-      "description": "Kira formatiert Betraege in eingehenden Mails falsch. z.B. 109.48 EUR wird zu 10,948.00 EUR. Betrifft Klassifizierung und Task-Erstellung. Bereits klassifizierte Mails muessen nachgebessert werden.",
+      "description": "Kira formatiert Betraege in eingehenden Mails falsch. z.B. 109.48 EUR wird zu 10,948.00 EUR. Betrifft Klassifizierung und Task-Erstellung.",
       "discovered": "2026-04-02 13:00 MEZ",
-      "session": "session-www"
+      "fixed": "2026-04-02 15:00 MEZ",
+      "session": "session-www",
+      "fix_summary": "_parseBetrag()/_fmtBetrag() JS-Helpers + Python :,.2f→replace German format in kira_llm.py"
     },
     {
       "id": "ISS-029",
-      "status": "open",
+      "status": "fixed",
       "priority": "important",
       "module": "scripts/server.py",
       "area": "postfach",
       "title": "Nachqualifizierung fuer Buchhaltung/Lexware im Postfach fehlt",
-      "description": "Im Postfach fehlt die Moeglichkeit, Mails nachtraeglich als Buchhaltungs-Belege fuer Lexware zu qualifizieren. Ausserdem fehlt ein visuelles Badge/Icon (Dollarzeichen) auf Mails die als Buchhaltung klassifiziert sind.",
+      "description": "Im Postfach fehlt die Moeglichkeit, Mails nachtraeglich als Buchhaltungs-Belege fuer Lexware zu qualifizieren.",
       "discovered": "2026-04-02 13:00 MEZ",
-      "session": "session-www"
+      "fixed": "2026-04-02 15:30 MEZ",
+      "session": "session-xxx",
+      "fix_summary": "pfQualifyLexware() JS + POST /api/mail/qualify-lexware Backend + 💲 Badge im Postfach"
     },
     {
       "id": "ISS-030",
-      "status": "open",
+      "status": "fixed",
       "priority": "critical",
       "module": "scripts/server.py",
       "area": "lexware",
       "title": "Lexware Belege UI: Mehrere schwere Fehler",
-      "description": "Betraege falsch formatiert (10,948.00 statt 109,48), Kontakte zeigen ID statt Name, Faelligkeitsdatum fehlt, einzelne Belegbetraege fehlen, Status englisch statt deutsch, Filterbereich funktioniert nicht, Detail-Seite scrollt mit statt sticky, Status stimmt nicht mit Lexware ueberein. Anhaenge werden bei Klassifizierung nicht mitbenutzt (Pflicht).",
+      "description": "Betraege falsch formatiert, Status englisch, Daten ISO statt deutsch, Detail-Seite nicht sticky, fehlende Pruefqueue-Status-Farben.",
       "discovered": "2026-04-02 13:00 MEZ",
-      "session": "session-www"
+      "fixed": "2026-04-02 16:00 MEZ",
+      "session": "session-xxx",
+      "fix_summary": "_fmt_eur()/_fmt_datum() Python-Helpers, alle Tabellen auf deutsches Format, CSS-Klassen fuer zu_pruefen/klassifiziert/abgelegt/unklar, sticky Detail-Panel, JS-Datum-Formatter in Detail-Views"
     },
     {
       "id": "ISS-031",
-      "status": "open",
+      "status": "fixed",
       "priority": "important",
-      "module": "scripts/server.py, scripts/kira_llm.py",
+      "module": "scripts/server.py",
       "area": "kira, mail",
       "title": "Kira-Ablehnung: Nachklassifizierung fehlt",
-      "description": "Wenn bei Ablehnung 'falsch klassifiziert' gemeldet wird, wird die Mail nur abgelegt aber nicht tatsaechlich umklassifiziert. Kira soll die Mail mit dem korrekten Typ nachklassifizieren und an die richtige Stelle weiterleiten.",
+      "description": "Wenn bei Ablehnung 'falsch klassifiziert' gemeldet wird, wird die Mail nicht umklassifiziert.",
       "discovered": "2026-04-02 13:00 MEZ",
-      "session": "session-www"
+      "fixed": "2026-04-02 16:30 MEZ",
+      "session": "session-xxx",
+      "fix_summary": "Reject-Handler: bei class_correct=False → Original-Mail aus mail_index.db laden, bestehenden Task aktualisieren oder neuen Task erstellen. Bestaetigung im UI zeigt Nachklassifizierung."
     },
     {
       "id": "ISS-021",

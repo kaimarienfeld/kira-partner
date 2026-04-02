@@ -1,6 +1,6 @@
 {
-  "last_session": "session-www",
-  "date": "2026-04-02 12:45",
+  "last_session": "session-xxx",
+  "date": "2026-04-02 17:00",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -56,7 +56,8 @@
     "session-ttt (2026-04-02): C-08..C-14 Mail-Verbindungs-Fixes. (C-08) ARCHIVER_DIR Pfad-Bug: Parent-Ordner-Check. (C-09) OAuth Konto-Liste nach Poll. (C-10) Reconnect-Flow auto-isReconnect. (C-11) SMTP-Migration fehlende Server/Port. (C-12) Case-insensitive Email-Lookup. (C-13) Admin SMTP Badge. (C-14) Quill CDN → lokal scripts/static/. Commit: f0cb6a4.",
     "session-uuu (2026-04-02): C-15 Lexware Belege-Sync HTTP-400-Fix + fehler_details-Array. Root-Cause: get_all_vouchers() ohne voucherStatus → HTTP 400. Fix: _TYP_STATUSES dict (invoice 6 Status, creditnote 5, quotation 4), Deduplizierung via seen_ids. fehler_details[] in allen 3 sync-Methoden. JS lexSync() zeigt Modal mit Details. Postfach-Header Abrufen-Button + pfAlleKontenAbrufen(). Mail-Freigabe-Modal ersetzt confirm() → echtes Modal + VON-Konto-Dropdown + Ergebnis-Popup. Backend from_email Override in _api_mail_approve_action(). Commits: abeddd5, 84997e6.",
     "session-vvv (2026-04-02): C-16 JS-Syntaxfehler behoben (0 Errors). Root-Cause 1: this.closest(\\'...\\')-Aufrufe in onclick-Attributen — \\'  wird zu ' in Python-String und bricht den umgebenden JS-String-Delimiter. Fix: &apos; HTML-Entity statt \\' (getElementById fuer spezifische Modal-ID). Root-Cause 2: pfAlleKontenAbrufen mit {{}} (f-string-Stil) in regulaerer build_postfach() '''..''' -String → literale {{ im Output → JS Unexpected token. Fix: alle {{ → { und }} → }. B-04 als erledigt markiert (Kai hat Leni-Draft Passwort gesendet). Statistik Block-B 1/4, Block-C 16/16, Gesamt 40/47.",
-    "session-www (2026-04-02): (1) Fix _pfCurrentKiraItem Scope-Bug (var in IIFE → window._pfCurrentKiraItem). (2) Kira Ablehnen-Modal mit Lernfunktion (Grund + Klassifizierungsfrage → LLM-Lernregel → wissen_regeln + Bestaetigung). (3) Original-Mail im Kira-Entwurf (GET /api/mail/approve/{id}/original, iframe, aufklappbar). (4) Mail-Rendering Originalformat (iframe+srcdoc, erweiterte HTML-Erkennung). (5) References-Header + Re:-Betreff beim Senden. (6) KRITISCH: auto_gelernt Regeln in System-Prompt eingebaut (war write-only!). (7) Tracking aktualisiert: 4 neue ISS (028-031), Todo_checkliste, known_issues, session_log. Commits: 40151e7, 624b25e."
+    "session-www (2026-04-02): (1) Fix _pfCurrentKiraItem Scope-Bug (var in IIFE → window._pfCurrentKiraItem). (2) Kira Ablehnen-Modal mit Lernfunktion (Grund + Klassifizierungsfrage → LLM-Lernregel → wissen_regeln + Bestaetigung). (3) Original-Mail im Kira-Entwurf (GET /api/mail/approve/{id}/original, iframe, aufklappbar). (4) Mail-Rendering Originalformat (iframe+srcdoc, erweiterte HTML-Erkennung). (5) References-Header + Re:-Betreff beim Senden. (6) KRITISCH: auto_gelernt Regeln in System-Prompt eingebaut (war write-only!). (7) Tracking aktualisiert: 4 neue ISS (028-031), Todo_checkliste, known_issues, session_log. Commits: 40151e7, 624b25e.",
+    "session-xxx (2026-04-02): Nachtlauf — 5 Tasks + Thread-Gruppierung. (1) ISS-028 fix: _parseBetrag()/_fmtBetrag() JS-Helpers + Python Betrag-Format deutsch. (2) ISS-029: Postfach Buchhaltungs-Nachqualifizierung — pfQualifyLexware() + POST /api/mail/qualify-lexware + 💲 Badge. (3) ISS-030: Lexware Belege UI komplett — _fmt_eur()/_fmt_datum() Python-Helpers, alle Tabellen deutsches Format, 4 neue CSS-Klassen (zu_pruefen/klassifiziert/abgelegt/unklar), sticky Detail-Panel, JS-Datum-Formatter. (4) ISS-031: Kira-Ablehnung → Nachklassifizierung — bei falsch-klassifiziert: Original-Mail laden, Task aktualisieren oder neu erstellen, Bestaetigung im UI. (5) Task C: Thread-Gruppierung im Postfach — pf-thread-badge (Zaehler), pf-thread-child CSS, JS thread-aware Rendering (neueste Mail sichtbar, aeltere eingeklappt, Badge-Klick expandiert)."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -182,6 +183,11 @@
     "admin-cloudflare-tunnel-card-externer-zugang",
     "einstellungen-admin-goto-buttons-keine-doppelten-felder",
     "mobil-sektion-externer-zugang-info-admin-link",
+    "betraege-formatierung-deutsch-js-python",
+    "postfach-buchhaltung-nachqualifizierung-badge",
+    "lexware-belege-ui-deutsch-format-sticky",
+    "kira-ablehnung-nachklassifizierung-task-update",
+    "postfach-thread-gruppierung-collapse",
     "session-ttt (2026-04-02): Mail-Verbindungs-Fixes Komplett. (1) C-08 ARCHIVER_DIR kritischer Pfad-Bug: config.json → mail_archiv.pfad zeigte auf .../Mail Archiv/Archiv (Unterordner), raumkult_config.json + tokens/ liegen aber im Parent. mail_monitor.py prueft jetzt Parent-Ordner automatisch → 5/6 Konten status=ok nach Neustart. (2) C-09 MS-OAuth Konto-Liste: _wizPollOAuth() done-Branch ergaenzt mit esLoadMailKonten()-Aufruf nach 3s Delay. (3) C-10 Reconnect-Flow: 'Konto bereits vorhanden'-Fehler setzt jetzt automatisch isReconnect=true statt abzubrechen. (4) C-11 SMTP-Migration: _migrate_konto_smtp() + migrate_all_smtp_settings() in mail_monitor.py — fehlende smtp_server/port/ssl aus Provider-Defaults ergaenzt, wird beim Server-Start ausgefuehrt. (5) C-12 Case-insensitive Email-Lookup in check_account_health() + run_full_connection_test() + neues_konto Duplikat-Check. (6) C-13 Admin SMTP Status-Badge: adm-smtp-status-badge im Admin-Header, 3 Zustaende (verbunden/ungetestet/nicht konfiguriert), letzter_test_ok in config.json via POST /api/admin/save section=smtp_test_ok persistiert. (7) C-14 Quill CDN-Warnung: quill.min.js + quill.snow.css lokal nach scripts/static/ kopiert, neuer /static/ Route-Handler in do_GET. Commit: f0cb6a4."
   ],
   "open_tasks": [
@@ -199,7 +205,7 @@
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
     "D-11 Partner-View Tour noch nicht implementiert (separate HTML-Datei)"
   ],
-  "next_step": "Server laeuft, 0 JS-Fehler. Block-A 16/16. Block-C 16/16 (C-01..C-16). Block-D: D-04..D-10 fertig, D-11 (Partner-View Tour) offen. Block-B: B-04 erledigt (Kai), B-01..B-03 noch offen (Cloudflare, Azure, WhatsApp). Empfohlen: B-01 Cloudflare-Tunnel einrichten ODER D-11 Partner-View Tour.",
+  "next_step": "ISS-028..031 alle behoben, Thread-Gruppierung eingebaut. Server neustarten + Playwright-Test empfohlen. Block-B: B-01..B-03 noch offen (Cloudflare, Azure, WhatsApp). D-11 Partner-View Tour offen. Empfohlen: Server-Test nach Commit.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
