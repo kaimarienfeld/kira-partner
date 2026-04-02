@@ -1488,8 +1488,9 @@ def build_postfach():
 <div class="pf-left" id="pf-left">
   <div class="pf-left-hdr">
     <span class="pf-left-title">Postfach</span>
-    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_POSTFACH,{erklaermodus:true})" style="margin-right:4px" title="Gefuehrte Tour durch das Postfach starten">Tour</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_POSTFACH,{{erklaermodus:true}})" style="margin-right:4px" title="Gefuehrte Tour durch das Postfach starten">Tour</button>
     <button class="pf-compose-btn" onclick="pfOpenCompose()" title="Neue Mail verfassen">&#x270F; Neu</button>
+    <button class="pf-compose-btn" id="pf-alle-abrufen-btn" onclick="pfAlleKontenAbrufen(this)" title="Alle Konten jetzt abrufen" style="margin-left:4px">&#x21BB;</button>
   </div>
   <div id="pf-folders-loading" style="padding:16px;color:var(--text-muted);font-size:13px">Lade Konten...</div>
   <div id="pf-folder-tree"></div>
@@ -3069,11 +3070,80 @@ function pfShowKiraMail(item) {
 }
 
 window.pfKiraMailFreigeben = function(id) {
-  if(!confirm('Mail jetzt senden?')) return;
-  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'approve'})})
-    .then(r=>r.json()).then(d=>{
-      if(d.ok){ showToast(d.message||'Gesendet','ok'); pfLoadKiraList(true); }
-      else showToast('Fehler: '+(d.error||'?'),'fehler');
+  const item = _pfCurrentKiraItem;
+  if(!item) return;
+  // Konto-Liste laden dann Modal zeigen
+  fetch('/api/mail/konten').then(r=>r.json()).then(function(kdata) {
+    const konten = (kdata.konten||[]).filter(k=>k.aktiv!==false);
+    const vorKonto = item.konto || '';
+    let kontoOpts = konten.map(k=>'<option value="'+_esc(k.email)+'"'+(k.email===vorKonto?' selected':'')+'>'+_esc(k.email)+'</option>').join('');
+    if(!kontoOpts) kontoOpts = '<option value="">Standard (info@raumkult.eu)</option>';
+    const modal = document.createElement('div');
+    modal.id = 'kira-approve-modal';
+    modal.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center';
+    modal.innerHTML='<div style="background:var(--bg-modal,#1e1e22);border:1px solid var(--border-strong);border-radius:16px;padding:24px;width:min(520px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.4)">'
+      +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;color:var(--text)">&#x2709; Mail jetzt senden?</div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-bottom:16px">Kira-Entwurf #'+id+'</div>'
+      +'<div style="background:var(--bg-raised);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--text)">'
+        +'<div style="margin-bottom:6px"><span style="color:var(--muted);font-size:11px">AN</span><br>'+_esc(item.an||'')+'</div>'
+        +'<div style="margin-bottom:6px"><span style="color:var(--muted);font-size:11px">BETREFF</span><br><strong>'+_esc(item.betreff||'')+'</strong></div>'
+        +'<div style="white-space:pre-wrap;max-height:120px;overflow-y:auto;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">'+_esc((item.body_plain||'').slice(0,400))+(item.body_plain&&item.body_plain.length>400?'\u2026':'')+'</div>'
+      +'</div>'
+      +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">VON (Absender-Konto)</label>'
+      +'<select id="kira-approve-konto" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;margin-bottom:16px">'+kontoOpts+'</select>'
+      +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+        +'<button onclick="document.getElementById(&apos;kira-approve-modal&apos;).remove()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>'
+        +'<button id="kira-approve-send-btn" onclick="pfKiraMailFreigebenSend('+id+',this)" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 22px;cursor:pointer;font-size:13px;font-weight:700">&#x2705; Senden</button>'
+      +'</div>'
+    +'</div>';
+    document.body.appendChild(modal);
+  }).catch(function() {
+    // Fallback: direkt senden ohne Konto-Wahl
+    if(!confirm('Mail jetzt senden?')) return;
+    pfKiraMailFreigebenSend(id, null);
+  });
+};
+window.pfKiraMailFreigebenSend = function(id, btn) {
+  const sel = document.getElementById('kira-approve-konto');
+  const vonKonto = sel ? sel.value : '';
+  if(btn) { btn.disabled=true; btn.textContent='Wird gesendet\u2026'; }
+  const payload = {action:'approve'};
+  if(vonKonto) payload.from_email = vonKonto;
+  fetch('/api/mail/approve/'+id, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(function(d) {
+      const modal = document.getElementById('kira-approve-modal');
+      if(modal) modal.remove();
+      if(d.ok) {
+        // Ergebnis-Modal
+        const rm = document.createElement('div');
+        rm.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+        rm.innerHTML='<div style="background:var(--bg-modal,#1e1e22);border:1px solid var(--border-strong);border-radius:16px;padding:28px;width:min(460px,92vw);box-shadow:0 8px 40px rgba(0,0,0,.4)">'
+          +'<div style="font-size:28px;text-align:center;margin-bottom:10px">&#x2705;</div>'
+          +'<div style="font-size:15px;font-weight:700;color:var(--text);text-align:center;margin-bottom:16px">Mail erfolgreich gesendet</div>'
+          +'<div style="background:var(--bg-raised);border-radius:8px;padding:12px;font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:5px;margin-bottom:16px">'
+            +'<div><span style="color:var(--muted)">Von:</span> '+_esc(d.von_konto||vonKonto||'Standard')+'</div>'
+            +'<div><span style="color:var(--muted)">An:</span> '+_esc(d.an||'')+'</div>'
+            +'<div><span style="color:var(--muted)">Betreff:</span> '+_esc(d.betreff||'')+'</div>'
+            +'<div><span style="color:var(--muted)">Status:</span> <span style="color:#22c55e">Gesendet &#x2714;</span></div>'
+            +'<div><span style="color:var(--muted)">Archiviert:</span> '+(d.archiviert?'&#x2714; im Postausgang':'Ja')+'</div>'
+          +'</div>'
+          +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+            +'<button onclick="this.closest(&apos;div[style*=fixed]&apos;).remove();pfLoadKiraList(true)" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Schliessen</button>'
+          +'</div>'
+        +'</div>';
+        document.body.appendChild(rm);
+        pfLoadKiraList(true);
+      } else {
+        if(btn) { btn.disabled=false; btn.textContent='\\u2705 Senden'; }
+        showSimpleModal('Senden fehlgeschlagen',
+          '<p style="color:var(--danger);margin-bottom:12px">&#x2717; '+_esc(d.error||'Unbekannter Fehler')+'</p>'
+          +'<p style="font-size:12px;color:var(--muted)">Konto: '+_esc(vonKonto||'Standard')+'<br>Bitte pruefen ob das Konto verbunden ist (Einstellungen &gt; Mail).</p>'
+        );
+      }
+    }).catch(function(e) {
+      const modal = document.getElementById('kira-approve-modal');
+      if(modal) modal.remove();
+      showSimpleModal('Netzwerkfehler','<p>'+_esc(String(e))+'</p>');
     });
 };
 window.pfKiraMailBearbeiten = function(id) {
@@ -3093,12 +3163,37 @@ window.pfKiraMailBearbeiten = function(id) {
 window.pfKiraMailSendenBearbeitet = function(id, btn) {
   var ta=document.getElementById('kiraEditBody');
   var newBody=ta?ta.value:'';
+  var kontoEl=document.getElementById('kiraEditKonto');
+  var vonKonto=kontoEl?kontoEl.value:'';
   btn.disabled=true; btn.textContent='Sende\u2026';
-  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'edit',body:newBody})})
+  var payload={action:'edit',body:newBody};
+  if(vonKonto) payload.from_email=vonKonto;
+  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(r=>r.json()).then(d=>{
-      btn.parentElement.parentElement.parentElement.parentElement.remove();
-      if(d.ok){ showToast(d.message||'Gesendet','ok'); pfLoadKiraList(true); }
-      else showToast('Fehler: '+(d.error||'?'),'fehler');
+      // Modal schliessen (3 Ebenen hoch vom btn)
+      var m=btn.closest('div[style*="position:fixed"]');
+      if(m) m.remove();
+      if(d.ok){
+        var rm=document.createElement('div');
+        rm.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+        rm.innerHTML='<div style="background:var(--bg-modal,#1e1e22);border:1px solid var(--border-strong);border-radius:16px;padding:28px;width:min(440px,92vw)">'
+          +'<div style="font-size:28px;text-align:center;margin-bottom:10px">&#x2705;</div>'
+          +'<div style="font-size:15px;font-weight:700;color:var(--text);text-align:center;margin-bottom:14px">Mail erfolgreich gesendet</div>'
+          +'<div style="background:var(--bg-raised);border-radius:8px;padding:12px;font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:5px;margin-bottom:16px">'
+            +'<div><span style="color:var(--muted)">Von:</span> '+_esc(d.von_konto||vonKonto||'Standard')+'</div>'
+            +'<div><span style="color:var(--muted)">An:</span> '+_esc(d.an||'')+'</div>'
+            +'<div><span style="color:var(--muted)">Betreff:</span> '+_esc(d.betreff||'')+'</div>'
+            +'<div><span style="color:var(--muted)">Archiviert:</span> &#x2714;</div>'
+          +'</div>'
+          +'<div style="text-align:right"><button onclick="this.closest(&apos;div[style*=fixed]&apos;).remove()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Schliessen</button></div>'
+        +'</div>';
+        document.body.appendChild(rm);
+        pfLoadKiraList(true);
+      } else {
+        showSimpleModal('Senden fehlgeschlagen','<p style="color:var(--danger)">'+_esc(d.error||'?')+'</p>');
+      }
+    }).catch(function(e){
+      showSimpleModal('Netzwerkfehler','<p>'+_esc(String(e))+'</p>');
     });
 };
 window.pfKiraMaillAblehnen = function(id) {
@@ -4099,6 +4194,18 @@ window.pfBarFlagCurrent = pfBarFlagCurrent;
 window.pfBarPinCurrent = pfBarPinCurrent;
 // Global exposieren damit showPanel() pfInit() aufrufen kann
 window.pfInit = pfInit;
+
+// Alle Konten abrufen (Header-Button)
+window.pfAlleKontenAbrufen = function(btn) {
+  if(btn) { btn.disabled=true; btn.textContent='...'; }
+  _rtlog('ui','pf_alle_abrufen','Alle Konten abrufen geklickt',{submodul:'postfach',context_type:'mail',status:'ok'});
+  fetch('/api/mail/konto/alle-abrufen',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(r=>r.json()).then(d=>{
+      if(btn) { btn.disabled=false; btn.textContent='\u21BB'; }
+      showToast(d.ok ? 'Alle Konten werden abgerufen\u2026' : 'Fehler: '+(d.error||'?'), d.ok?'ok':'fehler');
+      if(d.ok) setTimeout(()=>{ pfLoadFolderTree(); pfRefreshBadge(); }, 4000);
+    }).catch(()=>{ if(btn){btn.disabled=false;btn.textContent='\u21BB';} showToast('Netzwerkfehler','fehler'); });
+};
 })();
 </script>"""
 
@@ -18525,27 +18632,39 @@ setTimeout(_startKiraPolling, 4000);
 function openMailApproveModal() {{
   if(!_mailApproveItems.length) return;
   var item = _mailApproveItems[0];
-  var overlay = document.getElementById('mailApproveOverlay');
-  if(!overlay) {{
-    overlay = document.createElement('div');
-    overlay.id = 'mailApproveOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    document.body.appendChild(overlay);
-  }}
-  overlay.innerHTML = '<div style="background:var(--bg-modal,#fff);border:1px solid var(--border-strong);border-radius:14px;padding:28px;max-width:560px;width:100%;color:var(--text);font-family:Segoe UI,sans-serif;box-shadow:0 8px 40px rgba(0,0,0,.35);">' +
-    '<div style="font-size:13px;color:#d97706;font-weight:700;margin-bottom:8px">&#x2709; Mail wartet auf Freigabe</div>' +
-    '<div style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text)">An: <span style="color:var(--accent)">' + _esc(item.an) + '</span></div>' +
-    '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">Betreff: ' + _esc(item.betreff) + '</div>' +
-    '<textarea id="mailApproveBody" style="width:100%;min-height:120px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">' + _esc(item.body_plain || '') + '</textarea>' +
-    '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
-    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
-    '<button onclick="closeMailApproveOverlay()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'reject\\')" style="background:rgba(220,74,74,.12);color:#dc4a4a;border:1px solid rgba(220,74,74,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'edit\\')" style="background:rgba(79,125,249,.1);color:var(--accent);border:1px solid rgba(79,125,249,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearbeitet)</button>' +
-    '<button onclick="mailApproveAction(' + item.id + ',\\'approve\\')" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">Senden</button>' +
-    '</div>' +
-    '</div>';
-  overlay.style.display = 'flex';
+  // Konten laden dann Modal anzeigen
+  fetch('/api/mail/konten').then(function(r){{return r.json();}}).then(function(kdata){{
+    var konten = (kdata.konten||[]).filter(function(k){{return k.aktiv!==false;}});
+    var vorKonto = item.konto || '';
+    var kontoOpts = konten.map(function(k){{return '<option value="'+_esc(k.email)+'"'+(k.email===vorKonto?' selected':'')+'>'+_esc(k.email)+'</option>';}}).join('');
+    if(!kontoOpts) kontoOpts='<option value="">Standard (info@raumkult.eu)</option>';
+    var overlay = document.getElementById('mailApproveOverlay');
+    if(!overlay) {{
+      overlay = document.createElement('div');
+      overlay.id = 'mailApproveOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      document.body.appendChild(overlay);
+    }}
+    overlay.innerHTML = '<div style="background:var(--bg-modal,#1e1e22);border:1px solid var(--border-strong);border-radius:14px;padding:28px;max-width:560px;width:100%;color:var(--text);font-family:Segoe UI,sans-serif;box-shadow:0 8px 40px rgba(0,0,0,.35);">' +
+      '<div style="font-size:13px;color:#d97706;font-weight:700;margin-bottom:8px">&#x2709; Mail wartet auf Freigabe</div>' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text)">An: <span style="color:var(--accent)">' + _esc(item.an) + '</span></div>' +
+      '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">Betreff: ' + _esc(item.betreff) + '</div>' +
+      '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">VON (Absender)</label>' +
+      '<select id="mailApproveKonto" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;margin-bottom:10px">' + kontoOpts + '</select>' +
+      '<textarea id="mailApproveBody" style="width:100%;min-height:120px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">' + _esc(item.body_plain || '') + '</textarea>' +
+      '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Queue-ID #' + item.id + ' — erstellt ' + (item.erstellt_am||'').slice(0,16) + '</div>' +
+      '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
+      '<button onclick="closeMailApproveOverlay()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Abbrechen</button>' +
+      '<button onclick="mailApproveAction(' + item.id + ',\\'reject\\')" style="background:rgba(220,74,74,.12);color:#dc4a4a;border:1px solid rgba(220,74,74,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Ablehnen</button>' +
+      '<button onclick="mailApproveAction(' + item.id + ',\\'edit\\')" style="background:rgba(79,125,249,.1);color:var(--accent);border:1px solid rgba(79,125,249,.3);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Senden (bearb.)</button>' +
+      '<button onclick="mailApproveAction(' + item.id + ',\\'approve\\')" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700">&#x2705; Senden</button>' +
+      '</div>' +
+      '</div>';
+    overlay.style.display = 'flex';
+  }}).catch(function(){{
+    // Fallback ohne Konto-Auswahl
+    showToast('Konto-Liste nicht gelbar','warnung');
+  }});
 }}
 
 function closeMailApproveOverlay() {{
@@ -18554,20 +18673,42 @@ function closeMailApproveOverlay() {{
 }}
 
 function mailApproveAction(id, action) {{
-  var body = document.getElementById('mailApproveBody');
+  var bodyEl = document.getElementById('mailApproveBody');
+  var kontoEl = document.getElementById('mailApproveKonto');
   var payload = {{action: action}};
-  if(action === 'edit' && body) payload.body = body.value;
+  if(action === 'edit' && bodyEl) payload.body = bodyEl.value;
+  if(kontoEl && kontoEl.value) payload.from_email = kontoEl.value;
   fetch('/api/mail/approve/' + id, {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify(payload)
   }}).then(function(r){{return r.json();}}).then(function(d){{
     closeMailApproveOverlay();
+    if(action === 'reject') {{ showToast('Abgelehnt', 'ok'); _pollMailApprove(); return; }}
     if(d.ok) {{
-      showToast(d.message || 'Mail gesendet', 'ok');
+      // Ergebnis-Modal
+      var rm = document.createElement('div');
+      rm.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+      rm.innerHTML='<div style="background:var(--bg-modal,#1e1e22);border:1px solid var(--border-strong);border-radius:16px;padding:28px;width:min(440px,92vw)">'
+        +'<div style="font-size:28px;text-align:center;margin-bottom:10px">&#x2705;</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--text);text-align:center;margin-bottom:14px">Mail erfolgreich gesendet</div>'
+        +'<div style="background:var(--bg-raised);border-radius:8px;padding:12px;font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:5px;margin-bottom:16px">'
+          +'<div><span style="color:var(--muted)">Von:</span> '+_esc(d.von_konto||'')+'</div>'
+          +'<div><span style="color:var(--muted)">An:</span> '+_esc(d.an||'')+'</div>'
+          +'<div><span style="color:var(--muted)">Betreff:</span> '+_esc(d.betreff||'')+'</div>'
+          +'<div><span style="color:var(--muted)">Archiviert:</span> &#x2714;</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<button onclick="this.closest(&apos;div[style*=fixed]&apos;).remove()" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Schliessen</button>'
+        +'</div>'
+      +'</div>';
+      document.body.appendChild(rm);
       _pollMailApprove();
     }} else {{
-      showToast('Fehler: ' + (d.error||'?'), 'fehler');
+      showSimpleModal('Senden fehlgeschlagen',
+        '<p style="color:var(--danger)">&#x2717; '+_esc(d.error||'?')+'</p>'
+        +'<p style="font-size:12px;color:var(--muted);margin-top:8px">Konto pruefen: Einstellungen &gt; Mail &gt; Verbindungstest</p>'
+      );
     }}
   }}).catch(function(e){{ showToast('Netzwerkfehler', 'fehler'); }});
 }}
@@ -21984,7 +22125,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             # approve oder edit (edit → body übernehmen, dann senden)
             body_plain = new_body if (action == "edit" and new_body) else (row["body_plain"] or "")
-            from_email = row["konto"] or "info@raumkult.eu"
+            # from_email: aus Request (User hat Konto gewaehlt) > Queue-Konto > Standard
+            from_email = (body.get("from_email") or "").strip() or row["konto"] or "info@raumkult.eu"
             try:
                 from mail_sender import send_mail
                 result = send_mail(
@@ -22037,7 +22179,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                     pass
 
                     db.close()
-                    self._json({"ok": True, "message": f"Mail an {row['an']} gesendet."})
+                    self._json({"ok": True, "message": f"Mail an {row['an']} gesendet.",
+                                "von_konto": from_email, "an": row["an"], "betreff": row["betreff"],
+                                "archiviert": True})
                 else:
                     db.close()
                     self._json({"ok": False, "error": result.get("error", "Sendefehler")})

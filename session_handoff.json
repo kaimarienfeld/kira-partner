@@ -1,6 +1,6 @@
 {
-  "last_session": "session-sss",
-  "date": "2026-04-02 09:45",
+  "last_session": "session-vvv",
+  "date": "2026-04-02 09:36",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -52,7 +52,10 @@
     "session-ppp (2026-04-01): A-10 Diagnose Test-Ergebnis-Buttons — Block-A 16/16 komplett. _lxShowTestResult(ok, errText): Haekchen (gruen) oder X (rot) nach lexTestConnection(). Bei Fehler: lx-test-copy-err Div eingeblendet mit 'Fehlerdetails kopieren'-Button → copyErrorDetails(window._lxLastTestErr). lx-test-result-api Span + id lx-btn-test-api in diagnose_html. Tracking aktualisiert.",
     "session-qqq (2026-04-01): D-04..D-10 Modul-Tours alle implementiert (7 Tours, je 7-10 Schritte). window.KIRA_TOUR_POSTFACH/GESCHAEFT/WISSEN/CAPTURE/KIRA/DASHBOARD/EINSTELLUNGEN in TOUR_JS. Tour-Buttons: pf-left-hdr (Postfach), gh-mod-acts (Geschaeft), wissen-level-tabs (Wissen), cap-nav (Capture), kw-header-right (Kira-Workspace), dash-briefing-head (Dashboard), es-macts (Einstellungen). D-11 Partner-View offen (separate HTML-Datei).",
     "session-rrr (2026-04-02): C-01 Server-Crash behoben (ERR_EMPTY_RESPONSE). Root-Cause: 3 Tour-Buttons in Python f-String-Kontexten mit {erklaermodus:true} (einfache Klammern) → NameError bei generate_html() → leere HTTP-Antwort. Betroffen: build_lexware() (f\"\"\"...\"\"\"), build_capture() (f\"\"\"...\"\"\"), generate_html() kw-header-right. Fix: alle 3 auf {{erklaermodus:true}} korrigiert. Server laeuft wieder. feature_registry.json guided-tours Eintrag ergaenzt (68 Features). partner_view.html aktualisiert (generate_partner_view.py). KIRA_MASTERCHECKLISTE_LAUFEND.md: C-01 eingetragen + Block-A Stats 16/16 korrigiert. Commit: a479341.",
-    "session-sss (2026-04-02): 6 Bugfixes aus Kai-Fehlerreport + Bonus. (C-02) Lexware-Panel max-width:none + kein location.reload() nach Sync, Toast+Statuszeile. (C-03) Verbindungsstatus-Chip per JS aktualisiert (lx-chip-ok/err). (C-04) Pagination-Fix lexware_client.py: get_all_contacts/vouchers/articles pruefen jetzt last-Flag + empty-Guard — 273 Kontakte (war 200), 52 Artikel. (C-05) SMTP-Test-Button in Admin hinzugefuegt, SMTP/IMAP-Buttons aus Einstellungen entfernt. (C-06) GitHub-Token-Persistenz in partner_view.html (s.gh_token + API-Sync), 2 neue Endpoints /api/partner/get-token + /api/partner/save-token, Admin zeigt Token-Status. (C-07 Bonus) esNavTo → esShowSec an 2 Stellen gefixt (ReferenceError bei Kalender-Fehler-Link). Alle 6 Fixes via Playwright verifiziert (0 JS-Fehler). Commit: 4e5784e. Checkliste C-02..C-07 eingetragen, Statistik 38/30 aktualisiert."
+    "session-sss (2026-04-02): 6 Bugfixes aus Kai-Fehlerreport + Bonus. (C-02) Lexware-Panel max-width:none + kein location.reload() nach Sync, Toast+Statuszeile. (C-03) Verbindungsstatus-Chip per JS aktualisiert (lx-chip-ok/err). (C-04) Pagination-Fix lexware_client.py: get_all_contacts/vouchers/articles pruefen jetzt last-Flag + empty-Guard — 273 Kontakte (war 200), 52 Artikel. (C-05) SMTP-Test-Button in Admin hinzugefuegt, SMTP/IMAP-Buttons aus Einstellungen entfernt. (C-06) GitHub-Token-Persistenz in partner_view.html (s.gh_token + API-Sync), 2 neue Endpoints /api/partner/get-token + /api/partner/save-token, Admin zeigt Token-Status. (C-07 Bonus) esNavTo → esShowSec an 2 Stellen gefixt (ReferenceError bei Kalender-Fehler-Link). Alle 6 Fixes via Playwright verifiziert (0 JS-Fehler). Commit: 4e5784e. Checkliste C-02..C-07 eingetragen, Statistik 38/30 aktualisiert.",
+    "session-ttt (2026-04-02): C-08..C-14 Mail-Verbindungs-Fixes. (C-08) ARCHIVER_DIR Pfad-Bug: Parent-Ordner-Check. (C-09) OAuth Konto-Liste nach Poll. (C-10) Reconnect-Flow auto-isReconnect. (C-11) SMTP-Migration fehlende Server/Port. (C-12) Case-insensitive Email-Lookup. (C-13) Admin SMTP Badge. (C-14) Quill CDN → lokal scripts/static/. Commit: f0cb6a4.",
+    "session-uuu (2026-04-02): C-15 Lexware Belege-Sync HTTP-400-Fix + fehler_details-Array. Root-Cause: get_all_vouchers() ohne voucherStatus → HTTP 400. Fix: _TYP_STATUSES dict (invoice 6 Status, creditnote 5, quotation 4), Deduplizierung via seen_ids. fehler_details[] in allen 3 sync-Methoden. JS lexSync() zeigt Modal mit Details. Postfach-Header Abrufen-Button + pfAlleKontenAbrufen(). Mail-Freigabe-Modal ersetzt confirm() → echtes Modal + VON-Konto-Dropdown + Ergebnis-Popup. Backend from_email Override in _api_mail_approve_action(). Commits: abeddd5, 84997e6.",
+    "session-vvv (2026-04-02): C-16 JS-Syntaxfehler behoben (0 Errors). Root-Cause 1: this.closest(\\'...\\')-Aufrufe in onclick-Attributen — \\'  wird zu ' in Python-String und bricht den umgebenden JS-String-Delimiter. Fix: &apos; HTML-Entity statt \\' (getElementById fuer spezifische Modal-ID). Root-Cause 2: pfAlleKontenAbrufen mit {{}} (f-string-Stil) in regulaerer build_postfach() '''..''' -String → literale {{ im Output → JS Unexpected token. Fix: alle {{ → { und }} → }. B-04 als erledigt markiert (Kai hat Leni-Draft Passwort gesendet). Statistik Block-B 1/4, Block-C 16/16, Gesamt 40/47."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -193,9 +196,9 @@
     "Kira-Launcher beiseite rutschen wenn Maus Element dahinter erreichen will",
     "Mail-Monitor Polling-Intervall: Einstellung in UI (derzeit in Sekunden, sollte Stunden/Minuten sein)",
     "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
-    "Leni Draft-2 Passwort: Platzhalter [PASSWORT] in Gmail-Draft ID r1565559517660587330 muss ersetzt werden"
+    "D-11 Partner-View Tour noch nicht implementiert (separate HTML-Datei)"
   ],
-  "next_step": "Server laeuft. Block-A 16/16. Block-C 14/14 (C-08..C-14 mit session-ttt behoben). Block-D: D-04..D-10 fertig, D-11 (Partner-View Tour) offen. Empfohlen naechster Schritt: Block-B Kai-Aktionen (B-01 Cloudflare, B-02 Azure Calendars.ReadWrite, B-03 WhatsApp Token, B-04 Leni-Draft Passwort) ODER Belege-Sync Fehler-Details API-Erweiterung.",
+  "next_step": "Server laeuft, 0 JS-Fehler. Block-A 16/16. Block-C 16/16 (C-01..C-16). Block-D: D-04..D-10 fertig, D-11 (Partner-View Tour) offen. Block-B: B-04 erledigt (Kai), B-01..B-03 noch offen (Cloudflare, Azure, WhatsApp). Empfohlen: B-01 Cloudflare-Tunnel einrichten ODER D-11 Partner-View Tour.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
@@ -236,6 +239,6 @@
     "Kai-Aktion: Azure Calendars.ReadWrite hinzufuegen (fuer Kalender-Widget)",
     "Kai-Aktion: Google Cloud Console OAuth2 App + Client ID/Secret in Einstellungen eintragen",
     "Kai-Aktion: WhatsApp Business Token eintragen",
-    "Kai-Aktion: Leni Gmail-Draft-2 Passwort-Platzhalter ersetzen"
+    "D-11: Partner-View Tour noch nicht implementiert (separate HTML-Datei, kein TOUR_JS)"
   ]
 }

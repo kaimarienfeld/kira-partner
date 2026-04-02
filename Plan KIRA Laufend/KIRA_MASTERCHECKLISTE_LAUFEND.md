@@ -259,9 +259,9 @@
 **Erledigt am:** —
 
 ### B-04 — Leni Gmail-Draft Passwort
-**Status:** ⚠️ Kai-Aktion (bereits bekannt)
+**Status:** ✅ Erledigt (session-uuu, 2026-04-02)
 **Was:** Passwort-Platzhalter im Gmail-Draft ersetzen
-**Erledigt am:** —
+**Erledigt am:** 2026-04-02
 
 ---
 
@@ -419,6 +419,21 @@
 **Ergebnis:** 141 Belege + 273 Kontakte + 52 Artikel — 0 Fehler.
 **Behoben am:** 2026-04-02 10:46 MEZ
 
+### C-16 — JS-Syntaxfehler: `closest()` in onclick + `{{}}` in regulaerer Python-String
+**Status:** 🐛✅ Behoben (session-vvv, 2026-04-02)
+**Gefunden am:** 2026-04-02 09:32 MEZ
+**Beschreibung:** 2 JavaScript-Syntaxfehler nach session-uuu-Aenderungen:
+  (1) `this.closest(\'#kira-approve-modal\')` und `this.closest(\'div[style*=fixed]\')` in
+  `onclick`-Attributen — die `\'` wurden zu `'` in der regulaeren Python-String und terminierten
+  den umgebenden JS-String-Delimiter, sodass `#kira` bzw. `div` als nackte Identifier gesehen wurden.
+  (2) `pfAlleKontenAbrufen` mit `{{...}}` (f-string-Stil) in `build_postfach()` regulaerer `"""..."""`-String
+  → `{{method:'POST',...}}` wurde als `{{method:...}}` ausgegeben → `Unexpected token '{'`.
+**Fix:**
+  (1) `closest(\'...\')` in onclick → `closest(&apos;...&apos;)` (HTML-Entity, wird vom Browser zu `'` vor JS-Ausfuehrung)
+  bzw. `document.getElementById(&apos;kira-approve-modal&apos;).remove()` fuer die spezifische Modal-ID.
+  (2) `pfAlleKontenAbrufen`: alle `{{` → `{` und `}}` → `}` korrigiert.
+**Behoben am:** 2026-04-02 09:36 MEZ
+
 ---
 
 ## BLOCK D — Zukunft / Spaetere Sessions
@@ -466,17 +481,16 @@
 | Bereich | Gesamt | Erledigt | Offen | Blockiert | Kai-Aktion |
 |---------|--------|----------|-------|-----------|------------|
 | Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
-| Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
-| Block C (Laufend) | 15 | 15 | 0 | 0 | 0 |
+| Block B (Kai) | 4 | 1 | 0 | 0 | 3 |
+| Block C (Laufend) | 16 | 16 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **46** | **38** | **1** | **0** | **4** |
+| **Gesamt** | **47** | **40** | **1** | **0** | **3** |
 
-> Block-A 16/16 komplett. Block-C 15/15 (C-01..C-15 alle behoben).
+> Block-A 16/16 komplett. Block-C 16/16 (C-01..C-16 alle behoben).
 > session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
-> Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
-> session-sss: C-02..C-07 (Lexware Full-Width, Chip, Sync-Pagination, SMTP-Admin, GitHub-Token, esNavTo).
-> session-ttt: C-08..C-14 (ARCHIVER_DIR-Pfad, OAuth-Konto-Liste, Reconnect-Flow, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN).
-> session-uuu: C-15 (Lexware Belege-Sync HTTP-400-Fix + fehler_details-Array). 141 Belege/273 Kontakte/52 Artikel fehlerfrei.
+> Block-B 1/4: B-04 erledigt (Kai 2026-04-02). B-01..B-03 noch offen (Cloudflare, Azure, WhatsApp).
+> session-sss: C-02..C-07. session-ttt: C-08..C-14. session-uuu: C-15 Lexware-Sync-Fix.
+> session-vvv: C-16 JS-Syntaxfehler (closest/onclick/pfAlleKontenAbrufen). B-04 als erledigt markiert.
 
 ---
 
