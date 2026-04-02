@@ -955,3 +955,21 @@
 ⚠️ B2/B3: LLM-Warnung im Dashboard + ntfy-Push
 ⚠️ Phase 3: Newsletter-Intelligence (News-Kachel, Feedback-Buttons)
 **Status:** offen — Siehe KLASSIFIZIERUNG_CHECKLISTE.md
+
+---
+## 2026-04-02 23:00 — Session-Start (session-www, Kontext-Fortsetzung)
+**Auftrag:** Qualifizierungs-Tool fertigbauen, Einstellungen-UI, Nachtlauf starten (Kai schläft)
+**Status:** offen
+
+### 2026-04-02 23:15 — qualify_mails() Syntax-Check + API-Endpoints
+**Erledigt:** qualify_mails() in daily_check.py syntax-geprüft (OK). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status in server.py hinzugefügt. _api_mail_qualifizieren() + _api_mail_qualifizieren_status() Handler.
+**Status:** erledigt
+
+### 2026-04-02 23:30 — Einstellungen-UI Qualifizierung
+**Erledigt:** Neuer Abschnitt "Historische Mail-Qualifizierung" in Einstellungen > Mail-Klassifizierung. Zeitraum Von/Bis, Modus-Dropdown (Nur klassifizieren / Mit Aufgaben), Task-ab-Datum (conditional), Progress-Bar + Status-Text, esMailQualifizieren() JS-Funktion mit Polling.
+**Commit:** cbf5401
+**Status:** erledigt
+
+### 2026-04-02 23:45 — Nachtlauf Phase 1 gestartet
+**Gestartet:** qualify_mails('2021-01-01', '2025-12-31', modus='nur_klassifizieren') — 11.334 INBOX-Mails, läuft im Hintergrund.
+**Status:** offen — wartet auf Abschluss

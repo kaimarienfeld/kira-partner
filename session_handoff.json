@@ -1,6 +1,6 @@
 {
-  "last_session": "session-vvv",
-  "date": "2026-04-02 21:30",
+  "last_session": "session-www",
+  "date": "2026-04-02 23:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -241,9 +241,12 @@
     "Kira Tagesstart-Briefing Dashboard Widget (seit session-zz: generate_daily_briefing() + Tagesbriefing Zone-A)",
     "D-01 Kira Live-Chip (seit session-zz: kiraLiveChip + 4 Status-CSS-Klassen + onclick Activity-Drawer)",
     "D-02 Activity-Drawer (seit session-zz: kiraActivityDrawer Slide-In + kiraActivityDrawerOpen/Close)",
-    "D-11 Partner-View Tour (partner_view.html: Tour-Engine mit Kai/Leni-Schritte, Overlay, Dots)"
+    "D-11 Partner-View Tour (partner_view.html: Tour-Engine mit Kai/Leni-Schritte, Overlay, Dots)",
+    "session-vvv (2026-04-02): Mail-Klassifizierung komplett repariert — 8 kaskadierende Fehler behoben. Formular-Mails (noreply@) als Leads erkennen (Step 1b). Textfenster 1200→3000 Zeichen. Domain-Level schon-beantwortet→E-Mail-Level. Universelle Geschäfts-Keywords (30+). Smarter Fallback anfrage@/info@. LLM-Fehler sichtbar (Logging+Marker). System-Prompt universell aus config.json. Klassifizierung in mail_index.db. Thread-ID in Tasks. Thread-basierte Task-Zusammenführung. Pflegbare Keywords in config.json. Trockenlauf: 4,5× mehr Tasks (2→9). Commits: 27acc81, 5133857, b68f66c, 9cc770a.",
+    "session-vvv-cont: Lexware-Kontext in LLM-Klassifizierung eingebaut (_get_lexware_kontext() in llm_classifier.py). Commit bdc4552.",
+    "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren."
   ],
-  "next_step": "KLASSIFIZIERUNG: D6 Keywords-UI in Einstellungen + D7 Nachklassifizierung echt ausfuehren + B2 LLM-Warnung im Dashboard. Dann Phase 3 Newsletter-Intelligence. Siehe KLASSIFIZIERUNG_CHECKLISTE.md",
+  "next_step": "QUALIFIZIERUNG-ERGEBNIS PRÜFEN: Phase 1 (2021-2025 nur klassifizieren) abwarten, dann Phase 2 (2026 mit Tasks). Dann: D6 Keywords-UI + B2 LLM-Dashboard-Warnung + Phase 3 Newsletter-Intelligence. Siehe KLASSIFIZIERUNG_CHECKLISTE.md",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

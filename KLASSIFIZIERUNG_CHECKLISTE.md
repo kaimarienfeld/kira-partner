@@ -46,7 +46,7 @@
 | D4 | Thread-basierte Task-Zusammenfuehrung | ✅ Erledigt (session-vvv) | 27acc81 | mail_monitor.py: Folgemail → bestehenden Task updaten |
 | D5 | Pflegbare Keywords in config.json | ✅ Erledigt (session-vvv) | 27acc81 | mail_klassifizierung.eigene_keywords Array |
 | D6 | **Pflegbare Keywords in Einstellungen-UI** | ⚠️ Offen | — | Input-Feld in Einstellungen > Mail-Klassifizierung |
-| D7 | **Nachklassifizierung mit neuen Fixes ausfuehren** | ⚠️ Offen | — | Feb+Maerz Mails echt nachklassifizieren (kein dry_run) |
+| D7 | **Historische Qualifizierung (12.000+ Mails)** | 🔄 Läuft (session-www) | cbf5401 | qualify_mails() + UI + API gebaut. Nachtlauf 2021-2025 gestartet |
 
 ---
 
@@ -123,3 +123,6 @@
 |-------|---------|-----|
 | 2026-04-02 | session-vvv | Phase 1 (A1-A7, B1, C1-C2) + Phase 2 (D1-D5) implementiert |
 | 2026-04-02 | session-vvv | Formular-Klassifizierung gefixt (Step 1b in mail_classifier.py) |
+| 2026-04-02 | session-vvv | Lexware-Kontext in LLM-Klassifizierung (bdc4552) |
+| 2026-04-02 | session-www | qualify_mails() + Einstellungen-UI + API-Endpoints (cbf5401) |
+| 2026-04-02 | session-www | Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren |
