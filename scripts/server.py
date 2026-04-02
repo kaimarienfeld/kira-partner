@@ -2256,7 +2256,7 @@ function pfRefreshBadge() {
         const fid='pf-fi-'+safe+'_'+ord.name.replace(/[^a-z0-9]/gi,'_');
         const el=document.getElementById(fid);
         if(el) {
-          const b=el.querySelector('.pf-folder-badge');
+          const b=el.querySelector('.pf-folder-badge,.pf-folder-badge-inbox');
           if(ord.unread>0) {
             if(b) b.textContent=ord.unread;
             else { const s=document.createElement('span');s.className='pf-folder-badge';s.textContent=ord.unread;el.appendChild(s); }
@@ -2886,11 +2886,11 @@ function pfRenderFolders(data, onReady) {
         const _isSnooze= _fn.includes('erinnern');
         let _badge = '';
         if(_isInbox && ord.unread>0)
-          _badge = '<span class="pf-folder-badge-inbox">'+ord.unread+'</span>';
+          _badge = '<span class="pf-folder-badge">'+ord.unread+'</span>';
         else if(_isDraft && (ord.count||0)>0)
-          _badge = '<span class="pf-folder-badge-draft">'+(ord.count)+'</span>';
+          _badge = '<span class="pf-folder-badge pf-folder-badge-draft">'+(ord.count)+'</span>';
         else if(_isSnooze && (ord.count||0)>0)
-          _badge = '<span class="pf-folder-badge-snooze">'+(ord.count)+'</span>';
+          _badge = '<span class="pf-folder-badge pf-folder-badge-snooze">'+(ord.count)+'</span>';
         else if(ord.unread>0)
           _badge = '<span class="pf-folder-badge">'+ord.unread+'</span>';
         item.innerHTML = pfFolderIconWrap(ord.name)
@@ -2933,9 +2933,16 @@ function pfRenderFolders(data, onReady) {
     kiraFolders.forEach(kf=>{
       const ki=document.createElement('div');
       ki.className='pf-folder-item'; ki.id='pf-kira-folder-'+kf.status;
-      ki.innerHTML='<span style="font-size:14px;min-width:18px;text-align:center">'+kf.icon+'</span><span style="flex:1">'+kf.label+'</span>';
+      ki.innerHTML='<span style="font-size:14px;min-width:18px;text-align:center">'+kf.icon+'</span><span style="flex:1">'+kf.label+'</span><span class="pf-folder-badge" id="pf-kira-badge-'+kf.status+'" style="display:none"></span>';
       ki.onclick=()=>pfSelectKiraFolder(kf.status);
       tree.appendChild(ki);
+    });
+    // Kira-Ausgang Badges laden (je Status einzeln)
+    kiraFolders.forEach(function(kf){
+      fetch('/api/mail/approve/pending?status='+kf.status).then(r=>r.json()).then(d=>{
+        var badge=document.getElementById('pf-kira-badge-'+kf.status);
+        if(badge && d.count>0){ badge.textContent=d.count; badge.style.display=''; }
+      }).catch(function(){});
     });
 
     _pfUpdateSidebarBadge();
@@ -3570,7 +3577,7 @@ function pfRenderMailItem(m, container) {
       +'<span class="pf-item-absender">'+esc(absender)+'</span>'
       +(m.flagged?'<span class="pf-item-flag-badge" title="Gekennzeichnet">&#x2691;</span>':'<span class="pf-item-flag-badge" style="display:none" title="Gekennzeichnet">&#x2691;</span>')
       +(m.pinned?'<span class="pf-item-pin-badge" title="Angeheftet">&#x1F4CD;</span>':'<span class="pf-item-pin-badge" style="display:none" title="Angeheftet">&#x1F4CD;</span>')
-      +(m.ist_buchhaltung?'<span style="background:#059669;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px" title="Buchhaltung / Lexware">&#x1F4B2;</span>':'')
+      +(m.ist_buchhaltung?'<span style="font-size:11px;margin-left:3px;opacity:.7" title="Buchhaltung / Lexware">&#x1F4B2;</span>':'')
       +(m.kira_verwendet?'<span class="pf-item-kira-badge" title="Von Kira verwendet">Kira</span>':'')
       +(m.snooze_until?'<span class="pf-item-snooze-badge" title="Erneut erinnern: '+esc(m.snooze_until)+'">&#x23F0;</span>':'')
       +(m.hat_thread&&m.thread_count>1?'<span class="pf-thread-badge" title="'+m.thread_count+' Nachrichten in diesem Thread">'+m.thread_count+'</span>':'')
@@ -14713,29 +14720,77 @@ function lxBelegDetail(lexId) {{
       }}
       // Belegformat/Dokument
       var docHtml = '';
-      var files = det.files || [];
-      if(files.length > 0){{
+      var _fRaw = det.files;
+      var _fArr = Array.isArray(_fRaw) ? _fRaw : (_fRaw && typeof _fRaw === 'object' ? [_fRaw] : []);
+      if(_fArr.length > 0){{
         docHtml = '<div class="lx-det-sec">DOKUMENTE</div>';
-        files.forEach(function(f){{ docHtml += '<div style="font-size:var(--fs-xs)">&#x1F4C4; ' + _esc(f.name||f.id||'Datei') + '</div>'; }});
+        _fArr.forEach(function(f){{ docHtml += '<div style="font-size:var(--fs-xs)">&#x1F4C4; ' + _esc(f.name||f.id||f.documentFileId||'Datei') + '</div>'; }});
       }} else {{
         docHtml = '<div class="lx-det-sec">DOKUMENT</div><div style="font-size:var(--fs-xs);color:var(--muted)">PDF (Standard-Belegformat)</div>';
       }}
+      // Kontakt-Daten (aus Backend-kontakt Objekt oder Fallback)
+      var kontaktHtml = '';
+      var kontaktId = b.kontakt_id || det.contactId || pl.contactId || '';
+      var kontaktName = b.kontakt_name || det.contactName || pl.contactName || '';
+      var kt = d.kontakt || {{}};
+      if(kt.name) kontaktName = kt.name;
+      var addr = kt.adresse_billing || kt.adresse || {{}};
+      if(kontaktName){{
+        kontaktHtml = '<div class="lx-det-sec">KUNDE</div>'
+          + '<div style="font-weight:600">' + _esc(kontaktName) + '</div>';
+        if(kt.kundennummer) kontaktHtml += '<div style="font-size:var(--fs-xs);color:var(--muted)">Nr. ' + _esc(kt.kundennummer) + '</div>';
+        if(addr.strasse||addr.street) kontaktHtml += '<div style="font-size:var(--fs-xs);color:var(--muted)">' + _esc(addr.strasse||addr.street) + '</div>';
+        if(addr.plz||addr.zip||addr.ort||addr.city) kontaktHtml += '<div style="font-size:var(--fs-xs);color:var(--muted)">' + _esc((addr.plz||addr.zip||'')+' '+(addr.ort||addr.city||'')) + '</div>';
+        if(kt.email_business||kt.email) kontaktHtml += '<div style="font-size:var(--fs-xs);color:var(--muted)">&#x2709; ' + _esc(kt.email_business||kt.email) + '</div>';
+        if(kt.telefon) kontaktHtml += '<div style="font-size:var(--fs-xs);color:var(--muted)">&#x260E; ' + _esc(kt.telefon) + '</div>';
+        if(kontaktId) kontaktHtml += '<div style="margin-top:4px"><a href="https://app.lexoffice.de/customer/#/'+kontaktId+'" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none">&#x1F517; Kundenmanager &ouml;ffnen</a></div>';
+      }}
+      // Bezahlt-am (bei paid: updatedDate als Annaeherung, oder closingDate)
+      var paidDateHtml = '';
+      if(b.status === 'paid' || b.status === 'paidoff'){{
+        var paidD = det.closingDate || updatedDate || '';
+        if(paidD) paidDateHtml = '<div><span class="lx-det-lbl" style="color:#16a34a">Bezahlt am:</span> <b style="color:#16a34a">' + _fmtDat(paidD) + '</b></div>';
+      }}
+      // PDF-Vorschau (aus files oder Render-URL)
+      var pdfHtml = '';
+      var _fl = det.files;
+      var _files2 = Array.isArray(_fl) ? _fl : (_fl && typeof _fl === 'object' ? [_fl] : []);
+      var pdfFile = _files2.length > 0 ? _files2.find(function(f){{ return (f.documentFileType||'').toLowerCase()==='pdf'||/\\.pdf/i.test(f.name||''); }}) || _files2[0] : null;
+      if(pdfFile){{
+        pdfHtml = '<div style="margin:8px 0;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg-raised)">'
+          + '<div style="display:flex;align-items:center;gap:8px">'
+          + '<span style="font-size:20px">&#x1F4C4;</span>'
+          + '<div><div style="font-size:var(--fs-xs);font-weight:600">' + _esc(pdfFile.name||'Rechnung.pdf') + '</div>'
+          + '<div style="font-size:10px;color:var(--muted)">PDF (Lexware Office)</div></div>'
+          + '</div></div>';
+      }}
+      // Aktionen-Toolbar (oben, wie Lexware Office)
+      var actionsTop = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">'
+        + '<button class="btn btn-sec btn-xs" onclick="lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)" title="Mit Kira besprechen" style="display:flex;align-items:center;gap:3px"><span style="font-size:13px">&#x1F916;</span></button>'
+        + '<button class="btn btn-sec btn-xs" onclick="showLexSec(&apos;zahlungen&apos;)" title="Zahlungen" style="display:flex;align-items:center;gap:3px"><span style="font-size:13px">&#x1F4B3;</span></button>'
+        + (pdfFile ? '<button class="btn btn-sec btn-xs" title="PDF" style="display:flex;align-items:center;gap:3px"><span style="font-size:13px">&#x1F5B6;</span></button>' : '')
+        + '<a href="https://app.lexoffice.de/voucher/#/'+_esc(b.lexware_id)+'" target="_blank" class="btn btn-sec btn-xs" title="In Lexware Office oeffnen" style="display:flex;align-items:center;gap:3px;text-decoration:none"><span style="font-size:13px">&#x1F517;</span></a>'
+        + '</div>';
       // Zusammenbau
       content.innerHTML = '<div style="line-height:1.7">'
+        // Aktionen oben
+        + actionsTop
         // Header: Belegnummer + Typ-Badge
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
         + '<div style="font-weight:700;font-size:16px">' + _esc(b.nummer||'—') + '</div>'
         + '<span class="' + stCls + '">' + stLabel + '</span>'
         + '</div>'
-        + '<div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:12px">' + (typ_labels[b.typ]||b.typ||'') + '</div>'
+        + '<div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">' + (typ_labels[b.typ]||b.typ||'') + '</div>'
         + overdueInfo
+        // PDF-Vorschau
+        + pdfHtml
         // Zeitstempel-Block
         + '<div class="lx-det-sec">BELEGE-DATEN</div>'
         + '<div><span class="lx-det-lbl">Belegdatum:</span> ' + _fmtDat(b.datum) + '</div>'
         + (createdDate ? '<div><span class="lx-det-lbl">Erstellt am:</span> ' + _fmtDat(createdDate) + '</div>' : '')
         + (updatedDate ? '<div><span class="lx-det-lbl">Aktualisiert:</span> ' + _fmtDat(updatedDate) + '</div>' : '')
-        + '<div><span class="lx-det-lbl">Kontakt:</span> <b>' + _esc(b.kontakt_name||'—') + '</b></div>'
         + (faelligDat ? '<div><span class="lx-det-lbl">Faelligkeit:</span> ' + _fmtDat(faelligDat) + '</div>' : '')
+        + paidDateHtml
         + servicePeriod
         + validUntil
         // Betraege
@@ -14743,19 +14798,14 @@ function lxBelegDetail(lexId) {{
         + ((!priceHtml && b.brutto) ? '<div class="lx-det-sec">BETRAG</div><div style="font-weight:700;font-size:15px">' + _fmtEur(b.brutto, b.waehrung) + '</div>' : '')
         // Zahlungen / Offener Betrag
         + openAmt
+        // Kunde
+        + kontaktHtml
         // Positionen
         + posHtml
         // Zahlungsbedingungen
         + payHtml
         // Zugehoerige Belege
         + relHtml
-        // Dokumente
-        + docHtml
-        // Aktionen
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">'
-        + '<button class="btn btn-primary btn-xs" onclick="lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)">&#x1F916; Kira</button>'
-        + '<button class="btn btn-sec btn-xs" onclick="showLexSec(&apos;zahlungen&apos;)">&#x1F4B3; Zahlungen</button>'
-        + '</div>'
         + '</div>';
     }}).catch(e => {{
       if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
@@ -24503,6 +24553,57 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         d["total_price"] = detail["totalPrice"]
             except Exception as e:
                 d["detail_error"] = str(e)
+            # Kontaktdaten nachladen (Adresse, E-Mail, Kundennummer)
+            contact_id = d.get("kontakt_id") or ""
+            if not contact_id and d.get("detail"):
+                contact_id = d["detail"].get("contactId", "")
+            if contact_id:
+                try:
+                    krow = db.execute(
+                        "SELECT name, email, adresse_json, payload_json FROM lexware_kontakte WHERE lexware_id=?",
+                        (contact_id,)
+                    ).fetchone()
+                    if krow:
+                        kontakt = {"name": krow[0] or "", "email": krow[1] or ""}
+                        if krow[2]:
+                            try: kontakt["adresse"] = json.loads(krow[2])
+                            except Exception: pass
+                        if krow[3]:
+                            try:
+                                kpl = json.loads(krow[3])
+                                # Rollen (Kundennummer etc.)
+                                roles = kpl.get("roles", {})
+                                cust = roles.get("customer", {})
+                                if cust.get("number"):
+                                    kontakt["kundennummer"] = cust["number"]
+                                # E-Mail-Adressen
+                                emails = kpl.get("emailAddresses", {})
+                                if emails.get("business"):
+                                    kontakt["email_business"] = emails["business"]
+                                elif emails.get("office"):
+                                    kontakt["email_business"] = emails["office"]
+                                # Telefon
+                                phones = kpl.get("phoneNumbers", {})
+                                if phones.get("business"):
+                                    kontakt["telefon"] = phones["business"]
+                                elif phones.get("mobile"):
+                                    kontakt["telefon"] = phones["mobile"]
+                                # Billing-Adresse aus payload
+                                addrs = kpl.get("addresses", {})
+                                billing = addrs.get("billing", [])
+                                if billing and len(billing) > 0:
+                                    ba = billing[0]
+                                    kontakt["adresse_billing"] = {
+                                        "strasse": ba.get("street", ""),
+                                        "plz": ba.get("zip", ""),
+                                        "ort": ba.get("city", ""),
+                                        "land": ba.get("countryCode", "DE"),
+                                    }
+                            except Exception:
+                                pass
+                        d["kontakt"] = kontakt
+                except Exception:
+                    pass
             self._json(d)
         finally:
             db.close()

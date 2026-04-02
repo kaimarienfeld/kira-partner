@@ -435,7 +435,9 @@ def _save_token_cache(cache, path):
 
 
 def get_oauth2_token(konto):
-    """Holt OAuth2 Access Token aus dem KIRA-App-Cache (silent)."""
+    """Holt OAuth2 Access Token aus dem KIRA-App-Cache (silent).
+    Retry-Logik: bei Netzwerk-/Timeout-Fehlern bis zu 2 Wiederholungen.
+    Cache wird auch nach Refresh-Token-Nutzung gespeichert."""
     email_addr = konto["email"]
     # Immer zentrale KIRA-App nutzen — per-konto oauth2_client_id ist veraltet.
     # start_oauth_browser_flow() speichert immer unter KIRA-App-Client-ID.
@@ -451,14 +453,47 @@ def get_oauth2_token(konto):
             version_path.unlink()
         app, cache, cache_path = _msal_app_kira(email_addr)  # neu initialisieren
 
-    # Silent aus Cache
-    accounts = app.get_accounts(username=email_addr)
-    if accounts:
-        result = app.acquire_token_silent(OAUTH_SCOPES, account=accounts[0])
-        if result and "access_token" in result:
-            _save_token_cache(cache, cache_path)
-            version_path.write_text(OAUTH_SCOPE_VERSION)
-            return result["access_token"]
+    # Silent aus Cache — mit Retry bei Netzwerk-Fehlern
+    MAX_RETRIES = 2
+    last_error = None
+    for attempt in range(MAX_RETRIES + 1):
+        accounts = app.get_accounts(username=email_addr)
+        if accounts:
+            try:
+                result = app.acquire_token_silent(OAUTH_SCOPES, account=accounts[0])
+            except Exception as e:
+                last_error = e
+                if attempt < MAX_RETRIES:
+                    import time
+                    time.sleep(2 * (attempt + 1))
+                    log.warning(f"OAuth2 silent retry {attempt+1} für {email_addr}: {e}")
+                    # Cache neu laden (evtl. wurde er extern aktualisiert)
+                    app, cache, cache_path = _msal_app_kira(email_addr)
+                    continue
+                else:
+                    log.error(f"OAuth2 silent fehlgeschlagen nach {MAX_RETRIES+1} Versuchen für {email_addr}: {e}")
+                    break
+            if result and "access_token" in result:
+                _save_token_cache(cache, cache_path)
+                version_path.write_text(OAUTH_SCOPE_VERSION)
+                return result["access_token"]
+            elif result and "error" in result:
+                err_desc = result.get("error_description", result.get("error", ""))
+                log.warning(f"OAuth2 silent Fehler für {email_addr}: {err_desc}")
+                # Bei interaction_required: Token abgelaufen, kein Retry sinnvoll
+                if "interaction_required" in str(result.get("error", "")):
+                    break
+                if attempt < MAX_RETRIES:
+                    import time
+                    time.sleep(2 * (attempt + 1))
+                    continue
+            else:
+                break  # Kein result oder kein Token — kein Retry
+        else:
+            break  # Kein Account im Cache
+
+    # Cache trotzdem speichern (MSAL könnte Refresh-Token intern aktualisiert haben)
+    _save_token_cache(cache, cache_path)
 
     # Kein Token → Reconnect über UI-Wizard erforderlich (kein Device-Flow)
     log.warning(f"OAuth2 Token fehlt für {email_addr} — Reconnect über Einstellungen nötig")
@@ -718,22 +753,31 @@ def get_volltest_status(job_id: str) -> dict:
         return dict(_volltest_jobs.get(job_id, {"status": "unbekannt"}))
 
 
-def imap_connect(konto):
-    """IMAP-Verbindung via OAuth2 (Microsoft/Google) oder IMAP-Passwort."""
+def imap_connect(konto, _retry=0):
+    """IMAP-Verbindung via OAuth2 (Microsoft/Google) oder IMAP-Passwort.
+    Bei Verbindungs-/Auth-Fehlern: 1 Retry mit frischem Token."""
     server = konto.get("imap_server", "outlook.office365.com")
     port = int(konto.get("imap_port", 993))
     use_ssl = konto.get("imap_ssl", True)
     email_addr = konto["email"]
     auth_methode = konto.get("auth_methode", "oauth2_microsoft")
 
-    if use_ssl:
-        imap = imaplib.IMAP4_SSL(server, port)
-    else:
-        imap = imaplib.IMAP4(server, port)
-        try:
-            imap.starttls()
-        except:
-            pass
+    try:
+        if use_ssl:
+            imap = imaplib.IMAP4_SSL(server, port)
+        else:
+            imap = imaplib.IMAP4(server, port)
+            try:
+                imap.starttls()
+            except:
+                pass
+    except (OSError, TimeoutError, ConnectionError) as e:
+        if _retry < 1:
+            import time
+            log.warning(f"IMAP-Verbindung fehlgeschlagen ({email_addr}), Retry in 5s: {e}")
+            time.sleep(5)
+            return imap_connect(konto, _retry=_retry + 1)
+        raise
 
     try:
         imap.sock.settimeout(IMAP_TIMEOUT)
@@ -751,9 +795,23 @@ def imap_connect(konto):
         imap.login(login, passwort)
     else:
         # OAuth2 (Microsoft XOAUTH2 / Google) — auth_methode: oauth2, oauth2_microsoft, oauth2_google
-        token = get_oauth2_token(konto)
-        auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01".encode("utf-8")
-        imap.authenticate("XOAUTH2", lambda x: auth_string)
+        try:
+            token = get_oauth2_token(konto)
+            auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01".encode("utf-8")
+            imap.authenticate("XOAUTH2", lambda x: auth_string)
+        except imaplib.IMAP4.error as e:
+            # XOAUTH2-Auth abgelehnt — bei erstem Versuch Token-Cache leeren und Retry
+            if _retry < 1 and "AUTHENTICATE" in str(e).upper():
+                log.warning(f"XOAUTH2 Auth fehlgeschlagen ({email_addr}), Token-Cache leeren + Retry: {e}")
+                try:
+                    imap.logout()
+                except:
+                    pass
+                # Token-Cache-Datei nicht loeschen — MSAL Refresh soll erneut versucht werden
+                import time
+                time.sleep(3)
+                return imap_connect(konto, _retry=_retry + 1)
+            raise
 
     return imap
 
@@ -1747,16 +1805,33 @@ def poll_all_accounts():
         try:
             imap = imap_connect(konto)
         except Exception as e:
-            log.error(f"IMAP-Verbindung fehlgeschlagen für {email_addr}: {e}")
-            _update_status(last_error=f"{email_addr}: {e}")
             err_str = str(e).lower()
-            with _health_lock:
-                _account_health[email_addr] = {
-                    "status": "auth_fehler" if any(k in err_str for k in ("auth", "login", "token")) else "fehler",
-                    "error": str(e)[:200], "inbox_count": 0,
-                    "last_check": datetime.now().isoformat(),
-                }
-            continue
+            is_token_expired = "token_abgelaufen" in err_str
+            is_transient = any(k in err_str for k in ("timeout", "timed out", "connection", "reset", "broken pipe", "eof"))
+            # Bei transienten Fehlern: einmal Retry nach 10s
+            if is_transient and not is_token_expired:
+                log.warning(f"IMAP transient error für {email_addr}, Retry in 10s: {e}")
+                import time
+                time.sleep(10)
+                try:
+                    imap = imap_connect(konto)
+                except Exception as e2:
+                    log.error(f"IMAP-Verbindung fehlgeschlagen (Retry) für {email_addr}: {e2}")
+                    e = e2
+                    err_str = str(e2).lower()
+                else:
+                    # Retry erfolgreich — weiter zum normalen Flow
+                    e = None
+            if e is not None:
+                log.error(f"IMAP-Verbindung fehlgeschlagen für {email_addr}: {e}")
+                _update_status(last_error=f"{email_addr}: {e}")
+                with _health_lock:
+                    _account_health[email_addr] = {
+                        "status": "auth_fehler" if any(k in err_str for k in ("auth", "login", "token")) else "fehler",
+                        "error": str(e)[:200], "inbox_count": 0,
+                        "last_check": datetime.now().isoformat(),
+                    }
+                continue
 
         # IMAP verbunden → Health auf ok setzen
         with _health_lock:
