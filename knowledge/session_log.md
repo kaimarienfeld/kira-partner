@@ -924,3 +924,34 @@
 **Erledigt:** FileWatcher-Thread (5 Kerndateien, 15s Poll), GET /api/server/check-update, Client-Polling 30s mit rotem Fixed-Banner + Toast. Verifiziert via Playwright (Banner sichtbar).
 **Commit:** 5ba938c
 **Status:** erledigt
+
+---
+
+## 2026-04-02 21:00 — Session-Start (session-vvv)
+**Auftrag:** Mail-Klassifizierung komplett reparieren. 12.592 Mails → nur 131 Tasks (1%). Root-Cause-Analyse + Reparatur der kompletten Pipeline. 8 kaskadierende Fehler + 1 kritischer Formular-Bug identifiziert und behoben. Master-Checkliste erstellen.
+**Status:** offen
+
+### 2026-04-02 21:00 — Root-Cause-Analyse + Plan
+**Erledigt:** 8 Fehlerursachen identifiziert: (1) "Zur Kenntnis" skip, (2) Textfenster 400-1200 Zeichen, (3) enge Keywords, (4) stiller LLM-Fallback, (5) Domain-Level "beantwortet", (6) leerer System-Prompt, (7) keine Thread-Verknüpfung, (8) kein Speichern der Klassifizierung. Plan in whimsical-frolicking-dawn.md erstellt.
+**Status:** erledigt
+
+### 2026-04-02 21:15 — Phase 1+2+3 Code-Änderungen
+**Erledigt:** 7 Python-Dateien geändert (daily_check, mail_classifier, llm_classifier, kira_llm, mail_monitor, server). Alle Syntax-Checks bestanden.
+**Commit:** 27acc81
+**Status:** erledigt
+
+### 2026-04-02 21:25 — Kritischer Formular-Bug entdeckt + gefixt
+**Erledigt:** Landing-Page-Benachrichtigungen (noreply@raumkult.eu) matchten SYSTEM_SENDER_PATTERNS → 20+ Leads/Monat als "Ignorieren" klassifiziert. Fix: Step 1b in classify_mail() erkennt Formular-Muster VOR System-Sender-Check. extract_form_customer_email() fuer alle 3 Einstiegspunkte.
+**Commit:** 5133857
+**Status:** erledigt
+
+### 2026-04-02 21:30 — Trockenlauf + Master-Checkliste
+**Erledigt:** Trockenlauf Jan 2026: 203 Mails → 2 Tasks (korrekt: Rest = Tests/System/beantwortet). Feb+Mär läuft noch. KLASSIFIZIERUNG_CHECKLISTE.md erstellt mit 4 Phasen, Analyse was eingebaut/offen, 6 offene Fragen.
+**Status:** erledigt
+
+### 2026-04-02 21:30 — Offene Punkte
+⚠️ D6: Keywords-UI in Einstellungen fehlt noch
+⚠️ D7: Echte Nachklassifizierung (kein dry_run) steht aus
+⚠️ B2/B3: LLM-Warnung im Dashboard + ntfy-Push
+⚠️ Phase 3: Newsletter-Intelligence (News-Kachel, Feedback-Buttons)
+**Status:** offen — Siehe KLASSIFIZIERUNG_CHECKLISTE.md
