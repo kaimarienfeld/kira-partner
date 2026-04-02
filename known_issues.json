@@ -1,5 +1,5 @@
 {
-  "_updated": "2026-04-02 16:45 session-zzz — alle Issues fixed, keine offenen",
+  "_updated": "2026-04-02 19:45 session-aaaa — 3 neue fixed Issues (Skonto/Filter/Umlaute)",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
@@ -165,7 +165,9 @@
       "discovered": "2026-03-27",
       "session": "session-o",
       "fix_suggestion": "fetch('/api/tasks') → fetch('/api/tasks/open') und badge-count aus data.tasks.length korrekt auslesen.",
-      "lines": [4918],
+      "lines": [
+        4918
+      ],
       "workaround": "Kein funktionaler Schaden, rein kosmetisches Konsolen-Problem.",
       "to_verify": []
     },
@@ -183,7 +185,9 @@
       "discovered": "2026-03-27",
       "session": "session-o",
       "fix_suggestion": "In renderKiraAufgaben(): ';closeKira()' aus onclick entfernen. Stattdessen nach a.action: showKTab('chat') aufrufen um zum Chat zu wechseln. Idealerweise task-spezifischen Kontext in kiraInput setzen.",
-      "lines": [4216],
+      "lines": [
+        4216
+      ],
       "workaround": "Aufgaben-Items aus dem Aufgaben-Tab nicht anklicken. Stattdessen direkt im Chat-Tab manuell über die Aufgabe schreiben.",
       "to_verify": []
     },
@@ -285,7 +289,7 @@
     },
     {
       "id": "ISS-003",
-      "status": "open",
+      "status": "fixed",
       "priority": "low",
       "module": "scripts/server.py",
       "area": "python",
@@ -293,9 +297,15 @@
       "description": "3 SyntaxWarnings für ungültige Escape-Sequences in Regex-Patterns (Zeilen 4789-4791). Pre-existing, nicht durch session-g/h eingeführt.",
       "discovered": "2026-03-27",
       "session": "session-h",
-      "lines": [4789, 4790, 4791],
+      "lines": [
+        4789,
+        4790,
+        4791
+      ],
       "workaround": "Raw-Strings (r'...') verwenden wenn die Zeilen angefasst werden",
-      "to_verify": []
+      "to_verify": [],
+      "fixed": "2026-03-30 session-jj",
+      "fix_summary": "Alle 7 SyntaxWarnings in server.py behoben (JS-Regex-Escapes)"
     },
     {
       "id": "ISS-004",
@@ -388,6 +398,45 @@
       "fix_summary": "3. positionales Arg auf betreff[:100] geändert (korrekte summary), Kategorie+Konfidenz+Absender ins result-Feld verschoben",
       "workaround": null,
       "to_verify": []
+    },
+    {
+      "id": "ISS-032",
+      "status": "fixed",
+      "priority": "important",
+      "module": "scripts/server.py",
+      "area": "lexware",
+      "title": "Skonto in Beleg-Details nicht sichtbar",
+      "description": "Skonto-Analyse wurde im ZAHLUNGSBEDINGUNGEN-Block gerendert, der nur bei vorhandenem paymentTermLabel angezeigt wird. Viele Belege haben kein paymentTermLabel, daher war Skonto unsichtbar.",
+      "discovered": "2026-04-02 17:30 MEZ",
+      "fixed": "2026-04-02 18:00 MEZ",
+      "session": "session-aaaa",
+      "fix_summary": "Skonto-Analyse in den BETRAEGE-Block verschoben, der immer gerendert wird wenn Preise vorhanden sind."
+    },
+    {
+      "id": "ISS-033",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/server.py",
+      "area": "lexware",
+      "title": "Belege-Filter (Typ + Status) funktionslos",
+      "description": "lxFilterBelege() las Zellen-Text (cells[N].textContent) und verglich mit Dropdown-Werten (z.B. 'Rechnung' vs 'invoice', 'Ueberfaellig' vs 'overdue'). Zusaetzlich falsche Spalten-Indizes nach Tabellen-Aenderungen.",
+      "discovered": "2026-04-02 18:15 MEZ",
+      "fixed": "2026-04-02 18:45 MEZ",
+      "session": "session-aaaa",
+      "fix_summary": "data-* Attribute auf <tr> (data-typ, data-status, data-datum etc.) + Filterung via dataset statt textContent. Neuer lxSortBelege() mit 12 Sortieroptionen."
+    },
+    {
+      "id": "ISS-034",
+      "status": "fixed",
+      "priority": "cosmetic",
+      "module": "scripts/server.py",
+      "area": "ui",
+      "title": "Umlaute als ae/oe/ue in UI-Labels",
+      "description": "~30 sichtbare Labels verwendeten ae/oe/ue statt echter deutscher Umlaute (Faelligkeit, BETRAEGE, Pruefen, etc.).",
+      "discovered": "2026-04-02 17:30 MEZ",
+      "fixed": "2026-04-02 18:00 MEZ",
+      "session": "session-aaaa",
+      "fix_summary": "Alle ~30 UI-Labels auf echte Umlaute korrigiert. Regel in CLAUDE.md und Memory gespeichert."
     }
   ]
 }

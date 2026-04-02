@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-hhh",
+  "_updated": "session-rrr",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -847,8 +847,31 @@
       "status": "done",
       "last_updated": "2026-04-01",
       "description": "window.kira_tour: start/next/prev/end/goTo. Spotlight-Overlay, Erklaerbox, Tab-Wechsel, Tastatursteuerung, runtime_log. 8 Tours: LEXWARE (21 Schritte), POSTFACH (8), GESCHAEFT (10), WISSEN (7), CAPTURE (7), KIRA (7), DASHBOARD (7), EINSTELLUNGEN (8). Erklaermodus sperrt Write-Buttons."
+    },
+    {
+      "id": "lexware-belege-filter-sort",
+      "name": "Lexware Belege Filter + Sortierung",
+      "status": "done",
+      "session": "session-aaaa",
+      "description": "data-*-Attribut-basierte Filterung + 12 Sortieroptionen (Datum/Faellig/Betrag/Kontakt/Belegnr/Letzte Aenderung x asc/desc)",
+      "leni_visible": false
+    },
+    {
+      "id": "lexware-belege-3col-layout",
+      "name": "Lexware 3-Spalten-Layout + Belegarten-Sidebar",
+      "status": "done",
+      "session": "session-aaaa",
+      "description": "Belegarten (Rechnungen/Gutschriften/Angebote/Mahnungen) als Sub-Navigation in Sidebar. Sticky Sidebar+Detail, nur Mittelspalte scrollbar.",
+      "leni_visible": false
+    },
+    {
+      "id": "lexware-skonto-betraege-ansicht",
+      "name": "Lexware Skonto-Analyse in Beleg-Details",
+      "status": "done",
+      "session": "session-aaaa",
+      "description": "Skonto-Prozent, Betrag, Frist, Aktiv/Abgelaufen, gezogen Ja/Nein, berechtigt Ja/Nein, Kira-Rueckforderungs-Button im BETRAEGE-Block",
+      "leni_visible": false
     }
   ],
-  "_total": 68,
-  "_updated": "session-rrr"
+  "_total": 68
 }
