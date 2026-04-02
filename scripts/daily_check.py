@@ -559,6 +559,7 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
                FROM mails
                WHERE datum >= ? AND datum < ?
                  AND folder = 'INBOX'
+                 AND (kategorie IS NULL OR kategorie = '')
                ORDER BY datum ASC"""
     kandidaten = mail_db.execute(query, (seit_datum, bis_datum + " 23:59:59")).fetchall()
     mail_db.close()
