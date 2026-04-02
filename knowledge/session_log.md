@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-04-02 18:00 — Session-aaaa Fortsetzung (Skonto + Umlaute)
+
+**Auftrag:** Skonto-Auflistung im Beträge-Block sichtbar machen + Umlaute-Korrektur app-weit + CLAUDE.md Regel
+
+**Erledigt:**
+- Skonto-Analyse aus ZAHLUNGSBEDINGUNGEN-Block in BETRÄGE-Block verschoben (war versteckt weil paymentTermLabel fehlte)
+- ~30 sichtbare UI-Labels korrigiert: Fälligkeit, BETRÄGE, ZUGEHÖRIGE, Gültig bis, Überfällig, Einträge, Prüfen, hinzufügen, ausführen, zurück, Änderung, etc.
+- CLAUDE.md global: Umlaut-Regel aktualisiert (war "Keine Umlaute" → jetzt "Immer echte Umlaute in sichtbarem Text")
+- CLAUDE.md projekt: Sektion 2 Umlaute-Regel hinzugefügt
+- Playwright-Test: 0 JS-Fehler, Skonto-Box sichtbar (3% = 148,82 EUR, ABGELAUFEN), alle Umlaute korrekt
+
+**Git:** 09f6169
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 17:45 — Session-Ende (session-aaaa)
 
 **Auftrag:** UI-Batch: Dollar-Badge, Doppel-Badges, Kira-Ausgang-Badges, Lexware Detail-Upgrade (Aktionen/PDF/Bezahlt-am/Kunde/Kundenmanager), Mail-Verbindungsstabilitaet + Faelligkeitsdatum + Skonto-Analyse + Typ-Farbsystem
