@@ -7463,10 +7463,6 @@ function esInfoPopup(btn, text) {{
                 ? `<button class="es-mk-btn sec" onclick="esMkToggleAktiv('${{k.email}}',true,this)">&#x25B6; Aktivieren</button>`
                 : `<button class="es-mk-btn" onclick="esMkAbrufen('${{k.email}}',this)">&#x25BA; Abrufen</button>
                    <button class="es-mk-btn sec" onclick="esMkVolltest('${{k.email}}',this)">&#x26A1; Verbindung testen</button>
-                   <button class="es-mk-btn sec" onclick="esMkSmtpTest('${{k.email}}',this)" title="SMTP-Verbindung testen und Testmail senden">SMTP testen</button>
-                   <button class="es-mk-btn sec" onclick="esMkImapTest('${{k.email}}',this)" title="IMAP-Verbindung pruefen und Ordner abrufen">IMAP pruefen</button>
-                   <div id="es-mk-smtp-res-${{safe}}" style="display:none;font-size:var(--fs-xs);margin-top:4px;padding:2px 0"></div>
-                   <div id="es-mk-imap-res-${{safe}}" style="display:none;font-size:var(--fs-xs);margin-top:4px;padding:2px 0"></div>
                    <span id="es-mk-recon-${{safe}}" style="${{needsReconnect?'':'display:none'}}"><button class="es-mk-btn warn" onclick="esMkReconnect('${{k.email}}',this)">&#x21BA; Verbindung wiederherstellen</button></span>
                    <button class="es-mk-btn warn" onclick="esMkToggleAktiv('${{k.email}}',false,this)" title="Konto deaktivieren — Archiv bleibt erhalten">&#x23F8; Deaktivieren</button>`
               }}
@@ -10353,9 +10349,9 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">GitHub Personal Access Token</div>
-              <div class="adm-field-hint">Fuer Partner-View GitHub-Sync &middot; ghp_...</div>
+              <div class="adm-field-hint">Fuer Partner-View GitHub-Sync &middot; ghp_... &middot; <span id="adm-gh-status" style="color:var(--muted)">Pruefe...</span></div>
             </div>
-            <input id="adm-f-github" type="password" class="adm-inp" placeholder="ghp_...">
+            <input id="adm-f-github" type="password" class="adm-inp" placeholder="ghp_..." autocomplete="new-password">
             <button class="adm-show-btn" onclick="admToggle('adm-f-github')">&#x1F441;</button>
           </div>
           <div class="adm-field">
@@ -10457,8 +10453,10 @@ def build_admin():
             <input id="adm-f-smtp-empf" type="email" class="adm-inp adm-inp-wide" placeholder="kai@raumkult.eu">
           </div>
         </div>
-        <div class="es-save-bar">
+        <div class="es-save-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="admSaveSection('smtp')">&#x1F4BE; Speichern</button>
+          <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an Empfaenger-Adresse senden">&#x2709; SMTP testen</button>
+          <span id="adm-smtp-test-res" style="font-size:12px;font-weight:600;margin-left:4px"></span>
           <span id="adm-save-smtp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
         </div>
       </div>
@@ -10585,10 +10583,10 @@ def build_admin():
           <div class="adm-cf-step-box">
             <div class="adm-cf-step-num">1</div>
             <div class="adm-cf-step-body">
-              <div class="adm-cf-step-title">cloudflared.exe herunterladen</div>
-              <div class="adm-cf-step-hint">Einmaliger Download des Cloudflare Tunnel Clients (~11 MB, von GitHub).</div>
+              <div class="adm-cf-step-title">cloudflared.exe laden &amp; installieren</div>
+              <div class="adm-cf-step-hint">Download in System-Downloads-Ordner (~11 MB, von GitHub). Danach startet die Installation automatisch.</div>
               <div id="adm-cf-dl-row" style="display:flex;gap:8px;align-items:center;margin-top:6px">
-                <button class="btn btn-sec btn-xs" id="adm-cf-dl-btn" onclick="admCfDownload()">&#x2B07; cloudflared.exe herunterladen</button>
+                <button class="btn btn-primary btn-xs" id="adm-cf-dl-btn" onclick="admCfDownload()">&#x2B07; Laden und installieren</button>
                 <span id="adm-cf-dl-status" style="font-size:11px;color:var(--muted)"></span>
               </div>
             </div>
@@ -10731,19 +10729,21 @@ function admCfToggle() {
 function admCfDownload() {
   const btn = document.getElementById('adm-cf-dl-btn');
   const st = document.getElementById('adm-cf-dl-status');
-  if(btn) { btn.disabled = true; btn.textContent = 'Lade...'; }
-  if(st) st.textContent = 'Download laeuft...';
+  if(btn) { btn.disabled = true; btn.textContent = 'Lade & installiere...'; }
+  if(st) st.textContent = 'Download laeuft (~11 MB)...';
   fetch('/api/admin/cf/download', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
     .then(r=>r.json()).then(d=>{
-      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 cloudflared.exe herunterladen'; }
+      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 Laden und installieren'; }
       if(d.ok) {
-        if(st) st.innerHTML = '<span style="color:#28c850">\u2713 Heruntergeladen: ' + (d.path||'') + '</span>';
-        showToast('cloudflared.exe heruntergeladen', 'ok');
+        const loc = d.path ? ' \u2192 ' + d.path : '';
+        const inst = d.install_info ? ('<br><small style="color:var(--muted)">' + escH(d.install_info) + '</small>') : '';
+        if(st) st.innerHTML = '<span style="color:#28c850">\u2713 ' + (d.already?'Bereits vorhanden':'Heruntergeladen') + loc + '</span>' + inst;
+        showToast('\u2713 cloudflared.exe bereit', 'ok');
       } else {
-        if(st) st.innerHTML = '<span style="color:#e84545">\u26A0 ' + (d.error||'Fehler') + '</span>';
+        if(st) st.innerHTML = '<span style="color:#e84545">\u26A0 ' + escH(d.error||'Fehler') + '</span>';
       }
     }).catch(e=>{
-      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 cloudflared.exe herunterladen'; }
+      if(btn) { btn.disabled = false; btn.textContent = '\u2B07 Laden und installieren'; }
       if(st) st.innerHTML = '<span style="color:#e84545">Netzwerkfehler</span>';
     });
 }
@@ -10784,6 +10784,29 @@ function admCfCopyCmd() {
   } else {
     try { const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);showToast('Befehl kopiert','ok'); } catch(e) {}
   }
+}
+
+function admSmtpTest() {
+  var btn = document.getElementById('adm-smtp-test-btn');
+  var res = document.getElementById('adm-smtp-test-res');
+  if(btn) { btn.disabled = true; btn.textContent = '...'; }
+  if(res) res.innerHTML = '';
+  var server  = document.getElementById('adm-f-smtp-server')?.value || '';
+  var port    = parseInt(document.getElementById('adm-f-smtp-port')?.value || '587');
+  var email   = document.getElementById('adm-f-smtp-email')?.value || '';
+  var pw      = document.getElementById('adm-f-smtp-pw')?.value || '';
+  var empf    = document.getElementById('adm-f-smtp-empf')?.value || email;
+  fetch('/api/ntfy/test', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({smtp_server:server, smtp_port:port, smtp_email:email, smtp_password:pw, to:empf, _type:'smtp'})
+  }).then(r=>r.json()).then(d=>{
+    if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
+    if(res) res.innerHTML = d.ok
+      ? '<span style="color:#22c55e">\u2713 Testmail gesendet an '+escH(empf||email)+'</span>'
+      : '<span style="color:#dc2626">\u2717 '+escH(d.error||'Fehler')+'</span>';
+  }).catch(e=>{
+    if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
+    if(res) res.innerHTML = '<span style="color:#dc2626">\u2717 Netzwerkfehler: '+escH(String(e))+'</span>';
+  });
 }
 
 function admLogin() {
@@ -10833,7 +10856,12 @@ function admLoadData() {
     var s = d.secrets || {}, c = d.config || {};
     var setVal = function(id, v) { var el=document.getElementById(id); if(el&&v!=null&&v!==undefined) el.value=v; };
     setVal('adm-f-anthropic', s.anthropic_api_key);
-    setVal('adm-f-github', s.github_pat);
+    var ghTok = s.github_pat || s.partner_feedback_token || '';
+    setVal('adm-f-github', ghTok);
+    var ghStat = document.getElementById('adm-gh-status');
+    if(ghStat) ghStat.innerHTML = ghTok
+      ? '<span style="color:#22c55e">\u2713 Token hinterlegt (' + ghTok.slice(0,12) + '****)</span>'
+      : '<span style="color:#f59e0b">\u26A0 Kein Token gespeichert</span>';
     var lx = c.lexware || {};
     setVal('adm-f-lex-key', lx.api_key);
     setVal('adm-f-lex-url', lx.api_base_url);
@@ -13782,28 +13810,41 @@ function showLexTab(tabId) {{
 
 function lexSync(mode) {{
   const log = document.getElementById('lx-sync-log');
-  if(log) log.textContent = 'Synchronisierung laeuft...';
-  _rtlog('ui','lex_sync_start','Lexware Sync gestartet: '+(mode||'belege'),{{submodul:'lexware',context_type:'sync',status:'ok'}});
+  const syncMode = mode || 'full';
+  if(log) log.textContent = 'Synchronisierung laeuft (' + syncMode + ')...';
+  _rtlog('ui','lex_sync_start','Lexware Sync gestartet: '+syncMode,{{submodul:'lexware',context_type:'sync',status:'ok'}});
+  // Sync-Button waehrend Lauf deaktivieren
+  document.querySelectorAll('.lx-sync-btn,[onclick*="lexSync"]').forEach(b=>{{b.disabled=true;}});
   fetch('/api/lexware/sync', {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{mode: mode || 'belege'}})
+    body: JSON.stringify({{mode: syncMode}})
   }}).then(r => r.json()).then(d => {{
+    document.querySelectorAll('.lx-sync-btn,[onclick*="lexSync"]').forEach(b=>{{b.disabled=false;}});
     if(d.ok) {{
-      if(log) log.textContent = 'Sync abgeschlossen: ' + JSON.stringify(d.stats);
-      _rtlog('ui','lex_sync_done','Sync abgeschlossen: '+JSON.stringify(d.stats||{{}}),{{submodul:'lexware',context_type:'sync',status:'ok'}});
-      setTimeout(() => location.reload(), 1500);
+      const st = d.stats || {{}};
+      let lines = [];
+      if(st.belege)   lines.push('\u2713 Belege: '+(st.belege.neu||0)+' neu, '+(st.belege.aktualisiert||0)+' akt., '+(st.belege.fehler||0)+' Fehler');
+      if(st.kontakte) lines.push('\u2713 Kontakte: '+(st.kontakte.neu||0)+' neu, '+(st.kontakte.aktualisiert||0)+' akt., '+(st.kontakte.fehler||0)+' Fehler');
+      if(st.artikel)  lines.push('\u2713 Artikel: '+(st.artikel.neu||0)+' neu, '+(st.artikel.aktualisiert||0)+' akt., '+(st.artikel.fehler||0)+' Fehler');
+      const summary = lines.join(' | ');
+      if(log) log.textContent = summary || 'Sync abgeschlossen';
+      _rtlog('ui','lex_sync_done','Sync: '+summary,{{submodul:'lexware',context_type:'sync',status:'ok'}});
+      showToast('\u2713 Sync abgeschlossen: '+summary, 'ok');
+      // Daten neu laden ohne Seitenwechsel
+      lxLoadSection(document.querySelector('.lx-nav-btn.active')?.dataset?.sec || 'cockpit');
     }} else {{
       if(log) log.textContent = 'Fehler: ' + (d.error||'?');
       _rtlog('ui','lex_sync_fehler',d.error||'Fehler',{{submodul:'lexware',context_type:'sync',status:'fehler'}});
       window._lexLastErr = d;
       showSimpleModal('Sync-Fehler',
         '<p style="color:var(--danger);margin-bottom:8px">&#x2717; Synchronisierung fehlgeschlagen</p>' +
-        '<pre style="white-space:pre-wrap;font-size:var(--fs-xs);background:var(--bg-raised);padding:8px;border-radius:4px;max-height:180px;overflow-y:auto">' + escH(d.error||'Unbekannter Fehler') + '</pre>' +
-        '<div style="margin-top:8px"><button class="btn-primary" onclick="copyErrorDetails(window._lexLastErr);closeModal()" style="font-size:var(--fs-xs)">Details kopieren</button></div>'
+        '<pre style="white-space:pre-wrap;font-size:var(--fs-xs);background:var(--bg-raised);padding:8px;border-radius:4px;max-height:220px;overflow-y:auto">' + escH(d.error||'Unbekannter Fehler') + '</pre>' +
+        '<div style="margin-top:8px"><button class="btn btn-sec btn-xs" onclick="copyErrorDetails(window._lexLastErr);closeModal()">Fehlerdetails kopieren</button></div>'
       );
     }}
   }}).catch(e => {{
+    document.querySelectorAll('.lx-sync-btn,[onclick*="lexSync"]').forEach(b=>{{b.disabled=false;}});
     if(log) log.textContent = 'Netzwerkfehler: ' + e;
     _rtlog('ui','lex_sync_fehler','Netzwerkfehler: '+String(e),{{submodul:'lexware',context_type:'sync',status:'fehler'}});
     window._lexLastErr = {{error: String(e)}};
@@ -13840,12 +13881,36 @@ function lexTestConnection() {{
     .then(r => r.json()).then(d => {{
       if(log) log.textContent = d.ok ? ('OK: ' + JSON.stringify(d.info, null, 2)) : ('FEHLER: ' + d.error);
       const dot = document.getElementById('lx-status-dot');
-      if(dot) dot.style.background = d.ok ? '#22c55e' : '#dc2626';
+      if(dot) {{
+        dot.className = 'lx-chip ' + (d.ok ? 'lx-chip-ok' : 'lx-chip-err');
+        dot.innerHTML = '&#x25CF; ' + (d.ok ? 'Verbunden' : 'Fehler');
+      }}
+      const dot2 = document.getElementById('lx-status-dot2');
+      if(dot2) dot2.style.background = d.ok ? '#22c55e' : '#dc2626';
       _lxShowTestResult(d.ok, d.ok ? null : (d.error || JSON.stringify(d)));
     }}).catch(e => {{
       if(log) log.textContent = 'Fehler: ' + e;
       _lxShowTestResult(false, String(e));
     }});
+}}
+
+function lxLoadSection(secId) {{
+  // Aktuellen Abschnitt neu laden ohne Seitenwechsel
+  const sec = document.getElementById('lx-sec-' + (secId||'cockpit'));
+  if(!sec) {{ showToast('\u2713 Sync abgeschlossen','ok'); return; }}
+  fetch('/api/lexware/cockpit').then(r=>r.json()).then(d=>{{
+    const kpiRow = document.getElementById('lx-kpi-row');
+    if(kpiRow && d.kpis) {{
+      kpiRow.querySelectorAll('.lx-kpi-n').forEach((el,i)=>{{
+        const keys=['offen','ueberfaellig','angebote','kontakte','artikel','eingang'];
+        if(d.kpis[keys[i]]!==undefined) el.textContent=d.kpis[keys[i]];
+      }});
+    }}
+  }}).catch(()=>{{}});
+  fetch('/api/lexware/status').then(r=>r.json()).then(d=>{{
+    const syncTs = document.querySelector('.lx-chip-muted');
+    if(syncTs && d.last_sync_ts) syncTs.textContent = 'Sync: '+d.last_sync_ts.slice(0,16);
+  }}).catch(()=>{{}});
 }}
 
 function lexLoadSyncLog() {{
@@ -17499,7 +17564,7 @@ function loadDashKalender() {{
     if(!d.ok){{
       const msg=d.error||'';
       if(msg.toLowerCase().indexOf('berechtigung')>=0||msg.toLowerCase().indexOf('scope')>=0||msg.toLowerCase().indexOf('token')>=0){{
-        list.innerHTML='<div style="font-size:11px;color:var(--muted)">&#x26A0; Azure-Berechtigung fehlt &mdash; <a onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esNavTo(\\'mail\\'),100)" style="cursor:pointer;color:var(--accent)">Kira-Postfach einrichten</a></div>';
+        list.innerHTML='<div style="font-size:11px;color:var(--muted)">&#x26A0; Azure-Berechtigung fehlt &mdash; <a onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'mail\\'),100)" style="cursor:pointer;color:var(--accent)">Kira-Postfach einrichten</a></div>';
       }}else{{
         list.innerHTML='<span style="font-size:11px;color:var(--muted)">Kalender nicht verfugbar</span>';
       }}
@@ -17526,7 +17591,7 @@ function loadOrgKalender() {{
         errHtml+='<div style="font-size:24px">&#x26A0;</div>'
           +'<div style="font-weight:600;margin:8px 0">Azure-Berechtigung erforderlich</div>'
           +'<div style="font-size:12px">Fur den Kalender-Zugriff muss die Berechtigung<br><code>Calendars.Read</code> in der Azure-App aktiviert sein.</div>'
-          +'<div style="margin-top:12px"><button onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esNavTo(\\'mail\\'),100)" style="font-size:12px;padding:5px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer">Kira-Postfach-Einstellungen</button></div>';
+          +'<div style="margin-top:12px"><button onclick="showPanel(\\'einstellungen\\');setTimeout(()=>esShowSec(\\'mail\\'),100)" style="font-size:12px;padding:5px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer">Kira-Postfach-Einstellungen</button></div>';
       }}else{{
         errHtml+='<div style="font-size:20px">&#x1F4C5;</div><div style="margin-top:8px;font-size:13px">'+escH(msg||'Kalender nicht verfugbar')+'</div>';
       }}
@@ -18688,6 +18753,9 @@ a:hover{text-decoration:underline;}
 .panel.pf-panel{padding:0;max-width:none;overflow:hidden}
 /* Dashboard: full-width, no max-width constraint */
 #panel-dashboard{max-width:none;padding:20px 24px 80px;}
+/* Lexware: Vollbreite, kein Padding, Sidebar+Content nutzen gesamten Platz */
+#panel-lexware{max-width:none;padding:0;overflow:hidden;display:none;}
+#panel-lexware.active{display:flex;flex-direction:column;}
 
 /* Planned module shell */
 .planned-shell{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:340px;text-align:center;padding:60px 30px;}
@@ -18898,7 +18966,7 @@ a:hover{text-decoration:underline;}
 
 /* Lexware Office Panel (session-fff — UI Komplettausbau) */
 /* Modul-Shell */
-.lx-module{display:flex;flex-direction:column;gap:0;height:100%;}
+.lx-module{display:flex;flex-direction:column;gap:0;height:100%;flex:1;}
 .lx-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
 .lx-header-left{flex:1;min-width:0;}
 .lx-header-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
@@ -20001,6 +20069,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._html(html)
             except FileNotFoundError:
                 self.send_error(404, 'partner_view.html nicht gefunden')
+
+        elif self.path == '/api/partner/get-token':
+            try:
+                secs_path = SCRIPTS_DIR / 'secrets.json'
+                secs = json.loads(secs_path.read_bytes()) if secs_path.exists() else {}
+                token = secs.get('partner_feedback_token') or secs.get('github_pat') or ''
+                # Token maskieren: nur Prefix zeigen, Rest als *
+                masked = (token[:12] + '****') if len(token) > 12 else ('****' if token else '')
+                self._json({'ok': True, 'token': token, 'masked': masked, 'has_token': bool(token)})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
 
         elif self.path == '/api/tasks/open':
             db = get_db()
@@ -24297,6 +24376,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         # ntfy Test-Push
         if self.path == '/api/ntfy/test':
+            # SMTP-Direkttest vom Admin-Bereich
+            if body.get('_type') == 'smtp':
+                try:
+                    import smtplib, ssl
+                    smtp_server = body.get('smtp_server','').strip()
+                    smtp_port   = int(body.get('smtp_port', 587))
+                    smtp_email  = body.get('smtp_email','').strip()
+                    smtp_pw     = body.get('smtp_password','').strip()
+                    to_addr     = (body.get('to') or smtp_email).strip()
+                    if not smtp_server or not smtp_email:
+                        self._json({'ok': False, 'error': 'SMTP-Server und Absender-E-Mail benoetigt'})
+                        return
+                    ctx = ssl.create_default_context()
+                    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as srv:
+                        srv.starttls(context=ctx)
+                        if smtp_pw:
+                            srv.login(smtp_email, smtp_pw)
+                        msg = f"From: {smtp_email}\r\nTo: {to_addr}\r\nSubject: KIRA SMTP-Test\r\n\r\nTestmail von KIRA - Verbindung erfolgreich!"
+                        srv.sendmail(smtp_email, [to_addr], msg.encode('utf-8'))
+                    self._json({'ok': True, 'info': f'Testmail an {to_addr} gesendet'})
+                except Exception as e:
+                    self._json({'ok': False, 'error': str(e)})
+                return
             try:
                 import urllib.request as _urlreq
                 topic  = (body.get('topic') or '').strip()
@@ -24322,6 +24424,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': st < 300})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Partner-View: GitHub-Token speichern
+        if self.path == '/api/partner/save-token':
+            try:
+                token = (body.get("token") or "").strip()
+                if token:
+                    secs_path = SCRIPTS_DIR / "secrets.json"
+                    secs = json.loads(secs_path.read_bytes()) if secs_path.exists() else {}
+                    secs["partner_feedback_token"] = token
+                    secs["github_pat"] = token
+                    secs_path.write_text(json.dumps(secs, ensure_ascii=False, indent=2), "utf-8")
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
             return
 
         # Partner-View: Leni-Feedback als GitHub-Issue anlegen
@@ -26402,6 +26519,7 @@ def _method_api_admin_save(self, body):
                 secs["anthropic_api_key"] = data["anthropic_api_key"]
             if data.get("github_pat"):
                 secs["github_pat"] = data["github_pat"]
+                secs["partner_feedback_token"] = data["github_pat"]  # sync beider Felder
             if "provider_keys" in data and isinstance(data["provider_keys"], dict):
                 old_prov = secs.get("provider_keys", {})
                 old_prov.update({k: v for k, v in data["provider_keys"].items() if v})
@@ -26472,20 +26590,31 @@ def _method_api_admin_save(self, body):
         self._json({"ok": False, "error": str(e)})
 
 def _method_api_admin_cf_download(self):
-    """POST /api/admin/cf/download — Laedt cloudflared.exe von GitHub Releases herunter."""
+    """POST /api/admin/cf/download — Laedt cloudflared.exe in System-Downloads und startet Installation."""
     try:
         import urllib.request as _ulr
-        import ssl as _ssl
-        dest = SCRIPTS_DIR / "cloudflared.exe"
-        if dest.exists():
-            self._json({"ok": True, "path": str(dest), "info": "Bereits vorhanden"})
-            return
-        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-        ctx = _ssl.create_default_context()
-        with _ulr.urlopen(url, timeout=60, context=ctx) as resp:
-            data = resp.read()
-        dest.write_bytes(data)
-        self._json({"ok": True, "path": str(dest), "size_kb": len(data)//1024})
+        import ssl as _ssl, subprocess as _sp, os as _os
+        # System-Downloads-Ordner ermitteln (Windows: %USERPROFILE%\Downloads)
+        downloads_dir = Path(_os.environ.get("USERPROFILE", _os.path.expanduser("~"))) / "Downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        dest = downloads_dir / "cloudflared.exe"
+        already = dest.exists()
+        if not already:
+            url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+            ctx = _ssl.create_default_context()
+            with _ulr.urlopen(url, timeout=120, context=ctx) as resp:
+                data = resp.read()
+            dest.write_bytes(data)
+        # Installation als Windows-Dienst starten
+        install_info = ""
+        try:
+            result = _sp.run([str(dest), "service", "install"],
+                             capture_output=True, text=True, timeout=30)
+            install_info = result.stdout.strip() or result.stderr.strip() or "Dienst-Installation gestartet"
+        except Exception as ie:
+            install_info = f"Download OK, manuelle Installation noetig: {ie}"
+        self._json({"ok": True, "path": str(dest), "size_kb": dest.stat().st_size//1024,
+                    "already": already, "install_info": install_info})
     except Exception as e:
         self._json({"ok": False, "error": str(e)})
 

@@ -212,8 +212,11 @@ class LexwareClient:
                 params["voucherStatus"] = voucher_status
             result = self._request("GET", "/voucherlist", params=params)
             items = result.get("content", [])
+            if not items:
+                break
             all_items.extend(items)
-            if page >= result.get("totalPages", 1) - 1:
+            is_last = result.get("last", False)
+            if is_last or page >= result.get("totalPages", 1) - 1:
                 break
             page += 1
         return all_items
@@ -282,14 +285,18 @@ class LexwareClient:
         return self._request("GET", "/contacts", params=params)
 
     def get_all_contacts(self) -> list:
-        """Holt alle Kontakte (paginiert)."""
+        """Holt alle Kontakte (paginiert). Nutzt totalPages + last-Flag als Sicherheitsnetz."""
         all_contacts = []
         page = 0
         while True:
             result = self.get_contacts(page=page, size=100)
             items = result.get("content", [])
+            if not items:
+                break
             all_contacts.extend(items)
-            if page >= result.get("totalPages", 1) - 1:
+            total_pages = result.get("totalPages", 1)
+            is_last = result.get("last", False)
+            if is_last or page >= total_pages - 1:
                 break
             page += 1
         return all_contacts
@@ -331,14 +338,17 @@ class LexwareClient:
         return self._request("GET", "/articles", params=params)
 
     def get_all_articles(self) -> list:
-        """Holt alle Artikel (paginiert)."""
+        """Holt alle Artikel (paginiert). Nutzt totalPages + last-Flag als Sicherheitsnetz."""
         all_articles = []
         page = 0
         while True:
             result = self.get_articles(page=page, size=100)
             items = result.get("content", [])
+            if not items:
+                break
             all_articles.extend(items)
-            if page >= result.get("totalPages", 1) - 1:
+            is_last = result.get("last", False)
+            if is_last or page >= result.get("totalPages", 1) - 1:
                 break
             page += 1
         return all_articles

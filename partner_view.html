@@ -1469,6 +1469,20 @@ function loadAdminSettings() {
   if (!result.ntfy_kai) result.ntfy_kai=CFG.ntfy_kai||'';
   return result;
 }
+// Token aus KIRA-App nachladen (falls in secrets.json hinterlegt aber localStorage leer)
+function loadTokenFromKira() {
+  const s=JSON.parse(localStorage.getItem('kira_pv_admin')||'{}');
+  if (s.gh_token) return; // bereits vorhanden
+  fetch('http://localhost:8765/api/partner/get-token').then(r=>r.json()).then(d=>{
+    if(d.token) {
+      const s2=loadAdminSettings();
+      s2.gh_token=d.token;
+      localStorage.setItem('kira_pv_admin',JSON.stringify(s2));
+      const el=document.getElementById('cfg-gh-token');
+      if(el) el.value=d.token;
+    }
+  }).catch(()=>{});
+}
 function saveAdminSettings() {
   const s = loadAdminSettings();
   const upd = {
@@ -1694,8 +1708,12 @@ async function pushToGitHub() {
     syncLog('OK Erfolgreich gepusht!','ok');
     syncLog('GitHub Pages baut neu (~1 Minute)','info');
     const now=new Date().toLocaleString('de-DE');
+    s.gh_token=ghToken; // Token dauerhaft speichern
     s.last_push=now;s.last_push_ok=true;
     localStorage.setItem('kira_pv_admin',JSON.stringify(s));
+    // Token auch in KIRA-App sichern (secrets.json)
+    try { fetch('http://localhost:8765/api/partner/save-token',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ghToken})}); } catch(_){}
     fillAdminForm();showToast('Erfolgreich gepusht!','🚀');
     if (s.ntfy_leni_auto==='1'&&s.ntfy_leni){
       syncLog('Sende Push an Leni...','info');
@@ -1717,6 +1735,7 @@ async function pushToGitHub() {
   } catch(e) {
     syncLog(`FEHLER: ${e.message}`,'err');
     const s2=loadAdminSettings();s2.last_push=new Date().toLocaleString('de-DE');s2.last_push_ok=false;
+    if(ghToken) s2.gh_token=ghToken; // Token auch bei Fehler nicht verlieren
     localStorage.setItem('kira_pv_admin',JSON.stringify(s2));fillAdminForm();
     showToast('Push fehlgeschlagen — Details im Log','✗');
   } finally {
@@ -1957,6 +1976,7 @@ function showAdminTab(tab,btn) {
   else document.querySelector(`.atab-btn[onclick*="'${tab}'"]`)?.classList.add('active');
   document.getElementById('atab-'+tab)?.classList.add('active');
   if (tab==='feedback') loadGitHubFeedback();
+  if (tab==='github') loadTokenFromKira();
 }
 async function loadGitHubFeedback() {
   const el=document.getElementById('gh-issues-list');
