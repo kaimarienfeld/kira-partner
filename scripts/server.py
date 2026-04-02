@@ -1460,15 +1460,15 @@ def build_postfach():
         <div class="pf-rbn-sep" id="pf-rbn-kira-sep" style="display:none"></div>
         <div class="pf-rbn-group" id="pf-rbn-kira-group" style="display:none">
           <div class="pf-rbn-actions">
-            <button class="pf-rbn-tool" id="pf-rb-kira-approve" onclick="pfKiraMailFreigeben(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf freigeben und senden" style="color:#10b981">
+            <button class="pf-rbn-tool" id="pf-rb-kira-approve" onclick="pfKiraMailFreigeben(window._pfCurrentKiraItem&&window._pfCurrentKiraItem.id)" title="Kira-Entwurf freigeben und senden" style="color:#10b981">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               <span>Freigeben</span>
             </button>
-            <button class="pf-rbn-tool" id="pf-rb-kira-edit" onclick="pfKiraMailBearbeiten(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf bearbeiten" style="color:#93c5fd">
+            <button class="pf-rbn-tool" id="pf-rb-kira-edit" onclick="pfKiraMailBearbeiten(window._pfCurrentKiraItem&&window._pfCurrentKiraItem.id)" title="Kira-Entwurf bearbeiten" style="color:#93c5fd">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               <span>Bearbeiten</span>
             </button>
-            <button class="pf-rbn-tool" id="pf-rb-kira-reject" onclick="pfKiraMaillAblehnen(_pfCurrentKiraItem&&_pfCurrentKiraItem.id)" title="Kira-Entwurf ablehnen" style="color:#ef4444">
+            <button class="pf-rbn-tool" id="pf-rb-kira-reject" onclick="pfKiraMaillAblehnen(window._pfCurrentKiraItem&&window._pfCurrentKiraItem.id)" title="Kira-Entwurf ablehnen" style="color:#ef4444">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               <span>Ablehnen</span>
             </button>
@@ -3027,9 +3027,9 @@ function pfRenderKiraMailItem(item, list) {
 }
 
 // ── Kira-Mail im Viewer anzeigen ──────────────────────────
-var _pfCurrentKiraItem = null;
+window._pfCurrentKiraItem = null;
 function pfShowKiraMail(item) {
-  _pfCurrentKiraItem = item;
+  window._pfCurrentKiraItem = item;
   _pfCurrentMail = null;
   _pfCurrentMsgId = null;
   pfRibbonUpdateState(true);
@@ -3070,7 +3070,7 @@ function pfShowKiraMail(item) {
 }
 
 window.pfKiraMailFreigeben = function(id) {
-  const item = _pfCurrentKiraItem;
+  const item = window._pfCurrentKiraItem;
   if(!item) return;
   // Konto-Liste laden dann Modal zeigen
   fetch('/api/mail/konten').then(r=>r.json()).then(function(kdata) {
@@ -3147,7 +3147,7 @@ window.pfKiraMailFreigebenSend = function(id, btn) {
     });
 };
 window.pfKiraMailBearbeiten = function(id) {
-  const item=_pfCurrentKiraItem; if(!item) return;
+  const item=window._pfCurrentKiraItem; if(!item) return;
   var oldText=item.body_plain||'';
   var modal=document.createElement('div');
   modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;';
@@ -3423,7 +3423,7 @@ function pfRibbonCheckEdges() {
 }
 
 window.pfRibbonUpdateState = function(mailSelected) {
-  var isKiraMail = mailSelected && !!_pfCurrentKiraItem;
+  var isKiraMail = mailSelected && !!window._pfCurrentKiraItem;
   // Normal mail actions: disabled when no regular mail OR when Kira-mail is active
   document.querySelectorAll('.pf-rbn-mail-dep').forEach(btn => {
     btn.classList.toggle('disabled', !mailSelected || isKiraMail);
@@ -3596,7 +3596,7 @@ window.pfOpenMail = function(m, el) {
   _pfActiveItem = el; if(el) el.classList.add('active');
   _pfCurrentMail = m;
   _pfCurrentMsgId = m.message_id || null;
-  _pfCurrentKiraItem = null;
+  window._pfCurrentKiraItem = null;
   pfUpdateBulkBar();
   pfRibbonUpdateState(true);
   document.getElementById('pf-preview-empty').style.display = 'none';
