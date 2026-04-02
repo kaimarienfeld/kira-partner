@@ -11764,7 +11764,7 @@ def build_lexware(db):
 
     # ── Hilfsfunktion: Belegzeile fuer Cockpit-Tabelle ──
     def _mini_beleg_row(b):
-        st_map = {"open": "Offen", "overdue": "&#220;berf&#228;llig", "paid": "Bezahlt", "draft": "Entwurf", "voided": "Storniert"}
+        st_map = {"open": "Offen", "overdue": "&#220;berf&#228;llig", "paid": "Bezahlt", "draft": "Entwurf", "voided": "Storniert", "accepted": "Angenommen", "rejected": "Abgelehnt", "paidoff": "Abgezahlt", "sepadebit": "SEPA-Lastschrift"}
         st = b.get("status", "")
         st_label = st_map.get(st, esc(st))
         return (
@@ -11955,7 +11955,7 @@ def build_lexware(db):
     # ── BELEGE Unterbereich ──
     def _beleg_row(b):
         st = b.get("status","")
-        _st_map = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert"}
+        _st_map = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert","accepted":"Angenommen","rejected":"Abgelehnt","paidoff":"Abgezahlt","sepadebit":"SEPA-Lastschrift"}
         st_label = _st_map.get(st, esc(st))
         st_cls = f"lx-st-chip lx-st-{st}"
         _typ_map = {"invoice":"Rechnung","creditnote":"Gutschrift","quotation":"Angebot","reminder":"Mahnung"}
@@ -11991,6 +11991,10 @@ def build_lexware(db):
     <option value="paid">Bezahlt</option>
     <option value="draft">Entwurf</option>
     <option value="voided">Storniert</option>
+    <option value="accepted">Angenommen</option>
+    <option value="rejected">Abgelehnt</option>
+    <option value="paidoff">Abgezahlt</option>
+    <option value="sepadebit">SEPA-Lastschrift</option>
   </select>
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
   <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
@@ -14569,7 +14573,7 @@ function lxBelegDetail(lexId) {{
   fetch('/api/lexware/beleg/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
       const b = d.beleg || d;
-      const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert'}};
+      const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert',accepted:'Angenommen',rejected:'Abgelehnt',paidoff:'Abgezahlt',sepadebit:'SEPA-Lastschrift'}};
       const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung'}};
       function _fmtDat(d){{ if(!d||d.length<10) return d||'-'; var p=d.substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
       content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
@@ -19580,6 +19584,10 @@ a:hover{text-decoration:underline;}
 .lx-st-klassifiziert{background:rgba(34,197,94,.12);color:#16a34a;}
 .lx-st-abgelegt{background:var(--bg-raised);color:var(--muted);border:1px solid var(--border);}
 .lx-st-unklar{background:rgba(220,38,38,.12);color:#dc2626;}
+.lx-st-accepted{background:rgba(34,197,94,.12);color:#16a34a;}
+.lx-st-rejected{background:rgba(220,38,38,.12);color:#dc2626;}
+.lx-st-paidoff{background:rgba(34,197,94,.18);color:#15803d;}
+.lx-st-sepadebit{background:rgba(59,130,246,.12);color:#2563eb;}
 /* Buchhaltung Unterbereich-Tabs */
 .lx-buch-nav{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;margin-bottom:0;}
 .lx-buch-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 12px;cursor:pointer;font-size:var(--fs-xs);font-family:inherit;white-space:nowrap;font-weight:500;transition:color .15s;}

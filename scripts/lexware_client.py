@@ -523,9 +523,9 @@ class LexwareClient:
                         "nummer":       b.get("voucherNumber", ""),
                         "status":       b.get("voucherStatus", ""),
                         "kontakt_id":   b.get("contactId", ""),
-                        "kontakt_name": (b.get("address") or {}).get("name", "") or b.get("contactId", ""),
-                        "netto":        b.get("totalPrice", {}).get("totalNetAmount", 0),
-                        "brutto":       b.get("totalPrice", {}).get("totalGrossAmount", 0),
+                        "kontakt_name": b.get("contactName", "") or (b.get("address") or {}).get("name", "") or b.get("contactId", ""),
+                        "netto":        b.get("totalPrice", {}).get("totalNetAmount", 0) or b.get("totalAmount", 0),
+                        "brutto":       b.get("totalPrice", {}).get("totalGrossAmount", 0) or b.get("totalAmount", 0),
                         "waehrung":     b.get("currency", "EUR"),
                         "datum":        (b.get("voucherDate") or "")[:10],
                         "faellig":      (b.get("dueDate") or "")[:10] if "dueDate" in b else "",
@@ -554,7 +554,35 @@ class LexwareClient:
                         """, row)
                         stats["neu"] += 1
                 db.commit()
-                # Kontakt-Namen aus lexware_kontakte nachschlagen (UUID → Name)
+                # Backfill: Betraege + contactName aus payload_json nachziehen
+                try:
+                    rows = db.execute(
+                        "SELECT lexware_id, payload_json FROM lexware_belege WHERE payload_json IS NOT NULL AND payload_json != ''"
+                    ).fetchall()
+                    for r in rows:
+                        try:
+                            p = json.loads(r[1])
+                            ta = p.get("totalAmount", 0)
+                            cn = p.get("contactName", "")
+                            tp = p.get("totalPrice") or {}
+                            brutto = tp.get("totalGrossAmount", 0) or ta
+                            netto = tp.get("totalNetAmount", 0) or ta
+                            updates = {}
+                            if brutto and brutto != 0:
+                                updates["brutto"] = brutto
+                                updates["netto"] = netto
+                            if cn:
+                                updates["kontakt_name"] = cn
+                            if updates:
+                                sets = ", ".join(f"{k}=?" for k in updates)
+                                vals = list(updates.values()) + [r[0]]
+                                db.execute(f"UPDATE lexware_belege SET {sets} WHERE lexware_id=?", vals)
+                        except Exception:
+                            pass
+                    db.commit()
+                except Exception:
+                    pass
+                # Kontakt-Namen aus lexware_kontakte nachschlagen (UUID → Name, ueberschreibt contactName falls vorhanden)
                 try:
                     db.execute("""
                         UPDATE lexware_belege SET kontakt_name = (

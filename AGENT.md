@@ -1,4 +1,4 @@
-# AGENT.md — Verbindliche Arbeitsregeln für Claude Code
+# AGENT.md und claude.md— Verbindliche Arbeitsregeln für Claude Code
 
 > Immer lesen vor Arbeitsbeginn. Stand: 2026-03-29
 
