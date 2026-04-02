@@ -49,7 +49,8 @@ PRIORITAETEN = ["hoch", "mittel", "niedrig"]
 def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent,
                                   angebote_kontext: str = "", correction_beispiele: str = "",
                                   kira_wissen: str = "", kunden_profil: str = "",
-                                  mail_verlauf: str = "", anhaenge: list = None):
+                                  mail_verlauf: str = "", anhaenge: list = None,
+                                  lexware_kontext: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:3000]
 
@@ -92,8 +93,17 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
 {mail_verlauf}
 """
 
+    lexware_block = ""
+    if lexware_kontext:
+        lexware_block = f"""
+{lexware_kontext}
+→ Nutze diese Daten: Offene Rechnungen/Angebote beeinflussen die Priorität.
+  Bekannter Lexware-Kunde → wahrscheinlich Bestandskunde, nicht Spam.
+  Überfällige Rechnungen + Mail vom Kunden → könnte Zahlungsbezug haben.
+"""
+
     return f"""Klassifiziere diese E-Mail für rauMKult® Sichtbeton (Betonkosmetik-Fachbetrieb).
-{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}
+{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}
 MAIL-DATEN:
 - Konto: {konto}
 - Absender: {absender}
@@ -329,6 +339,86 @@ def _get_kunden_profil(email: str) -> str:
         return ""
 
 
+def _get_lexware_kontext(email: str) -> str:
+    """Lädt Lexware-Daten (Belege, Kontakt, offene Rechnungen) für eine E-Mail-Adresse."""
+    if not email:
+        return ""
+    email = email.lower().strip()
+    try:
+        tdb = sqlite3.connect(str(TASKS_DB))
+        tdb.row_factory = sqlite3.Row
+        parts = []
+
+        # 1. Lexware-Kontakt finden (per E-Mail oder Domain-Match)
+        domain = email.split('@')[-1] if '@' in email else ''
+        kontakt = tdb.execute(
+            "SELECT name, email, lexware_id FROM lexware_kontakte WHERE LOWER(email)=? LIMIT 1",
+            (email,)
+        ).fetchone()
+        if not kontakt and domain:
+            kontakt = tdb.execute(
+                "SELECT name, email, lexware_id FROM lexware_kontakte WHERE LOWER(email) LIKE ? LIMIT 1",
+                (f'%@{domain}',)
+            ).fetchone()
+
+        if kontakt:
+            kid = kontakt["lexware_id"]
+            parts.append(f"Lexware-Kunde: {kontakt['name']} ({kontakt['email']})")
+
+            # 2. Belege für diesen Kontakt
+            belege = tdb.execute("""
+                SELECT typ, nummer, status, brutto, datum, waehrung
+                FROM lexware_belege
+                WHERE kontakt_id=?
+                ORDER BY datum DESC LIMIT 8
+            """, (kid,)).fetchall()
+
+            if belege:
+                offene = [b for b in belege if b["status"] in ("open", "overdue", "draft")]
+                bezahlt = [b for b in belege if b["status"] in ("paid", "paidoff")]
+                rechnungen = [b for b in belege if b["typ"] == "invoice"]
+                angebote_lx = [b for b in belege if b["typ"] == "quotation"]
+
+                beleg_info = []
+                if offene:
+                    summe = sum((b["brutto"] or 0) for b in offene)
+                    beleg_info.append(f"{len(offene)} offene Belege ({summe:,.2f} EUR)")
+                if bezahlt:
+                    beleg_info.append(f"{len(bezahlt)} bezahlt")
+                if rechnungen:
+                    beleg_info.append(f"{len(rechnungen)} Rechnungen")
+                if angebote_lx:
+                    acc = [a for a in angebote_lx if a["status"] == "accepted"]
+                    beleg_info.append(f"{len(angebote_lx)} Angebote ({len(acc)} angenommen)")
+
+                parts.append("Belege: " + ", ".join(beleg_info))
+
+                # Letzte Belege einzeln (kompakt)
+                for b in belege[:4]:
+                    st_map = {"open": "offen", "overdue": "überfällig", "paid": "bezahlt",
+                              "paidoff": "abgezahlt", "accepted": "angenommen",
+                              "rejected": "abgelehnt", "draft": "Entwurf"}
+                    st = st_map.get(b["status"], b["status"] or "?")
+                    parts.append(f"  {b['typ']:10s} {b['nummer'] or '':15s} {b['brutto'] or 0:>10.2f} EUR  {st:12s}  {(b['datum'] or '')[:10]}")
+        else:
+            # Kein Lexware-Kontakt gefunden — kurze Info
+            # Trotzdem nach Domain suchen in geschaeft-Tabelle
+            if domain:
+                gesc = tdb.execute(
+                    "SELECT COUNT(*) c FROM geschaeft WHERE LOWER(gegenpartei_email) LIKE ?",
+                    (f'%@{domain}',)
+                ).fetchone()
+                if gesc and gesc["c"] > 0:
+                    parts.append(f"Geschäftsbeziehung: {gesc['c']} Belege von Domain {domain}")
+
+        tdb.close()
+        if not parts:
+            return ""
+        return "LEXWARE-DATEN:\n" + "\n".join(parts)
+    except Exception:
+        return ""
+
+
 def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
     """
     Lädt die letzten Mails von/an diesen Absender aus mail_index.db.
@@ -522,13 +612,14 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         if not providers:
             raise RuntimeError("Kein Provider konfiguriert")
 
-        # Kontext-Anreicherung: Angebote-Abgleich + Korrekturen + Kira-Wissen + Kundenprofil + Mail-Verlauf
+        # Kontext-Anreicherung: Angebote + Korrekturen + Wissen + Kundenprofil + Verlauf + Lexware
         kunden_email_raw     = extract_email(absender)
         angebote_kontext     = _get_angebote_kontext(absender, text, mail_datum=mail_datum)
         correction_beispiele = _get_correction_beispiele()
         kira_wissen          = _get_kira_wissen()
         kunden_profil        = _get_kunden_profil(kunden_email_raw)
         mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw)
+        lexware_kontext      = _get_lexware_kontext(kunden_email_raw)
 
         prompt = _build_classification_prompt(
             konto, absender, betreff, text, folder, is_sent,
@@ -537,6 +628,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             kira_wissen=kira_wissen,
             kunden_profil=kunden_profil,
             mail_verlauf=mail_verlauf,
+            lexware_kontext=lexware_kontext,
             anhaenge=anhaenge,
         )
 
