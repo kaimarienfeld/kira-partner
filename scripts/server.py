@@ -16210,7 +16210,7 @@ function rtLogCopyAll() {{
   if(!box) return;
   const lines = [];
   box.querySelectorAll('div').forEach(row=>{{ if(row.textContent.trim()) lines.push(row.textContent.trim()); }});
-  const text = lines.join('\n');
+  const text = lines.join('\\n');
   if(!text) {{ showToast('Keine Eintr\u00e4ge zum Kopieren','warnung'); return; }}
   if(navigator.clipboard) {{ navigator.clipboard.writeText(text).then(()=>showToast('Log kopiert ('+lines.length+' Zeilen)','ok')).catch(()=>_copyFallback(text)); }}
   else {{ _copyFallback(text); }}
