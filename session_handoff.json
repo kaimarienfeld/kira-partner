@@ -1,6 +1,6 @@
 {
   "last_session": "session-aaaa",
-  "date": "2026-04-02 20:35",
+  "date": "2026-04-02 19:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -219,7 +219,9 @@
     "lexware-belegarten-subnav-sidebar",
     "layout-sticky-fix-app-weit",
     "umlaute-korrektur-runde-2",
-    "lexware-detail-panel-sticky-fix"
+    "lexware-detail-panel-sticky-fix",
+    "hot-reload-detection-neustart-banner",
+    "js-syntaxerror-catch-handler-retry-button"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",

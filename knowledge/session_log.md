@@ -918,3 +918,9 @@
 5. Tracking-Listen nach Regeln aktualisieren
 **Status:** offen
 
+
+### 2026-04-02 19:45 -- Hot-Reload-Erkennung (session-aaaa Fortsetzung)
+**Auftrag:** Signal einbauen wenn Server-Neustart erforderlich nach Code-Änderung
+**Erledigt:** FileWatcher-Thread (5 Kerndateien, 15s Poll), GET /api/server/check-update, Client-Polling 30s mit rotem Fixed-Banner + Toast. Verifiziert via Playwright (Banner sichtbar).
+**Commit:** 5ba938c
+**Status:** erledigt
