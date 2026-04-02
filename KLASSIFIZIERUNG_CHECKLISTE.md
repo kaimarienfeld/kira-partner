@@ -78,13 +78,14 @@
 
 | Zeitraum | Mails | Tasks (vorher) | Tasks (nach Fix) | Anmerkung |
 |----------|-------|----------------|------------------|-----------|
-| Januar 2026 | 203 | 0 | 2 | Meiste Leads schon beantwortet, Tests gefiltert |
-| Februar 2026 | 260 | — | ⏳ Laeuft | — |
-| Maerz 2026 | 244 | — | ⏳ Laeuft | — |
+| Januar 2026 | 203 | 0 | **3** | +3 unbeantwortete Leads/Business-Mails |
+| Februar 2026 | 260 | 1 | **3** | +2 neue durch Formular-Erkennung |
+| Maerz 2026 | 244 | 1 | **3** | +2 neue durch Formular-Erkennung |
+| **Gesamt** | **707** | **2** | **9** | **4,5× mehr Tasks** |
 
-> **Warum nicht 50+ Tasks?** Die meisten Mails auf dem info-Konto sind System-Mails (Google, Apple, Shipcloud, Newsletter). Echte Kundenanfragen kommen fast nur ueber das anfrage-Konto (26/Monat). Von diesen wurden die meisten bereits manuell von Kai beantwortet → "schon beantwortet" filtert sie korrekt.
+> **Warum nicht 50+ Tasks?** ~85% der Mails sind System/Newsletter (Google, Apple, Shipcloud, Finom, Descript etc.). Echte Kundenanfragen kommen fast nur ueber das anfrage-Konto (~30/Monat). Von diesen wurden die meisten bereits manuell von Kai beantwortet → "schon beantwortet" filtert sie korrekt. Die 9 neuen Tasks sind wirklich unbeantwortete Leads.
 >
-> **Der echte Wert:** Ab JETZT werden neue Formular-Anfragen und Business-Mails automatisch erkannt und als Tasks erstellt. Die historischen Mails waren groesstenteils schon manuell bearbeitet.
+> **Der echte Wert:** Ab JETZT werden neue Formular-Anfragen (Landing Page) und Business-Mails automatisch erkannt und als Tasks erstellt. Das waren vorher ~20 verlorene Leads pro Monat, die nie als Task erschienen.
 
 ---
 
