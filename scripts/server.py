@@ -2137,12 +2137,12 @@ def build_postfach():
 // Locale-aware Betrag-Parser: "1.234,56" → 1234.56, "1,234.56" → 1234.56, "109.48" → 109.48
 function _parseBetrag(s) {
   if(!s && s!==0) return 0;
-  s = String(s).trim().replace(/[€$\s]/g,'');
+  s = String(s).trim().replace(/[\\u20ac$\\s]/g,'');
   // Wenn Komma UND Punkt: Letztes Trennzeichen ist Dezimal
   if(s.indexOf(',')>-1 && s.indexOf('.')>-1) {
     if(s.lastIndexOf(',') > s.lastIndexOf('.')) {
       // 1.234,56 → deutsch
-      s = s.replace(/\./g,'').replace(',','.');
+      s = s.replace(/\\./g,'').replace(',','.');
     } else {
       // 1,234.56 → englisch
       s = s.replace(/,/g,'');
@@ -3960,7 +3960,7 @@ window.pfOpenMail = function(m, el) {
     body.innerHTML = '';
     const rawText = d.text || '';
     const hasHtml = !!d.html;
-    const textLooksLikeHtml = !hasHtml && (/^\\s*(<html|<!doctype)/i.test(rawText) || /<(table|div|p|body|head)[\s>]/i.test(rawText));
+    const textLooksLikeHtml = !hasHtml && (/^\\s*(<html|<!doctype)/i.test(rawText) || /<(table|div|p|body|head)[\\s>]/i.test(rawText));
     if (hasHtml || textLooksLikeHtml) {
       pfUpdateViewerState('html');
       body.classList.add('iframe-mode');

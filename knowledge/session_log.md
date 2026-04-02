@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-04-02 16:55 — Session-Ende (session-zzz)
+
+**Auftrag:** Speedify-Betrag-Fix + Systematische Mail-Format-Analyse + Nachtlauf (alle offenen Tasks + Block-D abarbeiten, Listen aktualisieren, Server-Test)
+**Erledigt:**
+- Speedify 9027.0 → 90.27 in pruefqueue (IDs 1,15) + geschaeft (IDs 193,207) korrigiert
+- Systematische Analyse aller Provider-Formate (PayPal DE-Komma, Apple DE-Komma, Anthropic EN-Punkt, Speedify EN-Punkt, Google Ads DE-Komma)
+- Cross-Validierung: 133 DB-Eintraege gegen Mail-Inhalte — 0 Mismatches
+- 3 SyntaxWarnings in server.py behoben (\s, \., [\s>] in JS-Regex in Python-Strings)
+- session_handoff.json bereinigt: 9 von 13 open_tasks als erledigt verifiziert + entfernt
+- KIRA_MASTERCHECKLISTE: D-01/D-02/D-11 als erledigt markiert, Statistik 43/47
+- known_issues.json: Timestamp aktualisiert, alle Issues fixed
+- Server-Start-Test: Modul laedt fehlerfrei, HTTP 200, Playwright 0 JS-Errors (Dashboard/Lexware/Postfach)
+
+**Offen geblieben:** Nur Kai-Aktionen (B-01..B-03) + D-03 langfristig + Archiv-Ordner manuell loeschen
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 17:00 — Session-Ende (session-xxx)
 
 **Auftrag:** Nachtlauf — ISS-028..031 + Lexware UI + Thread-Gruppierung + Commit. Alle nacheinander, ohne Stopp.

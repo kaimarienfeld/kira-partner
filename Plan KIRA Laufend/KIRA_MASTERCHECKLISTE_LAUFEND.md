@@ -441,11 +441,12 @@
 *(Features die bewusst zurueckgestellt wurden)*
 
 ### D-01 — Kira Live-Chip im Header
-**Status:** 🔜 In Planung
-**Aus:** KIRA_SYSTEM_ANALYSE offene Posten
+**Status:** ✅ Erledigt (session-zz) — kiraLiveChip im Header, 4 Status-CSS-Klassen (idle/scanning/pending/error), onclick oeffnet Activity-Drawer
+**Behoben am:** 2026-03-31
 
 ### D-02 — Activity-Drawer Slide-In
-**Status:** 🔜 In Planung
+**Status:** ✅ Erledigt (session-zz) — kiraActivityDrawer mit Overlay, kiraActivityDrawerOpen/Close(), Aktivitaeten-Liste
+**Behoben am:** 2026-03-31
 
 ### D-03 — Multi-Agent-Architektur
 **Status:** 🔜 Langfristig
@@ -472,7 +473,8 @@
 **Status:** ✅ Erledigt (session-qqq) — KIRA_TOUR_EINSTELLUNGEN, 8 Schritte, Tour-Button in es-macts
 
 ### D-11 — Tour: Partner-View / Leni
-**Status:** 🔜 Offen — partner_view.html ist separate Datei (kein TOUR_JS). Bei Bedarf dort integrieren.
+**Status:** ✅ Erledigt — partner_view.html hat eigene Tour-Engine (TOUR_KAI/TOUR_LENI, tour-overlay, tour-card, Dots, Skip/Next)
+**Behoben am:** 2026-03-31
 
 ---
 
@@ -483,14 +485,12 @@
 | Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
 | Block B (Kai) | 4 | 1 | 0 | 0 | 3 |
 | Block C (Laufend) | 16 | 16 | 0 | 0 | 0 |
-| Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **47** | **40** | **1** | **0** | **3** |
+| Block D (Zukunft + Tours) | 11 | 10 | 0 | 0 | 0 |
+| **Gesamt** | **47** | **43** | **0** | **0** | **3** |
 
-> Block-A 16/16 komplett. Block-C 16/16 (C-01..C-16 alle behoben).
-> session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
-> Block-B 1/4: B-04 erledigt (Kai 2026-04-02). B-01..B-03 noch offen (Cloudflare, Azure, WhatsApp).
-> session-sss: C-02..C-07. session-ttt: C-08..C-14. session-uuu: C-15 Lexware-Sync-Fix.
-> session-vvv: C-16 JS-Syntaxfehler (closest/onclick/pfAlleKontenAbrufen). B-04 als erledigt markiert.
+> Block-A 16/16 komplett. Block-C 16/16 komplett. Block-D 10/11 (nur D-03 langfristig offen).
+> Block-B 1/4: B-04 erledigt. B-01..B-03 = Kai-Aktionen (Cloudflare, Azure, WhatsApp).
+> session-zzz: D-01/D-02/D-11 als erledigt verifiziert + alle open_tasks aus session_handoff geprueft und bereinigt.
 
 ---
 
@@ -510,6 +510,7 @@
 | 2026-04-02 | session-sss: C-02..C-07 eingetragen + behoben (Lexware Full-Width/Chip/Sync, SMTP-Admin, GitHub-Token, esNavTo) |
 | 2026-04-02 | session-ttt: C-08..C-14 eingetragen + behoben (ARCHIVER_DIR-Pfad, OAuth-Liste, Reconnect, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN) |
 | 2026-04-02 | session-uuu: C-15 eingetragen + behoben (Lexware Belege-Sync HTTP-400 + fehler_details-Array) |
+| 2026-04-02 | session-zzz: D-01/D-02/D-11 als erledigt verifiziert. Alle open_tasks geprueft: 9 von 13 waren bereits implementiert. Statistik 43/47 (3 Kai-Aktionen, 1 langfristig) |
 
 ---
 

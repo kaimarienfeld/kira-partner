@@ -1,6 +1,6 @@
 {
-  "last_session": "session-yyy",
-  "date": "2026-04-02 14:35",
+  "last_session": "session-zzz",
+  "date": "2026-04-02 16:20",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -58,7 +58,8 @@
     "session-vvv (2026-04-02): C-16 JS-Syntaxfehler behoben (0 Errors). Root-Cause 1: this.closest(\\'...\\')-Aufrufe in onclick-Attributen — \\'  wird zu ' in Python-String und bricht den umgebenden JS-String-Delimiter. Fix: &apos; HTML-Entity statt \\' (getElementById fuer spezifische Modal-ID). Root-Cause 2: pfAlleKontenAbrufen mit {{}} (f-string-Stil) in regulaerer build_postfach() '''..''' -String → literale {{ im Output → JS Unexpected token. Fix: alle {{ → { und }} → }. B-04 als erledigt markiert (Kai hat Leni-Draft Passwort gesendet). Statistik Block-B 1/4, Block-C 16/16, Gesamt 40/47.",
     "session-www (2026-04-02): (1) Fix _pfCurrentKiraItem Scope-Bug (var in IIFE → window._pfCurrentKiraItem). (2) Kira Ablehnen-Modal mit Lernfunktion (Grund + Klassifizierungsfrage → LLM-Lernregel → wissen_regeln + Bestaetigung). (3) Original-Mail im Kira-Entwurf (GET /api/mail/approve/{id}/original, iframe, aufklappbar). (4) Mail-Rendering Originalformat (iframe+srcdoc, erweiterte HTML-Erkennung). (5) References-Header + Re:-Betreff beim Senden. (6) KRITISCH: auto_gelernt Regeln in System-Prompt eingebaut (war write-only!). (7) Tracking aktualisiert: 4 neue ISS (028-031), Todo_checkliste, known_issues, session_log. Commits: 40151e7, 624b25e.",
     "session-xxx (2026-04-02): Nachtlauf — 5 Tasks + Thread-Gruppierung. (1) ISS-028 fix: _parseBetrag()/_fmtBetrag() JS-Helpers + Python Betrag-Format deutsch. (2) ISS-029: Postfach Buchhaltungs-Nachqualifizierung — pfQualifyLexware() + POST /api/mail/qualify-lexware + 💲 Badge. (3) ISS-030: Lexware Belege UI komplett — _fmt_eur()/_fmt_datum() Python-Helpers, alle Tabellen deutsches Format, 4 neue CSS-Klassen (zu_pruefen/klassifiziert/abgelegt/unklar), sticky Detail-Panel, JS-Datum-Formatter. (4) ISS-031: Kira-Ablehnung → Nachklassifizierung — bei falsch-klassifiziert: Original-Mail laden, Task aktualisieren oder neu erstellen, Bestaetigung im UI. (5) Task C: Thread-Gruppierung im Postfach — pf-thread-badge (Zaehler), pf-thread-child CSS, JS thread-aware Rendering (neueste Mail sichtbar, aeltere eingeklappt, Badge-Klick expandiert).",
-    "session-yyy (2026-04-02): Lexware Betrag+Kontaktname-Fix. (1) lexware_client.py: totalAmount als Fallback fuer totalPrice.totalGrossAmount (List-API liefert {} fuer totalPrice). contactName als primaere Quelle fuer kontakt_name (statt address.name die in List-API leer ist). Backfill-Schritt nach Sync: payload_json auswerten → brutto/netto/kontakt_name nachziehen. (2) DB-Backfill: 140 Betraege + 19 Kontaktnamen korrigiert. (3) Status-Uebersetzung: accepted→Angenommen, rejected→Abgelehnt, paidoff→Abgezahlt, sepadebit→SEPA-Lastschrift in allen 3 st_map-Stellen (Python) + JS st_labels. 4 neue CSS-Klassen (.lx-st-accepted/rejected/paidoff/sepadebit). Filter-Dropdown um 4 Optionen erweitert. Verifiziert via Playwright: alle Betraege korrekt (1.670,00 EUR statt 0,00), Kontaktnamen aufgeloest, accepted→Angenommen."
+    "session-yyy (2026-04-02): Lexware Betrag+Kontaktname-Fix. (1) lexware_client.py: totalAmount als Fallback fuer totalPrice.totalGrossAmount (List-API liefert {} fuer totalPrice). contactName als primaere Quelle fuer kontakt_name (statt address.name die in List-API leer ist). Backfill-Schritt nach Sync: payload_json auswerten → brutto/netto/kontakt_name nachziehen. (2) DB-Backfill: 140 Betraege + 19 Kontaktnamen korrigiert. (3) Status-Uebersetzung: accepted→Angenommen, rejected→Abgelehnt, paidoff→Abgezahlt, sepadebit→SEPA-Lastschrift in allen 3 st_map-Stellen (Python) + JS st_labels. 4 neue CSS-Klassen (.lx-st-accepted/rejected/paidoff/sepadebit). Filter-Dropdown um 4 Optionen erweitert. Verifiziert via Playwright: alle Betraege korrekt (1.670,00 EUR statt 0,00), Kontaktnamen aufgeloest, accepted→Angenommen.",
+    "session-zzz (2026-04-02): Speedify-Betrag-Fix + Systematische Mail-Format-Analyse. (1) Speedify 9027.0→90.27 in eingangsbelege_pruefqueue (IDs 1,15) und geschaeft (IDs 193,207) korrigiert. Root-Cause: alter Code vor _parse_amount() behandelte Punkt immer als Tausender. (2) Systematische Analyse aller Provider-Formate aus mail_index.db: PayPal DE=Komma (8,32 EUR), Apple=Komma (44,99 EUR), Anthropic=Punkt ($59.50/EUR109.48), Speedify=Punkt (EUR90.27), Google Ads=Komma (438,65 EUR). (3) Cross-Validierung: alle 127 geschaeft-Eintraege + 6 pruefqueue-Eintraege gegen Mail-Inhalte geprueft — 0 Mismatches. _parse_amount() in mail_monitor.py + server.py deckt alle Formate korrekt ab."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -197,19 +198,24 @@
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
     "server_map.md: Zeilen-Angaben fuer GET/POST-Endpunkte sind noch ca.-Werte",
-    "Google OAuth noch nicht verdrahtet",
-    "Provider-Persistierung nach OAuth-Login fehlt",
-    "SMTP-Passwort-Auth im Volltest (nutzt aktuell nur XOAUTH2)",
-    "geloeschte_protokoll-Anzeige in Einstellungen-UI fehlt noch",
-    "Zu Kira hinzufuegen-Button aus Postfach (Ordner direkt zu sync_ordner hinzufuegen)",
-    "bereinigung_frist_tage / geloeschte_bereinigung_aktiv noch nicht in Einstellungen-UI",
-    "Outlook-Kalender (Paket 8): Azure App a0591b2d braucht Calendars.ReadWrite Delegated Permission — Kai-Aktion in Entra ID noetig",
-    "Kira-Launcher beiseite rutschen wenn Maus Element dahinter erreichen will",
-    "Mail-Monitor Polling-Intervall: Einstellung in UI (derzeit in Sekunden, sollte Stunden/Minuten sein)",
-    "Kira Tagesstart-Briefing im Dashboard: Backend generate_daily_briefing() vorhanden, Morgen-Widget fehlt",
-    "D-11 Partner-View Tour noch nicht implementiert (separate HTML-Datei)"
+    "Outlook-Kalender (Paket 8): Azure App a0591b2d braucht Calendars.ReadWrite Delegated Permission — Kai-Aktion in Entra ID noetig (Block B-02)",
+    "D-03 Multi-Agent-Architektur — langfristig (Planung)"
   ],
-  "next_step": "Lexware Betrag/Kontakt/Status-Fixes alle live verifiziert. Weiter mit Plan (Kira Mail-System: Ablehnen-Lernfunktion + Original-Nachricht + Mail-Rendering) oder Block-B offene Punkte.",
+  "closed_in_session_zzz": [
+    "Google OAuth verdrahtet (seit session-aaa: google_oauth.py + server.py imports + 5 Endpoints)",
+    "Provider-Persistierung nach OAuth-Login (seit session-aaa: _save_token() in google_oauth.py)",
+    "SMTP-Passwort-Auth im Volltest (seit session-ddd: run_full_connection_test() brancht use_password_smtp)",
+    "geloeschte_protokoll-Anzeige in Einstellungen-UI (seit session-hh: Einstellungen > Mail > Protokoll laden)",
+    "Zu Kira hinzufuegen-Button aus Postfach (seit session-ddd: pfAddFolderToKira() + POST sync-ordner)",
+    "bereinigung_frist_tage / geloeschte_bereinigung_aktiv (seit session-hh: Toggle + Number-Input in Einstellungen)",
+    "Kira-Launcher beiseite rutschen (seit session-bbb: Kira-FAB Drag-to-Move mit snap-to-corner + localStorage)",
+    "Mail-Monitor Polling-Intervall (seit session-y: Abruf-Intervall Dropdown 2/5/10/15/30/60 min)",
+    "Kira Tagesstart-Briefing Dashboard Widget (seit session-zz: generate_daily_briefing() + Tagesbriefing Zone-A)",
+    "D-01 Kira Live-Chip (seit session-zz: kiraLiveChip + 4 Status-CSS-Klassen + onclick Activity-Drawer)",
+    "D-02 Activity-Drawer (seit session-zz: kiraActivityDrawer Slide-In + kiraActivityDrawerOpen/Close)",
+    "D-11 Partner-View Tour (partner_view.html: Tour-Engine mit Kai/Leni-Schritte, Overlay, Dots)"
+  ],
+  "next_step": "Alle offenen Tasks + Block-D verifiziert und als erledigt markiert. Verbleibend: Archiv-Ordner manuell loeschen (Kai), server_map.md Zeilen-Update (niedrig-prio), Azure Calendars.ReadWrite (Kai-Aktion), D-03 Multi-Agent langfristig.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
