@@ -7594,6 +7594,64 @@ function esInfoPopup(btn, text) {{
     </div>
     <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
   </div>
+
+  <!-- ── Historische Qualifizierung ── -->
+  <div class="es-grp">
+    <div class="es-grp-h">Historische Mail-Qualifizierung</div>
+    <div class="es-grp-sub">
+      Alle Mails im gew&auml;hlten Zeitraum klassifizieren und Kunden-Profile aufbauen.
+      Optional k&ouml;nnen f&uuml;r aktuelle Mails auch Aufgaben erstellt werden.
+    </div>
+    <div class="es-row">
+      <div class="es-row-label">
+        <span>Zeitraum</span>
+        <span class="es-row-hint">Alle Posteingangs-Mails in diesem Zeitraum werden qualifiziert</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text-muted)">Von:</label>
+        <input type="date" id="es-qual-seit" value="2021-01-01"
+               style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
+        <label style="font-size:12px;color:var(--text-muted)">Bis:</label>
+        <input type="date" id="es-qual-bis"
+               style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
+      </div>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label">
+        <span>Modus</span>
+        <span class="es-row-hint">Nur klassifizieren = Profile aufbauen. Mit Aufgaben = Tasks f&uuml;r aktuelle Mails</span>
+      </div>
+      <select id="es-qual-modus"
+              onchange="document.getElementById('es-qual-task-row').style.display=this.value==='mit_tasks'?'flex':'none'"
+              style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text)">
+        <option value="nur_klassifizieren">Nur klassifizieren (Profile aufbauen)</option>
+        <option value="mit_tasks">Mit Aufgaben ab Datum</option>
+      </select>
+    </div>
+    <div class="es-row" id="es-qual-task-row" style="display:none">
+      <div class="es-row-label">
+        <span>Aufgaben ab</span>
+        <span class="es-row-hint">Mails ab diesem Datum werden auch als Aufgaben erstellt (z.B. letzte 3 Monate)</span>
+      </div>
+      <input type="date" id="es-qual-task-seit"
+             style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
+    </div>
+    <div class="es-row" style="border-bottom:none">
+      <div class="es-row-label">
+        <span>Qualifizierung starten</span>
+        <span class="es-row-hint">L&auml;uft im Hintergrund &mdash; Fortschritt wird live angezeigt</span>
+      </div>
+      <button class="es-mk-btn" id="btn-qual-start" onclick="esMailQualifizieren(this)"
+              style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;padding:6px 18px;border-radius:6px;font-size:13px;cursor:pointer">
+        Qualifizierung starten
+      </button>
+    </div>
+    <div id="es-qual-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
+    <div id="es-qual-bar-wrap" style="display:none;margin:4px 0 8px 0;background:var(--bg-raised);border-radius:6px;height:8px;overflow:hidden">
+      <div id="es-qual-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:6px;transition:width .3s"></div>
+    </div>
+  </div>
+
   </div><!-- /es-mtp-klassifizierung -->
 
   <!-- ── TAB: SIGNATUREN ── -->
@@ -8548,6 +8606,64 @@ function esInfoPopup(btn, text) {{
     }}).catch(()=>{{
       if(btn){{ btn.disabled=false; btn.textContent='\u21BA Nachklassifizieren'; }}
       if(prog) prog.textContent='Verbindungsfehler';
+    }});
+  }};
+
+  window.esMailQualifizieren = function(btn) {{
+    const seitEl = document.getElementById('es-qual-seit');
+    const bisEl = document.getElementById('es-qual-bis');
+    const modusEl = document.getElementById('es-qual-modus');
+    const taskSeitEl = document.getElementById('es-qual-task-seit');
+    const seit = seitEl ? seitEl.value : '';
+    const bis = bisEl ? bisEl.value : null;
+    const modus = modusEl ? modusEl.value : 'nur_klassifizieren';
+    const taskSeit = (modus==='mit_tasks' && taskSeitEl) ? taskSeitEl.value : null;
+    if(!seit) {{ showToast('Bitte Startdatum w\u00e4hlen','warnung'); return; }}
+    if(modus==='mit_tasks' && !taskSeit) {{ showToast('Bitte \"Aufgaben ab\"-Datum w\u00e4hlen','warnung'); return; }}
+    if(btn) {{ btn.disabled=true; btn.textContent='L\u00e4uft\u2026'; }}
+    const prog = document.getElementById('es-qual-progress');
+    const barWrap = document.getElementById('es-qual-bar-wrap');
+    const bar = document.getElementById('es-qual-bar');
+    if(prog) prog.textContent = 'Starte\u2026';
+    if(barWrap) barWrap.style.display = '';
+    if(bar) bar.style.width = '0%';
+    fetch('/api/mail/qualifizieren', {{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{seit: seit, bis: bis, modus: modus, task_seit: taskSeit}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+        if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+        if(barWrap) barWrap.style.display='none';
+        return;
+      }}
+      showToast('Qualifizierung gestartet ab '+seit+' ('+modus+')\u2026','ok');
+      let polls=0;
+      const timer=setInterval(()=>{{
+        polls++;
+        fetch('/api/mail/qualifizieren/status').then(r=>r.json()).then(p=>{{
+          const pct=p.gesamt>0?Math.round(100*p.geprueft/p.gesamt):0;
+          if(bar) bar.style.width=pct+'%';
+          if(prog){{
+            if(p.finished){{
+              prog.textContent='Fertig: '+p.gesamt+' gepr\u00fcft \u00b7 '+p.klassifiziert+' klassifiziert \u00b7 '+(p.tasks_erstellt||0)+' Tasks \u00b7 '+(p.ignoriert||0)+' ignoriert'+(p.fehler?' \u00b7 '+p.fehler+' Fehler':'');
+            }} else {{
+              prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) \u00b7 Klassifiziert: '+p.klassifiziert+' \u00b7 Tasks: '+(p.tasks_erstellt||0)+' \u00b7 '+((p.aktuell||'').slice(0,50));
+            }}
+          }}
+          if(p.finished||polls>7200){{
+            clearInterval(timer);
+            if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+            if(bar) bar.style.width='100%';
+            if(p.klassifiziert>0) showToast(p.klassifiziert+' Mails qualifiziert'+(p.tasks_erstellt>0?' \u00b7 '+p.tasks_erstellt+' Tasks erstellt':''),'ok');
+          }}
+        }}).catch(()=>clearInterval(timer));
+      }},3000);
+    }}).catch(()=>{{
+      if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+      if(prog) prog.textContent='Verbindungsfehler';
+      if(barWrap) barWrap.style.display='none';
     }});
   }};
 
@@ -21439,6 +21555,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/nachklassifizieren/status'):
             self._api_mail_nachklassifizieren_status()
 
+        elif self.path.startswith('/api/mail/qualifizieren/status'):
+            self._api_mail_qualifizieren_status()
+
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
@@ -24634,6 +24753,56 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'running': False, 'finished': True, 'error': str(e)})
 
+    def _api_mail_qualifizieren(self, body):
+        """POST /api/mail/qualifizieren — Historische Mail-Qualifizierung starten."""
+        import threading as _threading, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        seit = (body.get('seit') or '').strip()
+        bis = body.get('bis') or None
+        modus = body.get('modus', 'nur_klassifizieren')
+        task_seit = body.get('task_seit') or None
+        if not seit:
+            self._json({'ok': False, 'error': 'seit-Datum fehlt (Format: YYYY-MM-DD)'})
+            return
+        try:
+            datetime.strptime(seit, '%Y-%m-%d')
+        except ValueError:
+            self._json({'ok': False, 'error': f'Ungültiges Datum: {seit}'})
+            return
+        if modus not in ('nur_klassifizieren', 'mit_tasks'):
+            self._json({'ok': False, 'error': f'Ungültiger Modus: {modus}'})
+            return
+        # Laufenden Job abweisen
+        try:
+            from daily_check import get_qualify_progress as _gqp
+            if _gqp().get('running', False):
+                self._json({'ok': False, 'error': 'Qualifizierung läuft bereits'})
+                return
+        except Exception:
+            pass
+        def _run():
+            try:
+                from daily_check import qualify_mails
+                qualify_mails(seit, bis, modus, task_seit)
+            except Exception as ex:
+                import logging
+                logging.getLogger('server').error(f'Qualifizierung-Fehler: {ex}')
+        _threading.Thread(target=_run, daemon=True).start()
+        self._json({'ok': True, 'status': 'gestartet', 'seit': seit, 'bis': bis,
+                     'modus': modus, 'task_seit': task_seit})
+
+    def _api_mail_qualifizieren_status(self):
+        """GET /api/mail/qualifizieren/status — Qualifizierungs-Fortschritt."""
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            from daily_check import get_qualify_progress
+            self._json(get_qualify_progress())
+        except Exception as e:
+            self._json({'running': False, 'finished': True, 'error': str(e)})
+
     def _api_mail_microsoft_app_test(self):
         """POST /api/mail/microsoft-app/test — Zentrale KIRA Entra App auf Erreichbarkeit testen."""
         try:
@@ -25167,6 +25336,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/nachklassifizieren':
             self._api_mail_nachklassifizieren(body)
+            return
+
+        if self.path == '/api/mail/qualifizieren':
+            self._api_mail_qualifizieren(body)
             return
 
         if self.path == '/api/mail/microsoft-app/test':

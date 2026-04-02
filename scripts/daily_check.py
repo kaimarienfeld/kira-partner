@@ -509,6 +509,223 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
     return stats
 
 
+# ── Fortschritt für Qualifizierung (thread-safe dict) ───────────────────────
+_qualify_progress: dict = {
+    "running": False, "finished": True,
+    "gesamt": 0, "geprueft": 0, "klassifiziert": 0,
+    "ignoriert": 0, "fehler": 0, "aktuell": "",
+    "modus": "", "tasks_erstellt": 0,
+}
+
+def get_qualify_progress() -> dict:
+    return dict(_qualify_progress)
+
+
+def qualify_mails(seit_datum: str, bis_datum: str = None,
+                  modus: str = "nur_klassifizieren",
+                  task_seit: str = None) -> dict:
+    """Qualifiziert historische Mails — klassifiziert ohne/mit Task-Erstellung.
+
+    Modi:
+      - "nur_klassifizieren": Speichert nur Kategorie+Konfidenz in mail_index.db
+        (baut Kunden-Profile auf, erstellt KEINE Tasks)
+      - "mit_tasks": Klassifiziert UND erstellt Tasks für Mails ab task_seit
+        (z.B. nur die letzten 3 Monate mit Tasks, Rest nur Profil)
+
+    Args:
+        seit_datum: Ab wann qualifizieren (YYYY-MM-DD)
+        bis_datum: Bis wann (Default: heute)
+        modus: "nur_klassifizieren" oder "mit_tasks"
+        task_seit: Ab wann Tasks erstellen (nur bei modus="mit_tasks")
+    """
+    import sqlite3
+    from llm_classifier import classify_mail
+
+    if not bis_datum:
+        bis_datum = datetime.now().strftime("%Y-%m-%d")
+
+    _qualify_progress.update({
+        "running": True, "finished": False,
+        "gesamt": 0, "geprueft": 0, "klassifiziert": 0,
+        "ignoriert": 0, "fehler": 0, "tasks_erstellt": 0,
+        "aktuell": "Initialisiere…", "modus": modus,
+    })
+
+    # Alle Mails im Zeitraum aus mail_index.db
+    mail_db = sqlite3.connect(str(MAIL_INDEX_DB))
+    mail_db.row_factory = sqlite3.Row
+    query = """SELECT message_id, absender, betreff, text_plain, datum,
+                      konto_label, folder, mail_folder_pfad, an, anhaenge, konto
+               FROM mails
+               WHERE datum >= ? AND datum < ?
+                 AND folder = 'INBOX'
+               ORDER BY datum ASC"""
+    kandidaten = mail_db.execute(query, (seit_datum, bis_datum + " 23:59:59")).fetchall()
+    mail_db.close()
+
+    stats = {"gesamt": len(kandidaten), "geprueft": 0, "klassifiziert": 0,
+             "ignoriert": 0, "fehler": 0, "tasks_erstellt": 0}
+    _qualify_progress["gesamt"] = len(kandidaten)
+
+    # Tasks-DB für Task-Erstellung (nur bei modus="mit_tasks")
+    tasks_db = None
+    existing_ids = set()
+    sent_index = {}
+    if modus == "mit_tasks" and task_seit:
+        tasks_db = sqlite3.connect(str(TASKS_DB))
+        tasks_db.row_factory = sqlite3.Row
+        existing_ids = {
+            r[0] for r in tasks_db.execute(
+                "SELECT message_id FROM tasks WHERE message_id IS NOT NULL AND message_id != ''"
+            ).fetchall()
+        }
+        # Gesendete laden
+        try:
+            sent_db = sqlite3.connect(str(SENT_DB))
+            sent_db.row_factory = sqlite3.Row
+            for r in sent_db.execute(
+                "SELECT kunden_email, datum FROM gesendete_mails ORDER BY datum"
+            ).fetchall():
+                em = (r["kunden_email"] or "").lower().strip()
+                if em:
+                    sent_index.setdefault(em, []).append(r["datum"])
+            sent_db.close()
+        except Exception:
+            pass
+
+    mi_db = sqlite3.connect(str(MAIL_INDEX_DB))
+
+    for idx, m in enumerate(kandidaten):
+        folder = m["folder"] or ""
+        absnd = m["absender"] or ""
+        betr = m["betreff"] or ""
+        datum = m["datum"] or ""
+        msgid = m["message_id"] or ""
+        konto = m["konto_label"] or m["konto"] or ""
+        an = m["an"] or ""
+
+        # Fortschritt
+        if idx % 10 == 0:
+            _qualify_progress.update({
+                "geprueft": stats["geprueft"],
+                "klassifiziert": stats["klassifiziert"],
+                "ignoriert": stats["ignoriert"],
+                "tasks_erstellt": stats["tasks_erstellt"],
+                "aktuell": f"{betr[:55]} ({datum[:10]})",
+            })
+
+        # Text laden
+        text = m["text_plain"] or ""
+        if not text and m["mail_folder_pfad"]:
+            try:
+                mj_path = Path(m["mail_folder_pfad"]) / "mail.json"
+                if mj_path.exists():
+                    mdata = json.loads(mj_path.read_text('utf-8', errors='replace'))
+                    text = h2t(mdata.get("text", "") or "")[:3000]
+            except Exception:
+                pass
+
+        # Kunden-Email (mit Formular-Extraktion)
+        k_email = get_kunden_email(absnd, an, folder)
+        if not k_email:
+            k_email = extract_form_customer_email(betr, text)
+        if not k_email:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+        k_email = resolve_alias(k_email)
+
+        # Eigene Domain
+        dom = k_email.split('@')[-1] if '@' in k_email else ''
+        if dom in EIGENE_DOMAINS:
+            stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        # Anhaenge
+        anhaenge_list = []
+        try:
+            raw = m["anhaenge"] or ""
+            if raw:
+                anhaenge_list = json.loads(raw)
+        except Exception:
+            pass
+
+        # Klassifizieren
+        try:
+            cl = classify_mail(
+                konto=konto, absender=absnd, betreff=betr, text=text,
+                anhaenge=anhaenge_list, folder=folder, is_sent=False,
+                mail_datum=datum, kanal="email",
+            )
+        except Exception as e:
+            stats["fehler"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        kat = cl["kategorie"]
+
+        # Klassifizierung in mail_index.db speichern (IMMER)
+        try:
+            mi_db.execute(
+                "UPDATE mails SET kategorie=?, konfidenz=?, antwort_noetig=?, klassifiziert_am=? WHERE message_id=?",
+                (kat, cl.get("konfidenz", "mittel"),
+                 1 if cl.get("antwort_noetig") else 0,
+                 datetime.now().isoformat(), msgid))
+            mi_db.commit()
+            stats["klassifiziert"] += 1
+        except Exception:
+            pass
+
+        # Task-Erstellung nur im "mit_tasks"-Modus und ab task_seit
+        if modus == "mit_tasks" and task_seit and datum >= task_seit and tasks_db:
+            # Ignorierbare Kategorien
+            if kat not in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
+                if not (kat in ("Shop / System", "Rechnung / Beleg") and not cl["antwort_noetig"]):
+                    # Duplikat-Check
+                    if msgid and msgid not in existing_ids:
+                        # Schon beantwortet?
+                        k_email_l = k_email.lower()
+                        if not any(d > datum for d in sent_index.get(k_email_l, [])):
+                            try:
+                                from mail_classifier import kategorie_to_task_typ
+                                task_typ = kategorie_to_task_typ(kat)
+                                tasks_db.execute("""INSERT INTO tasks
+                                    (typ, kategorie, titel, zusammenfassung, beschreibung,
+                                     kunden_email, absender_rolle, empfohlene_aktion,
+                                     kategorie_grund, message_id, mail_folder_pfad,
+                                     betreff, konto, datum_mail, prioritaet, antwort_noetig,
+                                     konfidenz)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                    (task_typ, kat, betr[:120] or f"Mail von {k_email}",
+                                     cl["zusammenfassung"], text[:1000],
+                                     k_email, cl["absender_rolle"],
+                                     cl["empfohlene_aktion"], cl["kategorie_grund"],
+                                     msgid, m["mail_folder_pfad"] or "",
+                                     betr[:120], konto, datum,
+                                     cl["prioritaet"], 1 if cl["antwort_noetig"] else 0,
+                                     cl.get("konfidenz", "mittel")))
+                                tasks_db.commit()
+                                stats["tasks_erstellt"] += 1
+                                existing_ids.add(msgid)
+                            except Exception:
+                                stats["fehler"] += 1
+
+        stats["geprueft"] += 1
+
+    mi_db.close()
+    if tasks_db:
+        tasks_db.close()
+
+    _qualify_progress.update({
+        "running": False, "finished": True,
+        "aktuell": "Fertig",
+        **{k: stats[k] for k in ("gesamt", "geprueft", "klassifiziert",
+                                   "ignoriert", "fehler", "tasks_erstellt")},
+    })
+    return stats
+
+
 # ── Angebot-Status Auto-Update ───────────────────────────────────────────────
 def _try_update_angebot_from_mail(k_email: str, text: str, tasks_db):
     """
