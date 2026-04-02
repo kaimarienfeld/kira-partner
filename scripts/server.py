@@ -12031,14 +12031,19 @@ def build_lexware(db):
             except Exception:
                 pass
         faellig_str = _fmt_datum(faellig_raw) if faellig_raw and len(str(faellig_raw).strip()) >= 8 else "&#8212;"
-        return f"""<tr class="lx-tr" onclick="lxBelegDetail('{esc(b["lexware_id"])}')">
+        _brutto_raw = b.get("brutto", 0) or 0
+        _updated_raw = b.get("aktualisiert", "") or b.get("datum", "") or ""
+        return f"""<tr class="lx-tr" onclick="lxBelegDetail('{esc(b["lexware_id"])}')"
+  data-typ="{esc(typ)}" data-status="{esc(st)}" data-datum="{esc(b.get('datum',''))}"
+  data-faellig="{esc(faellig_raw)}" data-betrag="{_brutto_raw}" data-name="{esc(b.get('kontakt_name',''))}"
+  data-nummer="{esc(b.get('nummer',''))}" data-updated="{esc(_updated_raw)}">
   <td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>
   <td><span style="font-size:var(--fs-xs);color:var(--muted)">{typ_label}</span></td>
   <td>{esc(b.get("kontakt_name",""))}{kira_badge}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("datum",""))}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{faellig_str}</td>
   <td><span class="{st_cls}">{st_label}</span></td>
-  <td style="text-align:right;font-weight:600">{_fmt_eur(b.get("brutto",0), b.get("waehrung","EUR"))}</td>
+  <td style="text-align:right;font-weight:600">{_fmt_eur(_brutto_raw, b.get("waehrung","EUR"))}</td>
   <td style="white-space:nowrap">
     <button class="btn btn-sec btn-xs" onclick="event.stopPropagation();lxBelegKira('{esc(b["lexware_id"])}','{esc(b.get("nummer",""))}','{esc(b.get("kontakt_name",""))}')">&#x1F916;</button>
   </td>
@@ -12057,7 +12062,7 @@ def build_lexware(db):
   <select id="lx-bel-status" onchange="lxFilterBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
     <option value="">Alle Status</option>
     <option value="open">Offen</option>
-    <option value="overdue">&#220;berf&#228;llig</option>
+    <option value="overdue">Überfällig</option>
     <option value="paid">Bezahlt</option>
     <option value="draft">Entwurf</option>
     <option value="voided">Storniert</option>
@@ -12065,6 +12070,20 @@ def build_lexware(db):
     <option value="rejected">Abgelehnt</option>
     <option value="paidoff">Abgezahlt</option>
     <option value="sepadebit">SEPA-Lastschrift</option>
+  </select>
+  <select id="lx-bel-sort" onchange="lxSortBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
+    <option value="datum-desc">Datum &#x2193; (neueste)</option>
+    <option value="datum-asc">Datum &#x2191; (älteste)</option>
+    <option value="faellig-asc">Fällig &#x2191; (nächste)</option>
+    <option value="faellig-desc">Fällig &#x2193; (späteste)</option>
+    <option value="betrag-desc">Betrag &#x2193; (höchste)</option>
+    <option value="betrag-asc">Betrag &#x2191; (niedrigste)</option>
+    <option value="name-asc">Kontakt A–Z</option>
+    <option value="name-desc">Kontakt Z–A</option>
+    <option value="nummer-desc">Belegnr. &#x2193; (neueste)</option>
+    <option value="nummer-asc">Belegnr. &#x2191; (älteste)</option>
+    <option value="updated-desc">Letzte Änderung &#x2193;</option>
+    <option value="updated-asc">Letzte Änderung &#x2191;</option>
   </select>
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
   <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
@@ -14551,15 +14570,40 @@ function lxFilterBelege() {{
   const q = (document.getElementById('lx-bel-search')?.value || '').toLowerCase();
   const rows = document.querySelectorAll('#lx-belege-tbody tr.lx-tr');
   rows.forEach(r => {{
-    const cells = r.querySelectorAll('td');
-    const num = cells[0]?.textContent || '';
-    const t   = cells[1]?.textContent || '';
-    const k   = cells[2]?.textContent || '';
-    const st  = cells[4]?.textContent || '';
-    const match = (!typ || t.includes(typ)) && (!status || st.toLowerCase().includes(status)) &&
-                  (!q || num.toLowerCase().includes(q) || k.toLowerCase().includes(q));
+    const rTyp = r.dataset.typ || '';
+    const rSt  = r.dataset.status || '';
+    const rNum = (r.dataset.nummer || '').toLowerCase();
+    const rName = (r.dataset.name || '').toLowerCase();
+    const match = (!typ || rTyp === typ) && (!status || rSt === status) &&
+                  (!q || rNum.includes(q) || rName.includes(q));
     r.style.display = match ? '' : 'none';
   }});
+}}
+function lxSortBelege() {{
+  const sel = document.getElementById('lx-bel-sort')?.value || 'datum-desc';
+  const [field, dir] = sel.split('-');
+  const tbody = document.getElementById('lx-belege-tbody');
+  if(!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr.lx-tr'));
+  rows.sort((a, b) => {{
+    let va = a.dataset[field] || '';
+    let vb = b.dataset[field] || '';
+    if(field === 'betrag') {{
+      va = parseFloat(va) || 0;
+      vb = parseFloat(vb) || 0;
+      return dir === 'asc' ? va - vb : vb - va;
+    }}
+    if(field === 'name') {{
+      va = va.toLowerCase(); vb = vb.toLowerCase();
+      const cmp = va.localeCompare(vb, 'de');
+      return dir === 'asc' ? cmp : -cmp;
+    }}
+    // Datum/Fällig/Updated/Nummer: String-Vergleich (ISO-Daten + Belegnummern sortieren korrekt)
+    if(va < vb) return dir === 'asc' ? -1 : 1;
+    if(va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  }});
+  rows.forEach(r => tbody.appendChild(r));
 }}
 
 function lxFilterKontakte() {{
