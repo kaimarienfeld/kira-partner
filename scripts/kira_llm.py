@@ -836,7 +836,8 @@ def _build_data_context(config, kira_cfg=None):
             if _k_rechnungen == "immer" or rows:
                 ctx += f"\n=== AUSGANGSRECHNUNGEN ({len(rows)} gesamt, {len(offen)} offen) ===\n"
                 for r in offen:
-                    ctx += f"  [{r['id']}] {r['re_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | {r['betrag_brutto'] or 0:,.2f} EUR | OFFEN"
+                    _bb = f"{r['betrag_brutto'] or 0:.2f}".replace('.', ',')
+                    ctx += f"  [{r['id']}] {r['re_nummer']} | {r['datum']} | {r['kunde_name'] or r['kunde_email'] or '?'} | {_bb} EUR | OFFEN"
                     if r['mahnung_count'] and r['mahnung_count'] > 0:
                         ctx += f" | {r['mahnung_count']}x gemahnt"
                     ctx += "\n"
@@ -863,7 +864,8 @@ def _build_data_context(config, kira_cfg=None):
             if rows:
                 ctx += f"\n=== OFFENE EINGANGSRECHNUNGEN ({len(rows)}) ===\n"
                 for r in rows:
-                    ctx += f"  [{r['id']}] {r['gegenpartei'] or r['gegenpartei_email'] or '?'} | {r['betreff'][:50]} | {r['betrag'] or 0:,.2f} EUR | {r['datum']}\n"
+                    _eb = f"{r['betrag'] or 0:.2f}".replace('.', ',')
+                    ctx += f"  [{r['id']}] {r['gegenpartei'] or r['gegenpartei_email'] or '?'} | {r['betreff'][:50]} | {_eb} EUR | {r['datum']}\n"
         except: pass
 
     if _k_aufgaben != "nie":
@@ -1761,7 +1763,8 @@ def _tool_rechnung_bezahlt(p):
     if tage is not None:
         wissen += f" Zahlungsdauer: {tage} Tage."
     if not p.get("voller_betrag") and p.get("betrag"):
-        wissen += f" Reduzierter Betrag: {p['betrag']} EUR (statt {betrag_orig:,.2f} EUR)."
+        _bo = f"{betrag_orig:.2f}".replace('.', ',')
+        wissen += f" Reduzierter Betrag: {p['betrag']} EUR (statt {_bo} EUR)."
     if p.get("notiz"):
         wissen += f" {p['notiz']}"
     db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",

@@ -2128,6 +2128,41 @@ def build_postfach():
 </style>
 
 <script>
+// ── Globale Hilfsfunktionen ──────────────────────────────
+// Locale-aware Betrag-Parser: "1.234,56" → 1234.56, "1,234.56" → 1234.56, "109.48" → 109.48
+function _parseBetrag(s) {
+  if(!s && s!==0) return 0;
+  s = String(s).trim().replace(/[€$\s]/g,'');
+  // Wenn Komma UND Punkt: Letztes Trennzeichen ist Dezimal
+  if(s.indexOf(',')>-1 && s.indexOf('.')>-1) {
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      // 1.234,56 → deutsch
+      s = s.replace(/\./g,'').replace(',','.');
+    } else {
+      // 1,234.56 → englisch
+      s = s.replace(/,/g,'');
+    }
+  } else if(s.indexOf(',')>-1) {
+    // Nur Komma: wenn genau 2 Nachkommastellen → deutsches Dezimal
+    var parts = s.split(',');
+    if(parts.length===2 && parts[1].length<=2) {
+      s = s.replace(',','.');
+    } else {
+      s = s.replace(/,/g,'');
+    }
+  }
+  // Nur Punkt: wenn genau 2 Nachkommastellen → englisches Dezimal (kein Tausender)
+  // z.B. "109.48" → 109.48 (NICHT 10948)
+  var v = parseFloat(s);
+  return isNaN(v) ? 0 : v;
+}
+// Betrag deutsch formatieren: 1234.56 → "1.234,56"
+function _fmtBetrag(n, waehrung) {
+  var v = typeof n === 'number' ? n : parseFloat(n||0);
+  if(isNaN(v)) v = 0;
+  return v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + (waehrung ? '\u00a0'+waehrung : '');
+}
+
 (function(){
 let _pfCurrentFolder = null;
 let _pfCurrentKonto  = null;
@@ -14688,7 +14723,7 @@ function lxBuchManuellSpeichern() {{
   const payload = {{
     absender: document.getElementById('lx-man-absender')?.value || '',
     betreff:  document.getElementById('lx-man-betreff')?.value || '',
-    betrag:   parseFloat(document.getElementById('lx-man-betrag')?.value || 0),
+    betrag:   _parseBetrag(document.getElementById('lx-man-betrag')?.value),
     datum_beleg: document.getElementById('lx-man-datum')?.value || '',
     source: 'manuell'
   }};
@@ -16043,7 +16078,7 @@ function submitEingangNeu() {{
     gegenpartei: partner,
     gegenpartei_email: document.getElementById('eineu-email')?.value.trim()||'',
     rechnungsnummer: document.getElementById('eineu-renr')?.value.trim()||'',
-    betrag: parseFloat(document.getElementById('eineu-betrag')?.value||'0')||null,
+    betrag: _parseBetrag(document.getElementById('eineu-betrag')?.value)||null,
     datum: document.getElementById('eineu-datum')?.value||new Date().toISOString().slice(0,10),
     faelligkeit_datum: document.getElementById('eineu-faell')?.value||'',
     betreff: document.getElementById('eineu-betreff')?.value.trim()||''
@@ -16075,7 +16110,7 @@ function eingangBetragDialog(id, currentBetrag, currentFaell) {{
     </div>`, {{noBtns:true}});
 }}
 function submitEingangBetrag(id) {{
-  const betrag = parseFloat(document.getElementById('eibet-betrag')?.value||'0')||null;
+  const betrag = _parseBetrag(document.getElementById('eibet-betrag')?.value)||null;
   const faell = document.getElementById('eibet-faell')?.value||'';
   fetch('/api/geschaeft/'+id+'/betrag',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{betrag,faelligkeit_datum:faell}})}})
     .then(r=>r.json()).then(d=>{{
