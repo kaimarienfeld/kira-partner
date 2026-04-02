@@ -11317,7 +11317,7 @@ def build_lexware(db):
     <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
     <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware</button>
     <button class="btn btn-sec btn-xs" onclick="showLexSec('diagnose')" title="Diagnose">&#x1F527;</button>
-    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_LEXWARE,{erklaermodus:true})" title="Geführte Tour durch Lexware Office starten">Tour</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_LEXWARE,{{erklaermodus:true}})" title="Gefuehrte Tour durch Lexware Office starten">Tour</button>
     <button class="btn btn-primary btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira</button>
   </div>
 </div>"""
@@ -12279,7 +12279,7 @@ def build_capture(db):
     <div class="cap-tab active" id="capTabUebersicht" onclick="capShowView('uebersicht')">&#x1F4CA; Uebersicht</div>
     <div class="cap-tab" id="capTabEingang" onclick="capShowView('eingang');capLoadList(1)">&#x1F4E5; Eingang</div>
     <div class="cap-tab" id="capTabDetail" id="capTabDetail" style="display:none">&#x1F4C4; Detail</div>
-    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_CAPTURE,{erklaermodus:true})" style="margin-left:auto;margin-right:4px" title="Gefuehrte Tour durch Capture starten">Tour</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_CAPTURE,{{erklaermodus:true}})" style="margin-left:auto;margin-right:4px" title="Gefuehrte Tour durch Capture starten">Tour</button>
   </div>
 
   <!-- View: Uebersicht -->
@@ -13407,7 +13407,7 @@ def generate_html() -> str:
         </div>
       </div>
       <div class="kw-header-right">
-        <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_KIRA,{erklaermodus:true})" style="margin-right:4px" title="Gefuehrte Tour durch den Kira Workspace">Tour</button>
+        <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_KIRA,{{erklaermodus:true}})" style="margin-right:4px" title="Gefuehrte Tour durch den Kira Workspace">Tour</button>
         <button class="btn btn-xs btn-muted" onclick="newKiraChat()">Neuer Chat</button>
         <button class="btn btn-xs btn-muted" onclick="toggleKiraTools()">Werkzeuge</button>
         <button class="kira-close" onclick="closeKiraWorkspace()">&times;</button>
