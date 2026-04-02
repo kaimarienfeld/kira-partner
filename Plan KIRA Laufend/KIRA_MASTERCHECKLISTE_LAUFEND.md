@@ -405,6 +405,20 @@
   auf `/static/quill.min.js` bzw. `/static/quill.snow.css`.
 **Behoben am:** 2026-04-02
 
+### C-15 — Lexware Belege-Sync: 3 Fehler (HTTP 400 voucherStatus fehlt)
+**Status:** 🐛✅ Behoben (session-uuu, commit abeddd5)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `sync_belege_to_db()` rief `get_all_vouchers(typ)` ohne `voucherStatus` auf.
+  Lexware `/voucherlist` erfordert `voucherStatus` als Pflichtparameter → HTTP 400 fuer alle 3 Typen
+  (invoice, creditnote, quotation). Fehler-Body `"Missing required request parameters: [voucherStatus]"`
+  war bisher nicht sichtbar da `e.body` leer.
+**Fix:** (1) `_TYP_STATUSES` dict in `sync_belege_to_db()` definiert: invoice=6 Statuses,
+  creditnote=5, quotation=4. Pro Typ alle relevanten Statuses abrufen (Deduplizierung via `seen_ids`).
+  (2) `fehler_details[]` Array in allen 3 sync-Methoden — Fehlertext + API-Body werden zurueckgegeben.
+  (3) JS `lexSync()` zeigt Modal mit Fehler-Details wenn `fehler > 0`.
+**Ergebnis:** 141 Belege + 273 Kontakte + 52 Artikel — 0 Fehler.
+**Behoben am:** 2026-04-02 10:46 MEZ
+
 ---
 
 ## BLOCK D — Zukunft / Spaetere Sessions
@@ -453,15 +467,16 @@
 |---------|--------|----------|-------|-----------|------------|
 | Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
-| Block C (Laufend) | 14 | 14 | 0 | 0 | 0 |
+| Block C (Laufend) | 15 | 15 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **45** | **37** | **1** | **0** | **4** |
+| **Gesamt** | **46** | **38** | **1** | **0** | **4** |
 
-> Block-A 16/16 komplett. Block-C 14/14 (C-01..C-14 alle behoben).
+> Block-A 16/16 komplett. Block-C 15/15 (C-01..C-15 alle behoben).
 > session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
 > Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
 > session-sss: C-02..C-07 (Lexware Full-Width, Chip, Sync-Pagination, SMTP-Admin, GitHub-Token, esNavTo).
 > session-ttt: C-08..C-14 (ARCHIVER_DIR-Pfad, OAuth-Konto-Liste, Reconnect-Flow, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN).
+> session-uuu: C-15 (Lexware Belege-Sync HTTP-400-Fix + fehler_details-Array). 141 Belege/273 Kontakte/52 Artikel fehlerfrei.
 
 ---
 
@@ -480,6 +495,7 @@
 | 2026-04-01 | session-rrr: C-01 f-string ERR_EMPTY_RESPONSE Crash behoben (3 Tour-Button-Stellen) |
 | 2026-04-02 | session-sss: C-02..C-07 eingetragen + behoben (Lexware Full-Width/Chip/Sync, SMTP-Admin, GitHub-Token, esNavTo) |
 | 2026-04-02 | session-ttt: C-08..C-14 eingetragen + behoben (ARCHIVER_DIR-Pfad, OAuth-Liste, Reconnect, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN) |
+| 2026-04-02 | session-uuu: C-15 eingetragen + behoben (Lexware Belege-Sync HTTP-400 + fehler_details-Array) |
 
 ---
 
