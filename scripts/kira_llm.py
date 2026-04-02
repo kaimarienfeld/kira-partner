@@ -2978,8 +2978,8 @@ def _parse_text_tool_call(text):
     return None
 
 
-# ── Leichtgewichtiger Klassifizierungs-Aufruf (kein System-Prompt, Haiku) ───
-def classify_direct(prompt: str, max_tokens: int = 512) -> dict:
+# ── Klassifizierungs-Aufruf (leichter System-Prompt, Haiku) ─────────────────
+def classify_direct(prompt: str, max_tokens: int = 768) -> dict:
     """
     Direkter, günstiger LLM-Aufruf NUR für Mail-Klassifizierung.
     Wählt automatisch das günstigste verfügbare Modell je Provider:
@@ -2987,7 +2987,7 @@ def classify_direct(prompt: str, max_tokens: int = 512) -> dict:
       OpenAI     → gpt-4o-mini               (~10× billiger als gpt-4o)
       OpenRouter → openai/gpt-4o-mini        (günstig + gut)
       Ollama/Custom → konfiguriertes Modell  (lokal = kostenlos)
-    Kein System-Prompt, keine Tools → minimaler Token-Verbrauch.
+    System-Prompt universell aus config.json, keine Tools.
     """
     # Günstigstes Modell je Provider-Typ
     _BUDGET_MODELS = {
@@ -3018,11 +3018,32 @@ def classify_direct(prompt: str, max_tokens: int = 512) -> dict:
 
     provider = budget_provider or fallback_provider
 
+    # ── Universeller System-Prompt aus config.json ──
+    _classify_sys = (
+        "Du bist ein E-Mail-Klassifizierer für ein geschäftliches Unternehmen. "
+        "Deine Aufgabe: E-Mails in Kategorien einteilen und entscheiden ob Handlungsbedarf besteht. "
+        "Du erkennst: Kundenanfragen, Leads, Angebots-Antworten, Rechnungen, Termine, Support-Anfragen, Newsletter. "
+        "Bei Unsicherheit: lieber 'Antwort erforderlich' als 'Ignorieren' oder 'Zur Kenntnis'."
+    )
+    try:
+        _cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+        _firma = _cfg.get("firma_name", "")
+        _branche = _cfg.get("firma_branche", "")
+        _beschr = _cfg.get("firma_beschreibung", "")
+        if _firma:
+            _classify_sys += f" Firma: {_firma}."
+        if _branche:
+            _classify_sys += f" Branche: {_branche}."
+        if _beschr:
+            _classify_sys += f" {_beschr[:200]}"
+    except Exception:
+        pass
+
     try:
         if provider.get("typ") == "anthropic":
-            result = _call_anthropic(provider, prompt, "", [], max_tokens=max_tokens)
+            result = _call_anthropic(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
         else:
-            result = _call_openai_compat(provider, prompt, "", [], max_tokens=max_tokens)
+            result = _call_openai_compat(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
         return {"antwort": result.get("text", ""),
                 "tokens_in":  result.get("tokens_in", 0),
                 "tokens_out": result.get("tokens_out", 0),

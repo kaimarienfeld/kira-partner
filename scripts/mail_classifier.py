@@ -158,22 +158,55 @@ EXCLUDE_SUBJECTS = [
 # 4. ECHTE KUNDEN-KEYWORDS
 # ======================================================================
 CUSTOMER_STRONG = [
+    # Branchenspezifisch (rauMKult)
     "betonkosmetik","sichtbeton","betontreppe","betonfassade","betonwand",
     "sichtbetonflaeche","ortbeton","fertigteil",
     "hydrophobierung","impraegnierung","versiegelung",
     "kostenvoranschlag","angebot erstellen",
+    # Universell — starke Kauf-/Auftragssignale
+    "beauftragen","auftrag erteilen","in auftrag geben",
+    "wir bestellen","hiermit bestelle","verbindliche bestellung",
+    "angebot angenommen","auftrag erteilt","zusage",
+    "angebot abgelehnt","absage","leider muessen wir",
 ]
 CUSTOMER_NORMAL = [
+    # Branchenspezifisch
     "anfrage","projekt","sanierung","retusche","reparatur","ausbesserung",
     "beton","treppe","fassade","wand","boden","decke",
     "reinigung","oberflaeche","flaeche","qm","quadratmeter",
     "foto","bilder sende","anbei foto",
-    "was kostet","wie teuer","preis","kosten",
-    "termin","zeitraum","verfuegbar","wann koennen",
-    "baustelle","neubau","umbau","anbau",
+    # Universell — Anfragen & Kontakt
+    "was kostet","wie teuer","preis","kosten","preisliste",
+    "termin","zeitraum","verfuegbar","wann koennen","terminvorschlag",
+    "baustelle","neubau","umbau","anbau","renovierung","instandsetzung",
     "koennen sie","koennten sie","waere es moeglich",
     "haette gerne","braeuchte","benoetige","suche jemand",
+    "angebot","offerte","preisanfrage","kalkulation",
+    "besichtigung","begutachtung","vor ort","ortstermin",
+    "schadensbild","schaeden","mangel","reklamation",
+    "rueckfrage","bezugnehmend auf","in bezug auf",
+    "interesse","interessiert","informieren sie mich",
+    "zusammenarbeit","kooperation","partnerschaft",
+    "empfehlung","empfohlen","referenz",
+    "dringend","zeitnah","schnellstmoeglich","asap",
 ]
+
+# ======================================================================
+# 4b. EIGENE KEYWORDS (aus config.json, zur Laufzeit geladen)
+# ======================================================================
+def _load_eigene_keywords():
+    """Lädt benutzerdefinierte Keywords aus config.json."""
+    try:
+        import json
+        from pathlib import Path
+        cfg_path = Path(__file__).parent / "config.json"
+        if cfg_path.exists():
+            cfg = json.loads(cfg_path.read_text("utf-8", errors="replace"))
+            mk = cfg.get("mail_klassifizierung", {})
+            return mk.get("eigene_keywords", [])
+    except Exception:
+        pass
+    return []
 
 # ======================================================================
 # 5. RECHNUNGS-KEYWORDS
@@ -276,7 +309,7 @@ def is_exclude_subject(betreff: str) -> bool:
 
 def has_open_question(text: str) -> bool:
     """Prueft ob echte Frage an den Empfaenger vorliegt (nicht Marketing-Fragen)."""
-    t = _normalize((text or "")[:1200]).lower()
+    t = _normalize((text or "")[:3000]).lower()
     # Starke Frage-Patterns (direkt an Empfaenger gerichtet)
     strong = [
         r'(?:koennen|koennten|wuerden|waere|haette)\s+(?:sie|ihr|du)',
@@ -337,7 +370,7 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
     email  = extract_email(absender)
     domain = get_domain(email)
     bl     = _normalize(betreff.lower())
-    txt_n  = _normalize((text or "")[:1200]).lower()
+    txt_n  = _normalize((text or "")[:3000]).lower()
     comb   = bl + " " + txt_n
     rolle  = classify_absender_rolle(absender, betreff, text, konto, is_sent)
 
@@ -394,10 +427,13 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
         return _r("Shop / System", "Shop", betreff, False,
                   "Zur Kenntnis", "Shop-Vorgang ohne Frage", "niedrig")
 
-    # ── 7. Echte Kundenanfragen ──
+    # ── 7. Echte Kundenanfragen (inkl. eigener Keywords aus Einstellungen) ──
+    eigene = _load_eigene_keywords()
     strong = sum(1 for kw in CUSTOMER_STRONG if kw in comb)
     normal = sum(1 for kw in CUSTOMER_NORMAL if kw in comb)
-    is_customer = strong >= 1 or (normal >= 2) or (konto in ("anfrage",) and normal >= 1)
+    eigene_hits = sum(1 for kw in eigene if kw.lower() in comb) if eigene else 0
+    is_customer = (strong >= 1 or (normal >= 2) or eigene_hits >= 1
+                   or (konto in ("anfrage",) and normal >= 1))
 
     if is_customer:
         is_reply = bl.startswith("re:") or bl.startswith("aw:")
@@ -413,13 +449,34 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
     # ── 8. Offene Frage (Fallback) ──
     if has_open_question(text) and konto in ("anfrage","info","intern"):
         return _r("Antwort erforderlich", rolle, betreff, True,
-                  "Pruefen und ggf. antworten",
+                  "Prüfen und ggf. antworten",
                   "Offene Frage erkannt", "mittel",
                   organisation=_extr_org(text))
 
+    # ── 8b. Substanzielle Mails an Geschäftskonten ──
+    # Mails an anfrage@/info@ mit echtem Inhalt sind wahrscheinlich relevant
+    if konto in ("anfrage", "info") and len((text or "").strip()) > 100:
+        is_reply = bl.startswith("re:") or bl.startswith("aw:")
+        if is_reply:
+            return _r("Antwort erforderlich", rolle, betreff, True,
+                      "Folgemail prüfen und antworten",
+                      "Antwort auf eigene Mail (Fallback)", "mittel")
+        # Persönliche/geschäftliche Anrede?
+        _personal = any(w in comb for w in [
+            "hallo", "guten tag", "sehr geehrt", "liebe ", "lieber ",
+            "hi ", "moin", "guten morgen",
+            "mfg", "mit freundlich", "gruss", "gruess",
+            "vielen dank", "danke fuer", "danke für",
+            "hochachtungsvoll", "beste gruesse",
+        ])
+        if _personal:
+            return _r("Antwort erforderlich", rolle, betreff, False,
+                      "Prüfen – möglicherweise relevant",
+                      "Persönliche Mail ohne klare Kategorie (Fallback)", "niedrig")
+
     # ── 9. Zur Kenntnis ──
     return _r("Zur Kenntnis", rolle, betreff, False,
-              "Keine Aktion noetig", "Kein Handlungsbedarf erkannt", "niedrig")
+              "Keine Aktion nötig", "Kein Handlungsbedarf erkannt", "niedrig")
 
 
 # ── Ergebnis-Builder ──────────────────────────────────────────────────

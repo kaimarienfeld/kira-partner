@@ -51,7 +51,7 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
                                   kira_wissen: str = "", kunden_profil: str = "",
                                   mail_verlauf: str = "", anhaenge: list = None):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
-    text_snippet = (text or "")[:2000]
+    text_snippet = (text or "")[:3000]
 
     angebote_block = ""
     if angebote_kontext:
@@ -540,8 +540,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             anhaenge=anhaenge,
         )
 
-        # Leichtgewichtiger Direkt-Aufruf (Haiku, 512 max_tokens, kein System-Prompt)
-        result = classify_direct(prompt, max_tokens=512)
+        # Klassifizierungs-Aufruf (Haiku, 768 max_tokens)
+        result = classify_direct(prompt, max_tokens=768)
 
         if result.get("error"):
             raise RuntimeError(result["error"])
@@ -583,11 +583,24 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             }
 
     except Exception as e:
-        # LLM fehlgeschlagen — Fallback
-        pass
+        # LLM fehlgeschlagen — Fallback MIT Logging
+        import logging
+        _log = logging.getLogger("llm_classifier")
+        _log.warning(f"LLM-Klassifizierung fehlgeschlagen, Fallback auf Regeln: {e}")
+        try:
+            from runtime_log import elog as _elog_lc
+            _elog_lc('system', 'llm_classify_fallback',
+                     f"LLM-Fehler: {str(e)[:200]} | {betreff[:80]}",
+                     source='llm_classifier', modul='llm_classifier',
+                     submodul='classify', actor_type='system', status='warnung',
+                     error_message=str(e)[:500])
+        except Exception:
+            pass
 
     # ── FALLBACK: Regelbasierte Klassifizierung ──
-    return _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
+    fb_result = _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
+    fb_result["_llm_fallback"] = True
+    return fb_result
 
 
 # Re-Export für Kompatibilität

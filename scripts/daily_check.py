@@ -129,6 +129,34 @@ def get_kunden_email(absender, an, folder):
     return None if domain in EIGENE_DOMAINS else email.strip()
 
 
+# ── Formular-Mail Kunden-Extraktion ─────────────────────────────────────────
+_FORM_BETREFF_MUSTER = re.compile(
+    r'(Anfrage\s*\(Landing\)|Kontaktformular|neue\s+Anfrage|Anfrage\s+über)',
+    re.IGNORECASE
+)
+
+def extract_form_customer_email(betreff: str, text: str) -> str | None:
+    """Extrahiert die echte Kunden-E-Mail aus Formular-Benachrichtigungen.
+
+    Formular-Mails kommen von noreply@raumkult.eu / info@raumkult.eu,
+    aber enthalten die Kunden-E-Mail im Body (z.B. "E-Mail kunde@example.com").
+    """
+    if not _FORM_BETREFF_MUSTER.search(betreff or ""):
+        return None
+    if not text:
+        return None
+    # Muster: "E-Mail <adresse>" im Formular-Body
+    em_match = re.search(r'E-Mail\s+([\w.+-]+@[\w.-]+\.\w+)', text)
+    if not em_match:
+        return None
+    email = em_match.group(1).lower().strip()
+    domain = email.split('@')[-1] if '@' in email else ''
+    # Nur zurückgeben wenn es KEIN eigener Test ist
+    if domain in EIGENE_DOMAINS:
+        return None
+    return email
+
+
 # ── Neue Mails scannen ───────────────────────────────────────────────────────
 def scan_new_mails(since_dt):
     new_mails = []
@@ -282,8 +310,23 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
             stats["geprueft"] += 1
             continue
 
+        # Text laden: text_plain aus DB oder aus mail.json auf Disk
+        # (VOR Kunden-E-Mail, damit Formular-Extraktion den Body nutzen kann)
+        text = m["text_plain"] or ""
+        if not text and m["mail_folder_pfad"]:
+            try:
+                mj_path = Path(m["mail_folder_pfad"]) / "mail.json"
+                if mj_path.exists():
+                    mdata = json.loads(mj_path.read_text('utf-8', errors='replace'))
+                    text = h2t(mdata.get("text", "") or "")[:3000]
+            except Exception:
+                pass
+
         # Kunden-E-Mail auflösen
         k_email = get_kunden_email(absnd, an, folder)
+        if not k_email:
+            # Formular-Benachrichtigung? Kunden-E-Mail aus Body extrahieren
+            k_email = extract_form_customer_email(betr, text)
         if not k_email:
             stats["ignoriert"] += 1
             stats["geprueft"] += 1
@@ -296,17 +339,6 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
             stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
-
-        # Text laden: text_plain aus DB oder aus mail.json auf Disk
-        text = m["text_plain"] or ""
-        if not text and m["mail_folder_pfad"]:
-            try:
-                mj_path = Path(m["mail_folder_pfad"]) / "mail.json"
-                if mj_path.exists():
-                    mdata = json.loads(mj_path.read_text('utf-8', errors='replace'))
-                    text = h2t(mdata.get("text", "") or "")[:3000]
-            except Exception:
-                pass
 
         # DATEV-Weiterleitungs-Duplikat-Filter
         absnd_dom = absnd.split('@')[-1].lower() if '@' in absnd else ''
@@ -341,8 +373,22 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
 
         kat = cl["kategorie"]
 
+        # Klassifizierung in mail_index.db speichern
+        try:
+            _mi_db = sqlite3.connect(str(MAIL_INDEX_DB))
+            _mi_db.execute(
+                "UPDATE mails SET kategorie=?, konfidenz=?, antwort_noetig=?, klassifiziert_am=? WHERE message_id=?",
+                (kat, cl.get("konfidenz", "mittel"),
+                 1 if cl.get("antwort_noetig") else 0,
+                 datetime.now().isoformat(), msgid))
+            _mi_db.commit()
+            _mi_db.close()
+        except Exception:
+            pass
+
         # Ignorierbare Kategorien → kein Task
-        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen", "Zur Kenntnis"):
+        # "Zur Kenntnis" NICHT mehr skippen — konsistent mit mail_monitor.py
+        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
             stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
@@ -351,22 +397,23 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
             stats["geprueft"] += 1
             continue
 
-        # Schon beantwortet?
+        # Schon beantwortet? — nur per DIREKTER E-Mail-Adresse, nicht per Domain
+        # Domain-Level-Check entfernt: antwort@firma.de != anfrage@firma.de
         k_email_l = k_email.lower()
         if any(d > datum for d in sent_index.get(k_email_l, [])):
             stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
-        k_domain = k_email_l.split('@')[-1] if '@' in k_email_l else ''
-        if k_domain and k_domain not in _GENERIC_SENT_DOMAINS:
-            if any(d > datum for d in sent_domains.get(k_domain, [])):
-                stats["ignoriert"] += 1
-                stats["geprueft"] += 1
-                continue
 
         # Erneuter Duplikat-Check (falls msgid leer war, nach oben-Filter)
         if msgid and msgid in existing_ids:
             stats["ignoriert"] += 1
+            stats["geprueft"] += 1
+            continue
+
+        # Im Trockenlauf: zählen aber nicht erstellen
+        if dry_run:
+            stats["tasks_erstellt"] += 1
             stats["geprueft"] += 1
             continue
 
@@ -717,15 +764,19 @@ def process_new_mails(new_mails, stats):
         folder  = m['folder']
         is_sent = "Gesendete" in folder or "Sent" in folder
         k_email = get_kunden_email(m['absender'], m['an'], folder)
-        # Alias-Auflösung: bekannte Alias-Adressen auf Haupt-E-Mail mappen
-        if k_email:
-            k_email = resolve_alias(k_email)
         konto   = m['konto']
         absnd   = m['absender']
         betr    = m['betreff']
         text    = m['text_plain']
         datum   = m['datum']
         msgid   = m['message_id']
+
+        # Formular-Benachrichtigung? Kunden-E-Mail aus Body extrahieren
+        if not k_email:
+            k_email = extract_form_customer_email(betr, text)
+        # Alias-Auflösung: bekannte Alias-Adressen auf Haupt-E-Mail mappen
+        if k_email:
+            k_email = resolve_alias(k_email)
 
         # In kunden.db eintragen
         if k_email:
@@ -787,8 +838,9 @@ def process_new_mails(new_mails, stats):
                            is_sent=is_sent, mail_datum=datum, kanal="email")
         kat = cl["kategorie"]
 
-        # Ignorieren / Newsletter / Zur Kenntnis -> kein Task
-        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen", "Zur Kenntnis"):
+        # Ignorieren / Newsletter → kein Task
+        # "Zur Kenntnis" NICHT mehr skippen — konsistent mit mail_monitor.py
+        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
             stats['ignoriert'] = stats.get('ignoriert',0)+1
             continue
 
@@ -796,17 +848,12 @@ def process_new_mails(new_mails, stats):
             stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
             continue
 
-        # Schon beantwortet? — konto-übergreifend (direkte E-Mail + cross-domain)
+        # Schon beantwortet? — nur per DIREKTER E-Mail-Adresse
+        # Domain-Level-Check entfernt: zu aggressiv
         k_email_l = k_email.lower()
         dates = sent_index.get(k_email_l, [])
         if any(d > datum for d in dates):
             continue
-        # Cross-domain-Check: wenn Firmen-Domain bekannt und bereits geantwortet
-        k_domain = k_email_l.split('@')[-1] if '@' in k_email_l else ''
-        if k_domain and k_domain not in _GENERIC_SENT_DOMAINS:
-            domain_dates = sent_domains.get(k_domain, [])
-            if any(d > datum for d in domain_dates):
-                continue
 
         # Duplikat-Check
         if msgid:

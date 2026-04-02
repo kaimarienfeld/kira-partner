@@ -1230,6 +1230,25 @@ def _process_mail(mail_data, konto_label, folder_name):
     msg_id = mail_data.get("message_id", "")
     is_sent = "sent" in folder_name.lower() or "gesendete" in folder_name.lower()
 
+    # Kunden-E-Mail: Bei Formular-Benachrichtigungen (noreply@raumkult.eu)
+    # die echte Kunden-E-Mail aus dem Body extrahieren
+    _absender_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
+    _absender_email = _absender_email_m.group(1).lower() if _absender_email_m else absender.strip().lower()
+    _kunden_email_resolved = _absender_email
+    _EIGENE = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com"}
+    _abs_dom = _absender_email.split('@')[-1] if '@' in _absender_email else ''
+    if _abs_dom in _EIGENE:
+        # Formular-Muster? E-Mail aus Body extrahieren
+        _form_pat = re.compile(r'(Anfrage\s*\(Landing\)|Kontaktformular|neue\s+Anfrage)', re.IGNORECASE)
+        if _form_pat.search(betreff or ""):
+            _clean_text = re.sub(r'<[^>]+>', ' ', text or '')
+            _em_m = re.search(r'E-Mail\s+([\w.+-]+@[\w.-]+\.\w+)', _clean_text)
+            if _em_m:
+                _form_em = _em_m.group(1).lower()
+                _form_dom = _form_em.split('@')[-1]
+                if _form_dom not in _EIGENE:
+                    _kunden_email_resolved = _form_em
+
     # Duplikat-Check
     db = sqlite3.connect(str(TASKS_DB))
     db.row_factory = sqlite3.Row
@@ -1238,11 +1257,22 @@ def _process_mail(mail_data, konto_label, folder_name):
         db.close()
         return None
 
+    # Thread-Check: gehört diese Mail zu einem bestehenden Thread mit offenem Task?
+    thread_id = mail_data.get("thread_id", "")
+    _thread_task = None
+    if thread_id and thread_id != msg_id:
+        _thread_task = db.execute(
+            "SELECT id, status, kategorie FROM tasks WHERE thread_id=? AND status='offen' ORDER BY id DESC LIMIT 1",
+            (thread_id,)
+        ).fetchone()
+
     # Klassifizierung
     t0 = time.monotonic()
     result = classify_mail(konto_label, absender, betreff, text,
                           anhaenge=mail_data.get("anhaenge", []),
-                          folder=folder_name, is_sent=is_sent)
+                          folder=folder_name, is_sent=is_sent,
+                          mail_datum=mail_data.get("datum", ""),
+                          kanal="email")
     kat_ms = int((time.monotonic() - t0) * 1000)
 
     kategorie = result.get("kategorie", "Zur Kenntnis")
@@ -1250,9 +1280,7 @@ def _process_mail(mail_data, konto_label, folder_name):
 
     # Automatische Angebot-Aktion (Annahme/Ablehnung automatisch buchen)
     if kategorie == "Angebotsrueckmeldung" and result.get("angebot_aktion"):
-        kunden_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
-        ke = kunden_email_m.group(1).lower() if kunden_email_m else absender.strip().lower()
-        auto_result = _auto_angebot_aktion(result, ke, betreff, msg_id)
+        auto_result = _auto_angebot_aktion(result, _kunden_email_resolved, betreff, msg_id)
         if auto_result.get("aktion_durchgefuehrt"):
             result["_auto_aktion"] = auto_result
 
@@ -1273,6 +1301,20 @@ def _process_mail(mail_data, konto_label, folder_name):
     # In mail_index.db speichern — IMMER, unabhängig von Kategorie
     _index_mail(mail_data, konto_label, folder_name)
 
+    # Klassifizierung in mail_index.db speichern (Kategorie, Konfidenz etc.)
+    try:
+        from datetime import datetime as _dt
+        _mi = sqlite3.connect(str(MAIL_INDEX_DB))
+        _mi.execute(
+            "UPDATE mails SET kategorie=?, konfidenz=?, antwort_noetig=?, klassifiziert_am=? WHERE message_id=?",
+            (kategorie, konfidenz,
+             1 if result.get("antwort_noetig") else 0,
+             _dt.now().isoformat(), msg_id))
+        _mi.commit()
+        _mi.close()
+    except Exception:
+        pass
+
     # Gefilterte Mails (Newsletter, Spam etc.) → kein Task, aber indexiert
     if skip_task:
         db.close()
@@ -1282,11 +1324,33 @@ def _process_mail(mail_data, konto_label, folder_name):
     entwurf = None
     if result.get("antwort_noetig"):
         try:
-            kunden_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
-            kunden_email = kunden_email_m.group(1).lower() if kunden_email_m else absender.strip().lower()
-            entwurf = generate_draft(betreff, absender, text, kunden_email)
+            entwurf = generate_draft(betreff, absender, text, _kunden_email_resolved)
         except:
             pass
+
+    # Thread-Zusammenführung: bestehenden Task updaten statt neuen erstellen
+    if _thread_task and _thread_task["status"] == "offen":
+        try:
+            from datetime import datetime as _dt_thread
+            db.execute("""UPDATE tasks SET
+                aktualisiert_am=?, notiz=COALESCE(notiz,'') || ?
+                WHERE id=?""",
+                (_dt_thread.now().isoformat(),
+                 f"\n[{mail_data.get('datum','')}] Folgemail: {betreff[:80]}",
+                 _thread_task["id"]))
+            db.commit()
+            _alog("Mail", "Folgemail → Task aktualisiert",
+                  f"Task #{_thread_task['id']} | {betreff[:80]}", "ok",
+                  task_id=_thread_task["id"])
+            _elog('system', 'task_thread_update',
+                  f"Folgemail in Thread: Task #{_thread_task['id']} | {betreff[:80]}",
+                  source='mail_monitor', modul='mail_monitor', submodul='thread',
+                  actor_type='system', status='ok', context_type='mail', context_id=msg_id)
+        except Exception as e:
+            log.error(f"Thread-Update fehlgeschlagen: {e}")
+        finally:
+            db.close()
+        return result
 
     # Task erstellen
     from mail_classifier import kategorie_to_task_typ
@@ -1300,12 +1364,13 @@ def _process_mail(mail_data, konto_label, folder_name):
              betreff, konto, datum_mail, message_id,
              antwort_entwurf, claude_prompt,
              status, prioritaet, antwort_noetig,
-             mit_termin, manuelle_pruefung, beantwortet)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             mit_termin, manuelle_pruefung, beantwortet,
+             thread_id, konfidenz)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (typ, kategorie, betreff[:200],
              result.get("zusammenfassung", ""),
              text[:2000],
-             re.search(r'<([^>]+@[^>]+)>', absender).group(1).lower() if re.search(r'<([^>]+@[^>]+)>', absender) else "",
+             _kunden_email_resolved,
              result.get("absender_rolle", ""),
              result.get("empfohlene_aktion", ""),
              result.get("kategorie_grund", ""),
@@ -1318,7 +1383,9 @@ def _process_mail(mail_data, konto_label, folder_name):
              1 if result.get("antwort_noetig") else 0,
              result.get("mit_termin", 0),
              result.get("manuelle_pruefung", 0),
-             result.get("beantwortet", 0)))
+             result.get("beantwortet", 0),
+             mail_data.get("thread_id", ""),
+             konfidenz))
         db.commit()
         task_id_new = db.execute("SELECT last_insert_rowid()").fetchone()[0]
         _alog("Mail", "Neue Mail → Task",
@@ -1342,14 +1409,12 @@ def _process_mail(mail_data, konto_label, folder_name):
     try:
         _tid = task_id_new  # NameError wenn Task-Insert fehlschlug → Router überspringen
         from vorgang_router import route_classified_mail as _vr_route
-        _ke = re.search(r'<([^>]+@[^>]+)>', absender)
-        _kunden_email_vr = _ke.group(1).lower() if _ke else absender.strip().lower()
         _kunden_name_vr  = (absender.split("<")[0].strip() if "<" in absender else "") or ""
         _route_result = _vr_route(
             task_id=_tid,
             classification_result=result,
             mail_message_id=msg_id,
-            kunden_email=_kunden_email_vr,
+            kunden_email=_kunden_email_resolved,
             kunden_name=_kunden_name_vr,
             konto=konto_label,
             betreff=betreff,

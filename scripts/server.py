@@ -195,10 +195,14 @@ def _ensure_mail_columns():
     try:
         conn = sqlite3.connect(str(MAIL_INDEX_DB))
         for col, typedef in [
-            ('flagged',       'INTEGER DEFAULT 0'),
-            ('pinned',        'INTEGER DEFAULT 0'),
-            ('kira_verwendet','INTEGER DEFAULT 0'),
-            ('snooze_until',  'TEXT DEFAULT NULL'),
+            ('flagged',         'INTEGER DEFAULT 0'),
+            ('pinned',          'INTEGER DEFAULT 0'),
+            ('kira_verwendet',  'INTEGER DEFAULT 0'),
+            ('snooze_until',    'TEXT DEFAULT NULL'),
+            ('kategorie',       'TEXT'),
+            ('konfidenz',       'TEXT'),
+            ('antwort_noetig',  'INTEGER DEFAULT 0'),
+            ('klassifiziert_am','TEXT'),
         ]:
             try:
                 conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {typedef}")
