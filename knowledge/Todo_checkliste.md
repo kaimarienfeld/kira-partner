@@ -535,4 +535,52 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ | Benachrichtigung 'alle' | cfg-nf-typ: push/toast/beide/aufgabe(Kira LLM)/alle (Push+Toast+Aufgabe kombiniert) |
 
 ---
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-u · 2026-03-28_
+
+## POSTFACH — Kira-Entwurf & Mail-Rendering (session-www, 2026-04-02)
+
+| Status | Feature | Details |
+|--------|---------|---------|
+| ✅ | _pfCurrentKiraItem Scope-Bug | var in IIFE war nicht global → window._pfCurrentKiraItem, Commit 40151e7 |
+| ✅ | Kira-Ablehnen Modal mit Lernfunktion | confirm() → Styled Modal (Grund + Klassifizierung), LLM-Lernregel, Bestaetigung |
+| ✅ | Original-Mail im Kira-Entwurf | GET /api/mail/approve/{id}/original, iframe-Rendering, aufklappbar |
+| ✅ | Mail-Rendering Originalformat | iframe+srcdoc fuer HTML, styled pre-wrap fuer Text, erweiterte HTML-Erkennung |
+| ✅ | References-Header beim Senden | Thread-Kette korrekt aufgebaut, Re:-Betreff erzwungen |
+| ✅ | Auto-gelernte Regeln im System-Prompt | kategorie='auto_gelernt' wird jetzt in Kira-Kontext eingebaut (war write-only!) |
+
+---
+
+## OFFENE AUFGABEN (session-www, 2026-04-02) — ISS-028 bis ISS-031
+
+### ISS-028: Betraege-Formatierung (KRITISCH)
+| Status | Aufgabe | Details |
+|--------|---------|---------|
+| ❌ | Betraege-Parsing in Kira fixen | z.B. 109.48 EUR wird 10,948.00 EUR — deutsches/englisches Format korrekt erkennen |
+| ❌ | Bereits klassifizierte Mails nachbessern | Falsch formatierte Betraege in tasks.db korrigieren |
+| ❌ | Anhaenge bei Klassifizierung mitbenutzen | Pflicht: PDF-Rechnungsanhaenge fuer Betragserkennung nutzen |
+
+### ISS-029: Postfach Buchhaltungs-Nachqualifizierung
+| Status | Aufgabe | Details |
+|--------|---------|---------|
+| ❌ | Nachqualifizierungs-Button pro Mail | Mail im Postfach als Buchhaltungs-Beleg fuer Lexware qualifizieren |
+| ❌ | Buchhaltungs-Badge/Icon | Dollarzeichen-Badge auf Mails die als Buchhaltung klassifiziert sind |
+
+### ISS-030: Lexware Belege UI (KRITISCH)
+| Status | Aufgabe | Details |
+|--------|---------|---------|
+| ❌ | Betraege-Formatierung fixen | 10,948.00 → 109,48 EUR (deutsches Format) |
+| ❌ | Kontakte: Name statt ID anzeigen | Lexware Kontakt-API abrufen, ID→Name mappen |
+| ❌ | Faelligkeitsdatum einbauen | Von Lexware API abrufen und anzeigen |
+| ❌ | Einzelne Belegbetraege anzeigen | Vollstaendige Betraege der Belege abrufen |
+| ❌ | Alle Lexware-Daten abrufen | Zahlungen, Mahnungen, Leistungszeitraum, zugehoerige Belege, Tags, Kommentare etc. |
+| ❌ | Status deutsch + farbig | accept→Angenommen, rejected→Abgelehnt, unterschiedliche Farben Angebot/Rechnung |
+| ❌ | Filter reparieren + erweitern | Letzte Aenderung, Ablaufdatum, Belegnummer, Belegdatum, Betrag, Name, auf-/absteigend |
+| ❌ | Detail-Seite sticky (nicht mitscrollen) | position:sticky fuer rechte Detail-Spalte |
+| ❌ | Status mit Lexware synchronisieren | Lexware-Status korrekt abbilden (versendet, ueberfaellig, bezahlt etc.) |
+
+### ISS-031: Kira-Ablehnung Nachklassifizierung
+| Status | Aufgabe | Details |
+|--------|---------|---------|
+| ❌ | Bei falsch-klassifiziert: Mail umklassifizieren | Kira soll Mail mit korrektem Typ nachklassifizieren + an richtige Stelle weiterleiten |
+
+---
+_Erstellt: session-r · 2026-03-27 · Zuletzt: session-www · 2026-04-02_

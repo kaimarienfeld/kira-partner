@@ -1,7 +1,51 @@
 {
-  "_updated": "2026-03-30 session-jj",
+  "_updated": "2026-04-02 session-www",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
+    {
+      "id": "ISS-028",
+      "status": "open",
+      "priority": "critical",
+      "module": "scripts/kira_llm.py, scripts/server.py",
+      "area": "mail, kira",
+      "title": "Betraege-Formatierung bei eingehenden Mails falsch",
+      "description": "Kira formatiert Betraege in eingehenden Mails falsch. z.B. 109.48 EUR wird zu 10,948.00 EUR. Betrifft Klassifizierung und Task-Erstellung. Bereits klassifizierte Mails muessen nachgebessert werden.",
+      "discovered": "2026-04-02 13:00 MEZ",
+      "session": "session-www"
+    },
+    {
+      "id": "ISS-029",
+      "status": "open",
+      "priority": "important",
+      "module": "scripts/server.py",
+      "area": "postfach",
+      "title": "Nachqualifizierung fuer Buchhaltung/Lexware im Postfach fehlt",
+      "description": "Im Postfach fehlt die Moeglichkeit, Mails nachtraeglich als Buchhaltungs-Belege fuer Lexware zu qualifizieren. Ausserdem fehlt ein visuelles Badge/Icon (Dollarzeichen) auf Mails die als Buchhaltung klassifiziert sind.",
+      "discovered": "2026-04-02 13:00 MEZ",
+      "session": "session-www"
+    },
+    {
+      "id": "ISS-030",
+      "status": "open",
+      "priority": "critical",
+      "module": "scripts/server.py",
+      "area": "lexware",
+      "title": "Lexware Belege UI: Mehrere schwere Fehler",
+      "description": "Betraege falsch formatiert (10,948.00 statt 109,48), Kontakte zeigen ID statt Name, Faelligkeitsdatum fehlt, einzelne Belegbetraege fehlen, Status englisch statt deutsch, Filterbereich funktioniert nicht, Detail-Seite scrollt mit statt sticky, Status stimmt nicht mit Lexware ueberein. Anhaenge werden bei Klassifizierung nicht mitbenutzt (Pflicht).",
+      "discovered": "2026-04-02 13:00 MEZ",
+      "session": "session-www"
+    },
+    {
+      "id": "ISS-031",
+      "status": "open",
+      "priority": "important",
+      "module": "scripts/server.py, scripts/kira_llm.py",
+      "area": "kira, mail",
+      "title": "Kira-Ablehnung: Nachklassifizierung fehlt",
+      "description": "Wenn bei Ablehnung 'falsch klassifiziert' gemeldet wird, wird die Mail nur abgelegt aber nicht tatsaechlich umklassifiziert. Kira soll die Mail mit dem korrekten Typ nachklassifizieren und an die richtige Stelle weiterleiten.",
+      "discovered": "2026-04-02 13:00 MEZ",
+      "session": "session-www"
+    },
     {
       "id": "ISS-021",
       "status": "fixed",

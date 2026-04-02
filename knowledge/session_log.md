@@ -792,5 +792,20 @@
 
 ## 2026-04-01 — Session-Start: UI-Verbesserungen & Bug-Fixes Nachtlauf
 **Auftrag:** Strukturierte Abarbeitung aller Punkte aus Kai-Feedback 2026-04-01 (session-ooo). 12 Aufgaben (A-00 bis A-11) in Prioritaetsreihenfolge. Pflichtdateien gelesen: AGENT.md, session_handoff.json, KIRA_MASTERCHECKLISTE_LAUFEND.md, change_log.jsonl (Stichwortsuche archiv/admin_sender/button/sync/log). config.json gecheckt: mail_archiv.pfad korrekt gesetzt. Plan-Agent intern (change_log.jsonl Auswertung): A-00 Pfad in config.json vorhanden aber saveSettings() ueberschreibt pfad durch disabled Input. A-11 Tour-System nicht vorhanden. A-09 blaue Buttons nicht vorher behoben. A-05 Mikro-Logging war vorhanden (runtime_log.py) aber UI-Click-Events nicht aktiv.
+**Status:** offen (Kontext-Session lief weiter als session-vvv)
+
+---
+
+## 2026-04-02 12:30 -- Session-Start (session-www)
+**Auftrag:** (1) JS-Fehler _pfCurrentKiraItem Scope-Bug beheben (IIFE-Scoping), (2) Kira Ablehnen-Button: Modal mit Lernfunktion statt confirm(), Original-Mail im Entwurf anzeigen, Mail-Rendering im Originalformat + volle Breite
+**Status:** erledigt (Commits 40151e7 + 624b25e)
+
+### 2026-04-02 13:00 -- Neuer Auftragsblock (5 Themen)
+**Auftrag (Original-Wortlaut):**
+1. Betraege-Formatierung bei eingehenden Mails falsch (z.B. 109.48 wird 10,948.00 EUR), auch bei bereits klassifizierten Mails nachbessern
+2. Postfach: Nachqualifizierung fuer Buchhaltung/Lexware (Button pro Mail), Buchhaltungs-Badge auf klassifizierten Mails
+3. Lexware Belege UI: Betraege falsch, Kontakte zeigen ID statt Name, Faelligkeitsdatum fehlt, Betraege fehlen, alle Lexware-Daten abrufen, Status deutsch + farbig, Filter kaputt + erweiterte Filter, Detail-Seite soll sticky sein, Status stimmt nicht mit Lexware ueberein
+4. Kira-Ablehnung Nachklassifizierung: Bei falsch-klassifiziert-Meldung soll Kira Mail tatsaechlich umklassifizieren
+5. Tracking-Listen nach Regeln aktualisieren
 **Status:** offen
 
