@@ -11999,16 +11999,16 @@ def build_lexware(db):
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
   <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
 </div>
-<div style="display:flex;gap:12px">
-  <div style="flex:1;overflow-x:auto">
+<div id="lx-belege-split" style="display:flex;gap:12px;align-items:flex-start;position:relative">
+  <div style="flex:1;min-width:0;overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
   <table class="lx-table" id="lx-belege-table">
-    <thead><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>F&#228;llig</th><th>Status</th><th style="text-align:right">Betrag</th><th></th></tr></thead>
+    <thead style="position:sticky;top:0;z-index:2;background:var(--bg)"><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>F&#228;llig</th><th>Status</th><th style="text-align:right">Betrag</th><th></th></tr></thead>
     <tbody id="lx-belege-tbody">{belege_rows}</tbody>
   </table>
   </div>
-  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:340px;flex-shrink:0;position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 160px);overflow-y:auto">
+  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:380px;flex-shrink:0;position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 160px);overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
     <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding-bottom:8px;border-bottom:1px solid var(--border);z-index:1">
         <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
         <button class="btn btn-sec btn-xs" onclick="document.getElementById('lx-bel-detail').style.display='none'">&#x2715;</button>
       </div>
@@ -14568,31 +14568,156 @@ function lxBelegDetail(lexId) {{
   const panel = document.getElementById('lx-bel-detail');
   const content = document.getElementById('lx-bel-detail-content');
   if(!panel || !content) return;
-  content.innerHTML = '<div style="color:var(--muted)">Lade...</div>';
+  content.innerHTML = '<div style="color:var(--muted);padding:20px 0">Lade Beleg-Details von Lexware...</div>';
   panel.style.display = 'block';
+  // Aktive Zeile markieren
+  document.querySelectorAll('#lx-belege-tbody tr.lx-tr').forEach(r => r.classList.remove('lx-selected'));
+  const selRow = document.querySelector('#lx-belege-tbody tr.lx-tr[onclick*="' + lexId + '"]');
+  if(selRow) selRow.classList.add('lx-selected');
   fetch('/api/lexware/beleg/' + encodeURIComponent(lexId))
     .then(r => r.json()).then(d => {{
       const b = d.beleg || d;
+      const det = b.detail || {{}};
+      const pl = b.payload || {{}};
       const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert',accepted:'Angenommen',rejected:'Abgelehnt',paidoff:'Abgezahlt',sepadebit:'SEPA-Lastschrift'}};
-      const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung'}};
-      function _fmtDat(d){{ if(!d||d.length<10) return d||'-'; var p=d.substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
-      content.innerHTML = `<div style="line-height:1.8;font-size:var(--fs-sm)">
-        <div style="font-weight:700;font-size:var(--fs-md);margin-bottom:8px">${{esc_js(b.nummer||'-')}}</div>
-        <div><span style="color:var(--muted)">Typ:</span> ${{typ_labels[b.typ]||b.typ||'-'}}</div>
-        <div><span style="color:var(--muted)">Kontakt:</span> ${{esc_js(b.kontakt_name||'-')}}</div>
-        <div><span style="color:var(--muted)">Datum:</span> ${{_fmtDat(b.datum)}}</div>
-        <div><span style="color:var(--muted)">F&#228;llig:</span> ${{_fmtDat(b.faelligkeit)}}</div>
-        <div><span style="color:var(--muted)">Status:</span> <b>${{st_labels[b.status]||b.status||'-'}}</b></div>
-        <div><span style="color:var(--muted)">Betrag:</span> <b style="font-size:var(--fs-md)">${{parseFloat(b.brutto||0).toLocaleString('de-DE',{{minimumFractionDigits:2}})}}&nbsp;${{b.waehrung||'EUR'}}</b></div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">DOKUMENT-BEZUG</div>
-          <div style="color:var(--muted);font-size:var(--fs-xs)">&#x1F4C2; Dokumente-Modul-Verzahnung in Vorbereitung</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn btn-primary btn-xs" onclick="lxBelegKira('${{esc_js(b.lexware_id)}}','${{esc_js(b.nummer||'-')}}','${{esc_js(b.kontakt_name||'-')}}')">&#x1F916; Mit Kira besprechen</button>
-          <button class="btn btn-sec btn-xs" onclick="showLexSec('zahlungen')">&#x1F4B3; Zahlungen</button>
-        </div>
-      </div>`;
+      const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung',orderconfirmation:'Auftragsbestaetigung',deliverynote:'Lieferschein'}};
+      function _fmtDat(d){{ if(!d||String(d).length<10) return d||'—'; var p=String(d).substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
+      function _fmtEur(v,w){{ return parseFloat(v||0).toLocaleString('de-DE',{{minimumFractionDigits:2,maximumFractionDigits:2}})+' '+(w||'EUR'); }}
+      function _esc(s){{ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }}
+      // Zeitstempel (Detail > Payload > leer)
+      var createdDate = det.createdDate || pl.createdDate || '';
+      var updatedDate = det.updatedDate || pl.updatedDate || '';
+      // Status-Timeline
+      var stLabel = st_labels[b.status]||b.status||'—';
+      var stCls = 'lx-st-chip lx-st-'+(b.status||'draft');
+      // Ueberfaellig-Info
+      var overdueInfo = '';
+      var faelligDat = b.faellig || b.faelligkeit || pl.dueDate || det.dueDate || '';
+      if(b.status === 'overdue' && faelligDat){{
+        var fd = new Date(faelligDat.substring(0,10));
+        var diff = Math.floor((Date.now() - fd.getTime())/(1000*60*60*24));
+        if(diff > 0) overdueInfo = '<div style="color:#dc2626;font-size:var(--fs-xs);font-weight:600">ueberfaellig seit ' + diff + ' Tagen (' + _fmtDat(faelligDat) + ')</div>';
+      }}
+      // Leistungszeitraum / Gueltig bis
+      var servicePeriod = '';
+      var sp = det.shippingConditions || {{}};
+      if(sp.shippingDate && sp.shippingEndDate){{
+        servicePeriod = '<div><span class="lx-det-lbl">Leistungszeitraum:</span> ' + _fmtDat(sp.shippingDate) + ' — ' + _fmtDat(sp.shippingEndDate) + '</div>';
+      }} else if(sp.shippingDate){{
+        servicePeriod = '<div><span class="lx-det-lbl">Leistungsdatum:</span> ' + _fmtDat(sp.shippingDate) + '</div>';
+      }}
+      // Gueltig bis (Angebote)
+      var validUntil = '';
+      var expirationDate = det.expirationDate || '';
+      if(expirationDate) validUntil = '<div><span class="lx-det-lbl">Gueltig bis:</span> ' + _fmtDat(expirationDate) + '</div>';
+      // totalPrice Detail
+      var tp = b.total_price || det.totalPrice || {{}};
+      var priceHtml = '';
+      if(tp.totalNetAmount || tp.totalGrossAmount){{
+        priceHtml = '<div class="lx-det-sec">BETRAEGE</div>'
+          + '<div><span class="lx-det-lbl">Netto:</span> ' + _fmtEur(tp.totalNetAmount, tp.currency||b.waehrung) + '</div>'
+          + '<div><span class="lx-det-lbl">MwSt:</span> ' + _fmtEur(tp.totalTaxAmount, tp.currency||b.waehrung) + '</div>'
+          + '<div style="font-weight:700"><span class="lx-det-lbl">Brutto:</span> ' + _fmtEur(tp.totalGrossAmount, tp.currency||b.waehrung) + '</div>';
+      }}
+      // Positionen
+      var posHtml = '';
+      var items = b.line_items || det.lineItems || [];
+      if(items.length > 0){{
+        posHtml = '<div class="lx-det-sec">POSITIONEN (' + items.length + ')</div>';
+        items.forEach(function(item, idx){{
+          var name = _esc(item.name || item.title || 'Position ' + (idx+1));
+          var qty = item.quantity || 1;
+          var unit = item.unitName || 'Stk';
+          var up = item.unitPrice || {{}};
+          var upNet = up.netAmount || up.grossAmount || 0;
+          var total = (up.netAmount||0) * qty;
+          posHtml += '<div class="lx-det-pos">'
+            + '<div style="font-weight:500">' + name + '</div>'
+            + '<div style="color:var(--muted);font-size:var(--fs-xs)">' + qty + ' ' + _esc(unit) + ' &#215; ' + _fmtEur(upNet, b.waehrung) + ' = <b>' + _fmtEur(total, b.waehrung) + '</b></div>'
+            + (item.description ? '<div style="color:var(--muted);font-size:var(--fs-xs);font-style:italic">' + _esc(item.description).substring(0,120) + '</div>' : '')
+            + '</div>';
+        }});
+      }}
+      // Zahlungsbedingungen
+      var payHtml = '';
+      var pc = b.payment_conditions || det.paymentConditions || {{}};
+      if(pc.paymentTermLabel || pc.paymentTermDuration){{
+        payHtml = '<div class="lx-det-sec">ZAHLUNGSBEDINGUNGEN</div>'
+          + (pc.paymentTermLabel ? '<div>' + _esc(pc.paymentTermLabel) + '</div>' : '')
+          + (pc.paymentTermDuration ? '<div><span class="lx-det-lbl">Zahlungsziel:</span> ' + pc.paymentTermDuration + ' Tage</div>' : '')
+          + (pc.paymentDiscountConditions ? '<div style="color:var(--muted);font-size:var(--fs-xs)">Skonto: ' + (pc.paymentDiscountConditions.discountPercentage||0) + '% bei Zahlung innerhalb ' + (pc.paymentDiscountConditions.discountRange||0) + ' Tagen</div>' : '');
+      }}
+      // Zugehoerige Belege
+      var relHtml = '';
+      var rel = b.related_vouchers || det.relatedVouchers || [];
+      if(rel.length > 0){{
+        relHtml = '<div class="lx-det-sec">ZUGEHOERIGE BELEGE</div>';
+        rel.forEach(function(rv){{
+          relHtml += '<div class="lx-det-rel" onclick="lxBelegDetail(&apos;' + _esc(rv.id||'') + '&apos;)" style="cursor:pointer">'
+            + '<span style="color:var(--accent)">' + _esc(rv.voucherNumber||'—') + '</span>'
+            + ' <span style="color:var(--muted);font-size:var(--fs-xs)">' + _fmtDat(rv.voucherDate) + '</span>'
+            + '</div>';
+        }});
+      }}
+      // Offener Betrag
+      var openAmt = '';
+      var oa = det.openAmount || pl.openAmount || 0;
+      var ta = tp.totalGrossAmount || det.totalAmount || b.brutto || 0;
+      if(oa > 0 && oa < ta){{
+        openAmt = '<div class="lx-det-sec">ZAHLUNGEN</div>'
+          + '<div><span class="lx-det-lbl">Gesamtbetrag:</span> ' + _fmtEur(ta, b.waehrung) + '</div>'
+          + '<div><span class="lx-det-lbl">Offen:</span> <b style="color:#dc2626">' + _fmtEur(oa, b.waehrung) + '</b></div>'
+          + '<div><span class="lx-det-lbl">Bezahlt:</span> <span style="color:#16a34a">' + _fmtEur(ta - oa, b.waehrung) + '</span></div>';
+      }} else if(oa > 0){{
+        openAmt = '<div class="lx-det-sec">ZAHLUNGEN</div>'
+          + '<div><span class="lx-det-lbl">Zu erhalten:</span> <b>' + _fmtEur(oa, b.waehrung) + '</b></div>';
+      }}
+      // Belegformat/Dokument
+      var docHtml = '';
+      var files = det.files || [];
+      if(files.length > 0){{
+        docHtml = '<div class="lx-det-sec">DOKUMENTE</div>';
+        files.forEach(function(f){{ docHtml += '<div style="font-size:var(--fs-xs)">&#x1F4C4; ' + _esc(f.name||f.id||'Datei') + '</div>'; }});
+      }} else {{
+        docHtml = '<div class="lx-det-sec">DOKUMENT</div><div style="font-size:var(--fs-xs);color:var(--muted)">PDF (Standard-Belegformat)</div>';
+      }}
+      // Zusammenbau
+      content.innerHTML = '<div style="line-height:1.7">'
+        // Header: Belegnummer + Typ-Badge
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        + '<div style="font-weight:700;font-size:16px">' + _esc(b.nummer||'—') + '</div>'
+        + '<span class="' + stCls + '">' + stLabel + '</span>'
+        + '</div>'
+        + '<div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:12px">' + (typ_labels[b.typ]||b.typ||'') + '</div>'
+        + overdueInfo
+        // Zeitstempel-Block
+        + '<div class="lx-det-sec">BELEGE-DATEN</div>'
+        + '<div><span class="lx-det-lbl">Belegdatum:</span> ' + _fmtDat(b.datum) + '</div>'
+        + (createdDate ? '<div><span class="lx-det-lbl">Erstellt am:</span> ' + _fmtDat(createdDate) + '</div>' : '')
+        + (updatedDate ? '<div><span class="lx-det-lbl">Aktualisiert:</span> ' + _fmtDat(updatedDate) + '</div>' : '')
+        + '<div><span class="lx-det-lbl">Kontakt:</span> <b>' + _esc(b.kontakt_name||'—') + '</b></div>'
+        + (faelligDat ? '<div><span class="lx-det-lbl">Faelligkeit:</span> ' + _fmtDat(faelligDat) + '</div>' : '')
+        + servicePeriod
+        + validUntil
+        // Betraege
+        + priceHtml
+        + ((!priceHtml && b.brutto) ? '<div class="lx-det-sec">BETRAG</div><div style="font-weight:700;font-size:15px">' + _fmtEur(b.brutto, b.waehrung) + '</div>' : '')
+        // Zahlungen / Offener Betrag
+        + openAmt
+        // Positionen
+        + posHtml
+        // Zahlungsbedingungen
+        + payHtml
+        // Zugehoerige Belege
+        + relHtml
+        // Dokumente
+        + docHtml
+        // Aktionen
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">'
+        + '<button class="btn btn-primary btn-xs" onclick="lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)">&#x1F916; Kira</button>'
+        + '<button class="btn btn-sec btn-xs" onclick="showLexSec(&apos;zahlungen&apos;)">&#x1F4B3; Zahlungen</button>'
+        + '</div>'
+        + '</div>';
     }}).catch(e => {{
       if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
     }});
@@ -19588,6 +19713,14 @@ a:hover{text-decoration:underline;}
 .lx-st-rejected{background:rgba(220,38,38,.12);color:#dc2626;}
 .lx-st-paidoff{background:rgba(34,197,94,.18);color:#15803d;}
 .lx-st-sepadebit{background:rgba(59,130,246,.12);color:#2563eb;}
+.lx-det-sec{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin:14px 0 4px;padding-top:10px;border-top:1px solid var(--border)}
+.lx-det-sec:first-child{border-top:none;margin-top:0;padding-top:0}
+.lx-det-lbl{color:var(--muted);font-size:var(--fs-xs);display:inline-block;min-width:100px}
+.lx-det-pos{padding:6px 0;border-bottom:1px solid rgba(128,128,128,.1)}
+.lx-det-pos:last-child{border-bottom:none}
+.lx-det-rel{padding:3px 0;font-size:var(--fs-xs)}
+.lx-det-rel:hover{color:var(--accent)}
+tr.lx-selected{background:rgba(99,102,241,.08) !important}
 /* Buchhaltung Unterbereich-Tabs */
 .lx-buch-nav{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;margin-bottom:0;}
 .lx-buch-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 12px;cursor:pointer;font-size:var(--fs-xs);font-family:inherit;white-space:nowrap;font-weight:500;transition:color .15s;}
@@ -24292,18 +24425,46 @@ class DashboardHandler(BaseHTTPRequestHandler):
         })
 
     def _api_lexware_beleg(self, lex_id):
-        """GET /api/lexware/beleg/{id}"""
+        """GET /api/lexware/beleg/{id} — DB-Daten + Live-Detail von Lexware API"""
         db = get_db()
         try:
             row = db.execute("SELECT * FROM lexware_belege WHERE lexware_id=?", (lex_id,)).fetchone()
-            if row:
-                d = dict(row)
-                if d.get("payload_json"):
-                    try: d["payload"] = json.loads(d["payload_json"])
-                    except Exception: pass
-                self._json(d)
-            else:
+            if not row:
                 self._json({"error": "Nicht gefunden"}, 404)
+                return
+            d = dict(row)
+            if d.get("payload_json"):
+                try: d["payload"] = json.loads(d["payload_json"])
+                except Exception: pass
+            # Live-Detail von Lexware API abrufen (Positionen, Zahlungen etc.)
+            try:
+                from lexware_client import LexwareClient
+                cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8"))
+                api_key = cfg.get("lexware", {}).get("api_key", "")
+                if api_key:
+                    client = LexwareClient(api_key)
+                    vtype = d.get("typ", "invoice")
+                    detail = client.get_voucher(lex_id, vtype)
+                    d["detail"] = detail
+                    # Zugehoerige Belege (relatedVouchers)
+                    related = detail.get("relatedVouchers", [])
+                    if related:
+                        d["related_vouchers"] = related
+                    # Zahlungen (paymentConditions + shippingConditions)
+                    if detail.get("paymentConditions"):
+                        d["payment_conditions"] = detail["paymentConditions"]
+                    # Positionen (lineItems)
+                    if detail.get("lineItems"):
+                        d["line_items"] = detail["lineItems"]
+                    # Steuern (taxAmounts)
+                    if detail.get("taxAmounts"):
+                        d["tax_amounts"] = detail["taxAmounts"]
+                    # totalPrice (Netto/Brutto/Steuer)
+                    if detail.get("totalPrice"):
+                        d["total_price"] = detail["totalPrice"]
+            except Exception as e:
+                d["detail_error"] = str(e)
+            self._json(d)
         finally:
             db.close()
 

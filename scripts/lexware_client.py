@@ -221,9 +221,19 @@ class LexwareClient:
             page += 1
         return all_items
 
-    def get_voucher(self, voucher_id: str) -> dict:
-        """Holt Belegdetails (Positionen, Steuern, etc.)."""
-        return self._request("GET", f"/invoices/{voucher_id}")
+    _VOUCHER_ENDPOINTS = {
+        "invoice": "invoices",
+        "creditnote": "credit-notes",
+        "quotation": "quotations",
+        "reminder": "dunnings",
+        "orderconfirmation": "order-confirmations",
+        "deliverynote": "delivery-notes",
+    }
+
+    def get_voucher(self, voucher_id: str, voucher_type: str = "invoice") -> dict:
+        """Holt Belegdetails (Positionen, Steuern, etc.). voucher_type bestimmt den Endpoint."""
+        ep = self._VOUCHER_ENDPOINTS.get(voucher_type, "invoices")
+        return self._request("GET", f"/{ep}/{voucher_id}")
 
     def get_voucher_document(self, voucher_id: str) -> str:
         """
