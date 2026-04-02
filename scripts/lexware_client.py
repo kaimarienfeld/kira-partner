@@ -554,6 +554,18 @@ class LexwareClient:
                         """, row)
                         stats["neu"] += 1
                 db.commit()
+                # Kontakt-Namen aus lexware_kontakte nachschlagen (UUID → Name)
+                try:
+                    db.execute("""
+                        UPDATE lexware_belege SET kontakt_name = (
+                            SELECT k.name FROM lexware_kontakte k
+                            WHERE k.lexware_id = lexware_belege.kontakt_id
+                        ) WHERE kontakt_id != '' AND kontakt_id IS NOT NULL
+                          AND EXISTS (SELECT 1 FROM lexware_kontakte k WHERE k.lexware_id = lexware_belege.kontakt_id)
+                    """)
+                    db.commit()
+                except Exception:
+                    pass
             except Exception as e:
                 logger.error(f"Sync-Fehler fuer {typ}: {e}")
                 stats["fehler"] += 1
