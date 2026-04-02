@@ -790,7 +790,7 @@ def build_dashboard(tasks, db):
     briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
   <div class="dash-briefing-head">
     <div class="dash-briefing-title">Tagesbriefing{_ts_display}</div>
-    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_DASHBOARD,{{erklaermodus:true}})" title="Gefuehrte Tour durch das Dashboard">Tour</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_DASHBOARD,{{erklaermodus:true}})" title="Geführte Tour durch das Dashboard">Tour</button>
     <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
   </div>
   <div class="dash-briefing-items">{"".join(briefing_items)}</div>
@@ -3327,7 +3327,7 @@ window.pfKiraMailFreigebenSend = function(id, btn) {
         if(btn) { btn.disabled=false; btn.textContent='\\u2705 Senden'; }
         showSimpleModal('Senden fehlgeschlagen',
           '<p style="color:var(--danger);margin-bottom:12px">&#x2717; '+_esc(d.error||'Unbekannter Fehler')+'</p>'
-          +'<p style="font-size:12px;color:var(--muted)">Konto: '+_esc(vonKonto||'Standard')+'<br>Bitte pruefen ob das Konto verbunden ist (Einstellungen &gt; Mail).</p>'
+          +'<p style="font-size:12px;color:var(--muted)">Konto: '+_esc(vonKonto||'Standard')+'<br>Bitte prüfen ob das Konto verbunden ist (Einstellungen &gt; Mail).</p>'
         );
       }
     }).catch(function(e) {
@@ -4963,7 +4963,7 @@ def build_geschaeft(db):
         <div id="ze-summary" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
         <!-- Tabelle -->
         <div id="ze-list" style="overflow-x:auto">
-          <div style="color:var(--text-muted);font-size:13px;padding:20px">Lade Eintraege&hellip;</div>
+          <div style="color:var(--text-muted);font-size:13px;padding:20px">Lade Einträge&hellip;</div>
         </div>
       </div>
       <!-- Neuer Eintrag Modal -->
@@ -9480,7 +9480,7 @@ function esInfoPopup(btn, text) {{
       <input id="cfg-dv-dedup-field" type="text" class="es-input" style="max-width:220px"
              value="{esc(lex_dv_dedup_field)}"
              placeholder="z.B. cr123_lexware_id">
-      <button class="btn btn-sec btn-xs" onclick="dvTestDedupField()">Pruefen</button>
+      <button class="btn btn-sec btn-xs" onclick="dvTestDedupField()">Prüfen</button>
     </div>
     <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px;padding:0 0 4px">
       Spaltenname (API-Name) der Spalte die als eindeutiger Schlussel fuer Duplikat-Erkennung dient.
@@ -9708,10 +9708,10 @@ function esInfoPopup(btn, text) {{
   function dvTestDedupField() {{
     const field = (document.getElementById('cfg-dv-dedup-field')||{{}}).value||'';
     if(!field.trim()) {{ showToast('Bitte zuerst einen Feldnamen eingeben','warnung'); return; }}
-    showSimpleModal('Duplikat-Prueffeld: ' + field, `<p>Das Feld <code>${{esc_js(field)}}</code> wird bei jedem Export als Duplikat-Schluessel verwendet.</p>
-<p>Um zu pruefen ob das Feld in deiner Dataverse-Tabelle existiert: Dataverse-Verbindungstest ausfuehren (Verbindungstest-Button).</p>
+    showSimpleModal('Duplikat-Prüffeld: ' + field, `<p>Das Feld <code>${{esc_js(field)}}</code> wird bei jedem Export als Duplikat-Schlüssel verwendet.</p>
+<p>Um zu prüfen ob das Feld in deiner Dataverse-Tabelle existiert: Dataverse-Verbindungstest ausführen (Verbindungstest-Button).</p>
 <p><b>Richtig?</b> Wenn du dir unsicher bist ob der API-Name korrekt ist:<br>
-Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigenamen &#x2192; Spalte auswaehlen &#x2192; Feld "Name" (Pflichtfeld, beginnt mit Publisher-Prefix).</p>`);
+Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigenamen &#x2192; Spalte auswählen &#x2192; Feld "Name" (Pflichtfeld, beginnt mit Publisher-Prefix).</p>`);
   }}
 
   let _dvWizStep = 0;
@@ -10212,7 +10212,7 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="es-btn" onclick="refreshRtLogStats()">&#x21BB; Aktualisieren</button>
         <button class="es-btn" onclick="exportRtLog()">&#x2197; Export CSV</button>
-        <button class="es-btn" onclick="rtLogCopyAll()" title="Alle aktuell angezeigten Log-Eintraege in Zwischenablage kopieren">&#x29C9; Alles kopieren</button>
+        <button class="es-btn" onclick="rtLogCopyAll()" title="Alle aktuell angezeigten Log-Einträge in Zwischenablage kopieren">&#x29C9; Alles kopieren</button>
         <button class="es-btn es-btn-red" onclick="clearRtLog()">DB leeren</button>
       </div>
     </div>
@@ -10377,7 +10377,7 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
   <div class="es-sec-sub">Token-Verbrauch, API-Kosten und Preisanalyse pro Provider und Modell. (Preise Naherungswerte, USD&rarr;EUR Kurs: 0,92)</div>
 
   <div class="es-proto-tabs">
-    <div class="es-proto-tab act" data-vtab="uebersicht" onclick="esShowVTab('uebersicht')">&#x1F4C8; Ubersicht</div>
+    <div class="es-proto-tab act" data-vtab="uebersicht" onclick="esShowVTab('uebersicht')">&#x1F4C8; Übersicht</div>
     <div class="es-proto-tab" data-vtab="detail" onclick="esShowVTab('detail')">&#x1F4CB; Detailtabelle</div>
   </div>
 
@@ -10617,11 +10617,11 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
     <label class="es-toggle"><input type="checkbox" id="cap-cfg-active" {'checked' if capture_cfg_es.get('active', True) else ''}><span class="es-slider"></span></label>
   </div>
   <div class="es-row">
-    <div class="es-row-left"><span class="es-lbl">Automatische Analyse</span><span class="es-hint">Kira analysiert neue Eintraege automatisch im Hintergrund</span></div>
+    <div class="es-row-left"><span class="es-lbl">Automatische Analyse</span><span class="es-hint">Kira analysiert neue Einträge automatisch im Hintergrund</span></div>
     <label class="es-toggle"><input type="checkbox" id="cap-cfg-auto-analyse" {'checked' if capture_cfg_es.get('auto_analyse', True) else ''}><span class="es-slider"></span></label>
   </div>
   <div class="es-row">
-    <div class="es-row-left"><span class="es-lbl">Automatische Zuordnung</span><span class="es-hint">Sicher erkannte Eintraege automatisch zuordnen (ohne Bestaetigung)</span></div>
+    <div class="es-row-left"><span class="es-lbl">Automatische Zuordnung</span><span class="es-hint">Sicher erkannte Einträge automatisch zuordnen (ohne Bestätigung)</span></div>
     <label class="es-toggle"><input type="checkbox" id="cap-cfg-auto-assign" {'checked' if capture_cfg_es.get('auto_assign', False) else ''}><span class="es-slider"></span></label>
   </div>
   <div class="es-row">
@@ -10672,7 +10672,7 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
 <div class="es-grp">
   <div class="es-grp-h">Abo-Faehigkeit <span class="es-badge es-badge-plan">In Planung</span></div>
   <div style="font-size:12px;color:var(--muted);padding:4px 0 8px">
-    Folgende Feature-Flags sind strukturell vorbereitet und koennen spaeter abo-abhaengig geschaltet werden:
+    Folgende Feature-Flags sind strukturell vorbereitet und können später abo-abhängig geschaltet werden:
     erweitertes-KI-Matching, Team-Freigaben, groessere Upload-Limits, Premium-Analysen, mehr Speicher.
   </div>
 </div>
@@ -10786,7 +10786,7 @@ def build_admin():
         <div class="es-grp" style="margin-top:10px">
           <div class="adm-sub-hd">Provider-Keys (OpenAI, Ollama, etc.)</div>
           <div id="adm-provider-keys-list"></div>
-          <button class="es-btn es-btn-green" style="margin-top:8px" onclick="admAddProviderKey()">&#x2B; Provider-Key hinzufuegen</button>
+          <button class="es-btn es-btn-green" style="margin-top:8px" onclick="admAddProviderKey()">&#x2B; Provider-Key hinzufügen</button>
         </div>
 
         <!-- Integrationen -->
@@ -10990,7 +10990,7 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Server-Port</div>
-              <div class="adm-field-hint">Standard: 8765 &middot; Aenderung erfordert Neustart</div>
+              <div class="adm-field-hint">Standard: 8765 &middot; Änderung erfordert Neustart</div>
             </div>
             <input id="adm-f-port" type="number" class="adm-inp" placeholder="8765" style="width:100px">
           </div>
@@ -11065,7 +11065,7 @@ def build_admin():
             <div class="adm-cf-step-num">3</div>
             <div class="adm-cf-step-body">
               <div class="adm-cf-step-title">Als Windows-Dienst installieren (einmalig, Admin)</div>
-              <div class="adm-cf-step-hint">Folgenden Befehl <b>als Administrator</b> in PowerShell ausfuehren. Tunnel laeuft danach automatisch beim Windows-Start.</div>
+              <div class="adm-cf-step-hint">Folgenden Befehl <b>als Administrator</b> in PowerShell ausführen. Tunnel läuft danach automatisch beim Windows-Start.</div>
               <div style="margin-top:6px;position:relative">
                 <code id="adm-cf-install-cmd" style="display:block;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text);word-break:break-all">Token oben eintragen um den Befehl zu generieren</code>
                 <button class="btn btn-sec btn-xs" style="position:absolute;top:6px;right:6px" onclick="admCfCopyCmd()" title="Befehl kopieren">Kopieren</button>
@@ -11878,7 +11878,7 @@ def build_lexware(db):
   </div>
   <div class="lx-header-right">
     <input id="lx-global-search" type="text" placeholder="&#x2315; Suche..." oninput="lxGlobalSearch(this.value)" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm);width:180px">
-    <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell pruefen">&#x1F50D; Pruefen</button>
+    <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')" title="Manuell prüfen">&#x1F50D; Prüfen</button>
     <button class="btn btn-sec btn-xs" onclick="lexSync()" title="Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware</button>
     <button class="btn btn-sec btn-xs" onclick="showLexSec('diagnose')" title="Diagnose">&#x1F527;</button>
     <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_LEXWARE,{{erklaermodus:true}})" title="Gefuehrte Tour durch Lexware Office starten">Tour</button>
@@ -11976,8 +11976,8 @@ def build_lexware(db):
     <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
       <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:12px;color:var(--muted)">SCHNELLAKTIONEN</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Neue und geaenderte Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware abrufen</button>
-        <button class="btn btn-sec btn-xs" onclick="lexSync('full')" title="Alle Daten vollstaendig von Lexware neu laden (Lexware &rarr; KIRA, langsamer)">&#x2190; Vollsync von Lexware</button>
+        <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Neue und geänderte Daten von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware abrufen</button>
+        <button class="btn btn-sec btn-xs" onclick="lexSync('full')" title="Alle Daten vollständig von Lexware neu laden (Lexware &rarr; KIRA, langsamer)">&#x2190; Vollsync von Lexware</button>
         <button class="btn btn-sec btn-xs" onclick="lexTestConnection()">Verbindung testen</button>
         <button class="btn btn-sec btn-xs" onclick="showLexSec('buchhaltung')">Eingangsbelege pr&#252;fen</button>
         <button class="btn btn-sec btn-xs" onclick="lxOpenKiraWithContext('cockpit','')">&#x1F916; Mit Kira besprechen</button>
@@ -12314,7 +12314,7 @@ def build_lexware(db):
     <option value="unklar">Unklar</option>
   </select>
   <input id="lx-pruef-search" type="text" placeholder="Absender / Betreff..." oninput="lxFilterPruef()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
-  <button class="btn btn-sec btn-xs" onclick="lxBuchManuellesPruefen()">+ Manuell hinzufuegen</button>
+  <button class="btn btn-sec btn-xs" onclick="lxBuchManuellesPruefen()">+ Manuell hinzufügen</button>
 </div>
 <div id="lx-buch-zu_pruefen" class="lx-buch-content" style="display:block"><div style="overflow-x:auto"><table class="lx-table" id="lx-pruef-table">{buch_table_header}<tbody id="lx-pruef-tbody">{_buch_tab_table(pruef_zu, "Keine Belege zu pruefe — Eingangsrechnungen werden automatisch erkannt")}</tbody></table></div></div>
 <div id="lx-buch-klassifiziert" class="lx-buch-content" style="display:none"><div style="overflow-x:auto"><table class="lx-table">{buch_table_header}<tbody>{_buch_tab_table(pruef_klass, "Noch keine klassifizierten Belege")}</tbody></table></div></div>
@@ -12867,12 +12867,12 @@ def build_capture(db):
 
   <!-- View: Uebersicht -->
   <div id="capViewUebersicht" class="cap-view">
-    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Letzte Eintraege</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Letzte Einträge</div>
     <div class="cap-list" id="capRecentList">
       <div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">
         <span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span>
       </div>
-      {recent_rows_html if recent_rows_html else '<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Eintraege. Jetzt erfassen!</div>'}
+      {recent_rows_html if recent_rows_html else '<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Einträge. Jetzt erfassen!</div>'}
     </div>
   </div>
 
@@ -12906,7 +12906,7 @@ def build_capture(db):
 
   <!-- View: Detail -->
   <div id="capViewDetail" class="cap-view" style="display:none">
-    <button class="btn btn-sec btn-xs" onclick="capShowView('eingang')" style="margin-bottom:12px">&#x2190; Zurueck</button>
+    <button class="btn btn-sec btn-xs" onclick="capShowView('eingang')" style="margin-bottom:12px">&#x2190; Zurück</button>
     <div id="capDetailContent"><div style="padding:40px;text-align:center;color:var(--muted)">Wird geladen&hellip;</div></div>
   </div>
 
@@ -12984,7 +12984,7 @@ function capSubmitNew() {{
       if(inp&&inp.files.length>0) {{
         capUploadFiles(capId, inp.files);
       }}
-      // Letzte Eintraege neu laden
+      // Letzte Einträge neu laden
       fetch('/api/capture/list?page=1&limit=20').then(r=>r.json()).then(ld=>capRenderRecentList(ld.items||[])).catch(()=>{{}});
     }} else {{
       showToast('Fehler: '+(d.error||'unbekannt'),'fehler');
@@ -13017,10 +13017,10 @@ function capLoadList(page) {{
     const items=d.items||[];
     const total=d.total||0;
     const cnt=document.getElementById('capListCount');
-    if(cnt) cnt.textContent=total+' Eintraege';
+    if(cnt) cnt.textContent=total+' Einträge';
     if(!cont) return;
     if(items.length===0) {{
-      cont.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Keine Eintraege gefunden.</div>';
+      cont.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Keine Einträge gefunden.</div>';
     }} else {{
       cont.innerHTML='<div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase"><span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span></div>'
         + items.map(r=>capRenderRow(r)).join('');
@@ -13046,7 +13046,7 @@ function capRenderRow(r) {{
   const conf=parseFloat(r.confidence||0);
   const confBar=conf>0?'<span class="cap-conf-bar"><span class="cap-conf-fill" style="width:'+Math.round(conf*100)+'%"></span></span>':'';
   const stCss={{'eingegangen':'cap-status-eingegangen','gespeichert':'cap-status-eingegangen','an_kira':'cap-status-eingegangen','analysiert':'cap-status-eingegangen','zugeordnet':'cap-status-zugeordnet','pruefung':'cap-status-pruefung','erledigt':'cap-status-erledigt'}}[st]||'cap-status-eingegangen';
-  const stLbl={{'eingegangen':'Eingegangen','gespeichert':'Gespeichert','zugeordnet':'Zugeordnet','pruefung':'Pruefen','erledigt':'Erledigt','an_kira':'Bei Kira'}}[st]||st;
+  const stLbl={{'eingegangen':'Eingegangen','gespeichert':'Gespeichert','zugeordnet':'Zugeordnet','pruefung':'Prüfen','erledigt':'Erledigt','an_kira':'Bei Kira'}}[st]||st;
   return '<div class="cap-row" onclick="capOpenDetail('+r.id+')">'
     +'<span style="color:var(--muted);font-size:12px">'+ts+'</span>'
     +'<span style="font-size:11px;color:var(--muted)">'+(r.source_channel||'')+'</span>'
@@ -13061,7 +13061,7 @@ function capRenderRecentList(items) {{
   const cont=document.getElementById('capRecentList');
   if(!cont) return;
   if(items.length===0){{
-    cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Eintraege.</div>';
+    cont.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Noch keine Einträge.</div>';
     return;
   }}
   cont.innerHTML='<div style="display:grid;grid-template-columns:130px 80px 1fr 100px 80px 120px;gap:8px;padding:6px 12px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase"><span>Zeit</span><span>Kanal</span><span>Text</span><span>Status</span><span>Konf.</span><span>Match</span></div>'
@@ -13293,9 +13293,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
         <div class="mob-log" id="mobLog"></div>
       </div>
 
-      <!-- Letzte Eintraege -->
+      <!-- Letzte Einträge -->
       <div class="mob-card" id="mobRecentCard">
-        <div class="mob-card-title">Letzte Eintraege</div>
+        <div class="mob-card-title">Letzte Einträge</div>
         <div id="mobRecentList" style="color:var(--mob-muted);font-size:13px">Wird geladen&hellip;</div>
       </div>
     </div>
@@ -13464,7 +13464,7 @@ function mobLoadRecent(){
   fetch('/api/capture/list?page=1&limit=5&source_channel=mobil',{headers:{'X-Mob-Token':_mobToken||''}})
     .then(r=>r.json()).then(d=>{
       var items=d.items||[];
-      if(items.length===0){list.innerHTML='<span style="color:var(--mob-muted);font-size:13px">Noch keine Eintraege.</span>';return;}
+      if(items.length===0){list.innerHTML='<span style="color:var(--mob-muted);font-size:13px">Noch keine Einträge.</span>';return;}
       list.innerHTML=items.map(r=>{
         var st={eingegangen:'warn',pruefung:'err',zugeordnet:'ok',erledigt:'ok'}[r.status]||'';
         var stl={eingegangen:'Eingegangen',pruefung:'Zu pruefen',zugeordnet:'Zugeordnet',erledigt:'Erledigt',an_kira:'Bei Kira'}[r.status]||r.status;
@@ -14649,7 +14649,7 @@ function lxBelegDetail(lexId) {{
       const b = d.beleg || d;
       const det = b.detail || {{}};
       const pl = b.payload || {{}};
-      const st_labels = {{open:'Offen',overdue:'Ueberfaellig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert',accepted:'Angenommen',rejected:'Abgelehnt',paidoff:'Abgezahlt',sepadebit:'SEPA-Lastschrift'}};
+      const st_labels = {{open:'Offen',overdue:'Überfällig',paid:'Bezahlt',draft:'Entwurf',voided:'Storniert',accepted:'Angenommen',rejected:'Abgelehnt',paidoff:'Abgezahlt',sepadebit:'SEPA-Lastschrift'}};
       const typ_labels = {{invoice:'Rechnung',creditnote:'Gutschrift',quotation:'Angebot',reminder:'Mahnung',orderconfirmation:'Auftragsbestaetigung',deliverynote:'Lieferschein'}};
       function _fmtDat(d){{ if(!d||String(d).length<10) return d||'—'; var p=String(d).substring(0,10).split('-'); return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:d; }}
       function _fmtEur(v,w){{ return parseFloat(v||0).toLocaleString('de-DE',{{minimumFractionDigits:2,maximumFractionDigits:2}})+' '+(w||'EUR'); }}
@@ -14667,7 +14667,7 @@ function lxBelegDetail(lexId) {{
       if(b.status === 'overdue' && faelligDat){{
         var fd = new Date(faelligDat.substring(0,10));
         var diff = Math.floor((Date.now() - fd.getTime())/(1000*60*60*24));
-        if(diff > 0) overdueInfo = '<div style="color:#dc2626;font-size:var(--fs-xs);font-weight:600">ueberfaellig seit ' + diff + ' Tagen (' + _fmtDat(faelligDat) + ')</div>';
+        if(diff > 0) overdueInfo = '<div style="color:#dc2626;font-size:var(--fs-xs);font-weight:600">überfällig seit ' + diff + ' Tagen (' + _fmtDat(faelligDat) + ')</div>';
       }}
       // Leistungszeitraum / Gueltig bis
       var servicePeriod = '';
@@ -14680,15 +14680,57 @@ function lxBelegDetail(lexId) {{
       // Gueltig bis (Angebote)
       var validUntil = '';
       var expirationDate = det.expirationDate || '';
-      if(expirationDate) validUntil = '<div><span class="lx-det-lbl">Gueltig bis:</span> ' + _fmtDat(expirationDate) + '</div>';
+      if(expirationDate) validUntil = '<div><span class="lx-det-lbl">Gültig bis:</span> ' + _fmtDat(expirationDate) + '</div>';
       // totalPrice Detail
       var tp = b.total_price || det.totalPrice || {{}};
       var priceHtml = '';
       if(tp.totalNetAmount || tp.totalGrossAmount){{
-        priceHtml = '<div class="lx-det-sec">BETRAEGE</div>'
+        var bruttoBetrag = parseFloat(tp.totalGrossAmount || det.totalAmount || b.brutto || 0);
+        priceHtml = '<div class="lx-det-sec">BETRÄGE</div>'
           + '<div><span class="lx-det-lbl">Netto:</span> ' + _fmtEur(tp.totalNetAmount, tp.currency||b.waehrung) + '</div>'
           + '<div><span class="lx-det-lbl">MwSt:</span> ' + _fmtEur(tp.totalTaxAmount, tp.currency||b.waehrung) + '</div>'
-          + '<div style="font-weight:700"><span class="lx-det-lbl">Brutto:</span> ' + _fmtEur(tp.totalGrossAmount, tp.currency||b.waehrung) + '</div>';
+          + '<div style="font-weight:700"><span class="lx-det-lbl">Brutto:</span> ' + _fmtEur(bruttoBetrag, tp.currency||b.waehrung) + '</div>';
+        // Skonto-Analyse direkt im Beträge-Block
+        var _pc = b.payment_conditions || det.paymentConditions || {{}};
+        var _dc = _pc.paymentDiscountConditions || {{}};
+        if(_dc.discountPercentage){{
+          var skontoP = _dc.discountPercentage || 0;
+          var skontoTage = _dc.discountRange || 0;
+          var skontoBetrag = (bruttoBetrag * skontoP / 100);
+          var belegDat = b.datum || det.voucherDate || '';
+          var skontoFrist = '';
+          if(belegDat && skontoTage > 0){{
+            var sd = new Date(belegDat.substring(0,10));
+            sd.setDate(sd.getDate() + skontoTage);
+            skontoFrist = _fmtDat(sd.toISOString());
+          }}
+          var heute = new Date();
+          var skontoAbgelaufen = skontoFrist && new Date(belegDat.substring(0,10)).getTime() + skontoTage*86400000 < heute.getTime();
+          var istBezahlt = (b.status === 'paid' || b.status === 'paidoff');
+          var oa2 = det.openAmount || pl.openAmount || 0;
+          var gezahlt = bruttoBetrag - parseFloat(oa2||0);
+          var skontoGezogen = (istBezahlt && bruttoBetrag > 0 && gezahlt > 0 && gezahlt < bruttoBetrag * 0.995);
+          var skontoBerechtigt = !skontoAbgelaufen;
+
+          priceHtml += '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised)">'
+            + '<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:6px">SKONTO</div>'
+            + '<div><span class="lx-det-lbl">Skonto:</span> <b>' + skontoP + '%</b> = <b>' + _fmtEur(skontoBetrag, b.waehrung) + '</b></div>'
+            + '<div><span class="lx-det-lbl">Skonto-Frist:</span> ' + (skontoFrist || '—') + ' (' + skontoTage + ' Tage)' + (skontoAbgelaufen ? ' <span style="color:#dc2626;font-size:10px;font-weight:700">ABGELAUFEN</span>' : ' <span style="color:#16a34a;font-size:10px;font-weight:700">AKTIV</span>') + '</div>';
+          if(istBezahlt){{
+            priceHtml += '<div><span class="lx-det-lbl">Skonto gezogen:</span> ' + (skontoGezogen ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:var(--muted)">Nein</span>') + '</div>';
+            if(skontoGezogen){{
+              priceHtml += '<div><span class="lx-det-lbl">Berechtigt:</span> ' + (skontoBerechtigt ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:#dc2626;font-weight:700">Nein &#x26A0;</span>') + '</div>';
+              if(!skontoBerechtigt){{
+                priceHtml += '<div style="margin-top:4px;padding:6px 8px;background:rgba(220,38,38,.08);border-radius:6px;border:1px solid rgba(220,38,38,.2)">'
+                  + '<div style="font-size:11px;color:#dc2626;font-weight:600">&#x26A0; Unberechtigter Skontoabzug</div>'
+                  + '<div style="font-size:var(--fs-xs);color:var(--muted)">Zahlung nach Skonto-Frist (' + skontoFrist + '). Rückforderung: ' + _fmtEur(skontoBetrag, b.waehrung) + '</div>'
+                  + '<button class="btn btn-sec btn-xs" style="margin-top:4px;color:#dc2626;border-color:#dc2626" onclick="event.stopPropagation();lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)">&#x1F916; Kira: Rückforderung prüfen</button>'
+                  + '</div>';
+              }}
+            }}
+          }}
+          priceHtml += '</div>';
+        }}
       }}
       // Positionen
       var posHtml = '';
@@ -14709,61 +14751,19 @@ function lxBelegDetail(lexId) {{
             + '</div>';
         }});
       }}
-      // Zahlungsbedingungen
+      // Zahlungsbedingungen (ohne Skonto — Skonto ist jetzt im Beträge-Block)
       var payHtml = '';
       var pc = b.payment_conditions || det.paymentConditions || {{}};
       if(pc.paymentTermLabel || pc.paymentTermDuration){{
         payHtml = '<div class="lx-det-sec">ZAHLUNGSBEDINGUNGEN</div>'
           + (pc.paymentTermLabel ? '<div style="font-size:var(--fs-xs)">' + _esc(pc.paymentTermLabel.split('\\n')[0]) + '</div>' : '')
           + (pc.paymentTermDuration ? '<div><span class="lx-det-lbl">Zahlungsziel:</span> ' + pc.paymentTermDuration + ' Tage</div>' : '');
-        // Skonto-Analyse
-        var dc = pc.paymentDiscountConditions || {{}};
-        if(dc.discountPercentage){{
-          var skontoP = dc.discountPercentage || 0;
-          var skontoTage = dc.discountRange || 0;
-          var bruttoBetrag = parseFloat(tp.totalGrossAmount || det.totalAmount || b.brutto || 0);
-          var skontoBetrag = (bruttoBetrag * skontoP / 100);
-          // Skonto-Frist berechnen (Rechnungsdatum + discountRange Tage)
-          var belegDat = b.datum || det.voucherDate || '';
-          var skontoFrist = '';
-          if(belegDat && skontoTage > 0){{
-            var sd = new Date(belegDat.substring(0,10));
-            sd.setDate(sd.getDate() + skontoTage);
-            skontoFrist = _fmtDat(sd.toISOString());
-          }}
-          var heute = new Date();
-          var skontoAbgelaufen = skontoFrist && new Date(belegDat.substring(0,10)).getTime() + skontoTage*86400000 < heute.getTime();
-          var istBezahlt = (b.status === 'paid' || b.status === 'paidoff');
-          // Pruefen ob Skonto gezogen wurde (Differenz zwischen Brutto und tatsaechlicher Zahlung)
-          var gezahlt = parseFloat(tp.totalGrossAmount||0) - parseFloat(oa||0);
-          var skontoGezogen = (istBezahlt && bruttoBetrag > 0 && gezahlt > 0 && gezahlt < bruttoBetrag * 0.995);
-          var skontoBerechtigt = !skontoAbgelaufen;
-
-          payHtml += '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised)">'
-            + '<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:6px">SKONTO</div>'
-            + '<div><span class="lx-det-lbl">Skonto:</span> <b>' + skontoP + '%</b> = <b>' + _fmtEur(skontoBetrag, b.waehrung) + '</b></div>'
-            + '<div><span class="lx-det-lbl">Skonto-Frist:</span> ' + (skontoFrist || '—') + (skontoAbgelaufen ? ' <span style="color:#dc2626;font-size:10px;font-weight:700">ABGELAUFEN</span>' : ' <span style="color:#16a34a;font-size:10px;font-weight:700">AKTIV</span>') + '</div>';
-          if(istBezahlt){{
-            payHtml += '<div><span class="lx-det-lbl">Skonto gezogen:</span> ' + (skontoGezogen ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:var(--muted)">Nein</span>') + '</div>';
-            if(skontoGezogen){{
-              payHtml += '<div><span class="lx-det-lbl">Berechtigt:</span> ' + (skontoBerechtigt ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:#dc2626;font-weight:700">Nein &#x26A0;</span>') + '</div>';
-              if(!skontoBerechtigt){{
-                payHtml += '<div style="margin-top:4px;padding:6px 8px;background:rgba(220,38,38,.08);border-radius:6px;border:1px solid rgba(220,38,38,.2)">'
-                  + '<div style="font-size:11px;color:#dc2626;font-weight:600">&#x26A0; Unberechtigter Skontoabzug</div>'
-                  + '<div style="font-size:var(--fs-xs);color:var(--muted)">Zahlung nach Skonto-Frist (' + skontoFrist + '). R&#252;ckforderung: ' + _fmtEur(skontoBetrag, b.waehrung) + '</div>'
-                  + '<button class="btn btn-sec btn-xs" style="margin-top:4px;color:#dc2626;border-color:#dc2626" onclick="event.stopPropagation();lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)">&#x1F916; Kira: R&#252;ckforderung pr&#252;fen</button>'
-                  + '</div>';
-              }}
-            }}
-          }}
-          payHtml += '</div>';
-        }}
       }}
-      // Zugehoerige Belege
+      // Zugehörige Belege
       var relHtml = '';
       var rel = b.related_vouchers || det.relatedVouchers || [];
       if(rel.length > 0){{
-        relHtml = '<div class="lx-det-sec">ZUGEHOERIGE BELEGE</div>';
+        relHtml = '<div class="lx-det-sec">ZUGEHÖRIGE BELEGE</div>';
         rel.forEach(function(rv){{
           relHtml += '<div class="lx-det-rel" onclick="lxBelegDetail(&apos;' + _esc(rv.id||'') + '&apos;)" style="cursor:pointer">'
             + '<span style="color:var(--accent)">' + _esc(rv.voucherNumber||'—') + '</span>'
@@ -14855,7 +14855,7 @@ function lxBelegDetail(lexId) {{
         + '<div><span class="lx-det-lbl">Belegdatum:</span> ' + _fmtDat(b.datum) + '</div>'
         + (createdDate ? '<div><span class="lx-det-lbl">Erstellt am:</span> ' + _fmtDat(createdDate) + '</div>' : '')
         + (updatedDate ? '<div><span class="lx-det-lbl">Aktualisiert:</span> ' + _fmtDat(updatedDate) + '</div>' : '')
-        + (faelligDat ? '<div><span class="lx-det-lbl">Faelligkeit:</span> ' + _fmtDat(faelligDat) + '</div>' : '')
+        + (faelligDat ? '<div><span class="lx-det-lbl">Fälligkeit:</span> ' + _fmtDat(faelligDat) + '</div>' : '')
         + paidDateHtml
         + servicePeriod
         + validUntil
@@ -14879,7 +14879,7 @@ function lxBelegDetail(lexId) {{
 }}
 
 function lxBelegKira(lexId, nummer, kontakt) {{
-  const prompt = 'Lexware Beleg pr&#252;fen\\\\n\\\\nBeleg: ' + (nummer||lexId) + '\\\\nKontakt: ' + (kontakt||'') + '\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschaetzung.';
+  const prompt = 'Lexware Beleg prüfen\\\\n\\\\nBeleg: ' + (nummer||lexId) + '\\\\nKontakt: ' + (kontakt||'') + '\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschätzung.';
   openKiraWorkspace('lexware_beleg', prompt);
 }}
 
@@ -16103,7 +16103,7 @@ function bvKiraErstellen() {{
   kiraSetQuickActions('frage');
   var input=document.getElementById('kiraInput');
   if(input){{
-    input.value='Erstelle mir eine professionelle HTML-Vorlage fuer ein '+lbl+' fuer ein Betonwerk / Sichtbeton-Unternehmen. '
+    input.value='Erstelle mir eine professionelle HTML-Vorlage für ein '+lbl+' für ein Betonwerk / Sichtbeton-Unternehmen. '
       +'Platzhalter: {{FIRMA}}, {{ANREDE}}, {{DATUM}}, {{POSITIONEN}}, {{BETRAG_NETTO}}, {{MWST}}, {{BETRAG_BRUTTO}}, {{ZAHLUNGSZIEL}}, {{IBAN}}. '
       +'Bitte vollstaendiges HTML zurueckgeben (inline-CSS, kein extern).';
     input.style.height='auto';
@@ -16152,7 +16152,7 @@ function loadZeiterfassung() {{
 function _zeRenderList(items) {{
   var el=document.getElementById('ze-list');
   if(!el)return;
-  if(!items.length){{el.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:20px">Keine Eintraege fuer diesen Zeitraum.</div>';return;}}
+  if(!items.length){{el.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:20px">Keine Einträge für diesen Zeitraum.</div>';return;}}
   var html='<table style="width:100%;border-collapse:collapse;font-size:13px">'
     +'<thead><tr style="border-bottom:2px solid var(--border);text-align:left">'
     +'<th style="padding:8px 10px;color:var(--text-muted);font-weight:600">Datum</th>'
@@ -16186,7 +16186,7 @@ function _zeRenderSummary(items) {{
     +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Gesamt</div>'
     +'<div style="font-size:20px;font-weight:700;color:var(--text)">'+totalStr+'</div></div>'
     +'<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">'
-    +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Eintraege</div>'
+    +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Einträge</div>'
     +'<div style="font-size:20px;font-weight:700;color:var(--text)">'+items.length+'</div></div>';
 }}
 
@@ -16401,7 +16401,7 @@ function kalKiraAngebot() {{
       +'Erstelle ein professionelles Angebot auf Basis dieser Kalkulation:\\n'
       +positions.join('\\n')
       +'\\n\\nKalkulierter Nettopreis: '+netto.toFixed(2)+' EUR'
-      +'\\n\\nBitte formuliere ein hoefliches, professionelles Angebot fuer ein Sichtbeton-Unternehmen.';
+      +'\\n\\nBitte formuliere ein höfliches, professionelles Angebot für ein Sichtbeton-Unternehmen.';
     input.style.height='auto';
     input.style.height=Math.min(input.scrollHeight,160)+'px';
     input.focus();
