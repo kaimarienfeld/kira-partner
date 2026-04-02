@@ -49,7 +49,7 @@ PRIORITAETEN = ["hoch", "mittel", "niedrig"]
 def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent,
                                   angebote_kontext: str = "", correction_beispiele: str = "",
                                   kira_wissen: str = "", kunden_profil: str = "",
-                                  mail_verlauf: str = ""):
+                                  mail_verlauf: str = "", anhaenge: list = None):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:2000]
 
@@ -99,6 +99,7 @@ MAIL-DATEN:
 - Absender: {absender}
 - Betreff: {betreff}
 - Ordner: {folder}
+- Anhaenge: {', '.join(str(a) for a in (anhaenge or [])) or 'Keine'}
 - Text (Auszug): {text_snippet}
 
 KATEGORIEN (wähle GENAU eine):
@@ -118,6 +119,9 @@ REGELN:
 - Re:/AW: mit Bezug auf Angebote → Angebotsrueckmeldung
 - Mails von bekanntem Angebots-Kunden (auch anderer Account!) → Angebotsrueckmeldung
 - Bei Unsicherheit: lieber "Antwort erforderlich" als "Ignorieren"
+- ANHAENGE BERUECKSICHTIGEN: PDF/ZIP/Bild-Anhaenge koennen Rechnungen, Angebote, Fotos, Vertraege enthalten.
+  Mail mit Anhang wie "Rechnung_*.pdf" oder "Invoice_*.pdf" → "Rechnung / Beleg" (auch wenn Betreff unklar)
+  Mail mit Foto-Anhaengen (*.jpg, *.png) von Kunden → koennte Projektanfrage sein
 
 Antworte NUR als JSON:
 {{
@@ -533,6 +537,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             kira_wissen=kira_wissen,
             kunden_profil=kunden_profil,
             mail_verlauf=mail_verlauf,
+            anhaenge=anhaenge,
         )
 
         # Leichtgewichtiger Direkt-Aufruf (Haiku, 512 max_tokens, kein System-Prompt)

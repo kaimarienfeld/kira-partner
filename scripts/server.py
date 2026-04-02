@@ -11732,12 +11732,51 @@ def build_lexware(db):
     except Exception:
         last_sync = "—"
 
+    def _parse_amount(raw) -> float:
+        """Universeller Betrags-Parser: erkennt DE/EN/gemischte Formate."""
+        if raw is None:
+            return 0.0
+        if isinstance(raw, (int, float)):
+            return float(raw)
+        import re as _re
+        s = str(raw).strip()
+        for c in ('\u20ac', '$', '\u00a3', 'EUR', 'USD', 'CHF', '\u00a0', '\u202f'):
+            s = s.replace(c, '')
+        s = s.strip()
+        if not s:
+            return 0.0
+        cleaned = _re.sub(r'[^\d.,-]', '', s)
+        if not cleaned:
+            return 0.0
+        has_dot = '.' in cleaned
+        has_comma = ',' in cleaned
+        if has_dot and has_comma:
+            if cleaned.rfind(',') > cleaned.rfind('.'):
+                cleaned = cleaned.replace('.', '').replace(',', '.')
+            else:
+                cleaned = cleaned.replace(',', '')
+        elif has_comma and not has_dot:
+            parts = cleaned.split(',')
+            if len(parts) == 2 and len(parts[1]) <= 2:
+                cleaned = cleaned.replace(',', '.')
+            else:
+                cleaned = cleaned.replace(',', '')
+        elif has_dot and not has_comma:
+            parts = cleaned.split('.')
+            if len(parts) == 2 and len(parts[1]) <= 2:
+                pass
+            elif len(parts) == 2 and len(parts[1]) == 3:
+                cleaned = cleaned.replace('.', '')
+            elif len(parts) > 2:
+                cleaned = cleaned.replace('.', '')
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+
     def _fmt_eur(val, waehrung="EUR"):
         """Deutsches Zahlenformat: 1.234,56 EUR"""
-        try:
-            n = float(val or 0)
-        except (ValueError, TypeError):
-            n = 0.0
+        n = _parse_amount(val)
         s = f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         return f"{s}&nbsp;{esc(waehrung)}"
 

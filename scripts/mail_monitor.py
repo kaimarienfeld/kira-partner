@@ -35,6 +35,79 @@ try:
 except ImportError:
     MSAL_OK = False
 
+def _parse_amount(raw: str) -> float:
+    """
+    Universeller Betrags-Parser: erkennt DE/EN/gemischte Formate korrekt.
+
+    Beispiele:
+      '109.48'      → 109.48   (EN: Punkt = Dezimal)
+      '109,48'      → 109.48   (DE: Komma = Dezimal)
+      '1,234.56'    → 1234.56  (EN: Komma = Tausender, Punkt = Dezimal)
+      '1.234,56'    → 1234.56  (DE: Punkt = Tausender, Komma = Dezimal)
+      '1234'        → 1234.0
+      '10.948,00'   → 10948.0  (DE: Punkt = Tausender)
+      '10,948.00'   → 10948.0  (EN: Komma = Tausender)
+      '$109.48'     → 109.48
+      '4.960,62 €'  → 4960.62
+    """
+    if not raw:
+        return 0.0
+    s = str(raw).strip()
+    # Waehrungszeichen und Leerzeichen entfernen
+    for c in ('€', '$', '£', 'EUR', 'USD', 'CHF', '\u00a0', '\u202f'):
+        s = s.replace(c, '')
+    s = s.strip()
+    if not s:
+        return 0.0
+    # Nur Ziffern, Punkte, Kommas und Minus behalten
+    cleaned = re.sub(r'[^\d.,-]', '', s)
+    if not cleaned:
+        return 0.0
+    has_dot = '.' in cleaned
+    has_comma = ',' in cleaned
+    if has_dot and has_comma:
+        # Beide vorhanden: das LETZTE Trennzeichen ist der Dezimaltrenner
+        last_dot = cleaned.rfind('.')
+        last_comma = cleaned.rfind(',')
+        if last_comma > last_dot:
+            # DE-Format: 1.234,56 → Punkt=Tausender, Komma=Dezimal
+            cleaned = cleaned.replace('.', '').replace(',', '.')
+        else:
+            # EN-Format: 1,234.56 → Komma=Tausender, Punkt=Dezimal
+            cleaned = cleaned.replace(',', '')
+    elif has_comma and not has_dot:
+        # Nur Komma: pruefen ob Tausender oder Dezimal
+        parts = cleaned.split(',')
+        if len(parts) == 2 and len(parts[1]) <= 2:
+            # 109,48 oder 1234,5 → Komma = Dezimal (DE)
+            cleaned = cleaned.replace(',', '.')
+        elif len(parts) == 2 and len(parts[1]) == 3:
+            # 10,948 → Komma = Tausender (EN) oder 10,948 als Dezimal?
+            # Wenn Teil vor Komma < 4 Stellen: Tausender-Trennzeichen
+            cleaned = cleaned.replace(',', '')
+        else:
+            # Mehrere Kommas: 1,234,567 → EN Tausender
+            cleaned = cleaned.replace(',', '')
+    elif has_dot and not has_comma:
+        # Nur Punkt: pruefen ob Tausender oder Dezimal
+        parts = cleaned.split('.')
+        if len(parts) == 2 and len(parts[1]) <= 2:
+            # 109.48 → Punkt = Dezimal (EN)
+            pass  # schon korrekt
+        elif len(parts) == 2 and len(parts[1]) == 3:
+            # 10.948 → Punkt = Tausender (DE)
+            cleaned = cleaned.replace('.', '')
+        else:
+            # Mehrere Punkte: 1.234.567 → DE Tausender
+            # Oder 1.234.567,89 (aber comma-Fall oben gefangen)
+            if len(parts) > 2:
+                cleaned = cleaned.replace('.', '')
+            # else: single dot with >3 decimals — treat as decimal
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
 SCRIPTS_DIR    = Path(__file__).parent
 KNOWLEDGE_DIR  = SCRIPTS_DIR.parent / "knowledge"
 TASKS_DB       = KNOWLEDGE_DIR / "tasks.db"
@@ -919,16 +992,17 @@ def _auto_scan_eingangsrechnung(mail_data: dict, konto_label: str, kategorie: st
         # Betrag per Regex aus Text extrahieren (EUR-Betrag)
         betrag = 0.0
         _betrag_patterns = [
-            r'(?:Gesamtbetrag|Betrag|Total|Summe|Rechnungsbetrag)[^\d]*?([\d]{1,6}[.,]\d{2})',
-            r'([\d]{1,6}[.,]\d{2})\s*(?:EUR|€)',
+            r'(?:Gesamtbetrag|Betrag|Total|Summe|Rechnungsbetrag|Amount|Charged)[^\d]*?([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})',
+            r'(?:Gesamtbetrag|Betrag|Total|Summe|Rechnungsbetrag|Amount|Charged)[^\d]*?([\d]+[.,]\d{2})',
+            r'([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|\$|USD)',
+            r'(?:EUR|€|\$|USD)\s*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})',
+            r'([\d]+[.,]\d{2})\s*(?:EUR|€|\$|USD)',
         ]
         _combined = betreff + '\n' + text[:3000]
         for _pat in _betrag_patterns:
             _m = re.search(_pat, _combined, re.IGNORECASE)
             if _m:
-                _raw = _m.group(1).replace('.', '').replace(',', '.')
-                try: betrag = float(_raw)
-                except: pass
+                betrag = _parse_amount(_m.group(1))
                 if betrag > 0:
                     break
 
@@ -1033,20 +1107,19 @@ def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: st
         # Betrag extrahieren
         betrag = None
         _betrag_patterns = [
-            r'(?:Gesamtbetrag|Total|Summe|Rechnungsbetrag|Betrag|Amount)[^\d]*?([\d]{1,6}[.,]\d{2})',
-            r'([\d]{1,6}[.,]\d{2})\s*(?:EUR|€|\$)',
+            r'(?:Gesamtbetrag|Total|Summe|Rechnungsbetrag|Betrag|Amount|Charged)[^\d]*?([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})',
+            r'(?:Gesamtbetrag|Total|Summe|Rechnungsbetrag|Betrag|Amount|Charged)[^\d]*?([\d]+[.,]\d{2})',
+            r'([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|\$|USD)',
+            r'(?:EUR|€|\$|USD)\s*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})',
+            r'([\d]+[.,]\d{2})\s*(?:EUR|€|\$|USD)',
         ]
         for _pat in _betrag_patterns:
             _m = re.search(_pat, combined, re.IGNORECASE)
             if _m:
-                _raw = _m.group(1).replace('.', '').replace(',', '.')
-                try:
-                    _b = float(_raw)
-                    if 0.5 < _b < 999999:
-                        betrag = _b
-                        break
-                except Exception:
-                    pass
+                _b = _parse_amount(_m.group(1))
+                if 0.5 < _b < 999999:
+                    betrag = _b
+                    break
 
         # Body-Excerpt (fuer Pruefqueue-Ansicht)
         body_excerpt = text[:500].strip() if text else ''
