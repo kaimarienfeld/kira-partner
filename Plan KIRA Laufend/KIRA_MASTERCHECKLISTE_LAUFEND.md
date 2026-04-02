@@ -279,6 +279,63 @@
 **Fix:** Alle 3 Stellen auf `{{erklaermodus:true}}` (doppelte Klammern in f-string) korrigiert.
 **Behoben am:** 2026-04-01
 
+### C-02 — Lexware: Panel nicht full-width + Sync springt zur Cockpit-Ansicht
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `#panel-lexware` hatte `max-width:1200px;margin:0 auto` durch globale `.panel`-Klasse.
+  Sync-Funktion `lexSync()` rief `location.reload()` nach Abschluss auf → sprang immer zur Start-Ansicht.
+**Fix:** CSS-Override `max-width:none` fuer `#panel-lexware`, `location.reload()` entfernt, stattdessen
+  Toast-Benachrichtigung + Statuszeile mit Kategorien-Counts.
+**Behoben am:** 2026-04-02
+
+### C-03 — Lexware: Verbindungsstatus-Chip zeigt "Nicht verbunden" nach erfolgreichem Test
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `lexTestConnection()` aktualisierte den Chip `lx-status-dot` nicht nach dem API-Call.
+  Chip blieb statisch auf "Nicht verbunden" auch wenn Test erfolgreich.
+**Fix:** JS-Code in `lexTestConnection()` ergaenzt: `dot.className = 'lx-chip ' + (ok ? 'lx-chip-ok' : 'lx-chip-err')`
+  + `dot.innerHTML` aktualisiert.
+**Behoben am:** 2026-04-02
+
+### C-04 — Lexware: Sync holt nur 200/273 Kontakte (Pagination-Bug)
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `get_all_contacts()` in `lexware_client.py` pruefte nur `totalPages - 1` als Abbruch-Bedingung,
+  ignorierte das `last`-Flag der Lexware-API. Resultat: Loop brach zu frueh ab.
+  Gleiches Problem in `get_all_vouchers()` und `get_all_articles()`.
+**Fix:** Alle drei Pagination-Loops pruefen jetzt `result.get("last", False)` ODER `page >= totalPages - 1`
+  + leere Items als zusaetzlicher Abbruch-Guard. Test: 273 Kontakte, 52 Artikel.
+**Behoben am:** 2026-04-02
+
+### C-05 — Admin: SMTP-Test fehlte, falsche Buttons in Einstellungen > Mail
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** SMTP/IMAP-Test-Buttons standen in Einstellungen > Mail-Konten (falscher Ort).
+  Im Admin-Panel fehlte ein SMTP-Test komplett.
+**Fix:** Buttons aus Einstellungen entfernt. Im Admin > E-Mail SMTP neuer Button `adm-smtp-test-btn`
+  + `admSmtpTest()` JS + `/api/ntfy/test` Backend-Extension fuer SMTP-Test via smtplib.
+**Behoben am:** 2026-04-02
+
+### C-06 — GitHub-Token in Partner-View nach Push nicht gespeichert
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** `pushToGitHub()` verwendete `ghToken` aber setzte `s.gh_token` nicht vor dem
+  `localStorage.setItem()`-Aufruf. Token ging nach Session-Ende verloren.
+  Admin-Panel zeigte keinen Token-Status.
+**Fix:** `s.gh_token = ghToken` vor localStorage-Save. Nach erfolgreichem Push: KIRA-API
+  `/api/partner/save-token` aufgerufen (Token in secrets.json persistiert).
+  Admin zeigt jetzt `adm-gh-status` mit `ghp_ViANv8sU****`.
+  Neue Endpoints: GET `/api/partner/get-token`, POST `/api/partner/save-token`.
+**Behoben am:** 2026-04-02
+
+### C-07 — `esNavTo` ReferenceError (Kalender-Fehler-Link)
+**Status:** 🐛✅ Behoben (session-sss, commit 4e5784e)
+**Gefunden am:** 2026-04-02
+**Beschreibung:** Zwei onclick-Handler in der Kalender-Fehleranzeige (Dashboard) riefen `esNavTo('mail')` auf —
+  Funktion existiert nicht. Korrekte Funktion ist `esShowSec()`.
+**Fix:** Beide Stellen (Zeile 17567 + 17594) auf `esShowSec('mail')` korrigiert.
+**Behoben am:** 2026-04-02
+
 ---
 
 ## BLOCK D — Zukunft / Spaetere Sessions
@@ -327,13 +384,14 @@
 |---------|--------|----------|-------|-----------|------------|
 | Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
-| Block C (Laufend) | 1 | 1 | 0 | 0 | 0 |
+| Block C (Laufend) | 7 | 7 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **32** | **24** | **1** | **0** | **4** |
+| **Gesamt** | **38** | **30** | **1** | **0** | **4** |
 
-> Block-A 16/16 komplett. Block-C 1/1 (C-01 f-string Crash behoben session-rrr).
+> Block-A 16/16 komplett. Block-C 7/7 (C-01..C-07 alle behoben).
 > session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
 > Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
+> session-sss: C-02..C-07 (Lexware Full-Width, Chip, Sync-Pagination, SMTP-Admin, GitHub-Token, esNavTo).
 
 ---
 
@@ -350,6 +408,7 @@
 | 2026-04-01 | session-qqq: D-04..D-10 Modul-Tours alle erledigt (7 Tours, 59 Schritte gesamt) |
 | 2026-04-01 | session-ooo (Fortsetzung): A-02/03/05/06/09/12 erledigt — alle AUFGABEN abgeschlossen |
 | 2026-04-01 | session-rrr: C-01 f-string ERR_EMPTY_RESPONSE Crash behoben (3 Tour-Button-Stellen) |
+| 2026-04-02 | session-sss: C-02..C-07 eingetragen + behoben (Lexware Full-Width/Chip/Sync, SMTP-Admin, GitHub-Token, esNavTo) |
 
 ---
 
