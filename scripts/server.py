@@ -1634,7 +1634,7 @@ def build_postfach():
           <span class="pf-state-chip pf-chip-html" id="pf-chip-html" style="display:none">HTML</span>
           <span class="pf-state-chip pf-chip-text" id="pf-chip-text" style="display:none">Nur Text</span>
           <span class="pf-state-chip pf-chip-blocked" id="pf-chip-blocked" style="display:none">Externe Bilder blockiert</span>
-          <button id="pf-btn-lexware" onclick="pfQualifyLexware()" style="display:none;margin-left:auto;background:#059669;color:#fff;border:1px solid #047857;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer" title="Als Beleg fuer Lexware Buchhaltung qualifizieren">&#x1F4B2; Lexware</button>
+          <button id="pf-btn-lexware" onclick="pfQualifyLexware()" style="display:none;margin-left:auto;background:#059669;color:#fff;border:1px solid #047857;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer" title="Als Beleg für Lexware Buchhaltung qualifizieren">&#x1F4B2; Lexware</button>
         </div>
       </div>
       <div class="pf-trust-banner" id="pf-trust-banner" style="display:none">
@@ -3776,15 +3776,15 @@ window.pfTrustSender = function() {
 // ── Lexware Nachqualifizierung ────────────────────────────
 window.pfQualifyLexware = function() {
   const m = _pfCurrentMail;
-  if(!m || !m.message_id) { showToast('Keine Mail ausgewaehlt','fehler'); return; }
-  if(!confirm('Diese Mail als Eingangsbeleg fuer Lexware Buchhaltung qualifizieren?')) return;
+  if(!m || !m.message_id) { showToast('Keine Mail ausgewählt','fehler'); return; }
+  if(!confirm('Diese Mail als Eingangsbeleg für Lexware Buchhaltung qualifizieren?')) return;
   fetch('/api/mail/qualify-lexware', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({message_id: m.message_id})
   }).then(r=>r.json()).then(d=>{
     if(d.ok) {
-      showToast('Als Beleg fuer Lexware qualifiziert (ID #'+(d.beleg_id||'?')+')','ok');
+      showToast('Als Beleg für Lexware qualifiziert (ID #'+(d.beleg_id||'?')+')','ok');
       // Badge im Item nachtraeglich setzen
       var item = document.querySelector('[data-msgid="'+m.message_id+'"] .pf-item-row1');
       if(item && !item.querySelector('.pf-buch-badge')) {
@@ -6629,7 +6629,7 @@ function esInfoPopup(btn, text) {{
     </div>
     <div class="es-row" style="align-items:flex-start">
       <div class="es-rl" style="padding-top:6px">Auto-Antwort Text<div class="es-rd">Inhalt der Abwesenheitsnotiz</div></div>
-      <textarea id="cfg-urlaub-autoreply-text" rows="4" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);resize:vertical">{esc(ntfy.get('urlaub_autoreply_text','Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rueckkehr bei Ihnen melden.'))}</textarea>
+      <textarea id="cfg-urlaub-autoreply-text" rows="4" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);resize:vertical">{esc(ntfy.get('urlaub_autoreply_text','Vielen Dank für Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rückkehr bei Ihnen melden.'))}</textarea>
     </div>
   </div>
 
@@ -8936,7 +8936,7 @@ function esInfoPopup(btn, text) {{
           <div class="es-sig-modal-body">
             <div class="es-sig-field">
               <label>Name der Vorlage</label>
-              <input type="text" id="es-vorlage-name" value="${{_esc(_vorlagEdit.name||'')}}" placeholder="z.B. Angebot-Followup, Danke fuer Anfrage">
+              <input type="text" id="es-vorlage-name" value="${{_esc(_vorlagEdit.name||'')}}" placeholder="z.B. Angebot-Followup, Danke für Anfrage">
             </div>
             <div style="display:flex;gap:12px">
               <div class="es-sig-field" style="flex:1">
@@ -10645,7 +10645,7 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
 <div class="es-grp">
   <div class="es-grp-h">Mobile-Zugang</div>
   <div class="es-row">
-    <div class="es-row-left"><span class="es-lbl">Mobile-Webapp aktiv</span><span class="es-hint">Zugang ueber /mobil erlauben</span></div>
+    <div class="es-row-left"><span class="es-lbl">Mobile-Webapp aktiv</span><span class="es-hint">Zugang über /mobil erlauben</span></div>
     <label class="es-toggle"><input type="checkbox" id="cap-cfg-mobile-access" {'checked' if capture_cfg_es.get('mobile_access', True) else ''}><span class="es-slider"></span></label>
   </div>
   <div class="es-row">
@@ -10742,11 +10742,11 @@ def build_admin():
 
       <div class="adm-grp-lbl">Zugangsdaten</div>
       <div class="adm-nav-item act" id="adm-nav-api" onclick="admShowSec('api')">
-        <span class="adm-nav-ico">&#x1F511;</span>API-Schluessel</div>
+        <span class="adm-nav-ico">&#x1F511;</span>API-Schlüssel</div>
       <div class="adm-nav-item" id="adm-nav-smtp" onclick="admShowSec('smtp')">
         <span class="adm-nav-ico">&#x2709;</span>E-Mail SMTP</div>
       <div class="adm-nav-item" id="adm-nav-passwoerter" onclick="admShowSec('passwoerter')">
-        <span class="adm-nav-ico">&#x1F510;</span>Passwoerter</div>
+        <span class="adm-nav-ico">&#x1F510;</span>Passwörter</div>
 
       <div class="adm-grp-lbl" style="margin-top:6px">Dienste</div>
       <div class="adm-nav-item" id="adm-nav-messaging" onclick="admShowSec('messaging')">
@@ -10766,8 +10766,8 @@ def build_admin():
 
       <!-- ══ API-SCHLUESSEL ══ -->
       <div class="adm-sec" id="adm-sec-api" style="display:block">
-        <div class="es-grp-h" style="margin-bottom:4px">API-Schluessel</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer KI-Provider und externe Dienste. In <code>secrets.json</code> + <code>config.json</code> gespeichert.</div>
+        <div class="es-grp-h" style="margin-bottom:4px">API-Schlüssel</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten für KI-Provider und externe Dienste. In <code>secrets.json</code> + <code>config.json</code> gespeichert.</div>
 
         <!-- KI-Provider -->
         <div class="es-grp">
@@ -10775,7 +10775,7 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Anthropic API-Key</div>
-              <div class="adm-field-hint">Pflichtfeld fuer KIRA KI-Funktionen &middot; sk-ant-...</div>
+              <div class="adm-field-hint">Pflichtfeld für KIRA KI-Funktionen &middot; sk-ant-...</div>
             </div>
             <input id="adm-f-anthropic" type="password" class="adm-inp" placeholder="sk-ant-...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-anthropic')">&#x1F441;</button>
@@ -10826,7 +10826,7 @@ def build_admin():
       <!-- ══ E-MAIL SMTP ══ -->
       <div class="adm-sec" id="adm-sec-smtp">
         <div class="es-grp-h" style="margin-bottom:4px">E-Mail SMTP</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende Mails fuer Benachrichtigungen &amp; Partnereinladungen. In <code>config.json &rarr; email_notification</code>.</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende Mails für Benachrichtigungen &amp; Partnereinladungen. In <code>config.json &rarr; email_notification</code>.</div>
         <div class="es-grp">
           <!-- Preset-Auswahl -->
           <div class="adm-preset-bar">
@@ -10879,7 +10879,7 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Absender E-Mail</div>
-              <div class="adm-field-hint">Von-Adresse fuer ausgehende Mails</div>
+              <div class="adm-field-hint">Von-Adresse für ausgehende Mails</div>
             </div>
             <input id="adm-f-smtp-email" type="email" class="adm-inp adm-inp-wide" placeholder="kira@raumkult.eu">
           </div>
@@ -10910,8 +10910,8 @@ def build_admin():
 
       <!-- ══ PASSWOERTER ══ -->
       <div class="adm-sec" id="adm-sec-passwoerter">
-        <div class="es-grp-h" style="margin-bottom:4px">System-Passwoerter</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Login-Passwoerter fuer Admin und Mobile-App. Gespeichert in <code>secrets.json</code>.</div>
+        <div class="es-grp-h" style="margin-bottom:4px">System-Passwörter</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Login-Passwörter für Admin und Mobile-App. Gespeichert in <code>secrets.json</code>.</div>
         <div class="es-grp">
           <div class="adm-field">
             <div class="adm-field-lbl">
@@ -10931,7 +10931,7 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Mobile-App Passwort</div>
-              <div class="adm-field-hint">Login-Schutz fuer /mobil &middot; Kira Capture App</div>
+              <div class="adm-field-hint">Login-Schutz für /mobil &middot; Kira Capture App</div>
             </div>
             <input id="adm-f-mobil-pw" type="password" class="adm-inp" placeholder="...">
             <button class="adm-show-btn" onclick="admToggle('adm-f-mobil-pw')">&#x1F441;</button>
@@ -10946,7 +10946,7 @@ def build_admin():
       <!-- ══ MESSAGING ══ -->
       <div class="adm-sec" id="adm-sec-messaging">
         <div class="es-grp-h" style="margin-bottom:4px">Messaging-Dienste</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten fuer externe Messaging-Dienste. Gespeichert in <code>secrets.json</code>.</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">Zugangsdaten für externe Messaging-Dienste. Gespeichert in <code>secrets.json</code>.</div>
         <div class="es-grp">
           <div class="adm-sub-hd">WhatsApp Business Cloud API</div>
           <div class="adm-field">
@@ -11010,7 +11010,7 @@ def build_admin():
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Backup-Pfad</div>
-              <div class="adm-field-hint">Zielverzeichnis fuer automatische Backups</div>
+              <div class="adm-field-hint">Zielverzeichnis für automatische Backups</div>
             </div>
             <input id="adm-f-backup-pfad" type="text" class="adm-inp adm-inp-wide" placeholder="knowledge/backups/">
             <button class="adm-pick-btn" title="Ordner auswaehlen" onclick="admPickFolder('adm-f-backup-pfad',this)">&#x1F4C2;</button>
@@ -11020,10 +11020,10 @@ def build_admin():
         <!-- Externer Zugang -->
         <div class="es-grp" style="margin-top:10px">
           <div class="adm-sub-hd">Externer Zugang (Cloudflare Tunnel) <span id="adm-cf-status-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:4px;vertical-align:middle" title="Status pruefen"></span></div>
-          <div class="es-grp-sub" style="margin-bottom:8px">Macht KIRA von ueberall per HTTPS erreichbar &mdash; kostenlos, kein VPS noetig. Ben&#246;tigt fuer Mobil-App und Partner-View.</div>
+          <div class="es-grp-sub" style="margin-bottom:8px">Macht KIRA von überall per HTTPS erreichbar &mdash; kostenlos, kein VPS nötig. Benötigt für Mobil-App und Partner-View.</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <span id="adm-cf-chip" style="font-size:11px;padding:2px 9px;border-radius:10px;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)">Nicht konfiguriert &mdash; nur lokal erreichbar</span>
-            <button class="btn btn-sec btn-xs" onclick="admCfCheckStatus()" title="Cloudflared-Status pruefen">Status pruefen</button>
+            <button class="btn btn-sec btn-xs" onclick="admCfCheckStatus()" title="Cloudflared-Status prüfen">Status prüfen</button>
           </div>
 
           <!-- Schritt 1: cloudflared herunterladen -->
@@ -11106,13 +11106,13 @@ var _admData = {};
 
 /* ── SMTP-Voreinstellungen (recherchierte 2025-Werte) ── */
 var _ADM_SMTP = {
-  gmail:     {s:'smtp.gmail.com',         p:587, hs:'smtp.gmail.com',          hp:'App-Passwort erforderlich: Google-Konto \u2192 Sicherheit \u2192 2-Schritt-Verifizierung \u2192 App-Passwoerter'},
-  gmx:       {s:'mail.gmx.net',           p:587, hs:'mail.gmx.net',            hp:'Normales GMX-Passwort oder App-Passwort (Mein GMX \u2192 Sicherheit \u2192 Passwoerter &amp; Zugangsdaten)'},
+  gmail:     {s:'smtp.gmail.com',         p:587, hs:'smtp.gmail.com',          hp:'App-Passwort erforderlich: Google-Konto \u2192 Sicherheit \u2192 2-Schritt-Verifizierung \u2192 App-Passwörter'},
+  gmx:       {s:'mail.gmx.net',           p:587, hs:'mail.gmx.net',            hp:'Normales GMX-Passwort oder App-Passwort (Mein GMX \u2192 Sicherheit \u2192 Passwörter &amp; Zugangsdaten)'},
   webde:     {s:'smtp.web.de',            p:587, hs:'smtp.web.de',             hp:'Normales web.de-Passwort'},
   tonline:   {s:'securesmtp.t-online.de', p:587, hs:'securesmtp.t-online.de',  hp:'T-Online E-Mail-Passwort (nicht das Telekom-Hauptpasswort!)'},
   freenet:   {s:'mx.freenet.de',          p:587, hs:'mx.freenet.de',           hp:'Freenet-Passwort'},
-  ionos:     {s:'smtp.ionos.de',          p:587, hs:'smtp.ionos.de',           hp:'IONOS-Passwort \u2014 vollstaendige E-Mail-Adresse als Benutzername verwenden'},
-  strato:    {s:'smtp.strato.de',         p:587, hs:'smtp.strato.de',          hp:'Strato-Passwort \u2014 vollstaendige E-Mail-Adresse als Benutzername'},
+  ionos:     {s:'smtp.ionos.de',          p:587, hs:'smtp.ionos.de',           hp:'IONOS-Passwort \u2014 vollständige E-Mail-Adresse als Benutzername verwenden'},
+  strato:    {s:'smtp.strato.de',         p:587, hs:'smtp.strato.de',          hp:'Strato-Passwort \u2014 vollständige E-Mail-Adresse als Benutzername'},
   allinkl:   {s:'',                       p:587, hs:'Server-Adresse aus All-Inkl-Kundencenter entnehmen (z.B. w00abc.kasserver.com)', hp:'All-Inkl-Hosting-Passwort'},
   hetzner:   {s:'mail.your-server.de',    p:587, hs:'mail.your-server.de',     hp:'Hetzner E-Mail-Passwort'},
   outlook:   {s:'smtp-mail.outlook.com',  p:587, hs:'smtp-mail.outlook.com',   hp:'Microsoft-Konto Passwort (bei 2FA: App-Passwort unter Konto \u2192 Sicherheit erstellen)'},
@@ -11121,7 +11121,7 @@ var _ADM_SMTP = {
   sendgrid:  {s:'smtp.sendgrid.net',      p:587, hs:'smtp.sendgrid.net',       hp:'Benutzername: apikey \u2014 Passwort: dein SendGrid API-Key (beginnt mit SG.)'},
   mailgun:   {s:'smtp.mailgun.org',       p:587, hs:'smtp.mailgun.org',        hp:'Mailgun SMTP-Credentials aus Dashboard \u2192 Sending \u2192 Domain Settings \u2192 SMTP'},
   yahoo:     {s:'smtp.mail.yahoo.com',    p:587, hs:'smtp.mail.yahoo.com',     hp:'Yahoo App-Passwort erstellen: Konto \u2192 Sicherheit \u2192 Andere App-Verwaltung'},
-  fastmail:  {s:'smtp.fastmail.com',      p:587, hs:'smtp.fastmail.com',       hp:'Fastmail App-Passwort (Einstellungen \u2192 Passwoerter &amp; App-Sicherheit)'},
+  fastmail:  {s:'smtp.fastmail.com',      p:587, hs:'smtp.fastmail.com',       hp:'Fastmail App-Passwort (Einstellungen \u2192 Passwörter &amp; App-Sicherheit)'},
   custom:    {s:'',                       p:587, hs:'SMTP-Serveradresse eintragen',    hp:'SMTP-Passwort eingeben'}
 };
 
@@ -11404,7 +11404,7 @@ function admAddProviderKey() {
   row.dataset.provId = newId;
   row.innerHTML = '<div class="adm-field-lbl"><div class="adm-field-key">'+newId+'</div>'
     +'<div class="adm-field-hint">Neuer Provider API-Key</div></div>'
-    +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+newId+'" placeholder="sk-... oder leer fuer Ollama">'
+    +'<input type="password" class="adm-inp adm-prov-key" data-prov="'+newId+'" placeholder="sk-... oder leer für Ollama">'
     +'<button class="adm-show-btn" onclick="admToggleThis(this)">\uD83D\uDC41</button>';
   list.appendChild(row);
 }
@@ -11424,7 +11424,7 @@ function admSaveSection(section) {
       absender_email: g('adm-f-smtp-email'), absender_passwort: g('adm-f-smtp-passwort'), empfaenger_email: g('adm-f-smtp-empf')};
   } else if (section === 'passwoerter') {
     var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
-    if (pw1 && pw1 !== pw2) { showToast('Passwoerter stimmen nicht ueberein', 'fehler'); return; }
+    if (pw1 && pw1 !== pw2) { showToast('Passwörter stimmen nicht überein', 'fehler'); return; }
     payload.data = {};
     if (pw1) payload.data.admin_password = pw1;
     var mp = g('adm-f-mobil-pw'); if (mp) payload.data.mobil_password = mp;
@@ -19639,7 +19639,7 @@ a:hover{text-decoration:underline;}
 #panel-dashboard{max-width:none;padding:20px 24px 80px;}
 /* Lexware: Vollbreite, kein Padding, Sidebar+Content nutzen gesamten Platz */
 #panel-lexware{max-width:none;padding:0;overflow:hidden;display:none;}
-#panel-lexware.active{display:flex;flex-direction:column;}
+#panel-lexware.active{display:flex;flex-direction:column;height:calc(100vh - 52px);}
 
 /* Planned module shell */
 .planned-shell{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:340px;text-align:center;padding:60px 30px;}
@@ -20008,7 +20008,7 @@ tr.lx-selected{background:rgba(99,102,241,.08) !important}
 
 /* ═══ Kommunikation Modul v2 ═══ */
 #panel-kommunikation{max-width:none;padding:0;}
-#panel-kommunikation.active{display:flex;flex-direction:column;}
+#panel-kommunikation.active{display:flex;flex-direction:column;height:calc(100vh - 52px);}
 .km-hdr{background:var(--header-bg);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .km-hdr-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .km-title{font-size:18px;font-weight:500;color:var(--text);}
@@ -20042,7 +20042,7 @@ tr.lx-selected{background:rgba(99,102,241,.08) !important}
 .km-fc-count{font-size:11px;color:var(--muted);padding-left:4px;}
 .km-search-inp{font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text);outline:none;width:160px;margin-left:auto;font-family:inherit;}
 .km-search-inp:focus{border-color:var(--accent-border);}
-.km-workspace{display:flex;overflow:hidden;min-height:calc(100vh - 240px);}
+.km-workspace{display:flex;overflow:hidden;flex:1;min-height:0;}
 .km-wl{width:58%;border-right:1px solid var(--border);overflow-y:auto;background:var(--bg);transition:width .2s;}
 .km-wl-inner{padding:12px 16px;}
 .km-ctx{width:42%;overflow-y:auto;background:var(--card);transition:width .2s;}
