@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-04-02 18:10 — Session-aaaa Fortsetzung (Filter-Fix + Sortierung)
+
+**Auftrag:** Belege-Filter funktioniert nicht + zusätzliche Sortier-/Filtermöglichkeiten einbauen
+
+**Erledigt:**
+- 3 Filter-Bugs gefixt: (1) Typ-Filter verglich "Rechnung" mit "invoice" → data-Attribute, (2) Status-Filter las cells[4] (Fällig) statt cells[5] (Status), (3) Status-Matching verglich übersetzten Text mit Raw-Key
+- data-Attribute auf jeder Beleg-Zeile: typ/status/datum/faellig/betrag/name/nummer/updated
+- lxFilterBelege() komplett neu geschrieben: liest data-Attribute statt Zelltext
+- lxSortBelege() neu: 12 Optionen in Dropdown (Datum/Fällig/Betrag/Kontakt/Belegnr./Letzte Änderung × auf-/absteigend)
+- Playwright-Tests: Typ=quotation → 64 Zeilen ✓, Status=paid → 65 Zeilen ✓, Sortierung Betrag/Name ✓, 0 JS-Fehler
+
+**Git:** 3e30f26
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 18:00 — Session-aaaa Fortsetzung (Skonto + Umlaute)
 
 **Auftrag:** Skonto-Auflistung im Beträge-Block sichtbar machen + Umlaute-Korrektur app-weit + CLAUDE.md Regel
