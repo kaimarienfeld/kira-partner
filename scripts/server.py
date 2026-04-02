@@ -155,6 +155,20 @@ try:
         )
     """)
     _db.commit()
+    # Safe migration: reject_reason + classification_correct Spalten
+    try:
+        _db.execute("ALTER TABLE mail_approve_queue ADD COLUMN reject_reason TEXT")
+    except Exception:
+        pass
+    try:
+        _db.execute("ALTER TABLE mail_approve_queue ADD COLUMN classification_correct INTEGER")
+    except Exception:
+        pass
+    try:
+        _db.execute("ALTER TABLE mail_approve_queue ADD COLUMN correct_classification TEXT")
+    except Exception:
+        pass
+    _db.commit()
     _db.close()
 except Exception:
     pass
@@ -3033,17 +3047,14 @@ function pfShowKiraMail(item) {
   _pfCurrentMail = null;
   _pfCurrentMsgId = null;
   pfRibbonUpdateState(true);
-  // Richtige Viewer-Elemente (pf-preview + pf-prev-body)
   const preview = document.getElementById('pf-preview');
   const body = document.getElementById('pf-prev-body');
   const empty = document.getElementById('pf-preview-empty');
   if(!preview || !body) return;
-  // Leere den Mail-Kopf, blende preview-empty aus, zeige preview
   const mailHead = document.getElementById('pf-mail-head');
   if(mailHead) mailHead.innerHTML = '';
   if(empty) empty.style.display = 'none';
   preview.style.display = '';
-  // Thread + Toolbar verstecken
   const tw = document.getElementById('pf-thread-wrap'); if(tw) tw.style.display='none';
   const vtb = document.getElementById('pf-viewer-toolbar'); if(vtb) vtb.style.display='none';
   const status = item.status || 'pending';
@@ -3051,22 +3062,100 @@ function pfShowKiraMail(item) {
   const headerBg = isPending ? 'rgba(245,158,11,.15)' : 'rgba(100,116,139,.1)';
   const headerColor = isPending ? '#f59e0b' : 'var(--text-muted)';
   const headerText = isPending ? '&#x1F4DD; Kira-Entwurf \u2014 wartet auf Freigabe' : ({sent:'&#x2705; Gesendet',rejected:'&#x274C; Abgelehnt',expired:'&#x23F0; Abgelaufen'}[status]||status);
-  const bodyText = (item.body_plain||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
   const reasonHtml = item.notiz_intern ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding:8px;background:var(--bg-raised);border-radius:6px;border-left:3px solid #f59e0b"><b>Kira-Begr\u00fcndung:</b> '+_esc(item.notiz_intern)+'</div>' : '';
+  // Buttons (nur bei pending)
+  const btnsHtml = isPending ?
+    '<div style="padding:14px 0 4px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
+      '<button class="btn btn-muted btn-sm" onclick="pfKiraMaillAblehnen('+item.id+')">&#x274C; Ablehnen</button>'+
+      '<button class="btn btn-sm" style="background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1)" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
+      '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
+    '</div>' : '';
+  // Body-Rendering: HTML oder styled Plaintext
+  const hasHtml = !!item.body_html;
   body.className = 'pf-prev-body';
-  body.innerHTML =
-    '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border);margin:-20px -20px 16px">'+headerText+'</div>'+
-    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
-    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
-    reasonHtml+
-    '<div style="font-size:14px;line-height:1.6;padding:12px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+bodyText+'</div>'+
-    (isPending ?
-      '<div style="padding:14px 0 4px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'+
-        '<button class="btn btn-muted btn-sm" onclick="pfKiraMaillAblehnen('+item.id+')">&#x274C; Ablehnen</button>'+
-        '<button class="btn btn-sm" style="background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1)" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
-        '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
-      '</div>'
-    : '');
+  body.style.cssText = '';
+  if(hasHtml) {
+    body.classList.add('iframe-mode');
+    body.innerHTML =
+      '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
+      '<div style="padding:12px 18px">'+
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
+        reasonHtml+
+      '</div>';
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox','allow-same-origin allow-popups-to-escape-sandbox');
+    iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;display:block;min-height:300px';
+    iframe.srcdoc = item.body_html;
+    body.appendChild(iframe);
+    const btnWrap = document.createElement('div');
+    btnWrap.innerHTML = btnsHtml;
+    body.appendChild(btnWrap);
+  } else {
+    const plainText = (item.body_plain||'');
+    body.innerHTML =
+      '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
+      '<div style="padding:16px 18px">'+
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
+        reasonHtml+
+        '<div style="font-size:14px;line-height:1.7;padding:16px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;word-wrap:break-word;font-family:inherit">'+_esc(plainText)+'</div>'+
+        btnsHtml+
+      '</div>';
+  }
+  // Original-Nachricht laden (falls in_reply_to vorhanden)
+  if(item.in_reply_to) {
+    _pfLoadOriginalMail(item.id, body);
+  }
+}
+
+// ── Original-Mail zum Kira-Entwurf laden und anzeigen ────
+function _pfLoadOriginalMail(queueId, container) {
+  const wrap = document.createElement('div');
+  wrap.id = 'kira-original-mail';
+  wrap.style.cssText = 'border-top:2px solid var(--border);margin-top:16px;padding-top:0';
+  wrap.innerHTML = '<div style="padding:12px 18px;color:var(--text-muted);font-size:12px">Original-Nachricht wird geladen\u2026</div>';
+  container.appendChild(wrap);
+  fetch('/api/mail/approve/'+queueId+'/original').then(r=>r.json()).then(function(d){
+    if(!d.ok || !d.original) {
+      wrap.innerHTML = '<div style="padding:12px 18px;color:var(--text-muted);font-size:12px;font-style:italic">'+(d.error||'Original-Mail nicht gefunden')+'</div>';
+      return;
+    }
+    const o = d.original;
+    const headerHtml =
+      '<div style="padding:12px 18px;background:var(--bg-raised);border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px" onclick="this.parentElement.querySelector(\\'.kira-orig-content\\').style.display=this.parentElement.querySelector(\\'.kira-orig-content\\').style.display===\\'none\\'?\\'\\':\\'none\\'">' +
+        '<span style="font-size:11px;color:var(--text-muted);transform:rotate(0deg);transition:transform .2s">&#x25BC;</span>' +
+        '<span style="font-size:13px;font-weight:600;color:var(--text)">Original-Nachricht</span>' +
+        '<span style="font-size:12px;color:var(--text-muted);margin-left:auto">'+_esc(o.absender||'')+' \u2014 '+_esc(o.datum||'')+'</span>' +
+      '</div>';
+    const hasHtml = !!o.html;
+    let contentHtml = '';
+    if(hasHtml) {
+      contentHtml =
+        '<div class="kira-orig-content">' +
+          '<div style="padding:8px 18px;font-size:12px;color:var(--text-muted)"><b>Betreff:</b> '+_esc(o.betreff||'')+'</div>' +
+          '<iframe sandbox="allow-same-origin allow-popups-to-escape-sandbox" ' +
+            'style="width:100%;border:none;background:#fff;min-height:300px;display:block" ' +
+            'srcdoc="'+_esc(o.html).replace(/"/g,'&quot;')+'"></iframe>' +
+        '</div>';
+    } else {
+      contentHtml =
+        '<div class="kira-orig-content" style="padding:12px 18px">' +
+          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px"><b>Betreff:</b> '+_esc(o.betreff||'')+'</div>' +
+          '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;background:var(--bg-raised);padding:12px;border-radius:6px;border:1px solid var(--border)">'+_esc(o.text||'(kein Inhalt)')+'</div>' +
+        '</div>';
+    }
+    wrap.innerHTML = headerHtml + contentHtml;
+    // iframe Hoehe automatisch anpassen
+    var origIframe = wrap.querySelector('iframe');
+    if(origIframe) {
+      origIframe.onload = function() {
+        try { origIframe.style.height = origIframe.contentDocument.documentElement.scrollHeight + 20 + 'px'; } catch(e) {}
+      };
+    }
+  }).catch(function(){
+    wrap.innerHTML = '<div style="padding:12px 18px;color:var(--danger);font-size:12px">Fehler beim Laden der Original-Mail</div>';
+  });
 }
 
 window.pfKiraMailFreigeben = function(id) {
@@ -3197,12 +3286,100 @@ window.pfKiraMailSendenBearbeitet = function(id, btn) {
     });
 };
 window.pfKiraMaillAblehnen = function(id) {
-  if(!confirm('Entwurf ablehnen?')) return;
-  fetch('/api/mail/approve/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reject'})})
-    .then(r=>r.json()).then(d=>{
-      if(d.ok){ showToast('Abgelehnt','ok'); pfLoadKiraList(true); }
-      else showToast('Fehler: '+(d.error||'?'),'fehler');
-    });
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML =
+    '<div style="background:var(--bg-modal,#fff);border:1px solid var(--border-strong);border-radius:16px;padding:24px;width:min(560px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.35)">' +
+      '<div style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text);display:flex;align-items:center;gap:8px">' +
+        '<span style="color:#ef4444;font-size:18px">&#x274C;</span> Entwurf ablehnen' +
+      '</div>' +
+      '<label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Warum lehnst du diesen Entwurf ab? *</label>' +
+      '<textarea id="kira-reject-reason" placeholder="z.B. Falscher Ton, falscher Empfaenger, Thema nicht relevant..." ' +
+        'style="width:100%;min-height:80px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical"></textarea>' +
+      '<div style="margin-top:14px">' +
+        '<label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:8px">War die Original-Mail richtig klassifiziert?</label>' +
+        '<div style="display:flex;gap:16px;align-items:center">' +
+          '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text);cursor:pointer"><input type="radio" name="kira-reject-class" value="ja" checked> Ja</label>' +
+          '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text);cursor:pointer"><input type="radio" name="kira-reject-class" value="nein"> Nein</label>' +
+        '</div>' +
+      '</div>' +
+      '<div id="kira-reject-class-detail" style="display:none;margin-top:10px">' +
+        '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Richtige Kategorie:</label>' +
+        '<select id="kira-reject-correct-class" style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px">' +
+          '<option value="">-- Bitte waehlen --</option>' +
+          '<option value="anfrage">Anfrage</option>' +
+          '<option value="angebot">Angebot / Angebotsrueckmeldung</option>' +
+          '<option value="bestellung">Bestellung / Auftrag</option>' +
+          '<option value="reklamation">Reklamation / Beschwerde</option>' +
+          '<option value="rechnung">Rechnung / Zahlung</option>' +
+          '<option value="newsletter">Newsletter / Werbung</option>' +
+          '<option value="intern">Intern / Organisatorisch</option>' +
+          '<option value="sonstiges">Sonstiges</option>' +
+        '</select>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
+        '<button onclick="this.closest(\\'.kira-reject-overlay\\').remove()" ' +
+          'style="background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer">Abbrechen</button>' +
+        '<button onclick="pfKiraRejectSubmit('+id+',this)" ' +
+          'style="background:#dc2626;color:#fff;border:1px solid #b91c1c;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">Ablehnen &amp; Kira lernen lassen</button>' +
+      '</div>' +
+    '</div>';
+  modal.className = 'kira-reject-overlay';
+  document.body.appendChild(modal);
+  // Radio-Toggle fuer Klassifizierungs-Detail
+  modal.querySelectorAll('input[name="kira-reject-class"]').forEach(function(r){
+    r.onchange = function(){ document.getElementById('kira-reject-class-detail').style.display = this.value==='nein'?'':'none'; };
+  });
+  document.getElementById('kira-reject-reason').focus();
+};
+
+window.pfKiraRejectSubmit = function(id, btn) {
+  var reason = (document.getElementById('kira-reject-reason').value||'').trim();
+  if(reason.length < 5) {
+    showToast('Bitte einen Ablehnungsgrund eingeben (mind. 5 Zeichen)','fehler');
+    return;
+  }
+  var classRadio = document.querySelector('input[name="kira-reject-class"]:checked');
+  var classCorrect = classRadio ? classRadio.value === 'ja' : true;
+  var correctClass = '';
+  if(!classCorrect) {
+    correctClass = (document.getElementById('kira-reject-correct-class').value||'').trim();
+  }
+  btn.disabled = true; btn.textContent = 'Wird verarbeitet\u2026';
+  fetch('/api/mail/approve/'+id, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action: 'reject',
+      reject_reason: reason,
+      classification_correct: classCorrect,
+      correct_classification: correctClass
+    })
+  }).then(r=>r.json()).then(function(d) {
+    var overlay = document.querySelector('.kira-reject-overlay');
+    if(overlay) overlay.remove();
+    if(d.ok) {
+      pfLoadKiraList(true);
+      // Bestaetigung zeigen was Kira gelernt hat
+      if(d.learned && d.learned.titel) {
+        showSimpleModal('&#x2705; Kira hat gelernt',
+          '<div style="padding:4px 0">' +
+            '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">'+_esc(d.learned.titel)+'</div>' +
+            '<div style="font-size:13px;color:var(--text-muted);line-height:1.5;padding:10px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">'+_esc(d.learned.inhalt)+'</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);margin-top:10px">Gespeichert in: Wissens-Datenbank (Regel #'+d.learned.regel_id+')</div>' +
+          '</div>'
+        );
+      } else {
+        showToast('Entwurf abgelehnt','ok');
+      }
+    } else {
+      showToast('Fehler: '+(d.error||'?'),'fehler');
+    }
+  }).catch(function(e) {
+    var overlay = document.querySelector('.kira-reject-overlay');
+    if(overlay) overlay.remove();
+    showToast('Netzwerkfehler: '+e,'fehler');
+  });
 };
 
 // ── Avatar / Datum Hilfsfunktionen ────────────────────────
@@ -3645,7 +3822,7 @@ window.pfOpenMail = function(m, el) {
     body.innerHTML = '';
     const rawText = d.text || '';
     const hasHtml = !!d.html;
-    const textLooksLikeHtml = !hasHtml && /^\\s*(<html|<!doctype)/i.test(rawText);
+    const textLooksLikeHtml = !hasHtml && (/^\\s*(<html|<!doctype)/i.test(rawText) || /<(table|div|p|body|head)[\s>]/i.test(rawText));
     if (hasHtml || textLooksLikeHtml) {
       pfUpdateViewerState('html');
       body.classList.add('iframe-mode');
@@ -20603,6 +20780,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({"error": str(e)})
 
+        elif '/original' in self.path and self.path.startswith('/api/mail/approve/'):
+            # GET /api/mail/approve/{id}/original — Original-Mail zum Kira-Entwurf
+            import re as _re_mod
+            _m = _re_mod.search(r'/api/mail/approve/(\d+)/original', self.path)
+            if _m:
+                self._api_mail_approve_original(int(_m.group(1)))
+            else:
+                self._json({"ok": False, "error": "Ungueltige ID"})
+
         elif self.path.startswith('/api/mail/approve/pending'):
             from urllib.parse import urlparse, parse_qs
             _qs = parse_qs(urlparse(self.path).query)
@@ -22081,7 +22267,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             db = sqlite3.connect(str(TASKS_DB))
             db.row_factory = sqlite3.Row
             rows = db.execute("""
-                SELECT id, an, betreff, body_plain, konto, in_reply_to,
+                SELECT id, an, betreff, body_plain, body_html, konto, in_reply_to,
                        task_id, vorgang_id, erstellt_von, erstellt_am, ablauf_am,
                        status, entschieden_am, gesendet_am
                 FROM mail_approve_queue
@@ -22094,6 +22280,69 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": True, "pending": items, "count": len(items), "status_filter": status})
         except Exception as e:
             self._json({"ok": False, "error": str(e), "pending": [], "count": 0})
+
+    def _api_mail_approve_original(self, queue_id: int):
+        """GET /api/mail/approve/{id}/original — Original-Mail zum Kira-Entwurf laden."""
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT in_reply_to FROM mail_approve_queue WHERE id=?", (queue_id,)).fetchone()
+            db.close()
+            if not row or not row["in_reply_to"]:
+                self._json({"ok": False, "error": "Kein Bezug zur Original-Mail vorhanden"})
+                return
+            reply_to = row["in_reply_to"].strip().strip("<>")
+            # Suche in mail_index.db
+            mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+            mdb.row_factory = sqlite3.Row
+            orig = mdb.execute(
+                "SELECT message_id, betreff, absender, an, datum, text_plain, "
+                "       mail_folder_pfad, eml_path, mail_references, in_reply_to "
+                "FROM mails WHERE message_id LIKE ?",
+                (f"%{reply_to}%",)
+            ).fetchone()
+            if not orig:
+                mdb.close()
+                self._json({"ok": False, "error": f"Original-Mail nicht im Index gefunden ({reply_to[:40]})"})
+                return
+            orig_dict = dict(orig)
+            mdb.close()
+            # EML parsen fuer vollstaendiges HTML
+            html_content = ""
+            text_content = orig_dict.get("text_plain") or ""
+            eml_p = orig_dict.get("eml_path") or ""
+            folder_p = orig_dict.get("mail_folder_pfad") or ""
+            eml_path = None
+            if eml_p and Path(eml_p).is_file():
+                eml_path = Path(eml_p)
+            elif folder_p:
+                candidate = Path(folder_p) / "mail.eml"
+                if candidate.is_file():
+                    eml_path = candidate
+            if eml_path:
+                try:
+                    t, h = self._parse_eml_content(eml_path)
+                    if h:
+                        html_content = h
+                    if t:
+                        text_content = t
+                except Exception:
+                    pass
+            self._json({
+                "ok": True,
+                "original": {
+                    "message_id": orig_dict.get("message_id", ""),
+                    "betreff": orig_dict.get("betreff", ""),
+                    "absender": orig_dict.get("absender", ""),
+                    "an": orig_dict.get("an", ""),
+                    "datum": orig_dict.get("datum", ""),
+                    "text": text_content,
+                    "html": html_content,
+                    "mail_references": orig_dict.get("mail_references", ""),
+                }
+            })
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
 
     def _api_mail_approve_action(self, queue_id: int, body: dict):
         """POST /api/mail/approve/{id} — approve/reject/edit."""
@@ -22116,17 +22365,89 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
 
             if action == "reject":
-                db.execute("UPDATE mail_approve_queue SET status='rejected', entschieden_am=? WHERE id=?",
-                           (now, queue_id))
+                reject_reason = body.get("reject_reason", "").strip()
+                class_correct = body.get("classification_correct", True)
+                correct_class = body.get("correct_classification", "").strip()
+                db.execute(
+                    "UPDATE mail_approve_queue SET status='rejected', entschieden_am=?, "
+                    "reject_reason=?, classification_correct=?, correct_classification=? WHERE id=?",
+                    (now, reject_reason, 1 if class_correct else 0, correct_class or None, queue_id)
+                )
                 db.commit()
                 db.close()
-                self._json({"ok": True, "message": f"Mail #{queue_id} abgelehnt."})
+                # Lern-Regel aus Ablehnung generieren
+                learned = None
+                if reject_reason:
+                    try:
+                        from kira_llm import chat as _kira_chat
+                        _lern_prompt = (
+                            f"Ein Mail-Entwurf wurde abgelehnt.\n"
+                            f"Betreff: '{row['betreff']}'\n"
+                            f"An: {row['an']}\n"
+                            f"Entwurf-Text (Auszug): '{(row['body_plain'] or '')[:400]}'\n\n"
+                            f"Ablehnungsgrund von Kai: '{reject_reason}'\n"
+                        )
+                        if not class_correct:
+                            _lern_prompt += f"Klassifizierung war FALSCH. Richtige Kategorie: {correct_class}\n"
+                        _lern_prompt += (
+                            "\nFormuliere daraus eine praezise, kurze Lernregel fuer die Zukunft."
+                            " Antworte NUR mit einem JSON-Objekt: "
+                            '{"titel": "max 80 Zeichen Kurztitel", "inhalt": "max 250 Zeichen Erklaerung was kuenftig anders gemacht werden soll"}'
+                        )
+                        import json as _json_mod
+                        _resp = _kira_chat(_lern_prompt, session_id="reject_learn")
+                        _answer = _resp.get("answer", "") if isinstance(_resp, dict) else str(_resp)
+                        # JSON aus Antwort extrahieren
+                        _j_start = _answer.find("{")
+                        _j_end = _answer.rfind("}") + 1
+                        if _j_start >= 0 and _j_end > _j_start:
+                            _rule = _json_mod.loads(_answer[_j_start:_j_end])
+                            _titel = str(_rule.get("titel", ""))[:100]
+                            _inhalt = str(_rule.get("inhalt", ""))[:300]
+                            if _titel and _inhalt:
+                                _rdb = sqlite3.connect(str(TASKS_DB))
+                                _cur = _rdb.execute(
+                                    "INSERT INTO wissen_regeln (kategorie, titel, inhalt, quelle, erstellt_am) "
+                                    "VALUES ('auto_gelernt', ?, ?, 'mail_rejection', ?)",
+                                    (_titel, _inhalt, now)
+                                )
+                                _regel_id = _cur.lastrowid
+                                _rdb.commit()
+                                _rdb.close()
+                                learned = {"titel": _titel, "inhalt": _inhalt, "regel_id": _regel_id}
+                                rlog("server", "kira_regel_gelernt",
+                                     f"Regel #{_regel_id} aus Mail-Ablehnung #{queue_id}: {_titel}",
+                                     modul="server", source="mail_rejection", actor_type="kira_autonom", status="ok")
+                    except Exception as _le:
+                        log.warning(f"Lern-Regel aus Ablehnung fehlgeschlagen: {_le}")
+                resp = {"ok": True, "message": f"Mail #{queue_id} abgelehnt."}
+                if learned:
+                    resp["learned"] = learned
+                self._json(resp)
                 return
 
             # approve oder edit (edit → body übernehmen, dann senden)
             body_plain = new_body if (action == "edit" and new_body) else (row["body_plain"] or "")
             # from_email: aus Request (User hat Konto gewaehlt) > Queue-Konto > Standard
             from_email = (body.get("from_email") or "").strip() or row["konto"] or "info@raumkult.eu"
+            # References-Kette aufbauen fuer Thread-Zuordnung
+            _references = ""
+            _in_reply_to = row["in_reply_to"] or ""
+            if _in_reply_to:
+                try:
+                    _mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+                    _mdb.row_factory = sqlite3.Row
+                    _reply_id = _in_reply_to.strip().strip("<>")
+                    _orig = _mdb.execute(
+                        "SELECT mail_references, message_id FROM mails WHERE message_id LIKE ?",
+                        (f"%{_reply_id}%",)
+                    ).fetchone()
+                    if _orig:
+                        _refs_chain = (_orig["mail_references"] or "").strip()
+                        _references = (_refs_chain + " " + _in_reply_to).strip() if _refs_chain else _in_reply_to
+                    _mdb.close()
+                except Exception:
+                    pass
             try:
                 from mail_sender import send_mail
                 result = send_mail(
@@ -22134,7 +22455,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     to=row["an"],
                     subject=row["betreff"],
                     body_plain=body_plain,
-                    in_reply_to=row["in_reply_to"] or "",
+                    in_reply_to=_in_reply_to,
+                    references=_references,
                 )
                 if result.get("ok"):
                     db.execute(

@@ -933,6 +933,27 @@ def _build_data_context(config, kira_cfg=None):
                 ctx += f"  • {r['titel']}: {r['inhalt'][:100]}\n"
     except: pass
 
+    # Auto-gelernte Regeln (aus Mail-Ablehnungen, Stil-Korrekturen, Feedback)
+    try:
+        auto_rows = db.execute(
+            "SELECT titel, inhalt, quelle FROM wissen_regeln "
+            "WHERE kategorie='auto_gelernt' AND status='aktiv' "
+            "ORDER BY id DESC LIMIT 15"
+        ).fetchall()
+        if auto_rows:
+            ctx += f"\n=== AUTO-GELERNTE REGELN ({len(auto_rows)}) ===\n"
+            ctx += "(Diese Regeln wurden aus Nutzer-Feedback automatisch erstellt. BEACHTE sie bei Mail-Entwuerfen und Antworten!)\n"
+            for r in auto_rows:
+                _src = ""
+                if r['quelle'] == 'mail_rejection':
+                    _src = " [Mail-Ablehnung]"
+                elif r['quelle'] == 'mail_stil_diff':
+                    _src = " [Stil-Korrektur]"
+                elif r['quelle'] and 'feedback' in r['quelle']:
+                    _src = " [Chat-Feedback]"
+                ctx += f"  • {r['titel']}: {r['inhalt'][:150]}{_src}\n"
+    except: pass
+
     try:
         zahlungsdauern = []
         for s in db.execute("SELECT daten_json FROM geschaeft_statistik WHERE ereignis='status_bezahlt' AND daten_json IS NOT NULL"):
@@ -2587,6 +2608,10 @@ def _tool_mail_senden(p):
 
     if not an or not betreff or not text:
         return {"error": "an, betreff und text sind erforderlich"}
+
+    # Re:-Betreff sicherstellen wenn Antwort auf bestehende Mail
+    if reply_id and not betreff.lower().startswith("re:"):
+        betreff = "Re: " + betreff
 
     from datetime import datetime, timedelta
     ablauf = (datetime.now() + timedelta(days=3)).isoformat()
