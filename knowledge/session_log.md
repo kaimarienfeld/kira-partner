@@ -5,9 +5,9 @@
 
 ---
 
-## 2026-04-02 16:55 — Session-Ende (session-aaaa)
+## 2026-04-02 17:45 — Session-Ende (session-aaaa)
 
-**Auftrag:** UI-Batch: Dollar-Badge, Doppel-Badges, Kira-Ausgang-Badges, Lexware Detail-Upgrade (Aktionen/PDF/Bezahlt-am/Kunde/Kundenmanager), Mail-Verbindungsstabilitaet
+**Auftrag:** UI-Batch: Dollar-Badge, Doppel-Badges, Kira-Ausgang-Badges, Lexware Detail-Upgrade (Aktionen/PDF/Bezahlt-am/Kunde/Kundenmanager), Mail-Verbindungsstabilitaet + Faelligkeitsdatum + Skonto-Analyse + Typ-Farbsystem
 
 **Erledigt:**
 - Dollar-Badge: nur Symbol, kein gruener Hintergrund
@@ -18,11 +18,15 @@
 - files.find TypeError gefixt (Lexware API Objekt vs Array)
 - Mail-Stabilitaet: OAuth2 Retry (3x + Backoff), IMAP-Connect Auto-Retry, poll_all_accounts transient-Retry
 - SyntaxWarnings behoben
+- Faelligkeitsdatum in Belege-Uebersicht: DB-Spalte faellig (nicht faelligkeit) + Fallback auf payload dueDate
+- Skonto-Analyse im Detail: Prozent, Betrag, Frist, AKTIV/ABGELAUFEN Status, gezogen Ja/Nein, berechtigt Ja/Nein, Kira-Rueckforderungs-Button bei unberechtigtem Skontoabzug
+- DB-Migration A-06: 6 neue Skonto-Spalten (skonto_prozent/tage/frist/betrag/gezogen/berechtigt)
+- Typ-Farbsystem: Rechnungen rot/gruen, Angebote gelb/grau — lx-st-q-* CSS-Klassen fuer quotation-Status
 - Server-Test: 0 JS-Fehler, alle Features via Playwright verifiziert
 
 **Offen:** info@raumkult.eu + invoice@sichtbeton-cire.de haben keine Token-Cache-Dateien → Kai muss OAuth-Browser-Login in Einstellungen durchfuehren
 
-**Git:** b0d4edd
+**Git:** b0d4edd, b0c3498
 **Status:** erledigt
 
 ---
