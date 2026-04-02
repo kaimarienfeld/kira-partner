@@ -11904,9 +11904,25 @@ def build_lexware(db):
         if sec_id == "buchhaltung" and n_unklar > 0:
             return f' <span class="si-badge" style="background:rgba(220,38,38,.12);color:#dc2626;border-color:rgba(220,38,38,.25)">{n_unklar}</span>'
         return ""
+    # Anzahl pro Belegart für Badges
+    _typ_counts = {}
+    for b in belege:
+        _t = b.get("typ", "")
+        _typ_counts[_t] = _typ_counts.get(_t, 0) + 1
     nav_html = '<div class="lx-nav-sec" id="lx-nav-sec">'
     for sec_id, icon, label in nav_items:
         nav_html += f'<button class="lx-nav-btn{"  active" if sec_id == "cockpit" else ""}" data-lxsec="{sec_id}" onclick="showLexSec(\'{sec_id}\')">{icon} {label}{_nav_badge(sec_id)}</button>'
+        # Sub-Nav für Belege: Belegarten als Untermenü
+        if sec_id == "belege":
+            _bel_sub = [("", "Alle Belege", len(belege)), ("invoice", "Rechnungen", _typ_counts.get("invoice", 0)),
+                        ("creditnote", "Gutschriften", _typ_counts.get("creditnote", 0)),
+                        ("quotation", "Angebote", _typ_counts.get("quotation", 0)),
+                        ("reminder", "Mahnungen", _typ_counts.get("reminder", 0))]
+            nav_html += '<div class="lx-nav-sub" id="lx-nav-sub-belege">'
+            for _btyp, _blbl, _bcnt in _bel_sub:
+                _badge = f' <span style="font-size:9px;opacity:.6;margin-left:auto">{_bcnt}</span>' if _bcnt > 0 else ''
+                nav_html += f'<button class="lx-nav-sub-btn{"  active" if _btyp == "" else ""}" data-beltyp="{_btyp}" onclick="lxBelegeTyp(\'{_btyp}\')" style="display:flex;align-items:center">{_blbl}{_badge}</button>'
+            nav_html += '</div>'
     # In-Planung-Bereiche (mit Trenner)
     planned_items = [("auswertung","&#x1F4C8;","Auswertung"),("kunden360","&#x1F464;","Kunden-360"),("cashflow","&#x1F4B0;","Cashflow"),("kalkulation","&#x1F9EE;","Kalkulation")]
     nav_html += '<div class="lx-nav-sep"></div>'
@@ -12038,7 +12054,6 @@ def build_lexware(db):
   data-faellig="{esc(faellig_raw)}" data-betrag="{_brutto_raw}" data-name="{esc(b.get('kontakt_name',''))}"
   data-nummer="{esc(b.get('nummer',''))}" data-updated="{esc(_updated_raw)}">
   <td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>
-  <td><span style="font-size:var(--fs-xs);color:var(--muted)">{typ_label}</span></td>
   <td>{esc(b.get("kontakt_name",""))}{kira_badge}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("datum",""))}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{faellig_str}</td>
@@ -12051,14 +12066,8 @@ def build_lexware(db):
 
     belege_rows = "".join(_beleg_row(b) for b in belege) if belege else "<tr><td colspan='8' style='text-align:center;color:var(--muted);padding:24px'>Keine Belege geladen — Sync starten</td></tr>"
     belege_html = f"""
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-  <select id="lx-bel-typ" onchange="lxFilterBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
-    <option value="">Alle Typen</option>
-    <option value="invoice">Rechnungen</option>
-    <option value="creditnote">Gutschriften</option>
-    <option value="quotation">Angebote</option>
-    <option value="reminder">Mahnungen</option>
-  </select>
+<input type="hidden" id="lx-bel-typ" value="">
+<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
   <select id="lx-bel-status" onchange="lxFilterBelege()" class="btn btn-sec btn-xs" style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border)">
     <option value="">Alle Status</option>
     <option value="open">Offen</option>
@@ -12088,14 +12097,14 @@ def build_lexware(db):
   <input id="lx-bel-search" type="text" placeholder="Suche Nummer / Kontakt..." oninput="lxFilterBelege()" style="flex:1;min-width:180px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:var(--fs-sm)">
   <button class="btn btn-primary btn-xs" onclick="lexSync()" title="Belege von Lexware in KIRA laden (Lexware &rarr; KIRA)">&#x2190; Von Lexware laden</button>
 </div>
-<div id="lx-belege-split" style="display:flex;gap:12px;align-items:flex-start;position:relative">
-  <div style="flex:1;min-width:0;overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
+<div id="lx-belege-split" style="display:flex;gap:12px;flex:1;min-height:0">
+  <div style="flex:1;min-width:0;overflow-y:auto;overflow-x:auto">
   <table class="lx-table" id="lx-belege-table">
-    <thead style="position:sticky;top:0;z-index:2;background:var(--bg)"><tr><th>Nummer</th><th>Typ</th><th>Kontakt</th><th>Datum</th><th>F&#228;llig</th><th>Status</th><th style="text-align:right">Betrag</th><th></th></tr></thead>
+    <thead style="position:sticky;top:0;z-index:2;background:var(--bg)"><tr><th>Nummer</th><th>Kontakt</th><th>Datum</th><th>Fällig</th><th>Status</th><th style="text-align:right">Betrag</th><th></th></tr></thead>
     <tbody id="lx-belege-tbody">{belege_rows}</tbody>
   </table>
   </div>
-  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:380px;flex-shrink:0;position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 160px);overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
+  <div id="lx-bel-detail" class="lx-detail-panel" style="display:none;width:380px;flex-shrink:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:0;background:var(--bg);padding-bottom:8px;border-bottom:1px solid var(--border);z-index:1">
         <div style="font-weight:600;font-size:var(--fs-sm)">Beleg-Details</div>
@@ -12481,7 +12490,7 @@ def build_lexware(db):
         active = " style='display:block'" if sec_id == "cockpit" else " style='display:none'"
         sections_html += f'<div class="lx-sec-content" id="lx-sec-{sec_id}" data-lxsec="{sec_id}"{active}>{sec_html}</div>'
 
-    return f"""<div class="lx-module">{header_html}<div class="lx-body"><div class="lx-sidebar">{nav_html}</div><div class="lx-content">{sections_html}</div></div></div>"""
+    return f"""<div class="lx-module">{header_html}<div class="lx-body"><div class="lx-sidebar">{nav_html}</div><div class="lx-content"><div class="lx-sec-wrap">{sections_html}</div></div></div></div>"""
 
 
 def _build_lexware_tabs_preview():
@@ -14641,10 +14650,23 @@ function showLexSec(secId) {{
   document.querySelectorAll('.lx-sec-content').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.lx-nav-btn').forEach(btn => btn.classList.remove('active'));
   const sec = document.getElementById('lx-sec-' + secId);
-  if(sec) sec.style.display = 'block';
+  if(sec) sec.style.display = 'flex';
   const btn = document.querySelector('[data-lxsec="' + secId + '"]');
   if(btn) btn.classList.add('active');
+  // Sub-Nav: öffne Untermenü wenn Sektion Sub-Nav hat
+  document.querySelectorAll('.lx-nav-sub').forEach(s => s.classList.remove('open'));
+  const sub = document.getElementById('lx-nav-sub-' + secId);
+  if(sub) sub.classList.add('open');
   if(secId === 'cockpit') lxUpdateCockpitDot();
+}}
+function lxBelegeTyp(typ) {{
+  showLexSec('belege');
+  document.getElementById('lx-bel-typ').value = typ;
+  // Sub-Nav aktiv markieren
+  document.querySelectorAll('#lx-nav-sub-belege .lx-nav-sub-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector('#lx-nav-sub-belege [data-beltyp="' + typ + '"]');
+  if(btn) btn.classList.add('active');
+  lxFilterBelege();
 }}
 
 function showLexBuchTab(tabId) {{
@@ -19851,9 +19873,16 @@ a:hover{text-decoration:underline;}
 .lx-nav-btn.active{color:var(--accent);border-left-color:var(--accent);font-weight:600;background:rgba(79,125,249,.06);}
 .lx-nav-planned{opacity:.6;}
 .lx-nav-planned:hover{opacity:.85;}
+/* Sub-Navigation (Belegarten etc.) */
+.lx-nav-sub{display:none;flex-direction:column;padding:0 0 4px 0;}
+.lx-nav-sub.open{display:flex;}
+.lx-nav-sub-btn{background:none;border:none;border-left:3px solid transparent;color:var(--muted);padding:5px 12px 5px 28px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;transition:color .15s,background .15s;text-align:left;width:100%;box-sizing:border-box;}
+.lx-nav-sub-btn:hover{color:var(--text);background:var(--bg-card);}
+.lx-nav-sub-btn.active{color:var(--accent);font-weight:600;border-left-color:var(--accent);background:rgba(79,125,249,.04);}
 /* Content */
-.lx-content{flex:1;overflow-y:auto;padding:16px 20px;}
-.lx-sec-content{display:none;}
+.lx-content{flex:1;overflow:hidden;padding:0;display:flex;flex-direction:column;}
+.lx-sec-wrap{flex:1;overflow-y:auto;padding:16px 20px;min-height:0;}
+.lx-sec-content{display:none;flex-direction:column;flex:1;min-height:0;}
 /* Tabellen */
 .lx-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
 .lx-table th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;white-space:nowrap;}
