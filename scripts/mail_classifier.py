@@ -379,6 +379,22 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
         return _r("Abgeschlossen", rolle, betreff, False,
                   "Eigene Mail – kein Handlungsbedarf", "Gesendete Mail", "niedrig")
 
+    # ── 1b. Formular-Benachrichtigungen (noreply@ → Lead) ──
+    # Landing-Page/Kontaktformular-Mails von noreply@ enthalten echte Kundenanfragen
+    # Diese NICHT als System-Mail behandeln, sondern als Lead
+    _is_form = bool(re.search(
+        r'(Anfrage\s*\(Landing\)|Kontaktformular|neue\s+Anfrage|Anfrage\s+über)',
+        betreff or "", re.IGNORECASE))
+    _is_noreply = bool(re.match(r'^no[-_.]?reply@', email))
+    if _is_form and _is_noreply:
+        prio = "hoch"
+        aktion = "Formular-Anfrage prüfen und beantworten"
+        if has_open_question(text):
+            aktion = "Anfrage enthält konkrete Frage — priorisiert beantworten"
+        return _r("Neue Lead-Anfrage", "Interessent / Lead", betreff, True,
+                  aktion, "Automatische Formular-Benachrichtigung (Landing Page/Kontaktformular)",
+                  prio)
+
     # ── 2. System-Absender (Prompt 01 § 7) ──
     if is_system_sender(absender):
         if _kw_in(["mahnung","zahlungserinnerung","payment reminder","overdue"], comb):
