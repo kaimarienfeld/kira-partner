@@ -7914,7 +7914,14 @@ function esInfoPopup(btn, text) {{
             auth_methode:'oauth2',imap_server:_wiz.settings.imap_server||'outlook.office365.com',
             imap_port:_wiz.settings.imap_port||993,imap_ssl:true}})}}).then(r=>r.json());
     savePromise.then(saved=>{{
-      if(!saved.ok && !_wiz.isReconnect){{showToast('Fehler: '+(saved.error||'?'),'fehler');return;}}
+      if(!saved.ok && !_wiz.isReconnect){{
+        if((saved.error||'').indexOf('bereits vorhanden')>=0){{
+          // Konto existiert bereits — Reconnect-Pfad nutzen
+          _wiz.isReconnect=true;
+        }} else {{
+          showToast('Fehler: '+(saved.error||'?'),'fehler');return;
+        }}
+      }}
       const endpoint = _wiz.isReconnect ? '/api/mail/konto/reconnect' : '/api/mail/konto/oauth-start';
       return fetch(endpoint,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}})
         .then(r=>r.json()).then(d=>{{
@@ -7929,7 +7936,7 @@ function esInfoPopup(btn, text) {{
     const timer=setInterval(()=>{{
       polls++;
       fetch('/api/mail/konto/oauth-status?job_id='+_wiz.jobId).then(r=>r.json()).then(s=>{{
-        if(s.status==='done'){{clearInterval(timer);fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}}).catch(()=>{{}});_wiz.step=6;_wizRender();}}
+        if(s.status==='done'){{clearInterval(timer);fetch('/api/mail/konto/health-check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:_wiz.email}})}}).catch(()=>{{}});setTimeout(()=>{{if(typeof esLoadMailKonten==='function')esLoadMailKonten();}},3000);_wiz.step=6;_wizRender();}}
         else if(s.status==='error'){{clearInterval(timer);_wiz.step=6;_wiz._error=s.error;_wizRender();}}
         else if(polls>120){{clearInterval(timer);_wiz._error='Timeout';_wiz.step=6;_wizRender();}}
       }}).catch(()=>{{}});
@@ -8366,10 +8373,10 @@ function esInfoPopup(btn, text) {{
     // Quill CDN laden
     const css=document.createElement('link');
     css.rel='stylesheet';
-    css.href='https://cdn.quilljs.com/1.3.7/quill.snow.css';
+    css.href='/static/quill.snow.css';
     document.head.appendChild(css);
     const scr=document.createElement('script');
-    scr.src='https://cdn.quilljs.com/1.3.7/quill.min.js';
+    scr.src='/static/quill.min.js';
     scr.onload=_esSigSetupQuill;
     document.head.appendChild(scr);
   }}
@@ -10458,6 +10465,7 @@ def build_admin():
           <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an Empfaenger-Adresse senden">&#x2709; SMTP testen</button>
           <span id="adm-smtp-test-res" style="font-size:12px;font-weight:600;margin-left:4px"></span>
           <span id="adm-save-smtp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
+          <span id="adm-smtp-status-badge" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600"></span>
         </div>
       </div>
 
@@ -10800,9 +10808,23 @@ function admSmtpTest() {
     body: JSON.stringify({smtp_server:server, smtp_port:port, smtp_email:email, smtp_password:pw, to:empf, _type:'smtp'})
   }).then(r=>r.json()).then(d=>{
     if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
+    const badge = document.getElementById('adm-smtp-status-badge');
     if(res) res.innerHTML = d.ok
       ? '<span style="color:#22c55e">\u2713 Testmail gesendet an '+escH(empf||email)+'</span>'
       : '<span style="color:#dc2626">\u2717 '+escH(d.error||'Fehler')+'</span>';
+    if(badge) {
+      if(d.ok) {
+        badge.textContent='\u2713 Verbunden';
+        badge.style.cssText='margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#e8f9f3;color:#1D9E75;border:0.5px solid #1D9E75';
+        // letzter_test_ok in config.json via SMTP-Save-Endpoint persistieren
+        fetch('/api/admin/save',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section:'smtp_test_ok',server:server,port:port,email:email})
+        }).catch(()=>{});
+      } else {
+        badge.textContent='\u2717 Test fehlgeschlagen';
+        badge.style.cssText='margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#fee2e2;color:#dc2626;border:0.5px solid #dc2626';
+      }
+    }
   }).catch(e=>{
     if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
     if(res) res.innerHTML = '<span style="color:#dc2626">\u2717 Netzwerkfehler: '+escH(String(e))+'</span>';
@@ -10871,6 +10893,22 @@ function admLoadData() {
     setVal('adm-f-smtp-email', smtp.absender_email);
     setVal('adm-f-smtp-passwort', smtp.absender_passwort);
     setVal('adm-f-smtp-empf', smtp.empfaenger_email);
+    // SMTP Status-Badge
+    var smtpBadge = document.getElementById('adm-smtp-status-badge');
+    if (smtpBadge) {
+      var hasSmtp = smtp.smtp_server && smtp.absender_email && smtp.absender_passwort;
+      var lastOk = smtp.letzter_test_ok;
+      if (hasSmtp && lastOk) {
+        smtpBadge.textContent = '\u2713 Verbunden';
+        smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#e8f9f3;color:#1D9E75;border:0.5px solid #1D9E75';
+      } else if (hasSmtp) {
+        smtpBadge.textContent = '\u26A0 Konfiguriert, ungetestet';
+        smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#fef3c7;color:#92400e;border:0.5px solid #fcd34d';
+      } else {
+        smtpBadge.textContent = '\u25CB Nicht konfiguriert';
+        smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)';
+      }
+    }
     setVal('adm-f-admin-pw', s.admin_password||'');
     setVal('adm-f-admin-pw2', s.admin_password||'');
     setVal('adm-f-mobil-pw', s.mobil_password||'');
@@ -20033,6 +20071,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args): pass
 
     def do_GET(self):
+        # Statische Dateien aus scripts/static/ (Quill etc.)
+        if self.path.startswith('/static/'):
+            fname = self.path[8:].split('?')[0]  # Strip /static/ prefix and query
+            if fname and '/' not in fname and '..' not in fname:
+                static_file = SCRIPTS_DIR / 'static' / fname
+                if static_file.exists():
+                    ext = fname.rsplit('.', 1)[-1].lower()
+                    mime = {'js': 'application/javascript', 'css': 'text/css',
+                            'png': 'image/png', 'svg': 'image/svg+xml'}.get(ext, 'application/octet-stream')
+                    data = static_file.read_bytes()
+                    self._respond(200, mime, data)
+                    return
+            self._respond(404, 'text/plain', b'Not found')
+            return
+
         if self.path == '/favicon.ico':
             # Minimal valid 1x1 32bpp transparent ICO (70 bytes)
             ico = bytes.fromhex(
@@ -22961,8 +23014,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             archiver_cfg = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv\raumkult_config.json")
             cfg = json.loads(archiver_cfg.read_text('utf-8')) if archiver_cfg.exists() else {'konten': []}
             konten = cfg.setdefault('konten', [])
-            # Duplikat-Check
-            if any(k.get('email') == email for k in konten):
+            # Duplikat-Check (case-insensitiv)
+            if any(k.get('email', '').lower() == email.lower() for k in konten):
                 self._json({'ok': False, 'error': 'Konto bereits vorhanden'})
                 return
             # Passwort obfuskieren (Base64, wie bestehende Konten)
@@ -22970,16 +23023,33 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if passwort:
                 import base64
                 passwort = 'enc:' + base64.b64encode(passwort.encode()).decode()
+            # SMTP-Defaults je nach Auth-Methode
+            auth_methode = body.get('auth_methode', 'oauth2')
+            if auth_methode in ('oauth2', 'oauth2_microsoft'):
+                smtp_server_default = 'smtp.office365.com'
+                smtp_port_default = 587
+                smtp_ssl_default = False
+            elif auth_methode == 'oauth2_google':
+                smtp_server_default = 'smtp.gmail.com'
+                smtp_port_default = 587
+                smtp_ssl_default = False
+            else:
+                smtp_server_default = body.get('smtp_server', '')
+                smtp_port_default = int(body.get('smtp_port', 587))
+                smtp_ssl_default = bool(body.get('smtp_ssl', False))
             neues_konto = {
                 'email': email,
                 'login': body.get('login', email),
                 'passwort': passwort,
                 'beschreibung': body.get('beschreibung', email.split('@')[0]),
                 'aktiv': True,
-                'auth_methode': body.get('auth_methode', 'oauth2'),
+                'auth_methode': auth_methode,
                 'imap_server': body.get('imap_server', 'outlook.office365.com'),
                 'imap_port': int(body.get('imap_port', 993)),
                 'imap_ssl': bool(body.get('imap_ssl', True)),
+                'smtp_server': body.get('smtp_server', smtp_server_default),
+                'smtp_port': int(body.get('smtp_port', smtp_port_default)),
+                'smtp_ssl': bool(body.get('smtp_ssl', smtp_ssl_default)),
             }
             konten.append(neues_konto)
             archiver_cfg.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
@@ -26542,6 +26612,14 @@ def _method_api_admin_save(self, body):
             cfg["email_notification"] = smtp
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
+        elif section == "smtp_test_ok":
+            # Nach erfolgreichem SMTP-Test: letzter_test_ok setzen
+            from datetime import datetime as _dt
+            smtp = cfg.get("email_notification", {})
+            smtp["letzter_test_ok"] = _dt.utcnow().isoformat()
+            cfg["email_notification"] = smtp
+            cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+
         elif section in ("whatsapp", "messaging"):
             for k in ("whatsapp_verify_token", "whatsapp_app_secret", "whatsapp_phone_number_id"):
                 if data.get(k):
@@ -26665,6 +26743,15 @@ def run_server(open_browser=True):
     auto_open = config.get("server", {}).get("auto_open_browser", True)
 
     _kill_old_instances(port)
+    # SMTP-Migration: fehlende smtp_server-Felder in raumkult_config.json ergaenzen
+    try:
+        import sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        import mail_monitor as _mm
+        _mm.migrate_all_smtp_settings()
+    except Exception:
+        pass
     _ensure_case_engine_tables()
     _ensure_lexware_tables()
     _ensure_capture_tables()

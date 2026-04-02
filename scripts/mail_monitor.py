@@ -48,9 +48,15 @@ try:
     _archiver_pfad = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8')).get("mail_archiv", {}).get("pfad", "").strip()
 except Exception:
     pass
-ARCHIVER_DIR  = Path(_archiver_pfad) if _archiver_pfad else Path(
-    r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv"
-)
+_ARCHIVER_FALLBACK = Path(r"C:\Users\kaimr\OneDrive - rauMKult Sichtbeton\0001_APPS_rauMKult\Mail Archiv")
+_archiver_base = Path(_archiver_pfad) if _archiver_pfad else _ARCHIVER_FALLBACK
+# raumkult_config.json liegt im Archiv-Root, nicht im Archiv-Unterordner.
+# Falls config.json auf einen Unterordner (z.B. .../Mail Archiv/Archiv) zeigt:
+# Eine Ebene hochgehen falls raumkult_config.json dort nicht existiert.
+if not (_archiver_base / "raumkult_config.json").exists() and (_archiver_base.parent / "raumkult_config.json").exists():
+    ARCHIVER_DIR = _archiver_base.parent
+else:
+    ARCHIVER_DIR = _archiver_base
 ARCHIVER_CFG  = ARCHIVER_DIR / "raumkult_config.json"
 TOKEN_DIR     = ARCHIVER_DIR / "tokens"
 
@@ -471,7 +477,7 @@ def test_microsoft_app() -> dict:
 def check_account_health(email_addr: str) -> dict:
     """Echte IMAP-Verbindungsprüfung für ein Konto."""
     konten = _load_accounts()
-    konto = next((k for k in konten if k["email"] == email_addr), None)
+    konto = next((k for k in konten if k["email"].lower() == email_addr.lower()), None)
     if not konto:
         result = {"status": "unbekannt", "error": "Konto nicht gefunden", "inbox_count": 0}
     else:
@@ -530,7 +536,7 @@ def run_full_connection_test(email_addr: str) -> dict:
               "inbox_count": 0, "timestamp": datetime.utcnow().isoformat()}
 
     konten = _load_accounts()
-    konto = next((k for k in konten if k["email"] == email_addr), None)
+    konto = next((k for k in konten if k["email"].lower() == email_addr.lower()), None)
     if not konto:
         result["imap_error"] = "Konto nicht gefunden"
         return result
@@ -1592,6 +1598,35 @@ def _send_notification(new_tasks):
 
 
 # ── Konten laden ─────────────────────────────────────────────────────────────
+def _migrate_konto_smtp(konto: dict) -> dict:
+    """Ergaenzt fehlende smtp_server/smtp_port/smtp_ssl aus Provider-Defaults (Migration)."""
+    if konto.get("smtp_server"):
+        return konto  # bereits gesetzt
+    smtp = get_smtp_settings(konto)
+    konto["smtp_server"] = smtp.get("server", "")
+    konto["smtp_port"] = smtp.get("port", 587)
+    konto["smtp_ssl"] = not smtp.get("starttls", True)
+    return konto
+
+
+def migrate_all_smtp_settings():
+    """Schreibt fehlende SMTP-Einstellungen in raumkult_config.json (einmalige Migration)."""
+    if not ARCHIVER_CFG.exists():
+        return
+    try:
+        cfg = json.loads(ARCHIVER_CFG.read_text("utf-8"))
+        changed = False
+        for k in cfg.get("konten", []):
+            if not k.get("smtp_server"):
+                _migrate_konto_smtp(k)
+                changed = True
+        if changed:
+            ARCHIVER_CFG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+            log.info("SMTP-Migration: fehlende smtp_server-Felder ergaenzt")
+    except Exception as e:
+        log.warning(f"SMTP-Migration fehlgeschlagen: {e}")
+
+
 def _load_accounts():
     """Lädt Konten aus dem Archiver-Config."""
     if not ARCHIVER_CFG.exists():
@@ -1601,7 +1636,12 @@ def _load_accounts():
     try:
         cfg = json.loads(ARCHIVER_CFG.read_text('utf-8'))
         konten = cfg.get("konten", [])
-        return [k for k in konten if k.get("aktiv", True)]
+        aktive = [k for k in konten if k.get("aktiv", True)]
+        # Fehlende SMTP-Felder on-the-fly ergaenzen (kein Disk-Write)
+        for k in aktive:
+            if not k.get("smtp_server"):
+                _migrate_konto_smtp(k)
+        return aktive
     except Exception as e:
         log.error(f"Config-Fehler: {e}")
         return []
