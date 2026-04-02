@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-04-02 18:25 — Session-aaaa Fortsetzung (3-Spalten-Layout)
+
+**Auftrag:** Belegarten als Sub-Nav in Sidebar + Sticky Sidebar/Detail + nur Mittelspalte scrollt
+
+**Erledigt:**
+- Belegarten (Alle/Rechnungen/Gutschriften/Angebote/Mahnungen) als Sub-Nav unter "Belege" in Lexware-Sidebar mit Anzahl-Badges
+- 3-Spalten-Layout: Sidebar fest, Detail-Panel fest, nur Tabelle scrollt
+- CSS: .lx-content overflow:hidden + .lx-sec-wrap, .lx-sec-content flex-column, .lx-nav-sub/sub-btn
+- JS: lxBelegeTyp() für Sidebar-Filter, showLexSec() öffnet automatisch Sub-Nav
+- Typ-Dropdown und Typ-Spalte entfernt (redundant)
+- Playwright-Test: Rechnungen=77 korrekt gefiltert, Detail sichtbar, 0 JS-Fehler
+
+**Git:** 2349678
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 18:10 — Session-aaaa Fortsetzung (Filter-Fix + Sortierung)
 
 **Auftrag:** Belege-Filter funktioniert nicht + zusätzliche Sortier-/Filtermöglichkeiten einbauen
