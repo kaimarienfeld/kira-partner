@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-04-02 16:55 — Session-Ende (session-aaaa)
+
+**Auftrag:** UI-Batch: Dollar-Badge, Doppel-Badges, Kira-Ausgang-Badges, Lexware Detail-Upgrade (Aktionen/PDF/Bezahlt-am/Kunde/Kundenmanager), Mail-Verbindungsstabilitaet
+
+**Erledigt:**
+- Dollar-Badge: nur Symbol, kein gruener Hintergrund
+- Postfach Doppel-Badges gefixt (einheitlich pf-folder-badge)
+- Kira-Ausgang Badges (Entwuerfe:5, Gesendet:1)
+- Lexware Beleg-Detail: Aktionen-Toolbar, PDF-Karte, Bezahlt-am Datum, KUNDE Sektion (Name/Nr/Adresse/Email/Telefon), Kundenmanager-Link
+- Backend: kontakt-Lookup aus lexware_kontakte (billing-Adresse, Rollen, Emails)
+- files.find TypeError gefixt (Lexware API Objekt vs Array)
+- Mail-Stabilitaet: OAuth2 Retry (3x + Backoff), IMAP-Connect Auto-Retry, poll_all_accounts transient-Retry
+- SyntaxWarnings behoben
+- Server-Test: 0 JS-Fehler, alle Features via Playwright verifiziert
+
+**Offen:** info@raumkult.eu + invoice@sichtbeton-cire.de haben keine Token-Cache-Dateien → Kai muss OAuth-Browser-Login in Einstellungen durchfuehren
+
+**Git:** b0d4edd
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 16:55 — Session-Ende (session-zzz)
 
 **Auftrag:** Speedify-Betrag-Fix + Systematische Mail-Format-Analyse + Nachtlauf (alle offenen Tasks + Block-D abarbeiten, Listen aktualisieren, Server-Test)
