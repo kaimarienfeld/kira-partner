@@ -834,7 +834,21 @@
       "status": "in_progress",
       "last_updated": "2026-04-01",
       "description": "Standalone HTML /mobil, mob-* CSS, HMAC token login, PWA manifest vorbereitet"
+    },
+    {
+      "id": "guided-tours",
+      "name": "Gefuehrte Modul-Touren",
+      "icon": "🎓",
+      "leni_name": "Geführte Tour durch jeden Bereich",
+      "leni_desc": "Jedes Modul hat eine eingebaute Tour die dir Schritt für Schritt erklärt was du siehst und was du tun kannst — ohne dass du etwas versehentlich veränderst. Einfach auf 'Tour' klicken.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py (TOUR_JS + kt-* CSS)",
+      "status": "done",
+      "last_updated": "2026-04-01",
+      "description": "window.kira_tour: start/next/prev/end/goTo. Spotlight-Overlay, Erklaerbox, Tab-Wechsel, Tastatursteuerung, runtime_log. 8 Tours: LEXWARE (21 Schritte), POSTFACH (8), GESCHAEFT (10), WISSEN (7), CAPTURE (7), KIRA (7), DASHBOARD (7), EINSTELLUNGEN (8). Erklaermodus sperrt Write-Buttons."
     }
   ],
-  "_total": 64
+  "_total": 68,
+  "_updated": "session-rrr"
 }

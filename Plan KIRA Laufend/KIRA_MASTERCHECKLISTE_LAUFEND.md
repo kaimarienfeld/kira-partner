@@ -269,11 +269,15 @@
 
 *(Wird laufend ergaenzt — Claude Code traegt hier neue Bugs ein die beim Testen auffallen)*
 
-### C-01 — [Platzhalter fuer naechsten Bug]
-**Status:** —
-**Gefunden am:** —
-**Beschreibung:** —
-**Behoben am:** —
+### C-01 — ERR_EMPTY_RESPONSE: f-string Braces-Bug in Tour-Buttons
+**Status:** 🐛✅ Behoben (session-rrr, commit a479341)
+**Gefunden am:** 2026-04-01
+**Beschreibung:** Tour-Buttons in `build_lexware()`, `build_capture()` und `generate_html()` (kw-header-right)
+  verwendeten `{erklaermodus:true}` (einfache Klammern) innerhalb von Python f-Strings.
+  Resultat: `NameError: name 'erklaermodus' is not defined` → Server sendete leere HTTP-Antwort.
+  py_compile erkennt diese Art von Fehler NICHT — nur erkennbar durch direkten generate_html()-Aufruf.
+**Fix:** Alle 3 Stellen auf `{{erklaermodus:true}}` (doppelte Klammern in f-string) korrigiert.
+**Behoben am:** 2026-04-01
 
 ---
 
@@ -321,13 +325,14 @@
 
 | Bereich | Gesamt | Erledigt | Offen | Blockiert | Kai-Aktion |
 |---------|--------|----------|-------|-----------|------------|
-| Block A (UI/Bugs + Tours) | 16 | 15 | 1 | 0 | 0 |
+| Block A (UI/Bugs + Tours) | 16 | 16 | 0 | 0 | 0 |
 | Block B (Kai) | 4 | 0 | 0 | 0 | 4 |
-| Block C (Laufend) | 0 | 0 | 0 | 0 | 0 |
+| Block C (Laufend) | 1 | 1 | 0 | 0 | 0 |
 | Block D (Zukunft + offene Tours) | 11 | 7 | 1 | 0 | 0 |
-| **Gesamt** | **31** | **23** | **1** | **0** | **4** |
+| **Gesamt** | **32** | **24** | **1** | **0** | **4** |
 
-> Block-A 16/16. session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
+> Block-A 16/16 komplett. Block-C 1/1 (C-01 f-string Crash behoben session-rrr).
+> session-qqq: D-04..D-10 (7 Modul-Tours) erledigt. D-11 (Partner-View) noch offen (separate HTML).
 > Block-B 0/4 (Kai-Aktionen: Cloudflare, Azure, WhatsApp, Leni-Draft).
 
 ---
@@ -344,6 +349,7 @@
 | 2026-04-01 | session-ppp: A-10 Diagnose Test-Ergebnis-Buttons erledigt — Block-A 16/16 komplett |
 | 2026-04-01 | session-qqq: D-04..D-10 Modul-Tours alle erledigt (7 Tours, 59 Schritte gesamt) |
 | 2026-04-01 | session-ooo (Fortsetzung): A-02/03/05/06/09/12 erledigt — alle AUFGABEN abgeschlossen |
+| 2026-04-01 | session-rrr: C-01 f-string ERR_EMPTY_RESPONSE Crash behoben (3 Tour-Button-Stellen) |
 
 ---
 
