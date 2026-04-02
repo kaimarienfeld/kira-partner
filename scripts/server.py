@@ -466,6 +466,15 @@ def _ensure_lexware_tables():
             );
         """)
         db.commit()
+        # Migration A-06: Skonto-Tracking fuer lexware_belege (session-aaaa)
+        _bel_cols = {r[1] for r in db.execute("PRAGMA table_info(lexware_belege)").fetchall()}
+        for _col, _typ in [("skonto_prozent","REAL"),("skonto_tage","INTEGER"),
+                           ("skonto_frist","TEXT"),("skonto_betrag","REAL"),
+                           ("skonto_gezogen","INTEGER DEFAULT 0"),("skonto_berechtigt","INTEGER DEFAULT 0")]:
+            _cname = _col.split()[0]
+            if _cname not in _bel_cols:
+                db.execute(f"ALTER TABLE lexware_belege ADD COLUMN {_col} {_typ}")
+        db.commit()
         # Migration A-05: neue Felder fuer lexware_kontakte
         _existing = {r[1] for r in db.execute("PRAGMA table_info(lexware_kontakte)").fetchall()}
         for _col, _typ in [("telefon","TEXT"),("mobil","TEXT"),("kundennummer","TEXT"),
@@ -12001,18 +12010,33 @@ def build_lexware(db):
     # ── BELEGE Unterbereich ──
     def _beleg_row(b):
         st = b.get("status","")
+        typ = b.get("typ","")
         _st_map = {"open":"Offen","overdue":"&#220;berf&#228;llig","paid":"Bezahlt","draft":"Entwurf","voided":"Storniert","accepted":"Angenommen","rejected":"Abgelehnt","paidoff":"Abgezahlt","sepadebit":"SEPA-Lastschrift"}
         st_label = _st_map.get(st, esc(st))
-        st_cls = f"lx-st-chip lx-st-{st}"
+        # Typ-abhaengiges Farbsystem: Rechnungen rot/gruen, Angebote gelb/grau
+        is_quotation = typ == "quotation"
+        if is_quotation:
+            st_cls = f"lx-st-chip lx-st-q-{st}"
+        else:
+            st_cls = f"lx-st-chip lx-st-{st}"
         _typ_map = {"invoice":"Rechnung","creditnote":"Gutschrift","quotation":"Angebot","reminder":"Mahnung"}
-        typ_label = _typ_map.get(b.get("typ",""), esc(b.get("typ","")))
+        typ_label = _typ_map.get(typ, esc(typ))
         kira_badge = ' <span class="lx-kira-badge">&#x1F916;</span>' if b.get("kira_verwendet") else ""
+        # Faelligkeitsdatum: aus DB-Spalte 'faellig' oder payload dueDate
+        faellig_raw = b.get("faellig","") or ""
+        if not faellig_raw or len(str(faellig_raw).strip()) < 8:
+            try:
+                pl = json.loads(b.get("payload_json","{}") or "{}")
+                faellig_raw = pl.get("dueDate","")
+            except Exception:
+                pass
+        faellig_str = _fmt_datum(faellig_raw) if faellig_raw and len(str(faellig_raw).strip()) >= 8 else "&#8212;"
         return f"""<tr class="lx-tr" onclick="lxBelegDetail('{esc(b["lexware_id"])}')">
   <td style="font-weight:600;font-family:monospace;font-size:var(--fs-xs)">{esc(b.get("nummer","—"))}</td>
   <td><span style="font-size:var(--fs-xs);color:var(--muted)">{typ_label}</span></td>
   <td>{esc(b.get("kontakt_name",""))}{kira_badge}</td>
   <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("datum",""))}</td>
-  <td style="font-size:var(--fs-xs);color:var(--muted)">{_fmt_datum(b.get("faelligkeit","") or "—")}</td>
+  <td style="font-size:var(--fs-xs);color:var(--muted)">{faellig_str}</td>
   <td><span class="{st_cls}">{st_label}</span></td>
   <td style="text-align:right;font-weight:600">{_fmt_eur(b.get("brutto",0), b.get("waehrung","EUR"))}</td>
   <td style="white-space:nowrap">
@@ -14633,9 +14657,10 @@ function lxBelegDetail(lexId) {{
       // Zeitstempel (Detail > Payload > leer)
       var createdDate = det.createdDate || pl.createdDate || '';
       var updatedDate = det.updatedDate || pl.updatedDate || '';
-      // Status-Timeline
+      // Status-Timeline — typ-abhaengiges Farbsystem
       var stLabel = st_labels[b.status]||b.status||'—';
-      var stCls = 'lx-st-chip lx-st-'+(b.status||'draft');
+      var _isQ = (b.typ==='quotation');
+      var stCls = 'lx-st-chip lx-st-'+(_isQ?'q-':'')+(b.status||'draft');
       // Ueberfaellig-Info
       var overdueInfo = '';
       var faelligDat = b.faellig || b.faelligkeit || pl.dueDate || det.dueDate || '';
@@ -14689,9 +14714,50 @@ function lxBelegDetail(lexId) {{
       var pc = b.payment_conditions || det.paymentConditions || {{}};
       if(pc.paymentTermLabel || pc.paymentTermDuration){{
         payHtml = '<div class="lx-det-sec">ZAHLUNGSBEDINGUNGEN</div>'
-          + (pc.paymentTermLabel ? '<div>' + _esc(pc.paymentTermLabel) + '</div>' : '')
-          + (pc.paymentTermDuration ? '<div><span class="lx-det-lbl">Zahlungsziel:</span> ' + pc.paymentTermDuration + ' Tage</div>' : '')
-          + (pc.paymentDiscountConditions ? '<div style="color:var(--muted);font-size:var(--fs-xs)">Skonto: ' + (pc.paymentDiscountConditions.discountPercentage||0) + '% bei Zahlung innerhalb ' + (pc.paymentDiscountConditions.discountRange||0) + ' Tagen</div>' : '');
+          + (pc.paymentTermLabel ? '<div style="font-size:var(--fs-xs)">' + _esc(pc.paymentTermLabel.split('\\n')[0]) + '</div>' : '')
+          + (pc.paymentTermDuration ? '<div><span class="lx-det-lbl">Zahlungsziel:</span> ' + pc.paymentTermDuration + ' Tage</div>' : '');
+        // Skonto-Analyse
+        var dc = pc.paymentDiscountConditions || {{}};
+        if(dc.discountPercentage){{
+          var skontoP = dc.discountPercentage || 0;
+          var skontoTage = dc.discountRange || 0;
+          var bruttoBetrag = parseFloat(tp.totalGrossAmount || det.totalAmount || b.brutto || 0);
+          var skontoBetrag = (bruttoBetrag * skontoP / 100);
+          // Skonto-Frist berechnen (Rechnungsdatum + discountRange Tage)
+          var belegDat = b.datum || det.voucherDate || '';
+          var skontoFrist = '';
+          if(belegDat && skontoTage > 0){{
+            var sd = new Date(belegDat.substring(0,10));
+            sd.setDate(sd.getDate() + skontoTage);
+            skontoFrist = _fmtDat(sd.toISOString());
+          }}
+          var heute = new Date();
+          var skontoAbgelaufen = skontoFrist && new Date(belegDat.substring(0,10)).getTime() + skontoTage*86400000 < heute.getTime();
+          var istBezahlt = (b.status === 'paid' || b.status === 'paidoff');
+          // Pruefen ob Skonto gezogen wurde (Differenz zwischen Brutto und tatsaechlicher Zahlung)
+          var gezahlt = parseFloat(tp.totalGrossAmount||0) - parseFloat(oa||0);
+          var skontoGezogen = (istBezahlt && bruttoBetrag > 0 && gezahlt > 0 && gezahlt < bruttoBetrag * 0.995);
+          var skontoBerechtigt = !skontoAbgelaufen;
+
+          payHtml += '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised)">'
+            + '<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:6px">SKONTO</div>'
+            + '<div><span class="lx-det-lbl">Skonto:</span> <b>' + skontoP + '%</b> = <b>' + _fmtEur(skontoBetrag, b.waehrung) + '</b></div>'
+            + '<div><span class="lx-det-lbl">Skonto-Frist:</span> ' + (skontoFrist || '—') + (skontoAbgelaufen ? ' <span style="color:#dc2626;font-size:10px;font-weight:700">ABGELAUFEN</span>' : ' <span style="color:#16a34a;font-size:10px;font-weight:700">AKTIV</span>') + '</div>';
+          if(istBezahlt){{
+            payHtml += '<div><span class="lx-det-lbl">Skonto gezogen:</span> ' + (skontoGezogen ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:var(--muted)">Nein</span>') + '</div>';
+            if(skontoGezogen){{
+              payHtml += '<div><span class="lx-det-lbl">Berechtigt:</span> ' + (skontoBerechtigt ? '<span style="color:#16a34a;font-weight:700">Ja</span>' : '<span style="color:#dc2626;font-weight:700">Nein &#x26A0;</span>') + '</div>';
+              if(!skontoBerechtigt){{
+                payHtml += '<div style="margin-top:4px;padding:6px 8px;background:rgba(220,38,38,.08);border-radius:6px;border:1px solid rgba(220,38,38,.2)">'
+                  + '<div style="font-size:11px;color:#dc2626;font-weight:600">&#x26A0; Unberechtigter Skontoabzug</div>'
+                  + '<div style="font-size:var(--fs-xs);color:var(--muted)">Zahlung nach Skonto-Frist (' + skontoFrist + '). R&#252;ckforderung: ' + _fmtEur(skontoBetrag, b.waehrung) + '</div>'
+                  + '<button class="btn btn-sec btn-xs" style="margin-top:4px;color:#dc2626;border-color:#dc2626" onclick="event.stopPropagation();lxBelegKira(&apos;' + _esc(b.lexware_id) + '&apos;,&apos;' + _esc(b.nummer||'') + '&apos;,&apos;' + _esc(b.kontakt_name||'') + '&apos;)">&#x1F916; Kira: R&#252;ckforderung pr&#252;fen</button>'
+                  + '</div>';
+              }}
+            }}
+          }}
+          payHtml += '</div>';
+        }}
       }}
       // Zugehoerige Belege
       var relHtml = '';
@@ -19802,6 +19868,12 @@ a:hover{text-decoration:underline;}
 .lx-st-rejected{background:rgba(220,38,38,.12);color:#dc2626;}
 .lx-st-paidoff{background:rgba(34,197,94,.18);color:#15803d;}
 .lx-st-sepadebit{background:rgba(59,130,246,.12);color:#2563eb;}
+.lx-st-q-open{background:rgba(245,158,11,.15);color:#b45309;}
+.lx-st-q-overdue{background:rgba(107,114,128,.12);color:#6b7280;}
+.lx-st-q-accepted{background:rgba(34,197,94,.12);color:#16a34a;}
+.lx-st-q-rejected{background:rgba(107,114,128,.15);color:#9ca3af;}
+.lx-st-q-draft{background:var(--bg-raised);color:var(--muted);border:1px solid var(--border);}
+.lx-st-q-voided{background:rgba(107,114,128,.12);color:#9ca3af;}
 .lx-det-sec{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin:14px 0 4px;padding-top:10px;border-top:1px solid var(--border)}
 .lx-det-sec:first-child{border-top:none;margin-top:0;padding-top:0}
 .lx-det-lbl{color:var(--muted);font-size:var(--fs-xs);display:inline-block;min-width:100px}
@@ -24551,6 +24623,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     # totalPrice (Netto/Brutto/Steuer)
                     if detail.get("totalPrice"):
                         d["total_price"] = detail["totalPrice"]
+                    # Skonto-Daten in DB persistieren (fuer Kira-Analysen)
+                    _pc = detail.get("paymentConditions", {})
+                    _dc = _pc.get("paymentDiscountConditions", {})
+                    if _dc.get("discountPercentage"):
+                        try:
+                            from datetime import datetime as _dt, timedelta as _td
+                            _sp = _dc.get("discountPercentage", 0)
+                            _st = _dc.get("discountRange", 0)
+                            _brutto = (detail.get("totalPrice") or {}).get("totalGrossAmount", d.get("brutto", 0))
+                            _sb = round(float(_brutto) * float(_sp) / 100, 2)
+                            _bd = (detail.get("voucherDate") or d.get("datum", ""))[:10]
+                            _sf = ""
+                            if _bd and _st:
+                                _sf = (_dt.strptime(_bd, "%Y-%m-%d") + _td(days=_st)).strftime("%Y-%m-%d")
+                            db.execute("""UPDATE lexware_belege SET skonto_prozent=?, skonto_tage=?,
+                                skonto_frist=?, skonto_betrag=? WHERE lexware_id=?""",
+                                (_sp, _st, _sf, _sb, lex_id))
+                            db.commit()
+                        except Exception:
+                            pass
             except Exception as e:
                 d["detail_error"] = str(e)
             # Kontaktdaten nachladen (Adresse, E-Mail, Kundennummer)
