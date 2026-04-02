@@ -25,6 +25,10 @@ ALLOWED_ROOTS = [str(ARCHIV_ROOT), str(KNOWLEDGE_DIR)]
 RUNTIME_EVENTS_DB  = KNOWLEDGE_DIR / "runtime_events.db"
 CAPTURE_FILES_DIR  = KNOWLEDGE_DIR / "capture_files"   # Capture-Modul Datei-Storage
 
+# ── Hot-Reload-Erkennung: merkt sich Datei-Zeitstempel beim Start ──
+_STARTUP_MTIMES = {}  # {pfad: mtime} — wird in run_server() befuellt
+_RESTART_NEEDED = False
+
 # LLM Kostenanalyse — Preistabelle USD pro 1M Token (Stand: 2026-03)
 MODEL_PRICING_USD_PER_1M = {
     "claude-sonnet-4-6":         {"in": 3.00,  "out": 15.00},
@@ -19321,6 +19325,34 @@ document.addEventListener('visibilitychange', function() {{
 }});
 setTimeout(_startKiraPolling, 4000);
 
+// ── Server-Update-Erkennung: Banner wenn Neustart nötig ──
+var _updateBannerShown = false;
+function _pollServerUpdate() {{
+  if(_updateBannerShown) return;
+  fetch('/api/server/check-update').then(r=>r.json()).then(d=>{{
+    if(d.restart_needed && !_updateBannerShown) {{
+      _updateBannerShown = true;
+      var files = (d.changed_files||[]).join(', ') || 'server.py';
+      var banner = document.createElement('div');
+      banner.id = 'restart-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 2px 12px rgba(220,38,38,.3);';
+      banner.innerHTML = '<span style="font-size:18px">&#x26A0;</span>'
+        + '<span>Server-Neustart erforderlich — Geändert: ' + files + '</span>'
+        + '<button onclick="location.reload()" style="background:#fff;color:#dc2626;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">&#x21bb; Seite neu laden</button>'
+        + '<span style="font-size:11px;opacity:.8">(Server muss manuell neu gestartet werden)</span>';
+      document.body.prepend(banner);
+      // Alle Panels nach unten schieben
+      var ma = document.querySelector('.main-area');
+      if(ma) ma.style.marginTop = '42px';
+      var sb = document.querySelector('.sidebar');
+      if(sb) sb.style.top = '42px';
+      showToast('⚠ Server-Code wurde geändert — Neustart erforderlich!', 'fehler');
+    }}
+  }}).catch(()=>{{}});
+}}
+setInterval(_pollServerUpdate, 30000);
+setTimeout(_pollServerUpdate, 8000);
+
 function openMailApproveModal() {{
   if(!_mailApproveItems.length) return;
   var item = _mailApproveItems[0];
@@ -21233,6 +21265,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/monitor/status':
             self._json(get_monitor_status())
+
+        elif self.path == '/api/server/check-update':
+            changed = []
+            for fp_str, orig_mt in _STARTUP_MTIMES.items():
+                try:
+                    cur = Path(fp_str).stat().st_mtime
+                    if cur != orig_mt:
+                        changed.append(Path(fp_str).name)
+                except Exception:
+                    pass
+            self._json({"restart_needed": _RESTART_NEEDED or len(changed) > 0, "changed_files": changed})
 
         elif self.path.startswith('/api/aktivitaeten'):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -28021,6 +28064,41 @@ def run_server(open_browser=True):
     _ensure_capture_config_defaults()
     CAPTURE_FILES_DIR.mkdir(exist_ok=True)
     rlog_ensure_cfg()
+    # ── Hot-Reload-Erkennung: Datei-Zeitstempel beim Start speichern ──
+    global _STARTUP_MTIMES, _RESTART_NEEDED
+    _RESTART_NEEDED = False
+    _watched_files = [
+        SCRIPTS_DIR / "server.py",
+        SCRIPTS_DIR / "kira_llm.py",
+        SCRIPTS_DIR / "mail_monitor.py",
+        SCRIPTS_DIR / "daily_check.py",
+        SCRIPTS_DIR / "case_engine.py",
+    ]
+    for fp in _watched_files:
+        try:
+            _STARTUP_MTIMES[str(fp)] = fp.stat().st_mtime
+        except Exception:
+            pass
+
+    def _file_watcher_loop():
+        """Prüft alle 15s ob sich überwachte Dateien geändert haben."""
+        import time as _t
+        global _RESTART_NEEDED
+        _t.sleep(10)
+        while True:
+            for fp_str, orig_mtime in _STARTUP_MTIMES.items():
+                try:
+                    cur = Path(fp_str).stat().st_mtime
+                    if cur != orig_mtime:
+                        _RESTART_NEEDED = True
+                        print(f"[Hot-Reload] Datei geändert: {Path(fp_str).name} — Neustart empfohlen")
+                        return  # Thread beenden, Signal steht
+                except Exception:
+                    pass
+            _t.sleep(15)
+
+    threading.Thread(target=_file_watcher_loop, daemon=True, name="FileWatcher").start()
+
     alog("Server", "Start", f"Port {port} | Python {__import__('sys').version.split()[0]}", "ok")
     rlog('system', 'server_started', f"Kira Dashboard gestartet auf Port {port}",
          source='server', modul='server', actor_type='system', status='ok')
