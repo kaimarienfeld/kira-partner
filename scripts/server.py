@@ -13862,13 +13862,31 @@ function lexSync(mode) {{
     if(d.ok) {{
       const st = d.stats || {{}};
       let lines = [];
-      if(st.belege)   lines.push('\u2713 Belege: '+(st.belege.neu||0)+' neu, '+(st.belege.aktualisiert||0)+' akt., '+(st.belege.fehler||0)+' Fehler');
-      if(st.kontakte) lines.push('\u2713 Kontakte: '+(st.kontakte.neu||0)+' neu, '+(st.kontakte.aktualisiert||0)+' akt., '+(st.kontakte.fehler||0)+' Fehler');
-      if(st.artikel)  lines.push('\u2713 Artikel: '+(st.artikel.neu||0)+' neu, '+(st.artikel.aktualisiert||0)+' akt., '+(st.artikel.fehler||0)+' Fehler');
+      let allFehlerDetails = [];
+      function _stLine(label, s) {{
+        if(!s) return;
+        let txt = '\u2713 ' + label + ': ' + (s.neu||0) + ' neu, ' + (s.aktualisiert||0) + ' akt.';
+        if(s.fehler) txt += ', \u26a0 ' + s.fehler + ' Fehler';
+        lines.push(txt);
+        if(s.fehler_details && s.fehler_details.length) allFehlerDetails = allFehlerDetails.concat(s.fehler_details);
+      }}
+      _stLine('Belege', st.belege);
+      _stLine('Kontakte', st.kontakte);
+      _stLine('Artikel', st.artikel);
       const summary = lines.join(' | ');
       if(log) log.textContent = summary || 'Sync abgeschlossen';
       _rtlog('ui','lex_sync_done','Sync: '+summary,{{submodul:'lexware',context_type:'sync',status:'ok'}});
-      showToast('\u2713 Sync abgeschlossen: '+summary, 'ok');
+      if(allFehlerDetails.length) {{
+        window._lexLastErr = {{stats: st, fehler_details: allFehlerDetails}};
+        showSimpleModal('Sync abgeschlossen mit Fehlern',
+          '<p style="margin-bottom:8px">' + escH(summary) + '</p>' +
+          '<p style="color:var(--danger);font-size:var(--fs-sm);margin-bottom:6px">&#x26a0; ' + allFehlerDetails.length + ' Fehler-Detail(s):</p>' +
+          '<pre style="white-space:pre-wrap;font-size:var(--fs-xs);background:var(--bg-raised);padding:8px;border-radius:4px;max-height:240px;overflow-y:auto">' + escH(allFehlerDetails.join('\\n')) + '</pre>' +
+          '<div style="margin-top:8px"><button class="btn btn-sec btn-xs" onclick="copyErrorDetails(window._lexLastErr);closeModal()">Fehlerdetails kopieren</button></div>'
+        );
+      }} else {{
+        showToast('\u2713 Sync abgeschlossen: '+summary, 'ok');
+      }}
       // Daten neu laden ohne Seitenwechsel
       lxLoadSection(document.querySelector('.lx-nav-btn.active')?.dataset?.sec || 'cockpit');
     }} else {{

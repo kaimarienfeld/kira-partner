@@ -485,11 +485,31 @@ class LexwareClient:
         if typen is None:
             typen = ["invoice", "creditnote", "quotation"]
 
-        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0}
+        # Lexware /voucherlist erfordert voucherStatus als Pflicht-Parameter.
+        # Pro Typ alle relevanten Statuses abrufen um vollstaendige Daten zu erhalten.
+        _TYP_STATUSES = {
+            "invoice":    ["draft", "open", "paid", "paidoff", "voided", "overdue"],
+            "creditnote": ["draft", "open", "paid", "paidoff", "voided"],
+            "quotation":  ["draft", "open", "accepted", "rejected"],
+        }
+
+        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0, "fehler_details": []}
 
         for typ in typen:
+            statuses = _TYP_STATUSES.get(typ, ["open"])
+            seen_ids = set()
+            belege = []
+            for vstatus in statuses:
+                try:
+                    chunk = self.get_all_vouchers(typ, voucher_status=vstatus)
+                    for b in chunk:
+                        bid = b.get("id")
+                        if bid and bid not in seen_ids:
+                            seen_ids.add(bid)
+                            belege.append(b)
+                except Exception as e_inner:
+                    logger.warning(f"Sync-Teilfehler {typ}/{vstatus}: {e_inner}")
             try:
-                belege = self.get_all_vouchers(typ)
                 for b in belege:
                     lex_id = b.get("id", "")
                     if not lex_id:
@@ -537,12 +557,21 @@ class LexwareClient:
             except Exception as e:
                 logger.error(f"Sync-Fehler fuer {typ}: {e}")
                 stats["fehler"] += 1
+                detail = f"[{typ}] {type(e).__name__}: {e}"
+                if hasattr(e, "body") and e.body:
+                    try:
+                        import json as _j
+                        bd = _j.loads(e.body)
+                        detail += f" | Body: {bd.get('message', e.body[:200])}"
+                    except Exception:
+                        detail += f" | Body: {str(e.body)[:200]}"
+                stats["fehler_details"].append(detail)
 
         return stats
 
     def sync_kontakte_to_db(self, db) -> dict:
         """Synchronisiert Kontakte aus Lexware in lexware_kontakte."""
-        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0}
+        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0, "fehler_details": []}
         try:
             kontakte = self.get_all_contacts()
             for k in kontakte:
@@ -602,11 +631,20 @@ class LexwareClient:
         except Exception as e:
             logger.error(f"Kontakt-Sync-Fehler: {e}")
             stats["fehler"] += 1
+            detail = f"[kontakte] {type(e).__name__}: {e}"
+            if hasattr(e, "body") and e.body:
+                try:
+                    import json as _j
+                    bd = _j.loads(e.body)
+                    detail += f" | Body: {bd.get('message', e.body[:200])}"
+                except Exception:
+                    detail += f" | Body: {str(e.body)[:200]}"
+            stats["fehler_details"].append(detail)
         return stats
 
     def sync_artikel_to_db(self, db) -> dict:
         """Synchronisiert Artikel aus Lexware in lexware_artikel."""
-        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0}
+        stats = {"neu": 0, "aktualisiert": 0, "fehler": 0, "fehler_details": []}
         try:
             artikel = self.get_all_articles()
             for a in artikel:
@@ -650,6 +688,15 @@ class LexwareClient:
         except Exception as e:
             logger.error(f"Artikel-Sync-Fehler: {e}")
             stats["fehler"] += 1
+            detail = f"[artikel] {type(e).__name__}: {e}"
+            if hasattr(e, "body") and e.body:
+                try:
+                    import json as _j
+                    bd = _j.loads(e.body)
+                    detail += f" | Body: {bd.get('message', e.body[:200])}"
+                except Exception:
+                    detail += f" | Body: {str(e.body)[:200]}"
+            stats["fehler_details"].append(detail)
         return stats
 
 
