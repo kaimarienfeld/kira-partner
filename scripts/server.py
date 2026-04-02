@@ -14941,7 +14941,11 @@ function lxBelegDetail(lexId) {{
         + relHtml
         + '</div>';
     }}).catch(e => {{
-      if(content) content.innerHTML = '<div style="color:var(--muted)">Fehler: ' + e + '</div>';
+      if(content) content.innerHTML = '<div style="color:#c84444;padding:12px 0">'
+        + '<div style="font-weight:600;margin-bottom:8px">Fehler beim Laden</div>'
+        + '<div style="font-size:12px;margin-bottom:12px">' + e + '</div>'
+        + '<button class="btn btn-sec btn-xs" onclick="lxBelegDetail(\\x27' + lexId + '\\x27)">&#x21bb; Erneut versuchen</button>'
+        + '</div>';
     }});
 }}
 
