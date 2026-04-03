@@ -665,15 +665,31 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
         if not k_email:
             k_email = extract_form_customer_email(betr, text)
         if not k_email:
-            stats["ignoriert"] += 1
+            try:
+                mi_db.execute(
+                    "UPDATE mails SET kategorie='Ignorieren' WHERE message_id=? AND (kategorie IS NULL OR kategorie='')",
+                    (msgid,))
+                if idx % 50 == 0:
+                    mi_db.commit()
+                stats["klassifiziert"] += 1
+            except Exception:
+                stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
         k_email = resolve_alias(k_email)
 
-        # Eigene Domain
+        # Eigene Domain → als "Shop / System" markieren
         dom = k_email.split('@')[-1] if '@' in k_email else ''
         if dom in EIGENE_DOMAINS:
-            stats["ignoriert"] += 1
+            try:
+                mi_db.execute(
+                    "UPDATE mails SET kategorie='Shop / System' WHERE message_id=? AND (kategorie IS NULL OR kategorie='')",
+                    (msgid,))
+                if idx % 50 == 0:
+                    mi_db.commit()
+                stats["klassifiziert"] += 1
+            except Exception:
+                stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
 
