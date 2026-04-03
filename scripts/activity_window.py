@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-KIRA Activity Window (session-nn)
-Desktop-Overlay für Stufe-C-Signale — läuft als Hintergrund-Thread.
+KIRA Activity Window (session-nn, erweitert session-cccc)
+Desktop-Overlay für Stufe-B/C-Signale — läuft als Hintergrund-Thread.
 Nutzt nur stdlib tkinter, keine externen Abhängigkeiten.
 
 Öffentliche API:
@@ -16,8 +16,18 @@ Nutzt nur stdlib tkinter, keine externen Abhängigkeiten.
 import threading
 import time
 import logging
+import sqlite3
+from pathlib import Path
+from datetime import datetime, timedelta
 
 log = logging.getLogger("activity_window")
+
+KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
+TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
+
+# Cooldown-Tracking: Verhindert Spam für gleiche Trigger
+_trigger_cooldowns: dict[str, float] = {}
+_COOLDOWN_SECS = 3600  # 1 Stunde zwischen gleichen Triggern
 
 _overlay_lock = threading.Lock()
 _watcher_started = False
@@ -128,6 +138,177 @@ def start_signal_watcher() -> None:
     log.info("Signal-Watcher gestartet (15s Intervall)")
 
 
+def _emit_signal(sig: dict) -> None:
+    """Schreibt ein Signal in die Case-Engine-DB für Browser-Polling (Toast/Modal)."""
+    try:
+        from case_engine import create_signal
+        create_signal(
+            stufe=sig.get("stufe", "B"),
+            titel=sig.get("titel", ""),
+            nachricht=sig.get("nachricht", ""),
+            typ=sig.get("typ", "activity_trigger"),
+        )
+    except Exception:
+        pass  # Case-Engine nicht verfügbar — nur Desktop-Overlay
+
+
+def _cooldown_ok(key: str) -> bool:
+    """Prüft ob Trigger angezeigt werden darf (Cooldown abgelaufen)."""
+    now = time.time()
+    last = _trigger_cooldowns.get(key, 0)
+    if now - last < _COOLDOWN_SECS:
+        return False
+    _trigger_cooldowns[key] = now
+    return True
+
+
+def _scan_ueberfaellige_rechnungen() -> dict | None:
+    """Prüft ausgangsrechnungen auf >14 Tage überfällige Einträge."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        today = datetime.now().date()
+        rows = db.execute("""
+            SELECT re_nummer, datum, kunde_name, betrag_brutto
+            FROM ausgangsrechnungen
+            WHERE status='offen' AND datum IS NOT NULL
+            ORDER BY datum ASC
+        """).fetchall()
+        db.close()
+
+        ueberfaellige = []
+        for r in rows:
+            try:
+                re_datum = datetime.strptime(str(r["datum"])[:10], "%Y-%m-%d").date()
+                tage = (today - re_datum).days
+            except Exception:
+                continue
+            if tage >= 14:
+                ueberfaellige.append({
+                    "re_nummer": r["re_nummer"],
+                    "kunde": r["kunde_name"] or "Unbekannt",
+                    "betrag": r["betrag_brutto"] or 0,
+                    "tage": tage,
+                })
+
+        if not ueberfaellige:
+            return None
+
+        key = f"re-ueberf-{len(ueberfaellige)}"
+        if not _cooldown_ok(key):
+            return None
+
+        # Höchste zuerst
+        ueberfaellige.sort(key=lambda x: x["tage"], reverse=True)
+        top = ueberfaellige[0]
+        n = len(ueberfaellige)
+        titel = f"{n} Rechnung{'en' if n > 1 else ''} überfällig"
+        lines = []
+        for u in ueberfaellige[:3]:
+            lines.append(f"{u['re_nummer']} — {u['kunde']} ({u['tage']}d, {u['betrag']:,.0f} €)")
+        nachricht = "\n".join(lines)
+        if n > 3:
+            nachricht += f"\n… und {n - 3} weitere"
+
+        stufe = "C" if top["tage"] >= 30 else "B"
+        return {
+            "id": f"re-ueberf-{top['re_nummer']}",
+            "stufe": stufe,
+            "titel": titel,
+            "nachricht": nachricht,
+        }
+    except Exception as e:
+        log.debug(f"scan_ueberfaellige: {e}")
+        return None
+
+
+def _scan_neue_leads() -> dict | None:
+    """Prüft auf neue Leads (Tasks vom Typ 'anfrage' der letzten 2h)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        seit = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
+        rows = db.execute("""
+            SELECT id, titel, kunde_name, erstellt_am
+            FROM tasks
+            WHERE typ IN ('anfrage', 'lead', 'anfrage_lead')
+              AND erstellt_am >= ?
+              AND status NOT IN ('erledigt', 'archiviert', 'ignoriert')
+            ORDER BY erstellt_am DESC
+        """, (seit,)).fetchall()
+        db.close()
+
+        if not rows:
+            return None
+
+        # Nur anzeigen wenn mindestens 1 neuer Lead im Cooldown-Fenster
+        key = f"neue-leads-{rows[0]['id']}"
+        if not _cooldown_ok(key):
+            return None
+
+        n = len(rows)
+        top = rows[0]
+        titel = f"{n} neue{'r' if n == 1 else ''} Lead{'s' if n > 1 else ''}"
+        lines = []
+        for r in rows[:3]:
+            name = r["kunde_name"] or r["titel"] or f"Task #{r['id']}"
+            lines.append(name)
+        nachricht = ", ".join(lines)
+        if n > 3:
+            nachricht += f" + {n - 3} weitere"
+
+        return {
+            "id": f"lead-{top['id']}",
+            "stufe": "B",
+            "titel": titel,
+            "nachricht": nachricht,
+        }
+    except Exception as e:
+        log.debug(f"scan_neue_leads: {e}")
+        return None
+
+
+def _scan_kira_freigaben() -> dict | None:
+    """Prüft auf Kira-Entwürfe die >2h auf Freigabe warten."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        grenze = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
+        rows = db.execute("""
+            SELECT id, an, betreff, erstellt_am
+            FROM mail_approve_queue
+            WHERE status='pending' AND erstellt_am <= ?
+            ORDER BY erstellt_am ASC
+        """, (grenze,)).fetchall()
+        db.close()
+
+        if not rows:
+            return None
+
+        key = f"freigaben-{len(rows)}"
+        if not _cooldown_ok(key):
+            return None
+
+        n = len(rows)
+        titel = f"{n} Kira-Entwurf{'e' if n > 1 else ''} warten auf Freigabe"
+        lines = []
+        for r in rows[:3]:
+            lines.append(f"An {r['an']}: {r['betreff']}")
+        nachricht = "\n".join(lines)
+        if n > 3:
+            nachricht += f"\n… und {n - 3} weitere"
+
+        return {
+            "id": f"freigabe-{rows[0]['id']}",
+            "stufe": "B",
+            "titel": titel,
+            "nachricht": nachricht,
+        }
+    except Exception as e:
+        log.debug(f"scan_kira_freigaben: {e}")
+        return None
+
+
 def _check_and_show() -> None:
     """Holt Signale aus mehreren Quellen und zeigt ggf. ein Overlay."""
     try:
@@ -156,8 +337,7 @@ def _check_and_show() -> None:
         # 2. Qualifizierungs-Status (pausiert = Guthaben leer)
         try:
             import json
-            from pathlib import Path
-            state_file = Path(__file__).parent.parent / "knowledge" / "qualify_state.json"
+            state_file = KNOWLEDGE_DIR / "qualify_state.json"
             if state_file.exists():
                 state = json.loads(state_file.read_text("utf-8"))
                 if state.get("paused") and not state.get("_desktop_shown"):
@@ -178,7 +358,21 @@ def _check_and_show() -> None:
         except Exception:
             pass
 
-        # 3. Case-Engine Stufe-B-Signale (niedrigere Prio, aber anzeigen wenn nichts anderes)
+        # 3. Überfällige Rechnungen (>14 Tage → Stufe B, >30 Tage → Stufe C)
+        re_sig = _scan_ueberfaellige_rechnungen()
+        if re_sig:
+            _emit_signal(re_sig)
+            show_signal_overlay(re_sig)
+            return
+
+        # 4. Kira-Freigaben wartend >2h
+        fg_sig = _scan_kira_freigaben()
+        if fg_sig:
+            _emit_signal(fg_sig)
+            show_signal_overlay(fg_sig)
+            return
+
+        # 5. Case-Engine Stufe-B-Signale
         try:
             from case_engine import get_pending_signals, mark_signal_shown
             signals = get_pending_signals(max_count=5)
@@ -192,6 +386,13 @@ def _check_and_show() -> None:
                 return
         except Exception:
             pass
+
+        # 6. Neue Leads (letzte 2h)
+        lead_sig = _scan_neue_leads()
+        if lead_sig:
+            _emit_signal(lead_sig)
+            show_signal_overlay(lead_sig)
+            return
 
     except Exception as e:
         log.error(f"_check_and_show Fehler: {e}")
