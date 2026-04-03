@@ -397,12 +397,19 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   prio)
 
     # ── 2. System-Absender (Prompt 01 § 7) ──
+    # Eigene Domains → immer archivieren (Kopien eigener Mahnungen/Rechnungen)
+    _EIGENE_DOMAINS_CL = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com", "invoicefetcher.email"}
+    if domain in _EIGENE_DOMAINS_CL:
+        return _r("Abgeschlossen", "Intern", betreff, False,
+                  "Interne Kopie — kein Handlungsbedarf", f"Eigene Domain {domain}", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
+
     if is_system_sender(absender):
         if _kw_in(["mahnung","zahlungserinnerung","payment reminder","overdue"], comb):
             return _r("Rechnung / Beleg", "Mahnung", betreff, True,
                       "Mahnung pruefen", f"System-Mahnung von {domain}", "hoch",
                       geschaeft=_extr_gesc(betreff, text, "mahnung"),
-                      routing="task", erfordert_handlung=True)
+                      routing="buchhaltung", erfordert_handlung=False)
         if _kw_in(RECHNUNG_KEYWORDS[:4], comb):
             return _r("Rechnung / Beleg", "Rechnung / Beleg", betreff, False,
                       "Zur Kenntnis / Ablegen", f"Beleg von {domain}", "niedrig",

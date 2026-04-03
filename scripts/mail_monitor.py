@@ -1297,6 +1297,13 @@ def _process_mail(mail_data, konto_label, folder_name):
                 if _form_dom not in _EIGENE:
                     _kunden_email_resolved = _form_em
 
+    # Eigene Domain → kein Task (Kopien eigener Mahnungen/Rechnungen etc.)
+    if _abs_dom in _EIGENE and _kunden_email_resolved == _absender_email:
+        # Absender ist eigene Domain UND keine Formular-Email extrahiert → interne Kopie
+        _index_mail(mail_data, konto_label, folder_name)
+        return {"kategorie": "Abgeschlossen", "routing": "archivieren",
+                "erfordert_handlung": False, "kategorie_grund": "Eigene Domain, interne Kopie"}
+
     # Duplikat-Check
     db = sqlite3.connect(str(TASKS_DB))
     db.row_factory = sqlite3.Row
