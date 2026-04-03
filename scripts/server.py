@@ -26074,9 +26074,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             def _run_stil():
                 try:
                     from kira_llm import extract_schreibstil
-                    extract_schreibstil()
-                except Exception:
-                    pass
+                    result = extract_schreibstil()
+                    if result.get("error"):
+                        logging.warning("Schreibstil-Extraktion Fehler: %s", result["error"])
+                except Exception as e:
+                    logging.error("Schreibstil-Extraktion Exception: %s", e)
             _th.Thread(target=_run_stil, daemon=True).start()
             self._json({'ok': True, 'status': 'gestartet'})
             return
@@ -26087,9 +26089,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             def _run_gm():
                 try:
                     from kira_llm import extract_geschaeftsmuster
-                    extract_geschaeftsmuster()
-                except Exception:
-                    pass
+                    result = extract_geschaeftsmuster()
+                    if result.get("error"):
+                        logging.warning("Geschäftsmuster-Extraktion Fehler: %s", result["error"])
+                except Exception as e:
+                    logging.error("Geschäftsmuster-Extraktion Exception: %s", e)
             _th.Thread(target=_run_gm, daemon=True).start()
             self._json({'ok': True, 'status': 'gestartet'})
             return
