@@ -8661,6 +8661,51 @@ function esInfoPopup(btn, text) {{
     }});
   }};
 
+  // Globaler Qualifizierungs-Poll-Timer (überlebt Panel-Wechsel)
+  var _qualPollTimer = null;
+  function _startQualPolling() {{
+    if(_qualPollTimer) return; // Bereits aktiv
+    _qualPollTimer = setInterval(function(){{
+      fetch('/api/mail/qualifizieren/status').then(function(r){{return r.json()}}).then(function(p){{
+        var prog=document.getElementById('es-qual-progress');
+        var bar=document.getElementById('es-qual-bar');
+        var barWrap=document.getElementById('es-qual-bar-wrap');
+        var btn=document.getElementById('btn-qual-start');
+        var pauseChip=document.getElementById('llmPauseChip');
+        if(!p.running && !p.paused && p.finished) {{
+          clearInterval(_qualPollTimer); _qualPollTimer=null;
+          if(prog) prog.textContent='Fertig: '+p.gesamt+' geprüft · '+p.klassifiziert+' klassifiziert · '+(p.tasks_erstellt||0)+' Tasks';
+          if(bar){{ bar.style.width='100%'; bar.style.background=''; }}
+          if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+          if(pauseChip) pauseChip.style.display='none';
+          return;
+        }}
+        if(p.paused) {{
+          clearInterval(_qualPollTimer); _qualPollTimer=null;
+          if(prog) prog.innerHTML='\u26a0\ufe0f Pausiert: '+(p.pause_grund||'Unbekannt')+'<br><button class="btn btn-sm" style="margin-top:6px;background:#7c3aed;color:#fff" onclick="esQualFortsetzen()">Fortsetzen</button>';
+          if(bar) bar.style.background='#e84545';
+          if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+          if(pauseChip) pauseChip.style.display='';
+          return;
+        }}
+        if(p.running) {{
+          var pct=p.gesamt>0?Math.round(100*p.geprueft/p.gesamt):0;
+          if(bar) bar.style.width=pct+'%';
+          if(barWrap) barWrap.style.display='';
+          if(prog) prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) · Klassifiziert: '+p.klassifiziert+' · '+((p.aktuell||'').slice(0,50));
+          if(btn){{ btn.disabled=true; btn.textContent='Läuft…'; }}
+        }}
+      }}).catch(function(){{}});
+    }}, 3000);
+  }}
+
+  // Beim Seitenlade und Panel-Wechsel: prüfe laufende Qualifizierung
+  (function(){{
+    fetch('/api/mail/qualifizieren/status').then(function(r){{return r.json()}}).then(function(p){{
+      if(p.running || p.paused) _startQualPolling();
+    }}).catch(function(){{}});
+  }})();
+
   window.esMailQualifizieren = function(btn) {{
     const seitEl = document.getElementById('es-qual-seit');
     const bisEl = document.getElementById('es-qual-bis');
