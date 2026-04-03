@@ -7670,15 +7670,33 @@ function esInfoPopup(btn, text) {{
       <input type="date" id="es-qual-task-seit"
              style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
     </div>
+    <div class="es-row">
+      <div class="es-row-label">
+        <span>Vorpr&uuml;fung</span>
+        <span class="es-row-hint">Z&auml;hlt unklassifizierte Mails und sch&auml;tzt Kosten</span>
+      </div>
+      <button class="es-mk-btn" id="btn-qual-check" onclick="esQualVorcheck()"
+              style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer">
+        Vorpr&uuml;fung starten
+      </button>
+    </div>
+    <div id="es-qual-vorcheck" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
     <div class="es-row" style="border-bottom:none">
       <div class="es-row-label">
         <span>Qualifizierung starten</span>
         <span class="es-row-hint">L&auml;uft im Hintergrund &mdash; Fortschritt wird live angezeigt</span>
       </div>
-      <button class="es-mk-btn" id="btn-qual-start" onclick="esMailQualifizieren(this)"
-              style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;padding:6px 18px;border-radius:6px;font-size:13px;cursor:pointer">
-        Qualifizierung starten
-      </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="es-mk-btn" id="btn-qual-all" onclick="esQualAlles(this)"
+                style="background:var(--bg-raised);color:var(--text);border:1px solid var(--border);padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer"
+                title="Alle unklassifizierten Mails qualifizieren">
+          Alle Mails
+        </button>
+        <button class="es-mk-btn" id="btn-qual-start" onclick="esMailQualifizieren(this)"
+                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;padding:6px 18px;border-radius:6px;font-size:13px;cursor:pointer">
+          Qualifizierung starten
+        </button>
+      </div>
     </div>
     <div id="es-qual-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
     <div id="es-qual-bar-wrap" style="display:none;margin:4px 0 8px 0;background:var(--bg-raised);border-radius:6px;height:8px;overflow:hidden">
@@ -8712,6 +8730,30 @@ function esInfoPopup(btn, text) {{
       if(prog) prog.textContent='Verbindungsfehler';
       if(barWrap) barWrap.style.display='none';
     }});
+  }};
+
+  // Vorprüfung: unklassifizierte Mails zählen + Kosten schätzen
+  window.esQualVorcheck = function() {{
+    const out = document.getElementById('es-qual-vorcheck');
+    if(out) out.textContent = 'Zähle…';
+    fetch('/api/mail/insights').then(r=>r.json()).then(d=>{{
+      if(d.error){{ if(out) out.textContent='Fehler: '+d.error; return; }}
+      const n = d.unklassifiziert || 0;
+      const kosten_guenstig = (n * 0.001).toFixed(2);
+      const kosten_teuer = (n * 0.005).toFixed(2);
+      const zeit_min = Math.ceil(n / 60);  // ~1 Mail/Sek
+      if(out) out.innerHTML = '<b>'+n.toLocaleString('de-DE')+' Mails</b> noch nicht klassifiziert'
+        +'<br>Geschätzte Kosten: <b>~'+kosten_guenstig+'€</b> (GPT-4o-mini) bis ~'+kosten_teuer+'€ (Claude)'
+        +'<br>Geschätzte Dauer: ~'+zeit_min+' Minuten';
+    }}).catch(()=>{{ if(out) out.textContent='Verbindungsfehler'; }});
+  }};
+
+  // Alle unklassifizierten Mails qualifizieren (setzt seit auf ältestes Datum)
+  window.esQualAlles = function(btn) {{
+    if(!confirm('Alle unklassifizierten Mails qualifizieren? Dies kann je nach Menge einige Zeit dauern.')) return;
+    const seitEl = document.getElementById('es-qual-seit');
+    if(seitEl) seitEl.value = '2020-01-01';
+    esMailQualifizieren(btn);
   }};
 
   // Qualifizierung fortsetzen (nach Pause)
