@@ -741,6 +741,21 @@ def build_dashboard(tasks, db):
     n_ges     = len(tasks)
     today     = datetime.now().strftime("%Y-%m-%d")
 
+    # Mail-Klassifizierung aus mail_index.db laden
+    mi_stats = {"gesamt": 0, "klassifiziert": 0, "kategorien": {}}
+    try:
+        mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
+        mi_db.row_factory = sqlite3.Row
+        r = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX'").fetchone()
+        mi_stats["gesamt"] = r["c"] if r else 0
+        r2 = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != ''").fetchone()
+        mi_stats["klassifiziert"] = r2["c"] if r2 else 0
+        for row in mi_db.execute("SELECT kategorie, COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != '' GROUP BY kategorie ORDER BY c DESC").fetchall():
+            mi_stats["kategorien"][row["kategorie"]] = row["c"]
+        mi_db.close()
+    except Exception:
+        pass
+
     # Organisation-Daten
     try: n_org = db.execute("SELECT COUNT(*) FROM organisation").fetchone()[0]
     except: n_org = 0
@@ -860,6 +875,10 @@ def build_dashboard(tasks, db):
   <div class="dash-kpi" onclick="showPanel('kommunikation')">
     <div class="dash-kpi-label">Gesamt offen</div>
     <div class="dash-kpi-row"><span class="dash-kpi-val">{n_ges}</span></div>
+  </div>
+  <div class="dash-kpi" onclick="esShowSec('mail');showPanel('einstellungen')" title="Mail-Intelligence: Klassifizierte Mails in KIRA">
+    <div class="dash-kpi-label">Mails klassifiziert</div>
+    <div class="dash-kpi-row"><span class="dash-kpi-val">{mi_stats['klassifiziert']:,}</span>{'<span class="dash-kpi-change info">von '+str(mi_stats["gesamt"])+' INBOX</span>' if mi_stats['gesamt']>0 else ''}</div>
   </div>
 </div>"""
 
@@ -1181,10 +1200,21 @@ def build_dashboard(tasks, db):
                 "showLöschHistorie()"))
     except: pass
 
+    # Mail-Intelligence Signal
+    if mi_stats["klassifiziert"] > 0:
+        kat = mi_stats["kategorien"]
+        n_mi_leads = kat.get("Neue Lead-Anfrage", 0)
+        n_mi_angebr = kat.get("Angebotsrückmeldung", 0)
+        n_mi_antw = kat.get("Antwort erforderlich", 0)
+        n_mi_biz = n_mi_leads + n_mi_angebr + n_mi_antw
+        signals.append(('s-blue', '#7c3aed',
+            f'{mi_stats["klassifiziert"]:,} Mails eingeordnet: {n_mi_leads} Leads, {n_mi_angebr} Angebotsrückmeldungen, {n_mi_antw} Business-Mails &mdash; Kundenprofile aufgebaut',
+            "esShowSec('mail');showPanel('einstellungen')"))
+
     signals_html = ""
     if signals:
         sig_items = ""
-        for cls, dot_color, text, action in signals[:7]:
+        for cls, dot_color, text, action in signals[:8]:
             sig_items += f'<div class="dash-sig {cls}" onclick="{action}"><span class="sig-dot" style="background:{dot_color}"></span><span class="sig-text">{text}</span><span class="sig-arr">&#x2192;</span></div>'
         signals_html = f"""<div class="dash-signals">
   <div class="dash-panel-title">Signale &amp; Auff&auml;lligkeiten</div>
@@ -21626,6 +21656,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/qualifizieren/status'):
             self._api_mail_qualifizieren_status()
 
+        elif self.path == '/api/mail/insights':
+            self._api_mail_insights()
+
         elif self.path.startswith('/api/mail/konto/health'):
             self._api_mail_konto_health()
 
@@ -24820,6 +24853,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json(get_recheck_progress())
         except Exception as e:
             self._json({'running': False, 'finished': True, 'error': str(e)})
+
+    def _api_mail_insights(self):
+        """GET /api/mail/insights — Mail-Klassifizierungs-Statistiken aus mail_index.db."""
+        try:
+            mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
+            mi_db.row_factory = sqlite3.Row
+            gesamt = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX'").fetchone()["c"]
+            klassifiziert = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != ''").fetchone()["c"]
+            kategorien = {}
+            for row in mi_db.execute("SELECT kategorie, COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != '' GROUP BY kategorie ORDER BY c DESC"):
+                kategorien[row["kategorie"]] = row["c"]
+            unklassifiziert = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX' AND (kategorie IS NULL OR kategorie = '')").fetchone()["c"]
+            mi_db.close()
+            self._json({
+                "gesamt": gesamt, "klassifiziert": klassifiziert,
+                "unklassifiziert": unklassifiziert,
+                "kategorien": kategorien,
+                "prozent": round(100 * klassifiziert / gesamt, 1) if gesamt > 0 else 0,
+            })
+        except Exception as e:
+            self._json({"error": str(e), "gesamt": 0, "klassifiziert": 0})
 
     def _api_mail_qualifizieren(self, body):
         """POST /api/mail/qualifizieren — Historische Mail-Qualifizierung starten."""
