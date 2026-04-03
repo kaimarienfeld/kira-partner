@@ -8652,11 +8652,24 @@ function esInfoPopup(btn, text) {{
               prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) \u00b7 Klassifiziert: '+p.klassifiziert+' \u00b7 Tasks: '+(p.tasks_erstellt||0)+' \u00b7 '+((p.aktuell||'').slice(0,50));
             }}
           }}
+          // Pause-Erkennung: Header-Chip + Toast + Fortsetzen-Button
+          const pauseChip=document.getElementById('llmPauseChip');
+          if(p.paused){{
+            if(pauseChip) pauseChip.style.display='';
+            if(prog) prog.innerHTML='\u26a0\ufe0f Pausiert: '+(p.pause_grund||'Unbekannt')+'<br><button class="btn btn-sm" style="margin-top:6px;background:#7c3aed;color:#fff" onclick="esQualFortsetzen()">Fortsetzen</button>';
+            if(bar) bar.style.background='#e84545';
+            clearInterval(timer);
+            if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
+            showToast('Qualifizierung pausiert: '+(p.pause_grund||'LLM nicht erreichbar'),'warnung');
+          }} else if(pauseChip){{
+            pauseChip.style.display='none';
+          }}
           if(p.finished||polls>7200){{
             clearInterval(timer);
             if(btn){{ btn.disabled=false; btn.textContent='Qualifizierung starten'; }}
-            if(bar) bar.style.width='100%';
+            if(bar){{ bar.style.width='100%'; bar.style.background=''; }}
             if(p.klassifiziert>0) showToast(p.klassifiziert+' Mails qualifiziert'+(p.tasks_erstellt>0?' \u00b7 '+p.tasks_erstellt+' Tasks erstellt':''),'ok');
+            if(pauseChip) pauseChip.style.display='none';
           }}
         }}).catch(()=>clearInterval(timer));
       }},3000);
@@ -8666,6 +8679,56 @@ function esInfoPopup(btn, text) {{
       if(barWrap) barWrap.style.display='none';
     }});
   }};
+
+  // Qualifizierung fortsetzen (nach Pause)
+  window.esQualFortsetzen = function() {{
+    const prog = document.getElementById('es-qual-progress');
+    const bar = document.getElementById('es-qual-bar');
+    const barWrap = document.getElementById('es-qual-bar-wrap');
+    if(prog) prog.textContent = 'Wird fortgesetzt\u2026';
+    if(bar){{ bar.style.background=''; bar.style.width='0%'; }}
+    if(barWrap) barWrap.style.display='';
+    fetch('/api/mail/qualifizieren/fortsetzen', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}}).then(r=>r.json()).then(d=>{{
+      if(!d.ok){{ showToast('Fehler: '+(d.error||'?'),'fehler'); return; }}
+      showToast('Qualifizierung wird fortgesetzt\u2026','ok');
+      const pauseChip=document.getElementById('llmPauseChip');
+      if(pauseChip) pauseChip.style.display='none';
+      // Polling starten
+      let polls=0;
+      const timer=setInterval(()=>{{
+        polls++;
+        fetch('/api/mail/qualifizieren/status').then(r=>r.json()).then(p=>{{
+          const pct=p.gesamt>0?Math.round(100*p.geprueft/p.gesamt):0;
+          if(bar) bar.style.width=pct+'%';
+          if(prog){{
+            if(p.paused){{
+              prog.innerHTML='\u26a0\ufe0f Erneut pausiert: '+(p.pause_grund||'')+'<br><button class="btn btn-sm" style="margin-top:6px;background:#7c3aed;color:#fff" onclick="esQualFortsetzen()">Fortsetzen</button>';
+              if(bar) bar.style.background='#e84545';
+              if(pauseChip) pauseChip.style.display='';
+              clearInterval(timer);
+            }} else if(p.finished){{
+              prog.textContent='Fertig: '+p.gesamt+' gepr\u00fcft \u00b7 '+p.klassifiziert+' klassifiziert \u00b7 '+(p.tasks_erstellt||0)+' Tasks';
+              if(bar){{ bar.style.width='100%'; bar.style.background=''; }}
+              if(pauseChip) pauseChip.style.display='none';
+              clearInterval(timer);
+              if(p.klassifiziert>0) showToast(p.klassifiziert+' Mails nachqualifiziert','ok');
+            }} else {{
+              prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) \u00b7 Klassifiziert: '+p.klassifiziert;
+            }}
+          }}
+          if(p.finished||polls>7200) clearInterval(timer);
+        }}).catch(()=>clearInterval(timer));
+      }},3000);
+    }}).catch(()=>showToast('Verbindungsfehler','fehler'));
+  }};
+
+  // Beim Laden: Pause-Status prüfen
+  (function(){{
+    fetch('/api/mail/qualifizieren/status').then(r=>r.json()).then(p=>{{
+      const chip=document.getElementById('llmPauseChip');
+      if(p.paused && chip) chip.style.display='';
+    }}).catch(()=>{{}});
+  }})();
 
   // Sync-Ordner laden (bestehende Funktion)
   function esLoadMailArchiv() {{
@@ -13852,6 +13915,7 @@ def generate_html() -> str:
       {'<div class="top-chip" style="background:#e84545;color:#fff;border-color:#c83030;font-weight:700" title="Urlaubsmodus aktiv — Push-Benachrichtigungen deaktiviert" onclick="esShowSec(\'benachrichtigungen\');showPanel(\'einstellungen\')">&#x1F3D6; Urlaub</div>' if ntfy_urlaub_modus else ''}
       <div class="top-chip kira-live-chip kira-live--idle" id="kiraLiveChip" onclick="kiraActivityDrawerOpen()" title="Kira-Status — klicken für Aktivitäten"><span id="kiraLiveIcon">&#x2705;</span> <span id="kiraLiveText">Kira bereit</span></div>
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
+      <div class="top-chip" id="llmPauseChip" style="display:none;background:#e84545;color:#fff;border-color:#c83030;font-weight:700;cursor:pointer" onclick="esShowSec('provider');showPanel('einstellungen')" title="LLM-Qualifizierung pausiert">&#x23F8; LLM pausiert</div>
       <div class="top-chip" id="mailApproveChip" onclick="pfKiraAusgangOpen()" title="Kira-Entwürfe warten auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
@@ -24803,6 +24867,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json({'running': False, 'finished': True, 'error': str(e)})
 
+    def _api_mail_qualifizieren_fortsetzen(self):
+        """POST /api/mail/qualifizieren/fortsetzen — Pausierte Qualifizierung fortsetzen."""
+        import threading as _threading, sys as _sys
+        if str(SCRIPTS_DIR) not in _sys.path:
+            _sys.path.insert(0, str(SCRIPTS_DIR))
+        try:
+            from daily_check import get_qualify_progress as _gqp
+            state = _gqp()
+            if not state.get('paused'):
+                self._json({'ok': False, 'error': 'Keine pausierte Qualifizierung vorhanden'})
+                return
+            if state.get('running'):
+                self._json({'ok': False, 'error': 'Qualifizierung läuft bereits'})
+                return
+            def _run():
+                try:
+                    from daily_check import resume_qualify_mails
+                    resume_qualify_mails()
+                except Exception as ex:
+                    import logging
+                    logging.getLogger('server').error(f'Qualifizierung-Fortsetzen-Fehler: {ex}')
+            _threading.Thread(target=_run, daemon=True).start()
+            self._json({'ok': True, 'status': 'fortgesetzt'})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
     def _api_mail_microsoft_app_test(self):
         """POST /api/mail/microsoft-app/test — Zentrale KIRA Entra App auf Erreichbarkeit testen."""
         try:
@@ -25340,6 +25430,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/qualifizieren':
             self._api_mail_qualifizieren(body)
+            return
+
+        if self.path == '/api/mail/qualifizieren/fortsetzen':
+            self._api_mail_qualifizieren_fortsetzen()
             return
 
         if self.path == '/api/mail/microsoft-app/test':

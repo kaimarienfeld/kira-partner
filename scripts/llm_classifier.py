@@ -636,6 +636,12 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         result = classify_direct(prompt, max_tokens=768)
 
         if result.get("error"):
+            if result.get("all_providers_failed"):
+                # ALLE Provider tot → Pause-Signal statt regelbasiertem Fallback
+                fb = _classify_rule_based(konto, absender, betreff, text, anhaenge, folder, is_sent)
+                fb["_llm_fallback"] = True
+                fb["_all_providers_failed"] = True
+                return fb
             raise RuntimeError(result["error"])
 
         antwort = result.get("antwort", "")

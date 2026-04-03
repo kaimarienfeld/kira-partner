@@ -509,13 +509,43 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
     return stats
 
 
-# ── Fortschritt für Qualifizierung (thread-safe dict) ───────────────────────
+# ── Fortschritt für Qualifizierung (persistent via JSON) ────────────────────
+_QUALIFY_STATE_FILE = KNOWLEDGE_DIR / "qualify_state.json"
+
 _qualify_progress: dict = {
-    "running": False, "finished": True,
+    "running": False, "finished": True, "paused": False,
     "gesamt": 0, "geprueft": 0, "klassifiziert": 0,
     "ignoriert": 0, "fehler": 0, "aktuell": "",
     "modus": "", "tasks_erstellt": 0,
+    "pause_grund": "", "letzte_message_id": "",
+    "seit_datum": "", "bis_datum": "",
 }
+
+# Beim Import: gespeicherten State laden (Crash-Recovery / Pause-Fortsetzen)
+try:
+    if _QUALIFY_STATE_FILE.exists():
+        _saved = json.loads(_QUALIFY_STATE_FILE.read_text("utf-8"))
+        # Nur relevante Felder übernehmen, nicht running=True (Crash)
+        for k in ("gesamt", "geprueft", "klassifiziert", "ignoriert", "fehler",
+                   "tasks_erstellt", "modus", "pause_grund", "letzte_message_id",
+                   "seit_datum", "bis_datum", "paused"):
+            if k in _saved:
+                _qualify_progress[k] = _saved[k]
+        if _saved.get("running") and not _saved.get("finished"):
+            _qualify_progress["paused"] = True
+            _qualify_progress["pause_grund"] = _saved.get("pause_grund") or "Abgebrochen (Crash/Neustart)"
+        _qualify_progress["running"] = False
+        _qualify_progress["finished"] = _saved.get("finished", True)
+except Exception:
+    pass
+
+def _save_qualify_state():
+    """Persist-State auf Disk (für Crash-Recovery + Pause-Fortsetzen)."""
+    try:
+        _QUALIFY_STATE_FILE.write_text(
+            json.dumps(_qualify_progress, ensure_ascii=False, indent=2), "utf-8")
+    except Exception:
+        pass
 
 def get_qualify_progress() -> dict:
     return dict(_qualify_progress)
@@ -545,11 +575,13 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
         bis_datum = datetime.now().strftime("%Y-%m-%d")
 
     _qualify_progress.update({
-        "running": True, "finished": False,
+        "running": True, "finished": False, "paused": False,
         "gesamt": 0, "geprueft": 0, "klassifiziert": 0,
         "ignoriert": 0, "fehler": 0, "tasks_erstellt": 0,
         "aktuell": "Initialisiere…", "modus": modus,
+        "pause_grund": "", "seit_datum": seit_datum, "bis_datum": bis_datum,
     })
+    _save_qualify_state()
 
     # Alle Mails im Zeitraum aus mail_index.db
     mail_db = sqlite3.connect(str(MAIL_INDEX_DB))
@@ -605,7 +637,7 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
         konto = m["konto_label"] or m["konto"] or ""
         an = m["an"] or ""
 
-        # Fortschritt
+        # Fortschritt (alle 10 Mails persistieren)
         if idx % 10 == 0:
             _qualify_progress.update({
                 "geprueft": stats["geprueft"],
@@ -613,7 +645,9 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
                 "ignoriert": stats["ignoriert"],
                 "tasks_erstellt": stats["tasks_erstellt"],
                 "aktuell": f"{betr[:55]} ({datum[:10]})",
+                "letzte_message_id": msgid,
             })
+            _save_qualify_state()
 
         # Text laden
         text = m["text_plain"] or ""
@@ -652,13 +686,33 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
         except Exception:
             pass
 
-        # Klassifizieren
+        # Klassifizieren — bei totalem LLM-Ausfall: PAUSE statt Fallback
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
                 anhaenge=anhaenge_list, folder=folder, is_sent=False,
                 mail_datum=datum, kanal="email",
             )
+            # Alle Provider gescheitert → SOFORT pausieren
+            if cl.get("_llm_fallback") and cl.get("_all_providers_failed"):
+                pause_msg = "Alle LLM-Provider nicht erreichbar — Guthaben leer oder Netzwerkfehler"
+                _qualify_progress.update({
+                    "running": False, "finished": False, "paused": True,
+                    "pause_grund": pause_msg,
+                    "letzte_message_id": msgid,
+                    "geprueft": stats["geprueft"],
+                    "klassifiziert": stats["klassifiziert"],
+                    "ignoriert": stats["ignoriert"],
+                    "fehler": stats["fehler"],
+                    "tasks_erstellt": stats["tasks_erstellt"],
+                    "aktuell": f"Pausiert: {pause_msg}",
+                })
+                _save_qualify_state()
+                _send_qualify_pause_push(pause_msg, stats)
+                mi_db.close()
+                if tasks_db:
+                    tasks_db.close()
+                return {**stats, "paused": True, "pause_grund": pause_msg}
         except Exception as e:
             stats["fehler"] += 1
             stats["geprueft"] += 1
@@ -719,12 +773,53 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
         tasks_db.close()
 
     _qualify_progress.update({
-        "running": False, "finished": True,
-        "aktuell": "Fertig",
+        "running": False, "finished": True, "paused": False,
+        "aktuell": "Fertig", "pause_grund": "",
         **{k: stats[k] for k in ("gesamt", "geprueft", "klassifiziert",
                                    "ignoriert", "fehler", "tasks_erstellt")},
     })
+    _save_qualify_state()
     return stats
+
+
+def _send_qualify_pause_push(grund: str, stats: dict):
+    """ntfy-Push wenn Qualifizierung pausiert (Guthaben leer etc.)."""
+    try:
+        cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8"))
+        ntfy_topic = cfg.get("benachrichtigungen", {}).get("ntfy_topic", "")
+        if not ntfy_topic:
+            return
+        import urllib.request
+        msg = (f"Qualifizierung PAUSIERT\n{grund}\n"
+               f"Fortschritt: {stats.get('klassifiziert', 0)}/{stats.get('gesamt', 0)} "
+               f"klassifiziert, {stats.get('fehler', 0)} Fehler")
+        req = urllib.request.Request(
+            f"https://ntfy.sh/{ntfy_topic}",
+            data=msg.encode(),
+            headers={"Title": "KIRA: Qualifizierung pausiert",
+                     "Priority": "high", "Tags": "warning"})
+        urllib.request.urlopen(req, timeout=8)
+    except Exception:
+        pass
+
+
+def resume_qualify_mails() -> dict:
+    """Setzt eine pausierte Qualifizierung fort (liest State aus qualify_state.json)."""
+    state = get_qualify_progress()
+    if not state.get("paused"):
+        return {"error": "Keine pausierte Qualifizierung vorhanden"}
+    if state.get("running"):
+        return {"error": "Qualifizierung läuft bereits"}
+
+    seit = state.get("seit_datum", "")
+    bis = state.get("bis_datum", "")
+    modus = state.get("modus", "nur_klassifizieren")
+    if not seit:
+        return {"error": "Kein seit_datum im gespeicherten State"}
+
+    # Fortsetzen: qualify_mails() filtert automatisch bereits klassifizierte Mails
+    # (WHERE kategorie IS NULL OR kategorie = '')
+    return qualify_mails(seit, bis, modus)
 
 
 # ── Angebot-Status Auto-Update ───────────────────────────────────────────────
