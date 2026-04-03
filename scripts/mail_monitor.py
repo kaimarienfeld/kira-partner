@@ -1283,9 +1283,10 @@ def _process_mail(mail_data, konto_label, folder_name):
     _absender_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
     _absender_email = _absender_email_m.group(1).lower() if _absender_email_m else absender.strip().lower()
     _kunden_email_resolved = _absender_email
-    _EIGENE = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com", "invoicefetcher.email"}
+    from mail_classifier import load_eigene_config as _lec
+    _eigene_emails_mm, _eigene_domains_mm = _lec()
     _abs_dom = _absender_email.split('@')[-1] if '@' in _absender_email else ''
-    if _abs_dom in _EIGENE:
+    if _abs_dom in _eigene_domains_mm:
         # Formular-Muster? E-Mail aus Body extrahieren
         _form_pat = re.compile(r'(Anfrage\s*\(Landing\)|Kontaktformular|neue\s+Anfrage)', re.IGNORECASE)
         if _form_pat.search(betreff or ""):
@@ -1294,11 +1295,11 @@ def _process_mail(mail_data, konto_label, folder_name):
             if _em_m:
                 _form_em = _em_m.group(1).lower()
                 _form_dom = _form_em.split('@')[-1]
-                if _form_dom not in _EIGENE:
+                if _form_dom not in _eigene_domains_mm:
                     _kunden_email_resolved = _form_em
 
-    # Eigene Domain → kein Task (Kopien eigener Mahnungen/Rechnungen etc.)
-    if _abs_dom in _EIGENE and _kunden_email_resolved == _absender_email:
+    # Kopie-Erkennung: Absender ist konfigurierte eigene E-Mail UND keine Formular-Mail → interne Kopie
+    if _absender_email in _eigene_emails_mm and _kunden_email_resolved == _absender_email:
         # Absender ist eigene Domain UND keine Formular-Email extrahiert → interne Kopie
         _index_mail(mail_data, konto_label, folder_name)
         return {"kategorie": "Abgeschlossen", "routing": "archivieren",

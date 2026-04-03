@@ -7682,6 +7682,33 @@ function esInfoPopup(btn, text) {{
     <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
   </div>
 
+  <!-- ── Eigene Domains / Kopie-Erkennung ── -->
+  <div class="es-grp">
+    <div class="es-grp-h">Eigene Domains &amp; Kopie-Erkennung</div>
+    <div class="es-grp-sub">
+      Mails von eigenen E-Mail-Adressen werden automatisch als <b>interne Kopie</b> erkannt und nicht als Aufgabe erstellt.<br>
+      <b>Automatisch erkannt</b> werden alle im Postfach konfigurierten Konten. Zus&auml;tzliche Domains (z.&thinsp;B. DATEV-Weiterleitung, Rechnungsdienste) k&ouml;nnen manuell erg&auml;nzt werden.
+    </div>
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-row-label" style="margin-bottom:6px"><span>Automatisch erkannte Konten &amp; Domains</span></div>
+      <div id="es-eigene-auto" style="display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 8px 0;min-height:28px;font-size:12px;color:var(--text-muted)">
+        <em>Lade...</em>
+      </div>
+    </div>
+    <div class="es-row" style="flex-direction:column;align-items:stretch;border-bottom:none">
+      <div class="es-row-label" style="margin-bottom:4px">
+        <span>Zus&auml;tzliche eigene Domains</span>
+        <span class="es-row-hint">Manuell hinzugef&uuml;gte Domains (z.&thinsp;B. invoicefetcher.email, datev-weiterleitung.de)</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="cfg-eigene-domain-neu" placeholder="domain.de"
+               style="flex:1;min-width:180px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text)">
+        <button class="es-mk-btn sec" onclick="esEigeneDomainAdd()">+ Hinzuf&uuml;gen</button>
+      </div>
+      <div id="es-eigene-extra" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 4px 0;min-height:24px"></div>
+    </div>
+  </div>
+
   <!-- ── Historische Qualifizierung ── -->
   <div class="es-grp">
     <div class="es-grp-h">Historische Mail-Qualifizierung</div>
@@ -8671,6 +8698,108 @@ function esInfoPopup(btn, text) {{
     }}).catch(()=>{{if(btn){{btn.disabled=false;btn.textContent='Re-Index starten';}}}});
   }};
 
+  // ── Eigene Domains ──────────────────────────────────────────────
+  window.esLoadEigeneDomains = function(cfgData) {{
+    const cp = cfgData.combined_postfach || {{}};
+    const konten = cp.konten || [];
+    const labels = cfgData.mail_konto_labels || {{}};
+    const mk = cfgData.mail_klassifizierung || {{}};
+    const extras = mk.eigene_domains_extra || [];
+
+    // Auto-erkannte E-Mails + Domains
+    const autoEmails = new Set();
+    konten.forEach(k => autoEmails.add(k.toLowerCase()));
+    Object.keys(labels).forEach(k => autoEmails.add(k.toLowerCase()));
+    const autoDomains = new Set();
+    autoEmails.forEach(em => {{
+      const p = em.split('@');
+      if(p.length>1) autoDomains.add(p[1]);
+    }});
+
+    const autoBox = document.getElementById('es-eigene-auto');
+    if(autoBox) {{
+      let html = '';
+      autoEmails.forEach(em => {{
+        html += '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg-raised);border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:12px">\\u2709 ' + em + '</span>';
+      }});
+      autoDomains.forEach(d => {{
+        html += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:2px 10px;font-size:12px;color:#7c3aed">\\u{1F310} ' + d + '</span>';
+      }});
+      if(!html) html = '<em>Keine Konten konfiguriert</em>';
+      autoBox.innerHTML = html;
+    }}
+
+    // Manuell hinzugef\\u00fcgte Extra-Domains
+    const extraBox = document.getElementById('es-eigene-extra');
+    if(extraBox) {{
+      _esRenderExtraDomains(extraBox, extras);
+    }}
+  }};
+
+  function _esRenderExtraDomains(box, extras) {{
+    if(!extras.length) {{ box.innerHTML='<span style="font-size:12px;color:var(--text-muted)">Keine zus\\u00e4tzlichen Domains</span>'; return; }}
+    box.innerHTML = extras.map(d =>
+      '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:12px;padding:2px 10px;font-size:12px">'
+      + d + ' <button onclick="esEigeneDomainRemove(\\'' + d + '\\')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0 2px" title="Entfernen">\\u00d7</button></span>'
+    ).join('');
+  }}
+
+  window.esEigeneDomainAdd = function() {{
+    const inp = document.getElementById('cfg-eigene-domain-neu');
+    if(!inp) return;
+    let val = inp.value.trim().toLowerCase();
+    if(!val) return;
+    // Domain normalisieren (@ entfernen falls jemand E-Mail eingibt)
+    if(val.includes('@')) val = val.split('@').pop();
+    if(!val.includes('.')) {{ showToast('Bitte eine g\\u00fcltige Domain eingeben (z.B. example.de)','warnung'); return; }}
+
+    fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{{
+      const mk = cfg.mail_klassifizierung || {{}};
+      const extras = mk.eigene_domains_extra || [];
+      if(extras.includes(val)) {{ showToast('Domain bereits vorhanden','warnung'); return; }}
+      extras.push(val);
+      mk.eigene_domains_extra = extras;
+      return fetch('/api/einstellungen', {{
+        method:'POST',
+        headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{mail_klassifizierung: mk}})
+      }});
+    }}).then(r=>{{if(r)return r.json()}}).then(d=>{{
+      if(d&&d.ok) {{
+        showToast('Domain ' + val + ' hinzugef\\u00fcgt','ok');
+        inp.value='';
+        // Extra-Chips neu rendern
+        fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{{
+          const box = document.getElementById('es-eigene-extra');
+          if(box) _esRenderExtraDomains(box, (cfg.mail_klassifizierung||{{}}).eigene_domains_extra||[]);
+        }});
+      }}
+    }}).catch(()=>showToast('Fehler beim Speichern','fehler'));
+  }};
+
+  window.esEigeneDomainRemove = function(domain) {{
+    fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{{
+      const mk = cfg.mail_klassifizierung || {{}};
+      const extras = (mk.eigene_domains_extra || []).filter(d => d !== domain);
+      mk.eigene_domains_extra = extras;
+      return fetch('/api/einstellungen', {{
+        method:'POST',
+        headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{mail_klassifizierung: mk}})
+      }});
+    }}).then(r=>{{if(r)return r.json()}}).then(d=>{{
+      if(d&&d.ok) {{
+        showToast('Domain ' + domain + ' entfernt','ok');
+        const box = document.getElementById('es-eigene-extra');
+        if(box) {{
+          fetch('/api/einstellungen').then(r=>r.json()).then(cfg=>{{
+            _esRenderExtraDomains(box, (cfg.mail_klassifizierung||{{}}).eigene_domains_extra||[]);
+          }});
+        }}
+      }}
+    }}).catch(()=>showToast('Fehler beim Speichern','fehler'));
+  }};
+
   window.esMailNachklassifizieren = function(btn) {{
     const seitEl = document.getElementById('es-recheck-seit');
     const seit = seitEl ? seitEl.value : '';
@@ -8932,6 +9061,8 @@ function esInfoPopup(btn, text) {{
       const lm=d.mail_postfach?.lese_markierung||'sofort';
       const lmSel=document.getElementById('cfg-lese-markierung');
       if(lmSel) lmSel.value=lm;
+      // ── Eigene Domains laden ──
+      esLoadEigeneDomains(d);
     }}).catch(()=>{{}});
     // Archiv laden
     fetch('/api/mail/archiv/status').then(r=>r.json()).then(d=>{{
@@ -17435,7 +17566,8 @@ function saveSettings() {{
     mail_klassifizierung: {{
       classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
       auto_tasks:         document.getElementById('cfg-mail-tasks')?.checked ?? false,
-      ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false
+      ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false,
+      eigene_domains_extra: undefined  // wird separat verwaltet, nicht überschreiben
     }},
     mail_archiv: {{
       pfad:                         document.getElementById('cfg-archiv-pfad')?.disabled ? undefined : (document.getElementById('cfg-archiv-pfad')?.value.trim() || ''),

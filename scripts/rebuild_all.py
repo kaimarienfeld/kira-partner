@@ -24,8 +24,11 @@ SENT_DB   = KNOWLEDGE_DIR / "sent_mails.db"
 DAYS_TASKS  = 30   # Tasks fuer die letzten N Tage
 DAYS_GESCH  = 180  # Geschaeftsdaten fuer die letzten N Tage
 
-EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com",
-                  "invoicefetcher.email"}  # DATEV-Weiterleitung
+# Eigene Domains: dynamisch aus config.json
+from mail_classifier import load_eigene_config as _load_eigene_config
+def _eigene_domains_rb():
+    _, domains = _load_eigene_config()
+    return domains
 
 # ======================================================================
 # 1. DATENBANK-SCHEMA
@@ -403,7 +406,7 @@ def classify_and_build(db, since_tasks: str, since_gesch: str, sent_index: dict)
         # Eigene-Domain-Mails ignorieren
         if k_email:
             dom = k_email.split('@')[-1] if '@' in k_email else ''
-            if dom in EIGENE_DOMAINS:
+            if dom in _eigene_domains_rb():
                 continue
 
         # Klassifizieren

@@ -50,8 +50,18 @@ KONTO_LABEL = (
         "kaimrf@rauMKultSichtbeton.onmicrosoft.com":"intern",
     }
 )
-EIGENE_DOMAINS = {"raumkult.eu","sichtbeton-cire.de","raumkultsichtbeton.onmicrosoft.com",
-                  "invoicefetcher.email"}  # DATEV-Weiterleitung
+# Eigene Domains: dynamisch aus config.json (load_eigene_config)
+from mail_classifier import load_eigene_config as _load_eigene_config
+
+def _eigene_domains():
+    """Gibt eigene Domains zurück (aus config.json, 60s Cache)."""
+    _, domains = _load_eigene_config()
+    return domains
+
+def _eigene_emails():
+    """Gibt eigene E-Mail-Adressen zurück (aus config.json, 60s Cache)."""
+    emails, _ = _load_eigene_config()
+    return emails
 
 # Generische Domains — kein cross-domain-Match sinnvoll
 _GENERIC_SENT_DOMAINS = {
@@ -126,7 +136,7 @@ def get_kunden_email(absender, an, folder):
     m = re.search(r'<([^>]+@[^>]+)>',q)
     email = m.group(1).lower() if m else q.lower()
     domain = email.split('@')[-1] if '@' in email else ''
-    return None if domain in EIGENE_DOMAINS else email.strip()
+    return None if domain in _eigene_domains() else email.strip()
 
 
 # ── Formular-Mail Kunden-Extraktion ─────────────────────────────────────────
@@ -152,7 +162,7 @@ def extract_form_customer_email(betreff: str, text: str) -> str | None:
     email = em_match.group(1).lower().strip()
     domain = email.split('@')[-1] if '@' in email else ''
     # Nur zurückgeben wenn es KEIN eigener Test ist
-    if domain in EIGENE_DOMAINS:
+    if domain in _eigene_domains():
         return None
     return email
 
@@ -335,14 +345,14 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
 
         # Eigene Domain überspringen
         dom = k_email.split('@')[-1] if '@' in k_email else ''
-        if dom in EIGENE_DOMAINS:
+        if dom in _eigene_domains():
             stats["ignoriert"] += 1
             stats["geprueft"] += 1
             continue
 
         # DATEV-Weiterleitungs-Duplikat-Filter
         absnd_dom = absnd.split('@')[-1].lower() if '@' in absnd else ''
-        if absnd_dom in EIGENE_DOMAINS:
+        if absnd_dom in _eigene_domains():
             anhaenge_pfad = m["anhaenge_pfad"] or ""
             dup = _check_datev_duplicate(betr, text, anhaenge_pfad, konto, tasks_db)
             if dup['action'] == 'skip':
@@ -680,7 +690,7 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
 
         # Eigene Domain → als "Shop / System" markieren
         dom = k_email.split('@')[-1] if '@' in k_email else ''
-        if dom in EIGENE_DOMAINS:
+        if dom in _eigene_domains():
             try:
                 mi_db.execute(
                     "UPDATE mails SET kategorie='Shop / System' WHERE message_id=? AND (kategorie IS NULL OR kategorie='')",
@@ -1171,12 +1181,12 @@ def process_new_mails(new_mails, stats):
 
         # Eigene Domain überspringen (Kunde = eigene Adresse)
         dom = k_email.split('@')[-1] if '@' in k_email else ''
-        if dom in EIGENE_DOMAINS: continue
+        if dom in _eigene_domains(): continue
 
         # DATEV/Weiterleitungs-Filter: Absender ist eigene Adresse (internes Routing)
         # → prüft Body-Ähnlichkeit + Anhang-Dateinamen gegen vorhandene Tasks
         absnd_dom = absnd.split('@')[-1].lower() if '@' in absnd else ''
-        if absnd_dom in EIGENE_DOMAINS:
+        if absnd_dom in _eigene_domains():
             dup = _check_datev_duplicate(
                 betr, text, m.get('anhaenge_pfad', ''), konto, tasks_db
             )

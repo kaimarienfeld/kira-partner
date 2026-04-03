@@ -208,6 +208,58 @@ def _load_eigene_keywords():
         pass
     return []
 
+
+# ======================================================================
+# 4c. EIGENE DOMAINS + ADRESSEN (aus config.json, dynamisch)
+# ======================================================================
+_eigene_cache = {"ts": 0, "emails": set(), "domains": set()}
+
+def load_eigene_config():
+    """
+    Lädt eigene E-Mail-Adressen und Domains aus config.json.
+    Quellen:
+      1. combined_postfach.konten → konfigurierte Konten-Adressen
+      2. mail_klassifizierung.eigene_domains_extra → manuelle Zusatz-Domains
+    Gibt zurück: (eigene_emails: set, eigene_domains: set)
+    Cache: 60 Sekunden
+    """
+    import json, time
+    from pathlib import Path
+    now = time.time()
+    if now - _eigene_cache["ts"] < 60 and _eigene_cache["emails"]:
+        return _eigene_cache["emails"], _eigene_cache["domains"]
+    try:
+        cfg_path = Path(__file__).parent / "config.json"
+        cfg = json.loads(cfg_path.read_text("utf-8", errors="replace"))
+
+        # 1. Konfigurierte E-Mail-Konten
+        konten = cfg.get("combined_postfach", {}).get("konten", [])
+        # Auch aus mail_konto_labels (falls konten leer)
+        labels = cfg.get("mail_konto_labels", {})
+        alle_emails = set()
+        for k in konten:
+            alle_emails.add(k.lower().strip())
+        for k in labels:
+            alle_emails.add(k.lower().strip())
+
+        # 2. Domains aus Adressen ableiten
+        domains = set()
+        for em in alle_emails:
+            if '@' in em:
+                domains.add(em.split('@')[-1].lower())
+
+        # 3. Zusätzliche manuelle Domains
+        mk = cfg.get("mail_klassifizierung", {})
+        extras = mk.get("eigene_domains_extra", [])
+        for d in extras:
+            domains.add(d.lower().strip())
+
+        _eigene_cache.update({"ts": now, "emails": alle_emails, "domains": domains})
+        return alle_emails, domains
+    except Exception:
+        # Fallback: leere Sets (kein Hardcoding!)
+        return set(), set()
+
 # ======================================================================
 # 5. RECHNUNGS-KEYWORDS
 # ======================================================================
@@ -397,9 +449,9 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   prio)
 
     # ── 2. System-Absender (Prompt 01 § 7) ──
-    # Eigene Domains → immer archivieren (Kopien eigener Mahnungen/Rechnungen)
-    _EIGENE_DOMAINS_CL = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com", "invoicefetcher.email"}
-    if domain in _EIGENE_DOMAINS_CL:
+    # Eigene Domains → Kopie-Erkennung (Absender = konfigurierte eigene Adresse → archivieren)
+    _eigene_emails, _eigene_domains = load_eigene_config()
+    if email in _eigene_emails:
         return _r("Abgeschlossen", "Intern", betreff, False,
                   "Interne Kopie — kein Handlungsbedarf", f"Eigene Domain {domain}", "niedrig",
                   routing="archivieren", erfordert_handlung=False)

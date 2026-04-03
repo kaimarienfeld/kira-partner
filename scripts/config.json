@@ -17,13 +17,13 @@
     "urlaub_autoreply_text": "Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rueckkehr bei Ihnen melden."
   },
   "email_notification": {
-    "aktiv": false,
+    "aktiv": true,
     "_anleitung": "SMTP-Zugangsdaten eintragen. Für Gmail: smtp_server=smtp.gmail.com, port=587, App-Passwort verwenden",
-    "smtp_server": "",
-    "smtp_port": 587,
-    "absender_email": "",
-    "absender_passwort": "",
-    "empfaenger_email": ""
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 465,
+    "absender_email": "kaimrf@gmail.com",
+    "absender_passwort": "@BjTJF&P&54Kg@7R",
+    "empfaenger_email": "kaimrf@gmail.com"
   },
   "aufgaben": {
     "unanswered_check_days": 3,
@@ -55,14 +55,14 @@
     "_kommentar": "0 = niemals löschen. Aktivitätsprotokoll (aktivitaeten-Tabelle in tasks.db). change_log.jsonl ist davon unabhängig und wird nie automatisch bereinigt."
   },
   "mail_monitor": {
-    "aktiv": false,
-    "intervall_sekunden": 300,
+    "aktiv": true,
+    "intervall_sekunden": 900,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
   "mail_archiv": {
     "_pflicht": true,
     "_erklaerung": "KIRA benötigt ein lokales Archiv für vollständigen LLM-Kontext. IMAP zeigt nur aktuelle Mails — alle Aufgaben, Antworten und Anhänge liest Kira aus dem lokalen Archiv. Bei Software-Export ist der Archiv-Ordner deine exportierbare Datenbasis.",
-    "pfad": "",
+    "pfad": "C:/Users/kaimr/OneDrive - rauMKult Sichtbeton/0001_APPS_rauMKult/Mail Archiv/Archiv",
     "anhaenge_unterordner": "attachments",
     "neue_mails_archivieren": false,
     "_neue_mails_erklaerung": "Neue Mails die per IMAP empfangen werden, werden automatisch als JSON+EML im Archiv gespeichert",
@@ -115,12 +115,20 @@
     "auto_wissen_extrahieren": true,
     "providers": [
       {
+        "id": "anthropic-2-1775137804",
+        "typ": "anthropic",
+        "name": "kira",
+        "model": "claude-sonnet-4-6",
+        "aktiv": true,
+        "prioritaet": 1
+      },
+      {
         "id": "openai-1-1774455440",
         "typ": "openai",
         "name": "KIRA Assiztenz Open AI",
         "model": "gpt-4o-mini",
         "aktiv": true,
-        "prioritaet": 1
+        "prioritaet": 2
       }
     ],
     "antwort_laenge": "normal",
@@ -209,13 +217,15 @@
     }
   },
   "mail_klassifizierung": {
-    "classify": false,
-    "auto_tasks": false,
-    "ignore_newsletter": false
+    "classify": true,
+    "auto_tasks": true,
+    "ignore_newsletter": false,
+    "eigene_keywords": [],
+    "eigene_domains_extra": ["invoicefetcher.email"]
   },
   "mail_postfach": {
-    "refresh_intervall_min": 0,
-    "lese_markierung": "sofort"
+    "refresh_intervall_min": 2,
+    "lese_markierung": "manuell"
   },
   "mail_konto_labels": {
     "kaimrf@rauMKultSichtbeton.onmicrosoft.com": "rauMKult Microsoft",
@@ -252,7 +262,7 @@
     "mahnung_eskalation_tage": 14,
     "konfidenz_stufe_a": 0.85,
     "konfidenz_stufe_b": 0.6,
-    "morgen_briefing_aktiv": false,
+    "morgen_briefing_aktiv": true,
     "morgen_briefing_uhrzeit": "07:00"
   },
   "backup": {
@@ -269,5 +279,11 @@
     "upload_size_mb": 10,
     "session_duration_hours": 24,
     "mobile_access": true
-  }
+  },
+  "cloudflare_tunnel": {
+    "public_url": ""
+  },
+  "firma_name": "rauMKult Sichtbeton",
+  "firma_branche": "Betonkosmetik / Sichtbeton-Fachbetrieb",
+  "firma_beschreibung": "Fachbetrieb fuer Betonkosmetik, Sichtbeton-Retusche, Betonsanierung und Oberflaechen-Beschichtung. Privatkunden >80%, Architekten, Planer. Projektvolumen 2.000-15.000 EUR."
 }
