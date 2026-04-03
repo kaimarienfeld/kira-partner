@@ -6723,6 +6723,19 @@ function esInfoPopup(btn, text) {{
   </div>
 
   <div class="es-grp">
+    <div class="es-grp-h">Schlie&szlig;en-Warnung</div>
+    <div class="es-grp-sub">Browser-Warnung beim Schlie&szlig;en des KIRA-Tabs.</div>
+    <div class="es-row">
+      <div class="es-rl">Generelle Schlie&szlig;en-Warnung<div class="es-rd">Fragt nach Bestätigung wenn der KIRA-Tab geschlossen wird. Bei laufenden Jobs wird immer gewarnt.</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-close-warn"
+               onchange="localStorage.setItem('kira-close-warn', this.checked ? 'true' : 'false')">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="es-grp">
     <div class="es-grp-h">E-Mail-Benachrichtigungen (SMTP)</div>
     <div class="es-grp-sub">Systembenachrichtigungen per E-Mail senden (z.B. bei Fehlern oder t&auml;glichen Reports). F&uuml;r Gmail: App-Passwort unter myaccount.google.com/security verwenden.</div>
     <div class="es-row">
@@ -18913,7 +18926,24 @@ setInterval(checkMonitorStatus, 30000);
 setTimeout(checkMonitorStatus, 2000);
 
 // Server-Shutdown Bestätigung beim Tab-Schließen
-// Kein beforeunload-Dialog mehr — Server läuft im Hintergrund weiter
+// beforeunload-Warnung: bei laufendem Job IMMER, generell wenn einstellbar
+window.addEventListener('beforeunload', function(e) {{
+  // Bei laufender Qualifizierung: immer warnen
+  if(_qualPollTimer) {{
+    e.preventDefault();
+    e.returnValue = 'Qualifizierung läuft noch. Wirklich schließen? Der Prozess läuft im Hintergrund weiter.';
+    return e.returnValue;
+  }}
+  // Generelle KIRA-Schließ-Warnung (einstellbar)
+  try {{
+    var cfg = localStorage.getItem('kira-close-warn');
+    if(cfg === 'true') {{
+      e.preventDefault();
+      e.returnValue = 'Wirklich KIRA schließen? Sie arbeitet dann nicht mehr aktiv.';
+      return e.returnValue;
+    }}
+  }} catch(ex) {{}}
+}});
 
 // Server stoppen wenn Fenster geschlossen wird (optional über Button)
 function shutdownServer() {{
@@ -19335,6 +19365,8 @@ document.addEventListener('keydown',e=>{{
 // Restore active tab + design on load
 (function(){{
   restoreDesign();
+  // Schließen-Warnung Toggle restaurieren
+  try {{ var cw=document.getElementById('cfg-close-warn'); if(cw) cw.checked=localStorage.getItem('kira-close-warn')==='true'; }} catch(e){{}}
   const tab = localStorage.getItem('kira_active_tab');
   if(tab && tab !== 'dashboard') showPanel(tab);
   setTimeout(loadDashKalender, 800);
