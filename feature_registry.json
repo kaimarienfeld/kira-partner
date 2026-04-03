@@ -897,7 +897,21 @@
       "session": "session-aaaa",
       "description": "Skonto-Prozent, Betrag, Frist, Aktiv/Abgelaufen, gezogen Ja/Nein, berechtigt Ja/Nein, Kira-Rueckforderungs-Button im BETRAEGE-Block",
       "leni_visible": false
+    },
+    {
+      "id": "dokumente-modul",
+      "name": "Dokumente-Modul (Eingang, Studio, Vorlagen, Export)",
+      "icon": "📄",
+      "leni_name": "Dokumente-Management",
+      "leni_desc": "Dokumente hochladen, automatisch erkennen und zuordnen. Eigene Dokumente im Studio erstellen, als PDF/Word exportieren, drucken. Vorlagen mit Platzhaltern für wiederkehrende Schreiben.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "dokument_storage.py + dokument_pipeline.py + server.py + kira_llm.py",
+      "status": "done",
+      "session": "session-eeee",
+      "last_updated": "2026-04-03",
+      "description": "Vollständiges Dokumenten-Modul: dokument_storage.py (DB-CRUD, Vorlagen, Briefköpfe, Hash-Dedup), dokument_pipeline.py (OCR, LLM-Klassifizierung, Routing, Folder-Watcher, PDF/DOCX-Export), 3 Kira-Tools, Sidebar+Panel+Studio-Overlay+Preview, 20 API-Endpoints, Einstellungen-Sektion, config.json dokumente-Sektion."
     }
   ],
-  "_total": 68
+  "_total": 69
 }

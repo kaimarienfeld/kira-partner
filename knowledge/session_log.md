@@ -1017,3 +1017,34 @@
 ### 2026-04-03 00:30 — Gesamtergebnis Nachtlauf
 **ENDERGEBNIS:** 11.652 / 12.071 INBOX-Mails klassifiziert (96,5%). 1.158 geschäftsrelevante Mails (Leads/Antwort/Angebote) als Kundenprofil-Daten gespeichert. Rate-Limit-Warnungen am Ende beider Phasen (Fallback auf Regeln, kein Datenverlust).
 **Status:** erledigt — Session-www komplett abgeschlossen
+
+---
+
+## 2026-04-03 22:15 — Session-eeee-dokumente — Session-Start
+**Auftrag:** Nachtmodus — Arbeitsanweisung Dokumente-Modul (Plan_Dokumente_Modul/Arbeitsanweisung_Dokumente_ClaudeCode_mit_Einleitung_v2.md) vollständig umsetzen (Phase A-D). Danach Commit, Checklisten aktualisieren, PC herunterfahren.
+**Status:** offen
+
+### 2026-04-03 22:30 — Phase 1: Planung + Recherche
+**Erledigt:** 7 Plan-Dateien erstellt (Masterplan, Gap-Analyse, Stack-Recherche, Checkliste, UI-Plan, Vorlagen-Plan, Runtime-Log-Plan). Internet-Recherche zu Quill/weasyprint/docxtpl/mammoth/watchdog.
+**Status:** erledigt
+
+### 2026-04-03 22:45 — Phase A: Backend-Fundament
+**Erledigt:** dokument_storage.py (~350 Zeilen) — DB-Tabellen (dokumente/vorlagen/briefköpfe), CRUD-API, Hash-Dedup. dokument_pipeline.py (~400 Zeilen) — Text-Extraktion, OCR, LLM-Klassifizierung + Rule-Fallback, Routing, 8-Schritt-Pipeline, Folder-Watcher, Export (PDF/DOCX). config.json dokumente-Sektion (16 Einstellungen).
+**Status:** erledigt
+
+### 2026-04-03 23:00 — Phase B: Kira-Integration
+**Erledigt:** kira_llm.py: 3 neue Tools (dokument_suchen/erstellen/zuordnen) + DOKUMENTE-Kontext in _build_data_context().
+**Status:** erledigt
+
+### 2026-04-03 23:15 — Phase C: Studio + Export
+**Erledigt:** In dokument_pipeline.py: export_pdf() (weasyprint), export_docx_from_template() (docxtpl), export_docx_from_html() (python-docx). Studio-UI in server.py (Quill-Editor, Variablen-Insert, Vorlagen-Load/Save).
+**Status:** erledigt
+
+### 2026-04-03 23:30 — Phase D: UI + Frontend
+**Erledigt:** server.py: Sidebar-Eintrag mit Badge, Dokumente-Panel (3-Spalten-Layout, Status-Cards, Drop-Zone, Dokument-Liste), Studio-Overlay, Preview-Overlay, ~350 Zeilen JS (dokLoadList/Filter/Upload/Reclassify/Archive/Delete/Studio/Export), 20 API-Endpoints (10 GET + 10 POST), Einstellungen-Sektion (Modul-Status/OCR/Klassifizierung/Kira-Regeln), saveSettings() dokumente-Block, CSS-Klassen (.dok-nav-item/.dok-status-card/.dok-list-item/.dok-drop-zone).
+**Status:** erledigt
+
+### 2026-04-03 23:45 — Session-Ende
+**Erledigt:** Dokumente-Modul Phase A-D komplett. Commit 49fa685. Tracking aktualisiert.
+**Offen geblieben:** Phase E (Folder-Watcher starten, Vorlagen-Bibliothek importieren, Playwright-Test) — bewusst ausgeklammert, nicht in Arbeitsanweisung als Pflicht markiert. Pip-Pakete (weasyprint, docxtpl, python-docx, mammoth, pytesseract, watchdog) müssen noch installiert werden.
+**Status:** erledigt

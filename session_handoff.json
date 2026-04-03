@@ -1,6 +1,6 @@
 {
-  "last_session": "session-dddd-widgets",
-  "date": "2026-04-03 13:30",
+  "last_session": "session-eeee-dokumente",
+  "date": "2026-04-03 23:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -254,7 +254,8 @@
     "feed-widgets-newsletter-digest-kira-llm",
     "feed-widgets-api-endpoint-dashboard-widgets",
     "feed-widgets-einstellungen-ui-config",
-    "feed-widgets-race-condition-fix"
+    "feed-widgets-race-condition-fix",
+    "session-eeee-dokumente (2026-04-03): Dokumente-Modul komplett implementiert (Phase A-D). (1) dokument_storage.py NEU (~350 Zeilen): SQLite-Tabellen dokumente (26 Spalten), dokument_vorlagen (13), dokument_briefkoepfe (13). Vollständige CRUD-API: store_file(), create_dokument(), list/get/update/delete, Vorlagen+Briefköpfe, Hash-Deduplizierung. (2) dokument_pipeline.py NEU (~400 Zeilen): Text-Extraktion (PDF/DOCX/Bilder), OCR via pytesseract, LLM-Klassifizierung + Rule-Based-Fallback, Routing-Layer (6 Ziele), 8-Schritt-Pipeline process_file(), Folder-Watcher (watchdog), Export PDF (weasyprint) + DOCX (docxtpl/python-docx). (3) kira_llm.py: 3 neue Tools (dokument_suchen/erstellen/zuordnen), DOKUMENTE-Kontext-Sektion. (4) server.py: Sidebar-Eintrag mit Badge, Dokumente-Panel (3-Spalten, Status-Cards, Drop-Zone), Studio-Overlay (Quill-Editor, Vorlagen-Variablen), Preview-Overlay, ~350 Zeilen JS (dokLoadList/dokFilter/dokUpload/dokReclassify/dokArchive/dokDelete/Studio/Export), 20 API-Endpoints (10 GET + 10 POST), Einstellungen-Sektion (Modul-Status/OCR/Klassifizierung/Kira-Regeln), saveSettings() dokumente-Block, CSS-Klassen. (5) config.json: dokumente-Sektion (16 Einstellungen). (6) 7 Plan-Dateien: Masterplan, Gap-Analyse, Stack-Recherche, Checkliste, UI-Plan, Vorlagen-Plan, Runtime-Log-Plan. Commit 49fa685."
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
