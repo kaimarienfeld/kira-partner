@@ -20115,78 +20115,83 @@ window.onerror = function(msg, src, line, col, err) {{
   document.title = document.title.replace(' \u2013 ', ' \u2713 \u2013 ');
 }})();
 
-/* ── Vorgang-Signal-Polling (Paket 8, session-nn) ── */
+/* ── Vorgang-Signal-Polling (Paket 8, session-nn / Redesign session-dddd) ── */
 (function() {{
   'use strict';
 
-  // Inject CSS für Toast + Modal
-  const _css = document.createElement('style');
-  _css.textContent = [
-    '#_vg-toast-container{{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}}',
-    '.vg-toast{{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#333);border-left:4px solid #f59e0b;border-radius:8px;padding:14px 16px;min-width:280px;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:all;cursor:pointer}}',
-    '.vg-toast.stufe-c{{border-left-color:#ef4444}}',
-    '.vg-toast-title{{font-size:12px;font-weight:600;opacity:.65;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}}',
-    '.vg-toast-body{{font-size:13px;line-height:1.4}}',
-    '.vg-toast-close{{float:right;opacity:.4;cursor:pointer;font-size:16px;line-height:1;margin:-2px -4px 0 8px}}',
-    '.vg-toast-close:hover{{opacity:.9}}',
-    '#_vg-modal-overlay{{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center}}',
-    '#_vg-modal{{background:var(--card-bg,#1e1e1e);color:var(--text,#e0e0e0);border:1px solid var(--border,#444);border-top:4px solid #ef4444;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)}}',
-    '#_vg-modal h3{{margin:0 0 8px;font-size:17px}}',
-    '#_vg-modal p{{margin:0 0 20px;font-size:14px;opacity:.8;line-height:1.5;white-space:pre-wrap}}',
-    '#_vg-modal .modal-btns{{display:flex;gap:10px;justify-content:flex-end}}',
-    '#_vg-modal button{{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600}}',
-    '#_vg-modal .btn-ok{{background:#ef4444;color:#fff}}',
-    '#_vg-modal .btn-snooze{{background:var(--btn-bg,#2a2a2a);color:var(--text,#e0e0e0);border:1px solid var(--border,#444)}}'
-  ].join('\\n');
-  document.head.appendChild(_css);
-
-  const _tc = document.createElement('div');
-  _tc.id = '_vg-toast-container';
-  document.body.appendChild(_tc);
-
   var _shownSignals = {{}};
-  var _modalOpen = false;
 
   function _markGelesen(sid, aktion) {{
     fetch('/api/vorgang/signal/gelesen', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{signal_id:sid,aktion:aktion}})}}).catch(function(){{}});
   }}
 
-  function _showToast(sig) {{
-    var t = document.createElement('div');
-    t.className = 'vg-toast' + (sig.stufe === 'C' ? ' stufe-c' : '');
-    t.innerHTML = '<span class="vg-toast-close">&#10005;</span><div class="vg-toast-title">Vorgang ' +
-      (sig.stufe === 'C' ? '&#9888; Aktion' : '&#9432; Hinweis') + '</div><div class="vg-toast-body">' +
-      sig.titel + '</div>';
-    _tc.appendChild(t);
-    t.querySelector('.vg-toast-close').onclick = function(e) {{ e.stopPropagation(); _markGelesen(sig.id,'geschlossen'); t.remove(); }};
-    t.onclick = function() {{ _markGelesen(sig.id,'geklickt'); t.remove(); }};
-    setTimeout(function() {{ if(t.parentNode) {{ _markGelesen(sig.id,'auto_timeout'); t.remove(); }} }}, 12000);
+  /* Gruppierter Toast für Stufe-B Signale */
+  function _showGroupedToast(signals) {{
+    if(!signals.length) return;
+    var n = signals.length;
+    var titel = n === 1 ? signals[0].titel : n + ' Hinweise';
+    var body = n === 1 ? (signals[0].nachricht||signals[0].titel) :
+      signals.map(function(s){{ return '\u2022 ' + s.titel; }}).join('\\n');
+    showToast(titel + (n>1?'\\n'+body:''), 'info', 8000);
+    signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
   }}
 
-  function _showModal(sig) {{
-    if(_modalOpen) return;
-    _modalOpen = true;
-    var ov = document.createElement('div');
-    ov.id = '_vg-modal-overlay';
-    ov.innerHTML = '<div id="_vg-modal"><h3>&#9888; ' + sig.titel + '</h3><p>' +
-      (sig.nachricht||'') + '</p><div class="modal-btns">' +
-      '<button class="btn-snooze" id="_vgSnooze">Sp\u00e4ter</button>' +
-      '<button class="btn-ok" id="_vgOk">Verstanden</button></div></div>';
-    document.body.appendChild(ov);
-    ov.querySelector('#_vgOk').onclick = function() {{ _markGelesen(sig.id,'bestaetigt'); ov.remove(); _modalOpen=false; }};
-    ov.querySelector('#_vgSnooze').onclick = function() {{ _markGelesen(sig.id,'snoozed'); ov.remove(); _modalOpen=false; }};
+  /* Stufe-C: Activity-Drawer öffnen mit Signalen als eigener Sektion */
+  function _showSignalsInDrawer(signals) {{
+    if(!signals.length) return;
+    // Markiere als gesehen
+    signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
+    // Drawer öffnen
+    if(typeof kiraActivityDrawerOpen === 'function') kiraActivityDrawerOpen();
+    // Warte bis Drawer geladen, dann Signale-Sektion oben einfügen
+    setTimeout(function() {{
+      var body = document.getElementById('kiraDrawerBody');
+      if(!body) return;
+      var existing = document.getElementById('_vg-signal-section');
+      if(existing) existing.remove();
+      var sec = document.createElement('div');
+      sec.id = '_vg-signal-section';
+      sec.className = 'kira-drawer-section';
+      sec.style.cssText = 'border-left:3px solid #ef4444;background:rgba(239,68,68,.06);border-radius:8px;margin-bottom:12px;padding:12px 14px';
+      var html = '<div class="kira-drawer-section-title" style="color:#ef4444">&#9888;&#65039; Aktion erforderlich (' + signals.length + ')</div>';
+      signals.forEach(function(sig) {{
+        html += '<div class="kira-drawer-item" style="margin:8px 0">';
+        html += '<div class="kira-drawer-item-icon">&#128308;</div>';
+        html += '<div class="kira-drawer-item-body">';
+        html += '<div class="kira-drawer-item-title">' + (sig.titel||'Signal') + '</div>';
+        if(sig.nachricht) html += '<div class="kira-drawer-item-sub" style="white-space:pre-wrap">' + sig.nachricht + '</div>';
+        html += '<div style="display:flex;gap:8px;margin-top:6px">';
+        html += '<span class="kira-drawer-item-action" data-sid="'+sig.id+'" onclick="this.closest(\\'.kira-drawer-item\\').style.opacity=\\'0.4\\';this.textContent=\\'Bestätigt\\'">Verstanden</span>';
+        html += '<span class="kira-drawer-item-action" style="opacity:.6" data-sid="'+sig.id+'" onclick="this.closest(\\'.kira-drawer-item\\').style.opacity=\\'0.4\\';this.textContent=\\'Verschoben\\'">Später</span>';
+        html += '</div></div></div>';
+      }});
+      sec.innerHTML = html;
+      // Aktionsbuttons verdrahten
+      sec.querySelectorAll('[data-sid]').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          var sid = parseInt(btn.dataset.sid);
+          var aktion = btn.textContent.trim() === 'Verstanden' ? 'bestaetigt' : 'snoozed';
+          _markGelesen(sid, aktion);
+        }});
+      }});
+      body.insertBefore(sec, body.firstChild);
+    }}, 400);
   }}
 
   function _pollSignals() {{
-    fetch('/api/vorgang/signals?limit=5').then(function(r) {{
+    fetch('/api/vorgang/signals?limit=10').then(function(r) {{
       return r.ok ? r.json() : null;
     }}).then(function(d) {{
       if(!d) return;
+      var newB = [], newC = [];
       (d.signals||[]).forEach(function(sig) {{
         if(_shownSignals[sig.id]) return;
         _shownSignals[sig.id] = true;
-        if(sig.stufe === 'C') _showModal(sig); else _showToast(sig);
+        if(sig.stufe === 'C') newC.push(sig); else newB.push(sig);
       }});
+      // Gruppiert anzeigen
+      if(newC.length) _showSignalsInDrawer(newC);
+      if(newB.length) _showGroupedToast(newB);
     }}).catch(function(){{}});
   }}
 
