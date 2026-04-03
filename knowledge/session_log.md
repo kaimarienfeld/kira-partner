@@ -971,5 +971,18 @@
 **Status:** erledigt
 
 ### 2026-04-02 23:45 — Nachtlauf Phase 1 gestartet
-**Gestartet:** qualify_mails('2021-01-01', '2025-12-31', modus='nur_klassifizieren') — 11.334 INBOX-Mails, läuft im Hintergrund.
-**Status:** offen — wartet auf Abschluss
+**Gestartet:** qualify_mails('2021-01-01', '2025-12-31', modus='nur_klassifizieren') — 11.334 INBOX-Mails.
+**Status:** ✅ Erledigt — 11.244 geprüft, 10.864 klassifiziert, 380 ignoriert, 0 Fehler
+
+### 2026-04-03 00:15 — Nachtlauf Phase 1 FERTIG
+**Ergebnis:** 11.569 / 12.071 INBOX-Mails klassifiziert (95,8%). Rate-Limit-Warnungen am Ende (Fallback auf Regeln). Verteilung: Ignorieren 7.669 (66%), Rechnung/Beleg 1.297 (11%), Antwort erforderlich 772 (7%), Newsletter 650 (6%), Zur Kenntnis 437 (4%), Shop/System 312 (3%), Neue Lead-Anfrage 213 (2%), Angebotsrückmeldung 173 (2%), Abgeschlossen 46 (<1%).
+**Status:** erledigt
+
+### 2026-04-03 00:20 — Phase 2 gestartet: 2026 mit Tasks
+**Gestartet:** qualify_mails('2026-01-01', '2026-04-03', modus='mit_tasks', task_seit='2026-01-01')
+**Ergebnis:** 121 geprüft, 83 klassifiziert, 38 ignoriert, 0 Tasks erstellt (alle bereits erfasst/beantwortet)
+**Status:** ✅ Erledigt
+
+### 2026-04-03 00:30 — Gesamtergebnis Nachtlauf
+**ENDERGEBNIS:** 11.652 / 12.071 INBOX-Mails klassifiziert (96,5%). 1.158 geschäftsrelevante Mails (Leads/Antwort/Angebote) als Kundenprofil-Daten gespeichert. Rate-Limit-Warnungen am Ende beider Phasen (Fallback auf Regeln, kein Datenverlust).
+**Status:** erledigt — Session-www komplett abgeschlossen

@@ -46,7 +46,7 @@
 | D4 | Thread-basierte Task-Zusammenfuehrung | ✅ Erledigt (session-vvv) | 27acc81 | mail_monitor.py: Folgemail → bestehenden Task updaten |
 | D5 | Pflegbare Keywords in config.json | ✅ Erledigt (session-vvv) | 27acc81 | mail_klassifizierung.eigene_keywords Array |
 | D6 | **Pflegbare Keywords in Einstellungen-UI** | ⚠️ Offen | — | Input-Feld in Einstellungen > Mail-Klassifizierung |
-| D7 | **Historische Qualifizierung (12.000+ Mails)** | 🔄 Läuft (session-www) | cbf5401 | qualify_mails() + UI + API gebaut. Nachtlauf 2021-2025 gestartet |
+| D7 | **Historische Qualifizierung (12.000+ Mails)** | ✅ Erledigt (session-www) | cbf5401 | 11.652/12.071 (96,5%) klassifiziert. Phase 1+2 komplett |
 
 ---
 
@@ -74,7 +74,26 @@
 
 ---
 
-## Trockenlauf-Ergebnisse
+## Ergebnisse
+
+### Nachtlauf 2026-04-02/03 — Historische Qualifizierung
+
+| Kennzahl | Wert |
+|----------|------|
+| INBOX-Mails gesamt | 12.071 |
+| Klassifiziert | 11.569 (95,8%) |
+| Ignorieren | 7.669 (66,3%) |
+| Rechnung / Beleg | 1.297 (11,2%) |
+| Antwort erforderlich | 772 (6,7%) |
+| Newsletter / Werbung | 650 (5,6%) |
+| Zur Kenntnis | 437 (3,8%) |
+| Shop / System | 312 (2,7%) |
+| Neue Lead-Anfrage | 213 (1,8%) |
+| Angebotsrueckmeldung | 173 (1,5%) |
+| Abgeschlossen | 46 (0,4%) |
+| **Geschaeftsrelevant** | **1.158 Mails** |
+
+### Frueherer Trockenlauf (nur 2026)
 
 | Zeitraum | Mails | Tasks (vorher) | Tasks (nach Fix) | Anmerkung |
 |----------|-------|----------------|------------------|-----------|
