@@ -1,6 +1,6 @@
 {
-  "last_session": "session-cccc-dashboard",
-  "date": "2026-04-03 15:45",
+  "last_session": "session-dddd-widgets",
+  "date": "2026-04-03 13:30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -246,7 +246,15 @@
     "dashboard-animation-engine-countup-stagger-pulse",
     "dashboard-css-dlive-theme-variables",
     "dashboard-auto-refresh-30s",
-    "dashboard-einstellungen-layout-konfetti-motion"
+    "dashboard-einstellungen-layout-konfetti-motion",
+    "session-dddd (2026-04-03): Dashboard Feed-Widgets komplett. (1) news_feed.py NEU (~350 Zeilen): fetch_weather() (wttr.in, 30min-Cache), fetch_rss_feeds() (xml.etree RSS+Atom, Bild-Extraktion 4-Tier, 15min-Cache), generate_newsletter_digest() (LLM-Summary 7d Newsletter, 24h-Cache), SQLite feed_cache.db, Background-Refresh-Thread. (2) server.py: GET /api/dashboard/widgets + defensiver Import + Thread-Start. (3) JS Widget-Renderer: weatherWidget() (Emoji+Temp+Forecast), newsCarousel() (Cover-Bild-Slides, Crossfade, Auto-Rotate 8s, Dots+Pfeile), newsletterWidget() (Kira-Branding, Shimmer-Border, Auto-Rotate 10s). (4) CSS: .dlive-widget-strip 3-Col Grid (280px 1fr 320px), responsive Breakpoints, Crossfade, Gradient-Overlay. (5) config.json news_feed Sektion + Einstellungen > Feed-Widgets (Wetter-Toggle/Standort, RSS-Feed-Liste add/remove, Newsletter-Digest). (6) BUGFIX: Widget-Strip Race-Condition — renderWidgetStrip() in renderDashboard() integriert. Commits: e3d0efc, f1407e0.",
+    "feed-widgets-news-feed-py-backend",
+    "feed-widgets-weather-wttr-in",
+    "feed-widgets-rss-karussell-crossfade",
+    "feed-widgets-newsletter-digest-kira-llm",
+    "feed-widgets-api-endpoint-dashboard-widgets",
+    "feed-widgets-einstellungen-ui-config",
+    "feed-widgets-race-condition-fix"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -271,7 +279,7 @@
     "session-vvv-cont: Lexware-Kontext in LLM-Klassifizierung eingebaut (_get_lexware_kontext() in llm_classifier.py). Commit bdc4552.",
     "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren."
   ],
-  "next_step": "Dashboard Live-Redesign KOMPLETT (alle 6 Phasen). Commits: cd25025 (Phasen 1-4+6) + 3488d46 (Phase 5 Activity Trigger). Kai prüft Dashboard + Activity Window live. Nächster Schritt: Kais Feedback abwarten, dann ggf. Feinschliff.",
+  "next_step": "Feed-Widgets KOMPLETT (alle 5 Phasen + Bugfix). Commits: e3d0efc (Phasen 1-5) + f1407e0 (Race-Condition-Fix). Wetter+News+Newsletter live im Dashboard. Kais Feedback abwarten, ggf. Feinschliff (z.B. mehr RSS-Feeds, Design-Tuning).",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

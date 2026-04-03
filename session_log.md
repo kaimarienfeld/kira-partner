@@ -38,7 +38,42 @@
 **Status:** erledigt
 
 ---
-## 2026-04-03 16:05 — Session-Ende
+## 2026-04-03 16:05 — Session-Ende (session-cccc-dashboard)
 **Erledigt:** Dashboard Live-Redesign ALLE 6 Phasen komplett. Activity Window mit 3 neuen Triggern. Listen aktualisiert.
 **Offen geblieben:** —
 **Status:** erledigt (6/6 Phasen)
+
+---
+## 2026-04-03 13:25 — Session-Start (session-dddd-widgets)
+**Auftrag:** Dashboard Feed-Widgets implementieren — Windows-Widget-Stil: Live-Wetter, News-Karussell mit Bildern (RSS), Newsletter-Digest von Kira zusammengestellt. Konfigurierbar in Einstellungen. Plan "whimsical-frolicking-dawn" (5 Phasen).
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Phase 1: news_feed.py Backend
+**Was:** Neues Modul ~350 Zeilen: fetch_weather() (wttr.in), fetch_rss_feeds() (xml.etree), generate_newsletter_digest() (LLM), SQLite TTL-Cache (feed_cache.db), Background-Refresh-Thread
+**Commit:** e3d0efc (zusammen mit Phasen 2-5)
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Phase 2: server.py API + Import
+**Was:** Import news_feed (defensiv), GET /api/dashboard/widgets Endpoint, start_feed_refresh_thread() in run_server()
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Phase 3: CSS Widget-Styles
+**Was:** ~60 Zeilen .dlive-widget-* CSS: 3-Col Grid (280px 1fr 320px), responsive Breakpoints, Crossfade-Karussell, Gradient-Overlay, Dot-Navigation, Newsletter Shimmer-Border
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Phase 4: JS Widget-Renderer
+**Was:** weatherWidget(), newsCarousel() (auto-rotate 8s, Crossfade, Dots+Pfeile), newsletterWidget() (Kira-Branding, auto-rotate 10s), renderWidgetStrip(), fetchWidgets() + 5min Refresh
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Phase 5: config.json + Einstellungen UI
+**Was:** news_feed Sektion in config.json (Wetter/RSS/Newsletter), Einstellungen > Feed-Widgets Sidebar-Sektion (Wetter-Toggle/Standort, RSS-Feed-Liste add/remove, Newsletter-Digest-Toggle/Max), saveSettings() erweitert
+**Status:** erledigt
+
+### 2026-04-03 13:25 — Bugfix: Widget-Strip Race-Condition
+**Was:** Widget-Strip erschien nicht im DOM — fetchAndRender() überschrieb renderWidgetStrip() bei async Race. Fix: renderWidgetStrip() in renderDashboard() nach Layout-Rebuild integriert.
+**Commit:** f1407e0
+**Status:** erledigt
+
+### 2026-04-03 13:26 — Playwright-Verifizierung
+**Was:** 0 JS-Fehler, alle 3 Widgets sichtbar: Wetter 8°C Düsseldorf, News-Karussell 8 Slides (Spiegel mit Bildern + tagesschau), Newsletter-Digest 3 Kira-Highlights
+**Status:** erledigt

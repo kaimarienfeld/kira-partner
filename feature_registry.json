@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-cccc",
+  "_updated": "session-dddd",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -15,6 +15,19 @@
       "status": "done",
       "last_updated": "2026-04-03",
       "description": "3 wählbare Layouts (Bento Grid, Command Center, Smart Cards), JSON-API /api/dashboard/live, Animation-Engine (Count-Up, Stagger, Bounce, Shimmer, Pulse), Auto-Refresh, Hell/Dunkel CSS-Variablen"
+    },
+    {
+      "id": "feed-widgets-dashboard",
+      "name": "Feed-Widgets — Wetter, News, Newsletter",
+      "icon": "🌤️",
+      "leni_name": "Live-Feed — Wetter, Nachrichten & Newsletter",
+      "leni_desc": "Im Dashboard erscheinen jetzt Live-Wetter, aktuelle Nachrichten mit Bildern (wie Windows Widgets) und ein Newsletter-Digest, den Kira zusammenstellt. Alles wechselt automatisch und ist konfigurierbar.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "news_feed.py + server.py",
+      "status": "done",
+      "last_updated": "2026-04-03",
+      "description": "news_feed.py Backend (wttr.in Weather, RSS 2.0+Atom mit Bild-Extraktion, LLM Newsletter-Digest, SQLite TTL-Cache), JS Widget-Renderer (weatherWidget, newsCarousel mit Crossfade 8s Auto-Rotate, newsletterWidget mit Kira-Branding 10s Rotate), 3-Col CSS Grid responsive, Einstellungen Feed-Widgets Sektion"
     },
     {
       "id": "kommunikation-panel",
