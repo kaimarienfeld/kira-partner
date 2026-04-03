@@ -77,3 +77,13 @@
 ### 2026-04-03 13:26 — Playwright-Verifizierung
 **Was:** 0 JS-Fehler, alle 3 Widgets sichtbar: Wetter 8°C Düsseldorf, News-Karussell 8 Slides (Spiegel mit Bildern + tagesschau), Newsletter-Digest 3 Kira-Highlights
 **Status:** erledigt
+
+### 2026-04-03 13:35 — Kai-Feedback: Signal-Modals
+**Auftrag:** Vorgang-Signale (Stufe-C) kamen als hässliches eigenes Modal (5x einzeln). Sollen stattdessen gruppiert im bestehenden Activity-Drawer (Slide-In von rechts) erscheinen.
+**Was:** Signal-Polling IIFE komplett umgebaut: (1) Stufe-C → Activity-Drawer mit rot markierter "Aktion erforderlich" Sektion, alle Signale gruppiert. (2) Stufe-B → ein gruppierter Toast statt mehrere einzelne. (3) Altes _vg-modal-overlay + _vg-toast-container komplett entfernt.
+**Commit:** 1866d07
+**Status:** erledigt
+
+### 2026-04-03 13:38 — To-Do: Feed-Widget Design-Tuning auf nächste Woche
+**Was:** 3 Aufgaben (Design-Tuning, weitere RSS-Feeds, Newsletter-Digest Qualität) in Todo_checkliste.md Sektion "NÄCHSTE WOCHE (ab 2026-04-07)" eingetragen
+**Status:** erledigt

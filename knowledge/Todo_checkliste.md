@@ -583,4 +583,14 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ❌ | Bei falsch-klassifiziert: Mail umklassifizieren | Kira soll Mail mit korrektem Typ nachklassifizieren + an richtige Stelle weiterleiten |
 
 ---
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-www · 2026-04-02_
+
+## NÄCHSTE WOCHE (ab 2026-04-07)
+
+| Status | Aufgabe | Details |
+|--------|---------|---------|
+| ⬜ | Feed-Widgets Design-Tuning | Kais Live-Feedback auswerten: Karussell-Optik, Bildgrößen, Animationen, Farben anpassen |
+| ⬜ | Weitere RSS-Feeds | Mehr Feed-Quellen hinzufügen (Business, Branche, regional) |
+| ⬜ | Newsletter-Digest Qualität | LLM-Prompt verbessern: bessere Zusammenfassungen, relevantere Highlights, deutsche Ausgabe |
+
+---
+_Erstellt: session-r · 2026-03-27 · Zuletzt: session-dddd · 2026-04-03_
