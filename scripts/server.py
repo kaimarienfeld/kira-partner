@@ -1328,6 +1328,8 @@ const renderers={{A:renderDashA,B:renderDashB,C:renderDashC}};
 function renderDashboard(data){{
   const render=renderers[DCFG.layout]||renderers.B;
   render(data);
+  // Re-insert widget strip after layout rebuild (widgets live outside layout innerHTML)
+  if(typeof renderWidgetStrip==="function")renderWidgetStrip();
 
   // Animate KPI values
   requestAnimationFrame(()=>{{
@@ -6061,6 +6063,12 @@ def build_einstellungen():
     proto         = config.get("protokoll", {})
     dashboard_cfg = config.get("dashboard", {})
     nf_cfg = config.get("news_feed", {})
+    _nf_wetter = nf_cfg.get("wetter", {})
+    _nf_digest = nf_cfg.get("newsletter_digest", {})
+    _nf_w_aktiv = _nf_wetter.get("aktiv", True)
+    _nf_w_standort = _nf_wetter.get("standort", "Düsseldorf")
+    _nf_d_aktiv = _nf_digest.get("aktiv", True)
+    _nf_d_max = _nf_digest.get("max_items", 5)
     rtlog_cfg = config.get("runtime_log", {})
     kira_cfg  = config.get("kira", {})
     launcher_variant = kira_cfg.get("launcher_variant", "B")
@@ -7367,13 +7375,13 @@ function esInfoPopup(btn, text) {{
     <div class="es-row">
       <div class="es-rl">Wetter-Widget aktiv<div class="es-rd">Live-Wetter auf dem Dashboard anzeigen (wttr.in, kein API-Key n&ouml;tig)</div></div>
       <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-wetter-aktiv" {'checked' if nf_cfg.get('wetter',{{}}).get('aktiv',True) else ''}>
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-wetter-aktiv" {'checked' if _nf_w_aktiv else ''}>
         <div class="es-toggle-vis"></div>
       </label>
     </div>
     <div class="es-row">
       <div class="es-rl">Standort<div class="es-rd">Stadt oder PLZ (z.B. D&uuml;sseldorf, 40213)</div></div>
-      <input class="es-inp" type="text" id="cfg-nf-wetter-standort" value="{_html(nf_cfg.get('wetter',{{}}).get('standort','D\\u00fcsseldorf'))}" placeholder="D&uuml;sseldorf" style="max-width:200px">
+      <input class="es-inp" type="text" id="cfg-nf-wetter-standort" value="{_nf_w_standort}" placeholder="D&uuml;sseldorf" style="max-width:200px">
     </div>
   </div>
 
@@ -7393,13 +7401,13 @@ function esInfoPopup(btn, text) {{
     <div class="es-row">
       <div class="es-rl">Newsletter-Digest aktiv<div class="es-rd">Kira fasst Newsletter-Inhalte der letzten 7 Tage zusammen</div></div>
       <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-newsletter-aktiv" {'checked' if nf_cfg.get('newsletter_digest',{{}}).get('aktiv',True) else ''}>
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-newsletter-aktiv" {'checked' if _nf_d_aktiv else ''}>
         <div class="es-toggle-vis"></div>
       </label>
     </div>
     <div class="es-row">
       <div class="es-rl">Maximale Highlights<div class="es-rd">Wie viele Highlights Kira extrahiert (3&ndash;8)</div></div>
-      <input class="es-inp-sm" type="number" id="cfg-nf-newsletter-max" value="{nf_cfg.get('newsletter_digest',{{}}).get('max_items',5)}" min="3" max="8">
+      <input class="es-inp-sm" type="number" id="cfg-nf-newsletter-max" value="{_nf_d_max}" min="3" max="8">
     </div>
   </div>
 
