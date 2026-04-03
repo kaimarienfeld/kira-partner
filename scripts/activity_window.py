@@ -129,35 +129,69 @@ def start_signal_watcher() -> None:
 
 
 def _check_and_show() -> None:
-    """Holt ausstehende Stufe-C-Signale und zeigt ggf. ein Overlay."""
+    """Holt Signale aus mehreren Quellen und zeigt ggf. ein Overlay."""
     try:
         from presence_detector import is_user_present
         if not is_user_present(idle_threshold_s=300):
             return  # Nutzer länger als 5 Min inaktiv — kein Popup
 
-        from case_engine import get_pending_signals, mark_signal_shown
-        signals = get_pending_signals(max_count=3)
-        c_signals = [s for s in signals if s.get("stufe") == "C"]
-        if not c_signals:
-            return
+        # 1. Case-Engine Stufe-C-Signale (höchste Priorität)
+        try:
+            from case_engine import get_pending_signals, mark_signal_shown
+            signals = get_pending_signals(max_count=3)
+            c_signals = [s for s in signals if s.get("stufe") == "C"]
+            if c_signals:
+                sig = c_signals[0]
+                def _confirm(s):
+                    try: mark_signal_shown(s["id"], "bestaetigt_desktop")
+                    except: pass
+                def _snooze(s):
+                    try: mark_signal_shown(s["id"], "snoozed_desktop")
+                    except: pass
+                show_signal_overlay(sig, on_confirm=_confirm, on_snooze=_snooze)
+                return
+        except Exception:
+            pass
 
-        sig = c_signals[0]
+        # 2. Qualifizierungs-Status (pausiert = Guthaben leer)
+        try:
+            import json
+            from pathlib import Path
+            state_file = Path(__file__).parent.parent / "knowledge" / "qualify_state.json"
+            if state_file.exists():
+                state = json.loads(state_file.read_text("utf-8"))
+                if state.get("paused") and not state.get("_desktop_shown"):
+                    sig = {
+                        "id": "qual_pause",
+                        "stufe": "C",
+                        "titel": "Qualifizierung pausiert",
+                        "nachricht": state.get("pause_grund", "LLM-Provider nicht erreichbar"),
+                        "aktion": "Guthaben aufladen und in KIRA fortsetzen",
+                    }
+                    def _confirm_q(s):
+                        try:
+                            state["_desktop_shown"] = True
+                            state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), "utf-8")
+                        except: pass
+                    show_signal_overlay(sig, on_confirm=_confirm_q, on_snooze=_confirm_q)
+                    return
+        except Exception:
+            pass
 
-        def _confirm(s):
-            try:
-                from case_engine import mark_signal_shown
-                mark_signal_shown(s["id"], "bestaetigt_desktop")
-            except Exception:
-                pass
-
-        def _snooze(s):
-            try:
-                from case_engine import mark_signal_shown
-                mark_signal_shown(s["id"], "snoozed_desktop")
-            except Exception:
-                pass
-
-        show_signal_overlay(sig, on_confirm=_confirm, on_snooze=_snooze)
+        # 3. Case-Engine Stufe-B-Signale (niedrigere Prio, aber anzeigen wenn nichts anderes)
+        try:
+            from case_engine import get_pending_signals, mark_signal_shown
+            signals = get_pending_signals(max_count=5)
+            b_signals = [s for s in signals if s.get("stufe") == "B"]
+            if b_signals:
+                sig = b_signals[0]
+                def _confirm_b(s):
+                    try: mark_signal_shown(s["id"], "bestaetigt_desktop")
+                    except: pass
+                show_signal_overlay(sig, on_confirm=_confirm_b, on_snooze=_confirm_b)
+                return
+        except Exception:
+            pass
 
     except Exception as e:
         log.error(f"_check_and_show Fehler: {e}")
