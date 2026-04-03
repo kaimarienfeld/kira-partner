@@ -11839,10 +11839,13 @@ def build_wissen(db):
     # Zwei Haupt-Ebenen als Tabs
     n_biblio = sum(len(grouped.get(k, [])) for k, _ in BIBLIO_CATS)
     n_regeln = len(grouped.get("fest", [])) + len(grouped.get("gelernt", [])) + len(grouped.get("vorschlag", [])) + len(korr_list)
+    n_auto = len([r for r in regeln if (r.get("quelle") or "").startswith("auto_")])
+    n_vorschlag = len(grouped.get("vorschlag", []))
 
     top_tabs = f"""<div class="wissen-level-tabs" style="align-items:center">
       <div class="wissen-level-tab active" onclick="showWissenLevel(this,'bibliothek')">Bibliothek ({n_biblio})</div>
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'regelsteuerung')">Regelsteuerung ({n_regeln})</div>
+      <div class="wissen-level-tab" onclick="showWissenLevel(this,'maillernen')">Mail-Lernen ({n_auto}){f' <span style="background:#e84545;color:#fff;border-radius:9px;padding:0 5px;font-size:10px;margin-left:4px">{n_vorschlag}</span>' if n_vorschlag > 0 else ''}</div>
       <div class="wissen-level-tab" onclick="showWissenLevel(this,'neu')">+ Neue Regel</div>
       <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_WISSEN,{{erklaermodus:true}})" style="margin-left:auto" title="Gefuehrte Tour durch das Wissen-Modul">Tour</button>
     </div>"""
@@ -11920,6 +11923,52 @@ def build_wissen(db):
     </div>
     <div class="wissen-tabs">{regel_tabs}</div>{regel_panels}"""
 
+    # ── Mail-Lernen Panel ──
+    auto_regeln = [r for r in regeln if (r.get("quelle") or "").startswith("auto_")]
+    vorschlag_regeln = [r for r in regeln if r.get("status") == "vorschlag"]
+    aktiv_auto = [r for r in auto_regeln if r.get("status") == "aktiv"]
+
+    ml_vorschlaege = ""
+    for r in vorschlag_regeln:
+        ml_vorschlaege += _wissen_card_review(r, "vorschlag")
+    if not ml_vorschlaege:
+        ml_vorschlaege = '<p class="empty" style="padding:12px 0;color:var(--muted)">Keine offenen Vorschl&auml;ge. KIRA hat alle Erkenntnisse mit hoher Konfidenz automatisch &uuml;bernommen.</p>'
+
+    ml_aktiv = ""
+    for r in aktiv_auto:
+        ml_aktiv += _wissen_card(r, with_id=True)
+    if not ml_aktiv:
+        ml_aktiv = '<p class="empty" style="padding:12px 0;color:var(--muted)">Noch keine automatisch gelernten Regeln. Starte die Extraktion unten.</p>'
+
+    maillernen_html = f"""
+    <div style="margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">Mail-Lernen</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">KIRA lernt aus deinen gesendeten Mails und klassifizierten Eing&auml;ngen. Erkenntnisse mit hoher Konfidenz (&ge;90%) werden automatisch &uuml;bernommen, niedrigere als Vorschlag angezeigt.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="es-btn es-btn-green" onclick="wissenExtractStil()" id="btn-extract-stil">Schreibstil analysieren</button>
+      <button class="es-btn es-btn-green" onclick="wissenExtractGM()" id="btn-extract-gm">Gesch&auml;ftsmuster extrahieren</button>
+      <span id="ml-extract-status" style="font-size:12px;color:var(--muted);line-height:32px"></span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 14px;flex:1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--text)">{len(aktiv_auto)}</div>
+        <div style="font-size:11px;color:var(--muted)">Automatisch &uuml;bernommen</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 14px;flex:1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:{'#e84545' if vorschlag_regeln else 'var(--text)'}">{len(vorschlag_regeln)}</div>
+        <div style="font-size:11px;color:var(--muted)">Vorschl&auml;ge zu pr&uuml;fen</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 14px;flex:1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--text)">{len(auto_regeln)}</div>
+        <div style="font-size:11px;color:var(--muted)">Gesamt gelernt</div>
+      </div>
+    </div>
+    {'<div style="font-weight:600;margin:12px 0 6px;font-size:13px">Vorschl&auml;ge pr&uuml;fen</div>' + ml_vorschlaege if vorschlag_regeln else ''}
+    <div style="font-weight:600;margin:12px 0 6px;font-size:13px">&Uuml;bernommene Regeln</div>
+    {ml_aktiv}
+    """
+
     # ── Neue Regel ──
     neue_html = f"""<div class="wissen-card" style="max-width:560px">
         <div class="wissen-titel" style="margin-bottom:10px">Neue Regel hinzuf&uuml;gen</div>
@@ -11946,6 +11995,7 @@ def build_wissen(db):
     {top_tabs}
     <div id="wissen-level-bibliothek" class="wissen-level active">{bibliothek_html}</div>
     <div id="wissen-level-regelsteuerung" class="wissen-level">{regelsteuerung_html}</div>
+    <div id="wissen-level-maillernen" class="wissen-level">{maillernen_html}</div>
     <div id="wissen-level-neu" class="wissen-level">{neue_html}</div>"""
 
 # ── LEXWARE OFFICE Panel ──────────────────────────────────────────────────────
@@ -17964,6 +18014,46 @@ function saveRegelEdit() {{
 }}
 
 // Neue Regel hinzufügen
+function wissenExtractStil() {{
+  var btn=document.getElementById('btn-extract-stil');
+  var st=document.getElementById('ml-extract-status');
+  if(btn) btn.disabled=true;
+  if(st) st.textContent='Schreibstil wird analysiert…';
+  fetch('/api/wissen/extract-schreibstil',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}}).then(function(r){{return r.json()}}).then(function(d){{
+    if(btn) btn.disabled=false;
+    if(d.ok){{
+      if(st) st.textContent='Analyse gestartet — neue Regeln erscheinen in wenigen Sekunden';
+      showToast('Schreibstil-Analyse gestartet (GPT-4o-mini)','ok');
+      setTimeout(function(){{location.reload()}},8000);
+    }} else {{
+      if(st) st.textContent='Fehler: '+(d.error||'?');
+    }}
+  }}).catch(function(){{
+    if(btn) btn.disabled=false;
+    if(st) st.textContent='Verbindungsfehler';
+  }});
+}}
+
+function wissenExtractGM() {{
+  var btn=document.getElementById('btn-extract-gm');
+  var st=document.getElementById('ml-extract-status');
+  if(btn) btn.disabled=true;
+  if(st) st.textContent='Geschäftsmuster werden extrahiert…';
+  fetch('/api/wissen/extract-geschaeftsmuster',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}}).then(function(r){{return r.json()}}).then(function(d){{
+    if(btn) btn.disabled=false;
+    if(d.ok){{
+      if(st) st.textContent='Extraktion gestartet — neue Regeln erscheinen in wenigen Sekunden';
+      showToast('Geschäftsmuster-Extraktion gestartet (GPT-4o-mini)','ok');
+      setTimeout(function(){{location.reload()}},8000);
+    }} else {{
+      if(st) st.textContent='Fehler: '+(d.error||'?');
+    }}
+  }}).catch(function(){{
+    if(btn) btn.disabled=false;
+    if(st) st.textContent='Verbindungsfehler';
+  }});
+}}
+
 function neueRegel() {{
   const kat    = document.getElementById('nr-kat').value;
   const titel  = document.getElementById('nr-titel').value.trim();
@@ -25976,6 +26066,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             finally:
                 db.close()
+            return
+
+        # Schreibstil-Extraktion (Hintergrund-Thread)
+        if self.path == '/api/wissen/extract-schreibstil':
+            import threading as _th
+            def _run_stil():
+                try:
+                    from kira_llm import extract_schreibstil
+                    extract_schreibstil()
+                except Exception:
+                    pass
+            _th.Thread(target=_run_stil, daemon=True).start()
+            self._json({'ok': True, 'status': 'gestartet'})
+            return
+
+        # Geschäftsmuster-Extraktion (Hintergrund-Thread)
+        if self.path == '/api/wissen/extract-geschaeftsmuster':
+            import threading as _th
+            def _run_gm():
+                try:
+                    from kira_llm import extract_geschaeftsmuster
+                    extract_geschaeftsmuster()
+                except Exception:
+                    pass
+            _th.Thread(target=_run_gm, daemon=True).start()
+            self._json({'ok': True, 'status': 'gestartet'})
             return
 
         # Wissen actions

@@ -3178,6 +3178,220 @@ def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str
     t.start()
 
 
+# ── Wissen-Extraktion: Schreibstil aus gesendeten Mails ─────────────────────
+def extract_schreibstil(max_mails: int = 50) -> dict:
+    """Analysiert gesendete Mails und extrahiert Schreibstil-Regeln per LLM (GPT-4o-mini).
+
+    Returns: {"regeln": [...], "model": "...", "error": None}
+    """
+    try:
+        sent_db = sqlite3.connect(str(KNOWLEDGE_DIR / "sent_mails.db"))
+        sent_db.row_factory = sqlite3.Row
+        # Zufällige Auswahl für Stil-Diversität
+        mails = sent_db.execute(
+            "SELECT betreff, text_plain, kunden_email FROM gesendete_mails "
+            "WHERE text_plain IS NOT NULL AND LENGTH(text_plain) > 50 "
+            "ORDER BY RANDOM() LIMIT ?", (max_mails,)
+        ).fetchall()
+        sent_db.close()
+
+        if not mails:
+            return {"regeln": [], "error": "Keine gesendeten Mails gefunden"}
+
+        # Texte zusammenfassen (max 200 Zeichen pro Mail)
+        samples = "\n---\n".join(
+            f"An: {m['kunden_email'] or '?'}\nBetreff: {m['betreff'] or ''}\n{(m['text_plain'] or '')[:200]}"
+            for m in mails[:max_mails]
+        )
+
+        prompt = (
+            f"Analysiere diese {len(mails)} gesendeten E-Mails und extrahiere den Schreibstil des Absenders.\n\n"
+            "Gib ein JSON-Array zurück mit bis zu 8 Stil-Regeln:\n"
+            '[{"titel": "...", "inhalt": "...", "konfidenz": 0.0-1.0, "kategorie": "stil"}]\n\n'
+            "Achte auf:\n"
+            "- Anrede-Stil (Du/Sie, formell/informell)\n"
+            "- Grußformeln am Ende\n"
+            "- Satzlänge und Ton (kurz/knapp oder ausführlich)\n"
+            "- Typische Wendungen und Floskeln\n"
+            "- Sprache (Deutsch/Englisch/gemischt)\n\n"
+            f"E-Mail-Beispiele:\n{samples[:6000]}"
+        )
+
+        provider, model_name = get_provider_for_task("extract")
+        if not provider:
+            return {"regeln": [], "error": "Kein Provider verfügbar"}
+
+        sys_prompt = "Du bist ein Schreibstil-Analyst. Extrahiere Stil-Muster als kompaktes JSON."
+        if provider.get("typ") == "anthropic":
+            result = _call_anthropic(provider, prompt, sys_prompt, [], max_tokens=1024)
+        else:
+            result = _call_openai_compat(provider, prompt, sys_prompt, [], max_tokens=1024)
+
+        raw = result.get("text", "").strip()
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        if start < 0 or end <= start:
+            return {"regeln": [], "error": "Kein JSON in Antwort", "model": model_name}
+
+        regeln = json.loads(raw[start:end])
+        if not isinstance(regeln, list):
+            return {"regeln": [], "error": "Ungültiges Format", "model": model_name}
+
+        # In wissen_regeln speichern
+        now = datetime.now().isoformat()
+        db = sqlite3.connect(str(TASKS_DB))
+        gespeichert = 0
+        for r in regeln[:8]:
+            titel = (r.get("titel") or "").strip()
+            inhalt = (r.get("inhalt") or "").strip()
+            konfidenz = float(r.get("konfidenz", 0.7))
+            if not titel or not inhalt or len(inhalt) < 10:
+                continue
+            # Duplikat-Check
+            existing = db.execute("SELECT id FROM wissen_regeln WHERE titel=?", (titel,)).fetchone()
+            if existing:
+                continue
+            # Auto-Approve bei hoher Konfidenz (>= 0.9)
+            status = "aktiv" if konfidenz >= 0.9 else "vorschlag"
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am,status) VALUES (?,?,?,?,?,?)",
+                ("stil", titel, inhalt, f"auto_schreibstil:{model_name}", now, status)
+            )
+            gespeichert += 1
+        db.commit()
+        db.close()
+
+        return {
+            "regeln": regeln[:8], "model": model_name,
+            "gespeichert": gespeichert, "mails_analysiert": len(mails),
+            "error": None,
+        }
+    except Exception as e:
+        return {"regeln": [], "error": str(e)}
+
+
+# ── Wissen-Extraktion: Geschäftsmuster aus Klassifizierungen ────────────────
+def extract_geschaeftsmuster() -> dict:
+    """Extrahiert Geschäftsmuster aus mail_index.db Klassifizierungen per LLM.
+
+    Phase 1: Statistische Analyse (kostenlos)
+    Phase 2: LLM-Zusammenfassung (GPT-4o-mini, ~$0.01)
+
+    Returns: {"regeln": [...], "model": "...", "error": None}
+    """
+    try:
+        mi_db = sqlite3.connect(str(MAIL_INDEX_DB))
+        mi_db.row_factory = sqlite3.Row
+
+        # Phase 1: Statistische Analyse
+        stats = {}
+
+        # Kategorie-Verteilung pro Absender-Domain
+        domain_kats = mi_db.execute("""
+            SELECT SUBSTR(absender, INSTR(absender, '@')+1) as domain, kategorie, COUNT(*) c
+            FROM mails
+            WHERE kategorie IS NOT NULL AND kategorie != '' AND folder='INBOX'
+              AND absender LIKE '%@%'
+            GROUP BY domain, kategorie
+            HAVING c >= 3
+            ORDER BY c DESC LIMIT 50
+        """).fetchall()
+        stats["domain_kategorien"] = [
+            {"domain": r["domain"], "kategorie": r["kategorie"], "anzahl": r["c"]}
+            for r in domain_kats
+        ]
+
+        # Top-Absender nach Geschäftsrelevanz
+        top_absender = mi_db.execute("""
+            SELECT absender, COUNT(*) c, kategorie
+            FROM mails
+            WHERE kategorie IN ('Neue Lead-Anfrage', 'Angebotsrückmeldung', 'Antwort erforderlich')
+              AND folder='INBOX'
+            GROUP BY absender
+            ORDER BY c DESC LIMIT 20
+        """).fetchall()
+        stats["top_geschaeft"] = [
+            {"absender": r["absender"], "anzahl": r["c"], "kategorie": r["kategorie"]}
+            for r in top_absender
+        ]
+
+        # Betreff-Muster
+        betreff_muster = mi_db.execute("""
+            SELECT LOWER(SUBSTR(betreff, 1, 30)) as muster, COUNT(*) c, kategorie
+            FROM mails
+            WHERE kategorie IS NOT NULL AND folder='INBOX' AND betreff IS NOT NULL
+            GROUP BY muster
+            HAVING c >= 5
+            ORDER BY c DESC LIMIT 20
+        """).fetchall()
+        stats["betreff_muster"] = [
+            {"muster": r["muster"], "anzahl": r["c"], "kategorie": r["kategorie"]}
+            for r in betreff_muster
+        ]
+
+        mi_db.close()
+
+        # Phase 2: LLM-Zusammenfassung
+        provider, model_name = get_provider_for_task("extract")
+        if not provider:
+            return {"regeln": [], "stats": stats, "error": "Kein Provider"}
+
+        prompt = (
+            "Analysiere diese E-Mail-Statistiken und extrahiere 5-8 Geschäftsregeln/-muster:\n\n"
+            f"Absender-Kategorien:\n{json.dumps(stats['domain_kategorien'][:20], ensure_ascii=False)}\n\n"
+            f"Top-Geschäftskontakte:\n{json.dumps(stats['top_geschaeft'][:10], ensure_ascii=False)}\n\n"
+            f"Betreff-Muster:\n{json.dumps(stats['betreff_muster'][:10], ensure_ascii=False)}\n\n"
+            "Gib ein JSON-Array zurück:\n"
+            '[{"titel": "...", "inhalt": "...", "konfidenz": 0.0-1.0, "kategorie": "prozess|preis|technik"}]'
+        )
+
+        sys_prompt = "Du analysierst Geschäftsmuster aus E-Mail-Statistiken. Kompaktes JSON."
+        if provider.get("typ") == "anthropic":
+            result = _call_anthropic(provider, prompt, sys_prompt, [], max_tokens=1024)
+        else:
+            result = _call_openai_compat(provider, prompt, sys_prompt, [], max_tokens=1024)
+
+        raw = result.get("text", "").strip()
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        if start < 0 or end <= start:
+            return {"regeln": [], "stats": stats, "error": "Kein JSON", "model": model_name}
+
+        regeln = json.loads(raw[start:end])
+
+        # Speichern
+        now = datetime.now().isoformat()
+        db = sqlite3.connect(str(TASKS_DB))
+        gespeichert = 0
+        for r in regeln[:8]:
+            titel = (r.get("titel") or "").strip()
+            inhalt = (r.get("inhalt") or "").strip()
+            konfidenz = float(r.get("konfidenz", 0.7))
+            kat = r.get("kategorie", "gelernt")
+            if kat not in ("prozess", "preis", "technik", "gelernt"):
+                kat = "gelernt"
+            if not titel or not inhalt or len(inhalt) < 10:
+                continue
+            existing = db.execute("SELECT id FROM wissen_regeln WHERE titel=?", (titel,)).fetchone()
+            if existing:
+                continue
+            status = "aktiv" if konfidenz >= 0.9 else "vorschlag"
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am,status) VALUES (?,?,?,?,?,?)",
+                (kat, titel, inhalt, f"auto_geschaeftsmuster:{model_name}", now, status)
+            )
+            gespeichert += 1
+        db.commit()
+        db.close()
+
+        return {
+            "regeln": regeln[:8], "model": model_name,
+            "gespeichert": gespeichert, "stats": stats, "error": None,
+        }
+    except Exception as e:
+        return {"regeln": [], "error": str(e)}
+
+
 # ── Haupt-Chat-Funktion ─────────────────────────────────────────────────────
 def chat(user_message, session_id=None, history=None, bild=None):
     """Chat mit automatischem Provider-Fallback. bild={type,media_type,data} fuer Foto-Analyse."""
