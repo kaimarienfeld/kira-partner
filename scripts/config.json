@@ -221,7 +221,9 @@
     "auto_tasks": true,
     "ignore_newsletter": false,
     "eigene_keywords": [],
-    "eigene_domains_extra": ["invoicefetcher.email"]
+    "eigene_domains_extra": [
+      "invoicefetcher.email"
+    ]
   },
   "mail_postfach": {
     "refresh_intervall_min": 2,
@@ -253,10 +255,25 @@
     "api_base_url": "https://api.lexware.io/v1"
   },
   "dashboard": {
-    "layout": "B",
-    "refresh_intervall_s": 30,
+    "layout": "C",
+    "refresh_intervall_s": 300,
     "konfetti": true,
     "reduced_motion": false
+  },
+  "news_feed": {
+    "_kommentar": "Widget-Konfiguration: Wetter, News-Feeds und Newsletter-Digest für das Dashboard",
+    "wetter": {
+      "aktiv": true,
+      "standort": "Düsseldorf"
+    },
+    "rss_feeds": [
+      {"url": "https://www.tagesschau.de/xml/rss2_https/", "label": "tagesschau", "kategorie": "allgemein"},
+      {"url": "https://www.spiegel.de/schlagzeilen/index.rss", "label": "Spiegel", "kategorie": "allgemein"}
+    ],
+    "newsletter_digest": {
+      "aktiv": true,
+      "max_items": 5
+    }
   },
   "kira_proaktiv": {
     "aktiv": true,

@@ -61,6 +61,11 @@ from kira_llm import (chat as kira_chat, get_conversations as kira_get_conversat
                        _validate_model, _auto_update_model, validate_all_providers,
                        start_react_task, get_react_task_status, cancel_react_task)
 from mail_monitor import start_monitor_thread, get_monitor_status, stop_monitor
+try:
+    from news_feed import get_dashboard_widgets, start_feed_refresh_thread
+except ImportError:
+    def get_dashboard_widgets(): return {"weather": None, "news": [], "newsletter": None, "ts": ""}
+    def start_feed_refresh_thread(): pass
 
 PORT = 8765
 
@@ -1389,9 +1394,155 @@ window._dashSetLayout=function(lay){{
   else fetchAndRender();
 }};
 
+/* ═══ Feed-Widgets: Wetter / News / Newsletter ═══ */
+let _widgetData=null, _newsSlide=0, _nlSlide=0;
+
+const _wIcon={{"113":"\\u2600\\ufe0f","116":"\\u26c5","119":"\\u2601\\ufe0f","122":"\\u2601\\ufe0f","143":"\\ud83c\\udf2b\\ufe0f","176":"\\ud83c\\udf26\\ufe0f","200":"\\u26c8\\ufe0f","227":"\\ud83c\\udf28\\ufe0f","230":"\\u2744\\ufe0f","248":"\\ud83c\\udf2b\\ufe0f","260":"\\ud83c\\udf2b\\ufe0f","263":"\\ud83c\\udf27\\ufe0f","266":"\\ud83c\\udf27\\ufe0f","293":"\\ud83c\\udf27\\ufe0f","296":"\\ud83c\\udf27\\ufe0f","299":"\\ud83c\\udf27\\ufe0f","302":"\\ud83c\\udf27\\ufe0f","305":"\\ud83c\\udf27\\ufe0f","308":"\\ud83c\\udf27\\ufe0f","320":"\\ud83c\\udf28\\ufe0f","323":"\\ud83c\\udf28\\ufe0f","326":"\\ud83c\\udf28\\ufe0f","332":"\\ud83c\\udf28\\ufe0f","335":"\\ud83c\\udf28\\ufe0f","338":"\\ud83c\\udf28\\ufe0f","386":"\\u26c8\\ufe0f","389":"\\u26c8\\ufe0f","395":"\\ud83c\\udf28\\ufe0f"}};
+
+function weatherWidget(w){{
+  if(!w)return "";
+  const icon=_wIcon[w.icon_code]||"\\ud83c\\udf24\\ufe0f";
+  const fcHtml=(w.forecast||[]).slice(0,3).map(f=>
+    `<div class="dlive-w-fc-day"><span class="dlive-w-fc-d">${{esc(f.day)}}</span><span class="dlive-w-fc-icon">${{_wIcon[f.icon_code]||"\\ud83c\\udf24\\ufe0f"}}</span><span class="dlive-w-fc-t">${{f.high}}\\u00b0/${{f.low}}\\u00b0</span></div>`
+  ).join("");
+  return `<div class="dlive-widget dlive-widget-weather dlive-card">
+    <div class="dlive-w-top">
+      <div class="dlive-w-icon">${{icon}}</div>
+      <div class="dlive-w-temp">${{w.temp_c}}\\u00b0C</div>
+      <div class="dlive-w-cond">${{esc(w.condition_de||w.condition)}}</div>
+    </div>
+    <div class="dlive-w-meta">
+      <span>\\ud83d\\udca7 ${{esc(w.humidity)}}</span>
+      <span>\\ud83d\\udca8 ${{w.wind_kmh}} km/h</span>
+      <span>\\ud83d\\udccd ${{esc(w.location)}}</span>
+    </div>
+    <div class="dlive-w-forecast">${{fcHtml}}</div>
+    ${{w.stale?'<div class="dlive-w-stale">Cache (offline)</div>':''}}
+  </div>`;
+}}
+
+function newsCarousel(items){{
+  if(!items||!items.length)return "";
+  const slides=items.slice(0,8).map((n,i)=>{{
+    const bg=n.image_url
+      ?`background-image:url('${{esc(n.image_url)}}');background-size:cover;background-position:center;`
+      :`background:linear-gradient(135deg,var(--accent),#7c3aed);`;
+    return `<div class="dlive-nc-slide ${{i===0?'active':''}}" data-idx="${{i}}" style="${{bg}}">
+      <div class="dlive-nc-overlay">
+        <div class="dlive-nc-source">${{esc(n.source||'')}}</div>
+        <div class="dlive-nc-title">${{esc(n.title||'')}}</div>
+        <div class="dlive-nc-snip">${{esc(n.snippet||'')}}</div>
+      </div>
+    </div>`;
+  }}).join("");
+  const dots=items.slice(0,8).map((_,i)=>
+    `<span class="dlive-nc-dot ${{i===0?'active':''}}" onclick="newsGoTo(${{i}})"></span>`
+  ).join("");
+  return `<div class="dlive-widget dlive-widget-news dlive-card" id="dlive-news-carousel">
+    <div class="dlive-nc-header">
+      <span class="dlive-nc-label">Nachrichten</span>
+      <div class="dlive-nc-nav">
+        <button class="dlive-nc-arr" onclick="newsNav(-1)">&#x276E;</button>
+        <button class="dlive-nc-arr" onclick="newsNav(1)">&#x276F;</button>
+      </div>
+    </div>
+    <div class="dlive-nc-track">${{slides}}</div>
+    <div class="dlive-nc-dots">${{dots}}</div>
+  </div>`;
+}}
+
+window.newsGoTo=function(idx){{
+  const slides=document.querySelectorAll('#dlive-news-carousel .dlive-nc-slide');
+  const dots=document.querySelectorAll('#dlive-news-carousel .dlive-nc-dot');
+  slides.forEach(s=>s.classList.remove('active'));
+  dots.forEach(d=>d.classList.remove('active'));
+  if(slides[idx]){{slides[idx].classList.add('active');_newsSlide=idx;}}
+  if(dots[idx])dots[idx].classList.add('active');
+}};
+window.newsNav=function(dir){{
+  const total=document.querySelectorAll('#dlive-news-carousel .dlive-nc-slide').length;
+  if(!total)return;
+  newsGoTo((_newsSlide+dir+total)%total);
+}};
+setInterval(()=>{{
+  if(!document.querySelector('#panel-dashboard.active'))return;
+  const total=document.querySelectorAll('#dlive-news-carousel .dlive-nc-slide').length;
+  if(total>1)newsGoTo((_newsSlide+1)%total);
+}},8000);
+
+function newsletterWidget(nl){{
+  if(!nl||!nl.highlights||!nl.highlights.length)return "";
+  const cards=nl.highlights.map((h,i)=>
+    `<div class="dlive-nl-card ${{i===0?'active':''}}" data-ni="${{i}}">
+      <div class="dlive-nl-titel">${{esc(h.titel)}}</div>
+      <div class="dlive-nl-text">${{esc(h.text)}}</div>
+      <div class="dlive-nl-quelle">${{esc(h.quelle)}}</div>
+    </div>`
+  ).join("");
+  const dots=nl.highlights.map((_,i)=>
+    `<span class="dlive-nl-dot ${{i===0?'active':''}}" onclick="nlGoTo(${{i}})"></span>`
+  ).join("");
+  const ts=nl.erstellt_am?nl.erstellt_am.substring(11,16):"";
+  return `<div class="dlive-widget dlive-widget-newsletter dlive-card" id="dlive-nl-widget">
+    <div class="dlive-nl-header">
+      <span class="dlive-nl-label">\\u2728 Newsletter-Digest</span>
+      <span class="dlive-nl-sub">zusammengestellt von Kira${{ts?' \\u00b7 '+ts:''}}</span>
+    </div>
+    <div class="dlive-nl-track">${{cards}}</div>
+    <div class="dlive-nl-dots">${{dots}}</div>
+  </div>`;
+}}
+
+window.nlGoTo=function(idx){{
+  const cards=document.querySelectorAll('#dlive-nl-widget .dlive-nl-card');
+  const dots=document.querySelectorAll('#dlive-nl-widget .dlive-nl-dot');
+  cards.forEach(c=>c.classList.remove('active'));
+  dots.forEach(d=>d.classList.remove('active'));
+  if(cards[idx]){{cards[idx].classList.add('active');_nlSlide=idx;}}
+  if(dots[idx])dots[idx].classList.add('active');
+}};
+setInterval(()=>{{
+  if(!document.querySelector('#panel-dashboard.active'))return;
+  const total=document.querySelectorAll('#dlive-nl-widget .dlive-nl-card').length;
+  if(total>1)nlGoTo((_nlSlide+1)%total);
+}},10000);
+
+function renderWidgetStrip(){{
+  let el=document.getElementById('dlive-widget-strip');
+  if(!el){{
+    el=document.createElement('div');
+    el.id='dlive-widget-strip';
+    el.className='dlive-widget-strip';
+    const briefing=document.querySelector('.dlive-briefing');
+    const kpiGrid=document.querySelector('.dlive-kpi-grid,.dlive-kpi-chips');
+    const root=document.getElementById('dash-root');
+    if(briefing&&briefing.nextSibling)briefing.parentNode.insertBefore(el,briefing.nextSibling);
+    else if(kpiGrid)kpiGrid.parentNode.insertBefore(el,kpiGrid);
+    else if(root)root.appendChild(el);
+  }}
+  if(!_widgetData){{el.innerHTML='';return;}}
+  el.innerHTML=weatherWidget(_widgetData.weather)
+    +newsCarousel(_widgetData.news)
+    +newsletterWidget(_widgetData.newsletter);
+  staggerIn(el.querySelectorAll('.dlive-widget'),100);
+}}
+
+async function fetchWidgets(){{
+  try{{
+    const r=await fetch("/api/dashboard/widgets");
+    if(!r.ok)return;
+    _widgetData=await r.json();
+    renderWidgetStrip();
+  }}catch(e){{console.warn("Widget fetch:",e);}}
+}}
+
 /* Init */
 fetchAndRender();
 startRefresh();
+fetchWidgets();
+setInterval(()=>{{
+  if(document.querySelector('#panel-dashboard.active'))fetchWidgets();
+}},300000);
 }})();
 </script>'''
 
@@ -5909,6 +6060,7 @@ def build_einstellungen():
     llm   = get_llm_config()
     proto         = config.get("protokoll", {})
     dashboard_cfg = config.get("dashboard", {})
+    nf_cfg = config.get("news_feed", {})
     rtlog_cfg = config.get("runtime_log", {})
     kira_cfg  = config.get("kira", {})
     launcher_variant = kira_cfg.get("launcher_variant", "B")
@@ -6507,6 +6659,7 @@ function esInfoPopup(btn, text) {{
   <div class="es-sn" data-essec="aufgaben" onclick="esShowSec('aufgaben')"><span class="es-sico">&#x2611;</span>Aufgabenlogik</div>
   <div class="es-sn" data-essec="nachfass" onclick="esShowSec('nachfass')"><span class="es-sico">&#x21BB;</span>Nachfass-Intervalle</div>
   <div class="es-sn" data-essec="dashboard" onclick="esShowSec('dashboard')"><span class="es-sico">&#x229E;</span>Dashboard</div>
+  <div class="es-sn" data-essec="widgets" onclick="esShowSec('widgets')"><span class="es-sico">&#x1F4F0;</span>Feed-Widgets</div>
   <div class="es-sn-sep"></div>
   <div class="es-snav-h">System</div>
   <div class="es-sn" data-essec="provider" onclick="esShowSec('provider')"><span class="es-sico">&#x25C8;</span>Kira / LLM / Provider<span class="es-scnt">{len(providers)}</span></div>
@@ -7203,6 +7356,86 @@ function esInfoPopup(btn, text) {{
     <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
   </div>
 </div>
+
+<!-- ── SECTION: FEED-WIDGETS ──────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-widgets">
+  <div class="es-sec-h">Feed-Widgets</div>
+  <div class="es-sec-sub">Wetter, Nachrichten-Feeds und Newsletter-Digest auf dem Dashboard.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Wetter</div>
+    <div class="es-row">
+      <div class="es-rl">Wetter-Widget aktiv<div class="es-rd">Live-Wetter auf dem Dashboard anzeigen (wttr.in, kein API-Key n&ouml;tig)</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-wetter-aktiv" {'checked' if nf_cfg.get('wetter',{{}}).get('aktiv',True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Standort<div class="es-rd">Stadt oder PLZ (z.B. D&uuml;sseldorf, 40213)</div></div>
+      <input class="es-inp" type="text" id="cfg-nf-wetter-standort" value="{_html(nf_cfg.get('wetter',{{}}).get('standort','D\\u00fcsseldorf'))}" placeholder="D&uuml;sseldorf" style="max-width:200px">
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">News-Feeds (RSS)</div>
+    <div class="es-grp-sub">Nachrichten-Quellen f&uuml;r das News-Karussell. Unterst&uuml;tzt RSS 2.0 und Atom.</div>
+    <div id="es-rss-list"></div>
+    <div class="es-row" style="gap:8px">
+      <input class="es-inp" type="text" id="cfg-nf-rss-url" placeholder="https://feed-url.de/rss" style="flex:2">
+      <input class="es-inp" type="text" id="cfg-nf-rss-label" placeholder="Label" style="max-width:120px">
+      <button class="es-btn es-btn-pri" onclick="esAddRssFeed()">+ Feed</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Newsletter-Digest</div>
+    <div class="es-row">
+      <div class="es-rl">Newsletter-Digest aktiv<div class="es-rd">Kira fasst Newsletter-Inhalte der letzten 7 Tage zusammen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-nf-newsletter-aktiv" {'checked' if nf_cfg.get('newsletter_digest',{{}}).get('aktiv',True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Maximale Highlights<div class="es-rd">Wie viele Highlights Kira extrahiert (3&ndash;8)</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-nf-newsletter-max" value="{nf_cfg.get('newsletter_digest',{{}}).get('max_items',5)}" min="3" max="8">
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+  </div>
+</div>
+
+<script>
+window._esRssFeeds = {json.dumps(nf_cfg.get('rss_feeds', []), ensure_ascii=False)};
+function esRenderRssFeeds(){{
+  const box=document.getElementById('es-rss-list');
+  if(!box)return;
+  box.innerHTML=window._esRssFeeds.map((f,i)=>
+    `<div class="es-row" style="align-items:center">
+      <span style="flex:1;font-size:12px;font-weight:600">${{f.label||f.url}}</span>
+      <span style="font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${{f.url}}</span>
+      <button class="es-btn" onclick="esRemoveRss(${{i}})" style="padding:4px 8px;font-size:11px">&#x2715;</button>
+    </div>`
+  ).join('')||'<div style="font-size:12px;color:var(--muted);padding:8px">Keine Feeds konfiguriert</div>';
+}}
+window.esAddRssFeed=function(){{
+  const url=(document.getElementById('cfg-nf-rss-url')||{{}}).value?.trim();
+  const label=(document.getElementById('cfg-nf-rss-label')||{{}}).value?.trim()||url;
+  if(!url)return;
+  window._esRssFeeds.push({{url,label,kategorie:'allgemein'}});
+  if(document.getElementById('cfg-nf-rss-url'))document.getElementById('cfg-nf-rss-url').value='';
+  if(document.getElementById('cfg-nf-rss-label'))document.getElementById('cfg-nf-rss-label').value='';
+  esRenderRssFeeds();
+}};
+window.esRemoveRss=function(idx){{
+  window._esRssFeeds.splice(idx,1);
+  esRenderRssFeeds();
+}};
+setTimeout(esRenderRssFeeds,100);
+</script>
 
 <!-- ── SECTION: PROVIDER / KIRA / LLM ────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-provider">
@@ -17686,6 +17919,17 @@ function saveSettings() {{
       konfetti: document.getElementById('cfg-dashboard-konfetti')?.checked ?? true,
       reduced_motion: document.getElementById('cfg-dashboard-reduced')?.checked ?? false
     }},
+    news_feed: {{
+      wetter: {{
+        aktiv: document.getElementById('cfg-nf-wetter-aktiv')?.checked ?? true,
+        standort: document.getElementById('cfg-nf-wetter-standort')?.value?.trim() || 'D\\u00fcsseldorf'
+      }},
+      rss_feeds: window._esRssFeeds || [],
+      newsletter_digest: {{
+        aktiv: document.getElementById('cfg-nf-newsletter-aktiv')?.checked ?? true,
+        max_items: parseInt(document.getElementById('cfg-nf-newsletter-max')?.value||'5')
+      }}
+    }},
     protokoll: {{
       max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
       tage:          parseInt(document.getElementById('cfg-proto-tage')?.value)||90
@@ -20710,6 +20954,59 @@ a:hover{text-decoration:underline;}
 [data-theme="light"] .dlive-sig-blue{background:#EFF6FF;border-color:#93C5FD;color:#1a4a8a;}
 [data-theme="light"] .dlive-sig-purple{background:#F5F3FF;border-color:#C4B5FD;color:#5b21b6;}
 
+/* ═══ FEED-WIDGETS: Wetter / News / Newsletter ═══ */
+.dlive-widget-strip{display:grid;grid-template-columns:280px 1fr 320px;gap:16px;margin-bottom:20px;}
+@media(max-width:1100px){.dlive-widget-strip{grid-template-columns:1fr 1fr;}.dlive-widget-newsletter{grid-column:1/-1;}}
+@media(max-width:700px){.dlive-widget-strip{grid-template-columns:1fr;}}
+
+/* ── Weather ── */
+.dlive-widget-weather{padding:20px;position:relative;overflow:hidden;}
+.dlive-w-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.dlive-w-icon{font-size:42px;line-height:1;}
+.dlive-w-temp{font-size:36px;font-weight:700;color:var(--text);letter-spacing:-1px;}
+.dlive-w-cond{font-size:13px;color:var(--text-secondary,var(--muted));font-weight:500;}
+.dlive-w-meta{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-bottom:14px;}
+.dlive-w-forecast{display:flex;gap:8px;border-top:.5px solid var(--border);padding-top:12px;}
+.dlive-w-fc-day{flex:1;text-align:center;}
+.dlive-w-fc-d{display:block;font-size:10px;font-weight:700;color:var(--text-secondary,var(--muted));text-transform:uppercase;letter-spacing:.5px;}
+.dlive-w-fc-icon{display:block;font-size:20px;margin:4px 0;}
+.dlive-w-fc-t{display:block;font-size:11px;color:var(--muted);}
+.dlive-w-stale{position:absolute;top:8px;right:10px;font-size:9px;color:var(--warn);}
+
+/* ── News Carousel ── */
+.dlive-widget-news{padding:0;overflow:hidden;min-height:240px;position:relative;border-radius:12px;}
+.dlive-nc-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0;position:relative;z-index:3;}
+.dlive-nc-label{font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.5px;}
+.dlive-nc-nav{display:flex;gap:4px;}
+.dlive-nc-arr{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:none;color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.dlive-nc-arr:hover{background:rgba(255,255,255,.3);}
+.dlive-nc-track{position:relative;width:100%;height:220px;}
+.dlive-nc-slide{position:absolute;inset:0;opacity:0;transition:opacity .6s ease-in-out;display:flex;align-items:flex-end;}
+.dlive-nc-slide.active{opacity:1;z-index:1;}
+.dlive-nc-overlay{width:100%;padding:50px 18px 16px;background:linear-gradient(transparent,rgba(0,0,0,.75));}
+.dlive-nc-source{font-size:10px;color:rgba(255,255,255,.7);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.dlive-nc-title{font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dlive-nc-snip{font-size:11px;color:rgba(255,255,255,.75);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dlive-nc-dots{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:2;}
+.dlive-nc-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:all .2s;}
+.dlive-nc-dot.active{background:#fff;width:16px;border-radius:3px;}
+
+/* ── Newsletter Digest ── */
+.dlive-widget-newsletter{position:relative;overflow:hidden;padding:18px;}
+.dlive-widget-newsletter::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#7c3aed,var(--accent),#7c3aed);background-size:200% 100%;animation:dlive-shimmer 3s ease-in-out infinite;}
+.dlive-nl-header{display:flex;align-items:baseline;gap:8px;margin-bottom:14px;}
+.dlive-nl-label{font-size:14px;font-weight:700;color:var(--text);}
+.dlive-nl-sub{font-size:11px;color:var(--muted);font-style:italic;}
+.dlive-nl-track{position:relative;min-height:100px;}
+.dlive-nl-card{opacity:0;max-height:0;overflow:hidden;transition:opacity .5s,max-height .5s;padding:0;}
+.dlive-nl-card.active{opacity:1;max-height:200px;padding:12px 0;}
+.dlive-nl-titel{font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.dlive-nl-text{font-size:12px;color:var(--text-secondary,var(--muted));line-height:1.5;margin-bottom:6px;}
+.dlive-nl-quelle{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.dlive-nl-dots{display:flex;gap:6px;margin-top:8px;}
+.dlive-nl-dot{width:6px;height:6px;border-radius:50%;background:var(--border-strong,var(--border));cursor:pointer;transition:all .2s;}
+.dlive-nl-dot.active{background:#7c3aed;width:16px;border-radius:3px;}
+
 /* ═══ LAYOUT A: Bento Grid ═══ */
 .dlive-layout-a .dlive-bento{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-bottom:22px;}
 .dlive-layout-a .dlive-bento-main{grid-row:span 2;}
@@ -22152,6 +22449,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json(data)
             except Exception as ex:
                 self._json({'error': str(ex), 'kpis': [], 'briefing': {}, 'actions': [], 'feed': [], 'termine': [], 'geschaeft': [], 'vorgaenge': {'items': [], 'total': 0}, 'signale': [], 'sent': [], 'sparkline': [], 'mi_stats': {}, 'freigaben': 0, 'ts': ''})
+
+        elif self.path == '/api/dashboard/widgets':
+            try:
+                data = get_dashboard_widgets()
+                self._json(data)
+            except Exception as ex:
+                self._json({'weather': None, 'news': [], 'newsletter': None, 'ts': '', '_err': str(ex)})
 
         elif self.path.startswith('/api/runtime/events'):
             qs          = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -29177,6 +29481,13 @@ def run_server(open_browser=True):
         print("[Signal-Watcher] Desktop-Overlay aktiv (15s Intervall)")
     except Exception as _sw_err:
         print(f"[Signal-Watcher] Nicht verfügbar: {_sw_err}")
+
+    # News-Feed Widget-Cache vorwärmen (Wetter, RSS, Newsletter-Digest)
+    try:
+        start_feed_refresh_thread()
+        print("[News-Feed] Widget-Refresh-Thread gestartet")
+    except Exception as _nf_err:
+        print(f"[News-Feed] Nicht verfügbar: {_nf_err}")
 
     # Mail-Monitor starten (Echtzeit-IMAP-Polling)
     monitor_cfg = config.get("mail_monitor", {})
