@@ -750,9 +750,12 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
 
         # Task-Erstellung nur im "mit_tasks"-Modus und ab task_seit
         if modus == "mit_tasks" and task_seit and datum >= task_seit and tasks_db:
-            # Ignorierbare Kategorien
-            if kat not in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
-                if not (kat in ("Shop / System", "Rechnung / Beleg") and not cl["antwort_noetig"]):
+            # Routing-Dispatch: nur bei routing=task UND erfordert_handlung
+            routing = cl.get("routing", "task")
+            erfordert_handlung = cl.get("erfordert_handlung", True)
+            if routing == "kira_vorschlag":
+                _route_kira_vorschlag_dc(cl, k_email, betr, text, msgid, konto)
+            if routing == "task" and erfordert_handlung:
                     # Duplikat-Check
                     if msgid and msgid not in existing_ids:
                         # Schon beantwortet?

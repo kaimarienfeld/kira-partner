@@ -1283,7 +1283,7 @@ def _process_mail(mail_data, konto_label, folder_name):
     _absender_email_m = re.search(r'<([^>]+@[^>]+)>', absender)
     _absender_email = _absender_email_m.group(1).lower() if _absender_email_m else absender.strip().lower()
     _kunden_email_resolved = _absender_email
-    _EIGENE = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com"}
+    _EIGENE = {"raumkult.eu", "sichtbeton-cire.de", "raumkultsichtbeton.onmicrosoft.com", "invoicefetcher.email"}
     _abs_dom = _absender_email.split('@')[-1] if '@' in _absender_email else ''
     if _abs_dom in _EIGENE:
         # Formular-Muster? E-Mail aus Body extrahieren
