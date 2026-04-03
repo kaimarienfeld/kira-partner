@@ -253,7 +253,10 @@
     "api_base_url": "https://api.lexware.io/v1"
   },
   "dashboard": {
-    "refresh_intervall_s": 300
+    "layout": "B",
+    "refresh_intervall_s": 30,
+    "konfetti": true,
+    "reduced_motion": false
   },
   "kira_proaktiv": {
     "aktiv": true,

@@ -734,14 +734,24 @@ def build_section(titel, tasks, collapsed=False):
     return f'<div class="section{coll_class}"><div class="section-title" onclick="this.parentElement.classList.toggle(\'collapsed\')">{titel} <span class="count-badge">{len(tasks)}</span></div><div class="section-body">{cards}</div></div>'
 
 # ── DASHBOARD Panel ───────────────────────────────────────────────────────────
-def build_dashboard(tasks, db):
+
+def _dashboard_data(tasks=None, db=None):
+    """Collect all dashboard data as JSON-serializable dict for /api/dashboard/live."""
+    close_db = False
+    if db is None:
+        db = get_db()
+        close_db = True
+    if tasks is None:
+        tasks_rows = db.execute("SELECT * FROM tasks WHERE status='offen' ORDER BY prioritaet DESC, datum_mail DESC").fetchall()
+        tasks = [dict(r) for r in tasks_rows]
+    today = datetime.now().strftime("%Y-%m-%d")
+
     n_antwort = sum(1 for t in tasks if t.get("kategorie") == "Antwort erforderlich")
     n_leads   = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
     n_angebot = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung")
     n_ges     = len(tasks)
-    today     = datetime.now().strftime("%Y-%m-%d")
 
-    # Mail-Klassifizierung aus mail_index.db laden
+    # Mail-Klassifizierung
     mi_stats = {"gesamt": 0, "klassifiziert": 0, "kategorien": {}}
     try:
         mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
@@ -750,482 +760,640 @@ def build_dashboard(tasks, db):
         mi_stats["gesamt"] = r["c"] if r else 0
         r2 = mi_db.execute("SELECT COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != ''").fetchone()
         mi_stats["klassifiziert"] = r2["c"] if r2 else 0
-        for row in mi_db.execute("SELECT kategorie, COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != '' GROUP BY kategorie ORDER BY c DESC").fetchall():
+        for row in mi_db.execute("SELECT kategorie, COUNT(*) c FROM mails WHERE folder='INBOX' AND kategorie IS NOT NULL AND kategorie != '' GROUP BY kategorie ORDER BY c DESC"):
             mi_stats["kategorien"][row["kategorie"]] = row["c"]
         mi_db.close()
     except Exception:
         pass
 
-    # Organisation-Daten — nur aktuelle/zukünftige Termine (ab heute -7 Tage)
     try: n_org = db.execute("SELECT COUNT(*) FROM organisation WHERE datum_erkannt >= date('now','-7 days')").fetchone()[0]
-    except: n_org = 0
+    except Exception: n_org = 0
 
-    # Ausgangsrechnungen offen
     try:
         ar_row = db.execute("SELECT COUNT(*) c, COALESCE(SUM(betrag_brutto),0) s FROM ausgangsrechnungen WHERE status='offen'").fetchone()
         n_ar_offen = ar_row[0]; s_ar_offen = ar_row[1]
-    except: n_ar_offen = 0; s_ar_offen = 0
+    except Exception: n_ar_offen = 0; s_ar_offen = 0
 
-    # Eingangsrechnungen offen
     try: n_eingang = db.execute("SELECT COUNT(*) FROM geschaeft WHERE wichtigkeit='aktiv' AND (bewertung IS NULL OR bewertung!='erledigt')").fetchone()[0]
-    except: n_eingang = 0
+    except Exception: n_eingang = 0
 
-    # Nachfass fällig
     try: n_nachfass = db.execute("SELECT COUNT(*) FROM angebote WHERE status='offen' AND naechster_nachfass IS NOT NULL AND naechster_nachfass <= ?", (today,)).fetchone()[0]
-    except: n_nachfass = 0
+    except Exception: n_nachfass = 0
 
-    # ── Zone A: Tagesbriefing (horizontale Leiste) ──
-    briefing_items = []
-    if n_antwort > 0:
-        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#E24B4A"></span>{n_antwort} Antwort{"en" if n_antwort>1 else ""} n&ouml;tig</div>')
-    if n_nachfass > 0:
-        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#EF9F27"></span>{n_nachfass} Nachfass f&auml;llig</div>')
-    if n_leads > 0:
-        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#378ADD"></span>{n_leads} neue{"r" if n_leads==1 else ""} Lead{"s" if n_leads>1 else ""}</div>')
-    if s_ar_offen > 0:
-        briefing_items.append(f'<div class="dash-b-item"><span class="dash-b-dot" style="background:#1D9E75"></span>&euro;&nbsp;{s_ar_offen:,.0f} offenes Volumen</div>')
+    # Kira freigaben
+    try: n_freigaben = db.execute("SELECT COUNT(*) FROM mail_approve_queue WHERE status='pending'").fetchone()[0]
+    except Exception: n_freigaben = 0
 
-    # LLM-Briefing (falls verfügbar) — voll anzeigen
-    llm_block = ""
-    briefing_ts = ""
-    try:
-        briefing = generate_daily_briefing()
-        bz   = (briefing.get("zusammenfassung","") or "").strip()
-        prios = briefing.get("prioritaeten") or []
-        _bt = (briefing.get("erstellt_am") or "")
-        if _bt: briefing_ts = _bt[11:16] if len(_bt) >= 16 else _bt[:16]
-        if bz:
-            prio_html = ""
-            if prios:
-                typ_col = {"rechnung":"#E24B4A","angebot":"#EF9F27","aufgabe":"#378ADD"}
-                items = "".join(
-                    f'<div class="dash-bs-prio"><span class="dash-bs-dot" style="background:{typ_col.get(str(p.get("typ","aufgabe")).lower(),"#888")}"></span>{esc(str(p.get("text",""))[:120])}</div>'
-                    for p in prios[:5]
-                )
-                prio_html = f'<div class="dash-bs-prios">{items}</div>'
-            llm_block = f'<div class="dash-briefing-summary"><div class="dash-bs-text">{esc(bz)}</div>{prio_html}</div>'
-    except: pass
+    # KPIs
+    kpis = [
+        {"key": "antwort_noetig", "label": "Antworten n\u00f6tig", "val": n_antwort, "change": "dringend" if n_antwort > 0 else "", "trend": "danger" if n_antwort > 0 else "ok", "action": "filterKomm('Antwort erforderlich')"},
+        {"key": "leads", "label": "Neue Leads", "val": n_leads, "change": "diese Woche", "trend": "accent" if n_leads > 0 else "stable", "action": "filterKomm('Neue Lead-Anfrage')"},
+        {"key": "volumen_offen", "label": "Offenes Rechnungsvolumen", "val": s_ar_offen, "change": f"{n_ar_offen} Rg." if n_ar_offen > 0 else "", "trend": "warn" if s_ar_offen > 0 else "stable", "is_currency": True, "action": "showPanel('geschaeft')"},
+        {"key": "nachfass", "label": "Nachfass f\u00e4llig", "val": n_nachfass, "change": "Angebote" if n_nachfass > 0 else "", "trend": "warn" if n_nachfass > 0 else "stable", "action": "showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)"},
+        {"key": "angebote", "label": "Angebotsrückmeldungen", "val": n_angebot, "change": "offen" if n_angebot > 0 else "", "trend": "up" if n_angebot > 0 else "stable", "action": "filterKomm('Angebotsrückmeldung')"},
+        {"key": "termine", "label": "Termine & Fristen", "val": n_org, "change": "aktuell" if n_org > 0 else "", "trend": "danger" if n_org > 0 else "stable", "action": "showPanel('organisation')"},
+        {"key": "eingang_offen", "label": "Eingangsrechnungen offen", "val": n_eingang, "change": "prüfen" if n_eingang > 0 else "", "trend": "warn" if n_eingang > 0 else "stable", "action": "showPanel('geschaeft');setTimeout(()=>showGeschTab('eingangsre'),100)"},
+        {"key": "gesamt_offen", "label": "Gesamt offen", "val": n_ges, "action": "showPanel('kommunikation')"},
+        {"key": "mails_klassifiziert", "label": "Mails klassifiziert", "val": mi_stats["klassifiziert"], "change": f"von {mi_stats['gesamt']} INBOX" if mi_stats["gesamt"] > 0 else "", "action": "esShowSec('mail');showPanel('einstellungen')"},
+    ]
 
-    if not briefing_items:
-        briefing_items = ['<div class="dash-b-item" style="color:var(--success)"><span class="dash-b-dot" style="background:var(--success)"></span>Alles im gr&uuml;nen Bereich</div>']
-
-    _ts_display = f' <span class="dash-briefing-ts">Stand {briefing_ts}</span>' if briefing_ts else ''
-    briefing_html = f'''<div id="kira-briefing" class="dash-briefing">
-  <div class="dash-briefing-head">
-    <div class="dash-briefing-title">Tagesbriefing{_ts_display}</div>
-    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_DASHBOARD,{{erklaermodus:true}})" title="Geführte Tour durch das Dashboard">Tour</button>
-    <button class="dash-briefing-refresh" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
-  </div>
-  <div class="dash-briefing-items">{"".join(briefing_items)}</div>
-  {llm_block}
-</div>'''
-
-    # ── Zone B: KPI-Karten ──
-    # Echte Monats-Sparkline für Rechnungsvolumen (letzte 6 Monate)
-    rechnung_spark = ""
+    # Sparkline (last 6 months)
+    sparkline = []
     try:
         months = db.execute("""
             SELECT strftime('%Y-%m', datum) as m, SUM(betrag_brutto) as total
             FROM ausgangsrechnungen WHERE datum >= date('now','-6 months')
             GROUP BY m ORDER BY m
         """).fetchall()
-        if months and len(months) >= 2:
-            vals = [r['total'] or 0 for r in months[-6:]]
-            max_v = max(vals) or 1
-            bar_w = 28; gap = 6
-            bars = ""
-            for i, v in enumerate(vals):
-                h = max(3, int(v / max_v * 26))
-                x = 8 + i * (bar_w + gap)
-                op = round(0.25 + 0.55 * v / max_v, 2)
-                bars += f'<rect x="{x}" y="{34-h}" width="{bar_w}" height="{h}" rx="3" fill="#EF9F27" opacity="{op}"/>'
-            rechnung_spark = f'<div class="dash-kpi-spark"><svg viewBox="0 0 220 34">{bars}</svg></div>'
-    except: pass
+        if months:
+            sparkline = [{"m": r["m"], "total": r["total"] or 0} for r in months[-6:]]
+    except Exception:
+        pass
 
-    kpi_html = f"""<div class="dash-kpi-grid" id="kpi-bar">
-  <div class="dash-kpi {'kpi-danger' if n_antwort>0 else ''}" onclick="filterKomm('Antwort erforderlich')">
-    <div class="dash-kpi-label">Antworten n&ouml;tig</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_antwort}</span>{'<span class="dash-kpi-change danger">dringend</span>' if n_antwort>0 else '<span class="dash-kpi-change info">kein Handlungsbedarf</span>'}</div>
-  </div>
-  <div class="dash-kpi {'kpi-accent' if n_leads>0 else ''}" onclick="filterKomm('Neue Lead-Anfrage')">
-    <div class="dash-kpi-label">Neue Leads</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_leads}</span><span class="dash-kpi-change info">diese Woche</span></div>
-  </div>
-  <div class="dash-kpi {'kpi-warn' if s_ar_offen>0 else ''}" onclick="showPanel('geschaeft')">
-    <div class="dash-kpi-label">Offenes Rechnungsvolumen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">&euro;&thinsp;{s_ar_offen:,.0f}</span>{'<span class="dash-kpi-change warn">' + str(n_ar_offen) + ' Rg.</span>' if n_ar_offen>0 else ''}</div>
-    {rechnung_spark}
-  </div>
-  <div class="dash-kpi {'kpi-warn' if n_nachfass>0 else ''}" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)">
-    <div class="dash-kpi-label">Nachfass f&auml;llig</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_nachfass}</span>{'<span class="dash-kpi-change warn">Angebote</span>' if n_nachfass>0 else ''}</div>
-  </div>
-  <div class="dash-kpi" onclick="filterKomm('Angebotsrückmeldung')">
-    <div class="dash-kpi-label">Angebots&shy;rückmeldungen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_angebot}</span>{'<span class="dash-kpi-change up">offen</span>' if n_angebot>0 else ''}</div>
-  </div>
-  <div class="dash-kpi {'kpi-danger' if n_org>0 else ''}" onclick="showPanel('organisation')">
-    <div class="dash-kpi-label">Termine &amp; Fristen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_org}</span>{'<span class="dash-kpi-change danger">heute</span>' if n_org>0 else ''}</div>
-  </div>
-  <div class="dash-kpi" onclick="showPanel('geschaeft');setTimeout(()=>showGeschTab('eingangsre'),100)">
-    <div class="dash-kpi-label">Eingangsrechnungen offen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_eingang}</span>{'<span class="dash-kpi-change warn">prüfen</span>' if n_eingang>0 else ''}</div>
-  </div>
-  <div class="dash-kpi" onclick="showPanel('kommunikation')">
-    <div class="dash-kpi-label">Gesamt offen</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{n_ges}</span></div>
-  </div>
-  <div class="dash-kpi" onclick="esShowSec('mail');showPanel('einstellungen')" title="Mail-Intelligence: Klassifizierte Mails in KIRA">
-    <div class="dash-kpi-label">Mails klassifiziert</div>
-    <div class="dash-kpi-row"><span class="dash-kpi-val">{mi_stats['klassifiziert']:,}</span>{'<span class="dash-kpi-change info">von '+str(mi_stats["gesamt"])+' INBOX</span>' if mi_stats['gesamt']>0 else ''}</div>
-  </div>
-</div>"""
-
-    # ── Zone C1: Heute priorisiert (max 5) ──
-    urgent = [t for t in tasks if t.get("kategorie") in ("Antwort erforderlich","Neue Lead-Anfrage","Angebotsrückmeldung")][:5]
-
-    def prio_color(kat):
-        if kat == "Antwort erforderlich": return "prio-red"
-        if kat == "Neue Lead-Anfrage": return "prio-blue"
-        if kat == "Angebotsrückmeldung": return "prio-amber"
-        return "prio-gray"
-
-    def prio_tag(kat):
-        if kat == "Antwort erforderlich": return '<span class="dash-tag dash-tag-red">dringend</span>'
-        if kat == "Neue Lead-Anfrage": return '<span class="dash-tag dash-tag-blue">neuer Lead</span>'
-        if kat == "Angebotsrückmeldung": return '<span class="dash-tag dash-tag-amber">Angebot</span>'
-        return '<span class="dash-tag dash-tag-gray">offen</span>'
-
-    prio_items_html = ""
-    for t in urgent:
-        kat = t.get("kategorie","")
-        title = esc((t.get("titel") or t.get("betreff") or "Vorgang")[:70])
-        meta_parts = []
-        if kat: meta_parts.append(kat)
-        if t.get("kunden_name"): meta_parts.append(esc(t["kunden_name"][:30]))
-        if t.get("datum_mail"): meta_parts.append(format_datum(t["datum_mail"]))
-        meta = " · ".join(meta_parts)
-        aktion = esc((t.get("empfohlene_aktion","") or "")[:60])
-        next_hint = f'<span class="dash-prio-next">{aktion}</span>' if aktion else ""
-        tid = t.get("id","")
-        prio_items_html += f'''<div class="dash-prio-item {prio_color(kat)}">
-  <div class="dash-prio-body">
-    <div class="dash-prio-title">{title}</div>
-    <div class="dash-prio-meta">{meta}</div>
-    <div class="dash-prio-tags">{prio_tag(kat)}{next_hint}</div>
-  </div>
-  <div class="dash-prio-menu" id="pmenu-{tid}">
-    <button class="dash-prio-dots" onclick="togglePrioMenu(this)" title="Aktionen">&#x22EE;</button>
-    <div class="dash-prio-dropdown">
-      <button class="dash-prio-dd-btn" onclick="filterKomm('{esc(kat)}');document.querySelectorAll('.dash-prio-menu.open').forEach(m=>m.classList.remove('open'))">&#x2192; &Ouml;ffnen</button>
-      <div class="dash-prio-dd-sep"></div>
-      <button class="dash-prio-dd-btn dd-kira" onclick="openKiraWorkspace('aufgabe');document.querySelectorAll('.dash-prio-menu.open').forEach(m=>m.classList.remove('open'))">&#x2728; Mit Kira bearbeiten</button>
-    </div>
-  </div>
-</div>'''
-
-    if not prio_items_html:
-        prio_items_html = '<div style="text-align:center;padding:28px 0;color:var(--muted);font-size:13px">&#x2713; Keine priorisierten Aufgaben heute</div>'
-
-    # ── Zone C0: Heute gesendete Mails ──
-    sent_rows = []
+    # Briefing
+    briefing = {"zusammenfassung": "", "prioritaeten": [], "erstellt_am": ""}
     try:
-        # Kira-Approval-Queue: heute gesendet
+        br = generate_daily_briefing()
+        briefing = {
+            "zusammenfassung": (br.get("zusammenfassung", "") or "").strip(),
+            "prioritaeten": br.get("prioritaeten") or [],
+            "erstellt_am": br.get("erstellt_am") or ""
+        }
+    except Exception:
+        pass
+
+    # Priority actions (top 5)
+    urgent = [t for t in tasks if t.get("kategorie") in ("Antwort erforderlich", "Neue Lead-Anfrage", "Angebotsrückmeldung")][:5]
+    actions = []
+    for t in urgent:
+        actions.append({
+            "id": t.get("id", ""),
+            "titel": (t.get("titel") or t.get("betreff") or "Vorgang")[:70],
+            "kategorie": t.get("kategorie", ""),
+            "kunden_name": (t.get("kunden_name") or "")[:30],
+            "datum_mail": str(t.get("datum_mail", "") or ""),
+            "empfohlene_aktion": (t.get("empfohlene_aktion", "") or "")[:60]
+        })
+
+    # Sent today
+    sent = []
+    try:
         kira_sent = db.execute(
             "SELECT an, betreff, gesendet_am FROM mail_approve_queue "
             "WHERE status='sent' AND gesendet_am LIKE ? ORDER BY gesendet_am DESC LIMIT 8",
             (today + '%',)
         ).fetchall()
         for r in kira_sent:
-            sent_rows.append({'to': r['an'], 'subject': r['betreff'], 'ts': (r['gesendet_am'] or '')[:16], 'via': 'kira'})
-    except: pass
+            sent.append({"to": r["an"], "subject": r["betreff"], "ts": (r["gesendet_am"] or "")[:16], "via": "kira"})
+    except Exception:
+        pass
     try:
-        import sqlite3 as _sq3
-        _rtdb = _sq3.connect(str(KNOWLEDGE_DIR / 'runtime_events.db'))
-        _rtdb.row_factory = _sq3.Row
+        _rtdb = sqlite3.connect(str(KNOWLEDGE_DIR / "runtime_events.db"))
+        _rtdb.row_factory = sqlite3.Row
         user_sent = _rtdb.execute(
             "SELECT summary, ts FROM events WHERE action='mail_gesendet' AND ts LIKE ? ORDER BY ts DESC LIMIT 8",
             (today + '%',)
         ).fetchall()
         _rtdb.close()
         for r in user_sent:
-            # summary format: "Mail an <to> | Betreff: <subj> | Von: <from>"
-            _s = r['summary'] or ''
-            _to = _s.split('|')[0].replace('Mail an ', '').strip() if '|' in _s else _s[:40]
-            _subj = _s.split('Betreff:')[1].split('|')[0].strip() if 'Betreff:' in _s else ''
-            sent_rows.append({'to': _to, 'subject': _subj, 'ts': (r['ts'] or '')[:16], 'via': 'user'})
-    except: pass
-    sent_rows.sort(key=lambda x: x['ts'], reverse=True)
-    sent_html = ""
-    for r in sent_rows[:6]:
-        icon = '&#x1F916;' if r['via'] == 'kira' else '&#x1F464;'
-        ts_display = r['ts'][11:16] if len(r['ts']) >= 16 else r['ts']
-        to_short = esc((r['to'] or '')[:35])
-        subj_short = esc((r['subject'] or '')[:40])
-        sent_html += f'<div class="dash-sent-item"><span class="dash-sent-icon">{icon}</span><div class="dash-sent-body"><div class="dash-sent-to">{to_short}</div><div class="dash-sent-subj">{subj_short}</div></div><span class="dash-sent-ts">{ts_display}</span></div>'
-    if not sent_html:
-        sent_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Noch keine gesendeten Mails heute</div>'
-    sent_today_panel = f"""<div class="dash-panel">
-      <div class="dash-panel-title">Heute gesendet</div>
-      <div class="dash-panel-sub">Ausgegangene Mails — Kira &#x1F916; &amp; manuell &#x1F464;</div>
-      {sent_html}
-    </div>"""
+            _s = r["summary"] or ""
+            _to = _s.split("|")[0].replace("Mail an ", "").strip() if "|" in _s else _s[:40]
+            _subj = _s.split("Betreff:")[1].split("|")[0].strip() if "Betreff:" in _s else ""
+            sent.append({"to": _to, "subject": _subj, "ts": (r["ts"] or "")[:16], "via": "user"})
+    except Exception:
+        pass
+    sent.sort(key=lambda x: x.get("ts", ""), reverse=True)
 
-    # ── Zone C2: Nächste Termine & Fristen ──
+    # Termine
+    termine = []
     try:
-        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation WHERE datum_erkannt >= date('now','-7 days') ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
-        term_html = ""
+        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation WHERE datum_erkannt >= date('now','-7 days') ORDER BY datum_erkannt ASC LIMIT 8").fetchall()
         _ORG_TYP = {"termin": "Termin", "frist": "Frist", "rueckruf": "Rückruf"}
         for r in org_rows:
-            dat = esc(r['datum_erkannt'] or '')
-            desc = esc((r['beschreibung'] or '')[:45])
-            raw_org_typ = r['typ'] or ''
-            typ = esc(_ORG_TYP.get(raw_org_typ, raw_org_typ.title()))
-            # Urgency color based on date
+            dat = r["datum_erkannt"] or ""
             urgency = "normal"
+            diff_days = 999
             try:
                 d = datetime.strptime(dat[:10], "%Y-%m-%d")
-                diff = (d.date() - datetime.now().date()).days
-                if diff <= 0: urgency = "urgent"
-                elif diff <= 2: urgency = "soon"
-            except: pass
-            dat_display = dat[:10] if dat else "–"
-            badge = ""
-            if urgency == "urgent":
-                if diff < 0: badge = f'<span class="dash-term-badge dash-tag-red">&#x26A0; &uuml;berf&auml;llig</span>'
-                else: badge = f'<span class="dash-term-badge dash-tag-red">heute</span>'
-            elif urgency == "soon": badge = f'<span class="dash-term-badge dash-tag-amber">bald</span>'
-            term_html += f'''<div class="dash-term-item">
-  <span class="dash-term-date {urgency}">{dat_display}</span>
-  <span class="dash-term-text">{desc or typ}</span>
-  {badge}
-</div>'''
-    except: term_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Termine erfasst</div>'
+                diff_days = (d.date() - datetime.now().date()).days
+                if diff_days <= 0: urgency = "urgent"
+                elif diff_days <= 2: urgency = "soon"
+            except Exception:
+                pass
+            termine.append({
+                "typ": _ORG_TYP.get(r["typ"] or "", (r["typ"] or "").title()),
+                "datum": dat[:10] if dat else "",
+                "beschreibung": (r["beschreibung"] or "")[:45],
+                "urgency": urgency,
+                "diff_days": diff_days
+            })
+    except Exception:
+        pass
 
-    # ── Zone C3: Geschäft aktuell ──
+    # Geschäft
+    geschaeft = []
     _TYP_LABELS = {
-        "sonstiger_vorgang": "Vorgang",
-        "eingangsrechnung": "Eingangsrechnung",
-        "zahlungserinnerung": "Zahlungserinnerung",
-        "routine_zahlung": "Routinezahlung",
-        "kundenvorgang": "Kundenvorgang",
-        "beleg": "Beleg",
-        "rechnung": "Rechnung",
-        "angebot": "Angebot",
-        "anfrage": "Anfrage",
-        "lead": "Lead",
-        "nachfass": "Nachfass",
+        "sonstiger_vorgang": "Vorgang", "eingangsrechnung": "Eingangsrechnung",
+        "zahlungserinnerung": "Zahlungserinnerung", "routine_zahlung": "Routinezahlung",
+        "kundenvorgang": "Kundenvorgang", "beleg": "Beleg", "rechnung": "Rechnung",
+        "angebot": "Angebot", "anfrage": "Anfrage", "lead": "Lead", "nachfass": "Nachfass",
     }
     try:
         gesch_rows = db.execute("SELECT typ,datum,betrag,gegenpartei,gegenpartei_email FROM geschaeft ORDER BY datum DESC LIMIT 5").fetchall()
-        biz_html = ""
         for r in gesch_rows:
-            raw_typ = r['typ'] or ''
-            typ = esc(_TYP_LABELS.get(raw_typ, raw_typ.replace("_"," ").title() if raw_typ else ''))
-            betrag = r['betrag'] or 0
-            name = esc((r['gegenpartei'] or r['gegenpartei_email'] or '')[:30])
-            # Color by type (use raw DB value for reliable matching)
+            raw_typ = r["typ"] or ""
             rt = raw_typ.lower()
-            if rt in ("routine_zahlung", "eingangsrechnung", "beleg") or "zahlung" in rt and "erinnerung" not in rt:
-                dot_color = "#1D9E75"; val_color = "#1D9E75"; prefix = "+"
+            if rt in ("routine_zahlung", "eingangsrechnung", "beleg") or ("zahlung" in rt and "erinnerung" not in rt):
+                color_cls = "green"
             elif "mahnung" in rt or "zahlungserinnerung" in rt or "ueberfaellig" in rt:
-                dot_color = "#E24B4A"; val_color = "#E24B4A"; prefix = ""
+                color_cls = "red"
             elif rt == "nachfass":
-                dot_color = "#EF9F27"; val_color = "#BA7517"; prefix = ""
+                color_cls = "amber"
             else:
-                dot_color = "#888780"; val_color = "var(--text-secondary)"; prefix = ""
-            betrag_str = f'{prefix}&euro;&nbsp;{betrag:,.0f}' if betrag else ""
-            biz_html += f'''<div class="dash-biz-item">
-  <span class="dash-biz-dot" style="background:{dot_color}"></span>
-  <span class="dash-biz-text">{typ}{": " if typ and name else ""}{name}</span>
-  <span class="dash-biz-val" style="color:{val_color}">{betrag_str}</span>
-</div>'''
-    except: biz_html = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine Geschäftsbewegungen</div>'
+                color_cls = "gray"
+            geschaeft.append({
+                "typ": _TYP_LABELS.get(raw_typ, raw_typ.replace("_", " ").title() if raw_typ else ""),
+                "name": (r["gegenpartei"] or r["gegenpartei_email"] or "")[:30],
+                "betrag": r["betrag"] or 0,
+                "color": color_cls
+            })
+    except Exception:
+        pass
 
-    # ── Zone C4: Vorgänge Übersicht ──
-    vor_panel = ""
+    # Vorgänge
+    vorgaenge = []
+    n_vor_total = 0
+    _VOR_LABEL = {"rechnung": "Rechnungen", "angebot": "Angebote", "anfrage": "Anfragen",
+                  "lead": "Leads", "mahnung": "Mahnungen", "kundenvorgang": "Kundenvorg\u00e4nge",
+                  "bestellung": "Bestellungen", "projekt": "Projekte"}
+    _VOR_COLOR = {"rechnung": "green", "angebot": "amber", "anfrage": "blue",
+                  "lead": "purple", "mahnung": "red"}
     try:
         vor_stats = db.execute("""
             SELECT typ, COUNT(*) as n FROM vorgaenge
             WHERE status NOT IN ('abgeschlossen', 'archiviert', 'abgebrochen')
             GROUP BY typ ORDER BY n DESC LIMIT 8
         """).fetchall()
-        _VOR_LABEL = {"rechnung":"Rechnungen","angebot":"Angebote","anfrage":"Anfragen",
-                      "lead":"Leads","mahnung":"Mahnungen","kundenvorgang":"Kundenvorg\u00e4nge",
-                      "bestellung":"Bestellungen","projekt":"Projekte"}
-        _VOR_COLOR = {"rechnung":"#1D9E75","angebot":"#EF9F27","anfrage":"#378ADD",
-                      "lead":"#7C3AED","mahnung":"#E24B4A"}
-        vor_items = ""
-        n_vor_total = 0
         for r in vor_stats:
-            n_vor_total += r['n']
-            col = _VOR_COLOR.get(r['typ'], "#888780")
-            label = esc(_VOR_LABEL.get(r['typ'], (r['typ'] or '').title()))
-            vor_items += f'<div class="dash-vor-item"><span class="dash-vor-dot" style="background:{col}"></span><span class="dash-vor-typ">{label}</span><span class="dash-vor-n">{r["n"]}</span></div>'
-        if not vor_items:
-            vor_items = '<div style="padding:12px;color:var(--muted);font-size:12px">Keine aktiven Vorg&auml;nge</div>'
-        vor_panel = f"""<div class="dash-panel" style="cursor:pointer" onclick="showPanel('geschaeft')">
-      <div class="dash-panel-title">Vorg&auml;nge aktiv</div>
-      <div class="dash-panel-sub">{n_vor_total} offene Vorg&auml;nge &mdash; nach Typ</div>
-      {vor_items}
-    </div>"""
-    except: pass
+            n_vor_total += r["n"]
+            vorgaenge.append({
+                "typ": _VOR_LABEL.get(r["typ"], (r["typ"] or "").title()),
+                "raw_typ": r["typ"] or "",
+                "n": r["n"],
+                "color": _VOR_COLOR.get(r["typ"], "gray")
+            })
+    except Exception:
+        pass
 
-    cal_panel = (
-        '<div class="dash-panel" id="dash-kal-panel">'
-        '<div class="dash-panel-title" style="cursor:pointer"'
-        ' onclick="showPanel(\'organisation\');setTimeout(()=>{const t=document.querySelector(\'.org-view-tabs .komm-view-tab:last-child\');if(t)t.click();},150)">'
-        '&#x1F4C5; Kalender</div>'
-        '<div class="dash-panel-sub">N&auml;chste Termine &mdash; Outlook-Kalender</div>'
-        '<div id="dash-kal-list" style="min-height:40px;color:var(--muted);font-size:12px;padding:8px 0">Lade...</div>'
-        '</div>'
-    )
-
-    work_html = f"""<div class="dash-work-grid">
-  <div class="dash-panel">
-    <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div>
-    <div class="dash-panel-sub">Top 5 &mdash; modulübergreifend kuratiert</div>
-    {prio_items_html}
-  </div>
-  <div class="dash-right-col">
-    <div class="dash-panel">
-      <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('organisation')">N&auml;chste Termine &amp; Fristen</div>
-      <div class="dash-panel-sub">Kommende 7 Tage</div>
-      {term_html}
-    </div>
-    {cal_panel}
-    {vor_panel}
-    <div class="dash-panel">
-      <div class="dash-panel-title" style="cursor:pointer" onclick="showPanel('geschaeft')">Gesch&auml;ft aktuell</div>
-      <div class="dash-panel-sub">Letzte Bewegungen</div>
-      {biz_html}
-    </div>
-    {sent_today_panel}
-  </div>
-</div>"""
-
-    # ── Zone D: Signale / Auffälligkeiten ──
-    signals = []
-
-    # Überfällige Rechnungen (> 30 Tage)
+    # Signale
+    signale = []
     try:
         for r in db.execute("SELECT re_nummer, kunde_name, datum FROM ausgangsrechnungen WHERE status='offen'"):
             try:
-                d = datetime.strptime(str(r['datum'])[:10], "%Y-%m-%d")
+                d = datetime.strptime(str(r["datum"])[:10], "%Y-%m-%d")
                 tage = (datetime.now() - d).days
                 if tage > 30:
-                    signals.append(('s-red', '#E24B4A',
-                        f'RE {esc(r["re_nummer"])} ({esc((r["kunde_name"] or "")[:20])}) seit {tage} Tagen offen',
-                        "showPanel('geschaeft')"))
-            except: pass
-    except: pass
-
-    # Skonto-Fristen
+                    signale.append({"color": "red", "text": f'RE {r["re_nummer"]} ({(r["kunde_name"] or "")[:20]}) seit {tage} Tagen offen', "action": "showPanel('geschaeft')"})
+            except Exception:
+                pass
+    except Exception:
+        pass
     try:
         ddb = sqlite3.connect(str(DETAIL_DB))
         ddb.row_factory = sqlite3.Row
         for r in ddb.execute("SELECT re_nummer, skonto_datum, skonto_prozent FROM rechnungen_detail WHERE skonto_datum >= ? AND skonto_datum IS NOT NULL", (today,)):
             try:
-                tage_rest = (datetime.strptime(r['skonto_datum'], "%Y-%m-%d").date() - datetime.now().date()).days
+                tage_rest = (datetime.strptime(r["skonto_datum"], "%Y-%m-%d").date() - datetime.now().date()).days
                 if tage_rest <= 3:
-                    signals.append(('s-amber', '#EF9F27',
-                        f'Skonto {r["skonto_prozent"]}% für {esc(r["re_nummer"])} läuft in {tage_rest} Tagen ab',
-                        "showPanel('geschaeft')"))
-            except: pass
+                    signale.append({"color": "amber", "text": f'Skonto {r["skonto_prozent"]}% für {r["re_nummer"]} läuft in {tage_rest} Tagen ab', "action": "showPanel('geschaeft')"})
+            except Exception:
+                pass
         ddb.close()
-    except: pass
-
-    # Gemahnte Rechnungen
+    except Exception:
+        pass
     try:
         mc = db.execute("SELECT COUNT(*) FROM ausgangsrechnungen WHERE (mahnung_count > 0) AND status='offen'").fetchone()[0]
         if mc > 0:
-            signals.append(('s-red', '#E24B4A',
-                f'{mc} gemahnte Rechnung{"en" if mc>1 else ""} noch offen &mdash; Mahnstufe pr&uuml;fen',
-                "showPanel('geschaeft')"))
-    except: pass
-
-    # Angebote ohne Rückmeldung > 14 Tage
+            signale.append({"color": "red", "text": f'{mc} gemahnte Rechnung{"en" if mc > 1 else ""} noch offen \u2014 Mahnstufe prüfen', "action": "showPanel('geschaeft')"})
+    except Exception:
+        pass
     try:
         for r in db.execute("SELECT angebots_nr, kunde, erstellt FROM angebote WHERE status='offen' AND erstellt IS NOT NULL"):
             try:
-                d = datetime.strptime(str(r['erstellt'])[:10], "%Y-%m-%d")
+                d = datetime.strptime(str(r["erstellt"])[:10], "%Y-%m-%d")
                 tage = (datetime.now() - d).days
                 if tage > 14:
-                    signals.append(('s-blue', '#378ADD',
-                        f'Angebot {esc(r["angebots_nr"] or "")} ({esc((r["kunde"] or "")[:20])}): {tage} Tage ohne Rückmeldung',
-                        "showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)"))
-            except: pass
-    except: pass
-
-    # Korrektur-Statistik: Häufig falsch klassifizierte Kategorien (letzte 90 Tage)
-    try:
-        cutoff90 = (datetime.now().replace(hour=0,minute=0,second=0)
-                   .__class__.now() if False else datetime.now()).strftime("%Y-%m-%d")
-        from datetime import timedelta as _td90
-        cutoff90 = (datetime.now() - _td90(days=90)).strftime("%Y-%m-%d")
-        korr_rows = db.execute("""
-            SELECT alter_typ, neuer_typ, COUNT(*) c
-            FROM corrections
-            WHERE alter_typ != neuer_typ AND erstellt_am >= ?
-            GROUP BY alter_typ, neuer_typ
-            HAVING c >= 3
-            ORDER BY c DESC LIMIT 3
-        """, (cutoff90,)).fetchall()
-        for r in korr_rows:
-            c = r['c']
-            von = esc(r['alter_typ'] or '')
-            zu  = esc(r['neuer_typ'] or '')
-            signals.append(('s-amber', '#EF9F27',
-                f'{c}x &#x201E;{von}&#x201C; &#x2192; &#x201E;{zu}&#x201C; korrigiert &mdash; Lernhinweis',
-                "showPanel('wissen')"))
-    except: pass
-
-    # Lösch-History: automatisch gefilterte DATEV-Duplikate (letzte 7 Tage)
-    try:
-        from datetime import timedelta as _td7
-        cutoff7 = (datetime.now() - _td7(days=7)).strftime("%Y-%m-%d")
-        lh_count = db.execute(
-            "SELECT COUNT(*) FROM loeschhistorie WHERE geloescht_am >= ? AND grund NOT LIKE 'BEHALTEN%'",
-            (cutoff7,)
-        ).fetchone()[0]
-        lh_keep  = db.execute(
-            "SELECT COUNT(*) FROM loeschhistorie WHERE geloescht_am >= ? AND grund LIKE 'BEHALTEN%'",
-            (cutoff7,)
-        ).fetchone()[0]
-        if lh_count > 0:
-            keep_hint = f", {lh_keep}x abweichend behalten" if lh_keep else ""
-            signals.append(('s-blue', '#6CB4F0',
-                f'{lh_count} Mail{"s" if lh_count>1 else ""} automatisch als DATEV-Duplikat gefiltert{keep_hint}',
-                "showLöschHistorie()"))
-    except: pass
-
-    # Mail-Intelligence Signal
+                    signale.append({"color": "blue", "text": f'Angebot {r["angebots_nr"] or ""} ({(r["kunde"] or "")[:20]}): {tage} Tage ohne Rückmeldung', "action": "showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)"})
+            except Exception:
+                pass
+    except Exception:
+        pass
     if mi_stats["klassifiziert"] > 0:
         kat = mi_stats["kategorien"]
         n_mi_leads = kat.get("Neue Lead-Anfrage", 0)
         n_mi_angebr = kat.get("Angebotsrückmeldung", 0)
         n_mi_antw = kat.get("Antwort erforderlich", 0)
-        n_mi_biz = n_mi_leads + n_mi_angebr + n_mi_antw
-        signals.append(('s-blue', '#7c3aed',
-            f'{mi_stats["klassifiziert"]:,} Mails eingeordnet: {n_mi_leads} Leads, {n_mi_angebr} Angebotsrückmeldungen, {n_mi_antw} Business-Mails &mdash; Kundenprofile aufgebaut',
-            "esShowSec('mail');showPanel('einstellungen')"))
+        signale.append({"color": "purple", "text": f'{mi_stats["klassifiziert"]:,} Mails eingeordnet: {n_mi_leads} Leads, {n_mi_angebr} Angebotsrückmeldungen, {n_mi_antw} Business-Mails', "action": "esShowSec('mail');showPanel('einstellungen')"})
 
-    signals_html = ""
-    if signals:
-        sig_items = ""
-        for cls, dot_color, text, action in signals[:8]:
-            sig_items += f'<div class="dash-sig {cls}" onclick="{action}"><span class="sig-dot" style="background:{dot_color}"></span><span class="sig-text">{text}</span><span class="sig-arr">&#x2192;</span></div>'
-        signals_html = f"""<div class="dash-signals">
-  <div class="dash-panel-title">Signale &amp; Auff&auml;lligkeiten</div>
-  <div class="dash-panel-sub">Automatisch erkannte Ausrei&szlig;er und Pr&uuml;fbedarf</div>
-  <div class="dash-sig-grid">{sig_items}</div>
-</div>"""
+    # Feed (runtime events)
+    feed = []
+    try:
+        _rtdb = sqlite3.connect(str(KNOWLEDGE_DIR / "runtime_events.db"))
+        _rtdb.row_factory = sqlite3.Row
+        rows = _rtdb.execute(
+            "SELECT action, modul, summary, ts, status FROM events ORDER BY ts DESC LIMIT 15"
+        ).fetchall()
+        _rtdb.close()
+        _FEED_ICON = {
+            "mail_eingang": "mail", "mail_gesendet": "send", "task_erstellt": "task",
+            "kira_antwort": "kira", "kira_entwurf": "kira", "zahlung_eingegangen": "payment",
+            "rechnung_erstellt": "invoice", "beleg_verarbeitet": "receipt",
+            "klassifizierung": "classify", "nachfass_erstellt": "followup",
+        }
+        for r in rows:
+            feed.append({
+                "ts": (r["ts"] or "")[:16],
+                "icon": _FEED_ICON.get(r["action"], "event"),
+                "text": (r["summary"] or "")[:80],
+                "action": r["action"] or "",
+                "status": r["status"] or ""
+            })
+    except Exception:
+        pass
 
-    return f"""{briefing_html}
-{kpi_html}
-{work_html}
-{signals_html}"""
+    if close_db:
+        db.close()
+
+    return {
+        "kpis": kpis,
+        "sparkline": sparkline,
+        "briefing": briefing,
+        "actions": actions,
+        "sent": sent[:6],
+        "termine": termine,
+        "geschaeft": geschaeft,
+        "vorgaenge": {"items": vorgaenge, "total": n_vor_total},
+        "signale": signale[:8],
+        "feed": feed,
+        "freigaben": n_freigaben,
+        "mi_stats": mi_stats,
+        "ts": datetime.now().isoformat()
+    }
+
+
+def build_dashboard(tasks, db):
+    """Return a minimal container + JS that fetches /api/dashboard/live and renders dynamically."""
+    try:
+        _cfg_dash = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8")).get("dashboard", {})
+    except Exception:
+        _cfg_dash = {}
+    _dash_layout = _cfg_dash.get("layout", "B")
+    _dash_konfetti = "true" if _cfg_dash.get("konfetti", True) else "false"
+    _dash_reduced = "true" if _cfg_dash.get("reduced_motion", False) else "false"
+    _dash_refresh = int(_cfg_dash.get("refresh_intervall_s", 30) or 30)
+
+    # ── Neues dynamisches Dashboard — Container + JS-Renderer ──
+    # Die eigentliche Logik läuft clientseitig, Daten kommen via /api/dashboard/live
+    return f'''<div id="dash-root" class="dlive-root" data-layout="{_dash_layout}">
+  <div class="dlive-loading" id="dashLoading">
+    <div class="dlive-spinner"></div>
+    <div class="dlive-loading-text">Dashboard wird geladen&hellip;</div>
+  </div>
+</div>
+<script>
+(function(){{
+"use strict";
+/* ═══ KIRA Dashboard Live Engine ═══ */
+const DCFG = {{layout:"{_dash_layout}", konfetti:{_dash_konfetti}, reduced:{_dash_reduced}, refresh:{_dash_refresh}*1000}};
+let _prevData = null, _refreshTimer = null, _initialLoad = true;
+
+/* ── Utilities ── */
+const esc = s => {{const d=document.createElement("div");d.textContent=s;return d.innerHTML;}};
+const fmt = n => typeof n==="number"? n.toLocaleString("de-DE"):String(n||"");
+const fmtEur = n => "\\u20AC\\u2009"+Number(n||0).toLocaleString("de-DE",{{minimumFractionDigits:0,maximumFractionDigits:0}});
+
+/* ── Animation Engine ── */
+function countUp(el,target,duration){{
+  if(DCFG.reduced){{el.textContent=fmt(target);return;}}
+  const start=performance.now();
+  const isCurrency=el.dataset.currency==="1";
+  const from=parseFloat(el.dataset.prev||"0")||0;
+  (function tick(now){{
+    const t=Math.min((now-start)/duration,1);
+    const ease=1-Math.pow(1-t,3);
+    const v=from+((target-from)*ease);
+    el.textContent=isCurrency?fmtEur(Math.round(v)):fmt(Math.round(v));
+    if(t<1)requestAnimationFrame(tick);
+    else el.dataset.prev=String(target);
+  }})(start);
+}}
+
+function staggerIn(cards,baseDelay){{
+  if(DCFG.reduced){{cards.forEach(c=>{{c.style.opacity="1";c.style.transform="none";}});return;}}
+  cards.forEach((c,i)=>{{
+    c.style.opacity="0";c.style.transform="translateY(18px)";
+    setTimeout(()=>{{c.style.transition="opacity .45s cubic-bezier(.16,1,.3,1),transform .45s cubic-bezier(.16,1,.3,1)";c.style.opacity="1";c.style.transform="none";}},baseDelay+i*60);
+  }});
+}}
+
+function pulseEl(el){{
+  if(DCFG.reduced)return;
+  el.classList.add("dlive-bounce");
+  setTimeout(()=>el.classList.remove("dlive-bounce"),600);
+}}
+
+function animateBar(el,pct){{
+  if(DCFG.reduced){{el.style.width=pct+"%";return;}}
+  el.style.width="0%";
+  requestAnimationFrame(()=>{{el.style.transition="width .8s cubic-bezier(.16,1,.3,1)";el.style.width=pct+"%";}});
+}}
+
+/* ── Sparkline SVG ── */
+function buildSparkSVG(data){{
+  if(!data||data.length<2)return "";
+  const maxV=Math.max(...data.map(d=>d.total))||1;
+  const w=200,h=36,pad=4;
+  let bars="";
+  const bw=Math.floor((w-pad*2)/data.length)-4;
+  data.forEach((d,i)=>{{
+    const bh=Math.max(3,Math.round(d.total/maxV*(h-6)));
+    const x=pad+i*(bw+4);
+    const op=(0.3+0.6*d.total/maxV).toFixed(2);
+    bars+=`<rect x="${{x}}" y="${{h-bh-2}}" width="${{bw}}" height="${{bh}}" rx="3" fill="var(--accent)" opacity="${{op}}"/>`;
+  }});
+  return `<svg class="dlive-spark-svg" viewBox="0 0 ${{w}} ${{h}}">${{bars}}</svg>`;
+}}
+
+/* ── KPI Card Builder ── */
+function kpiCard(kpi,sparkHtml){{
+  const trend=kpi.trend||"stable";
+  const cls=trend==="danger"?"dlive-kpi-danger":trend==="warn"?"dlive-kpi-warn":trend==="accent"?"dlive-kpi-accent":"";
+  const changeCls=trend==="danger"?"danger":trend==="warn"?"warn":trend==="up"?"up":"info";
+  const valDisp=kpi.is_currency?fmtEur(kpi.val):fmt(kpi.val);
+  const changeHtml=kpi.change?`<span class="dlive-kpi-change ${{changeCls}}">${{esc(kpi.change)}}</span>`:"";
+  const sparkBlock=sparkHtml?`<div class="dlive-kpi-spark">${{sparkHtml}}</div>`:"";
+  return `<div class="dlive-kpi ${{cls}} dlive-card" onclick="${{kpi.action||""}}" data-key="${{kpi.key}}">
+    <div class="dlive-kpi-label">${{esc(kpi.label)}}</div>
+    <div class="dlive-kpi-row"><span class="dlive-kpi-val" data-target="${{kpi.val}}" data-currency="${{kpi.is_currency?"1":"0"}}">${{valDisp}}</span>${{changeHtml}}</div>
+    ${{sparkBlock}}
+  </div>`;
+}}
+
+/* ── Briefing Card ── */
+function briefingCard(b){{
+  if(!b||!b.zusammenfassung)return "";
+  const ts=b.erstellt_am?(b.erstellt_am.substring(11,16)):"";
+  const tsSpan=ts?`<span class="dlive-briefing-ts">Stand ${{ts}}</span>`:"";
+  let prioHtml="";
+  if(b.prioritaeten&&b.prioritaeten.length){{
+    const typCol={{rechnung:"var(--danger)",angebot:"var(--warn)",aufgabe:"var(--accent)"}};
+    prioHtml=`<div class="dlive-bs-prios">${{b.prioritaeten.slice(0,5).map(p=>
+      `<div class="dlive-bs-prio"><span class="dlive-bs-dot" style="background:${{typCol[(p.typ||"aufgabe").toLowerCase()]||"var(--muted)"}}"></span>${{esc((p.text||"").substring(0,120))}}</div>`
+    ).join("")}}</div>`;
+  }}
+  return `<div class="dlive-briefing dlive-card" id="kiraBriefingCard">
+    <div class="dlive-briefing-head">
+      <div class="dlive-briefing-title">Tagesbriefing ${{tsSpan}}</div>
+      <div class="dlive-briefing-actions">
+        <button class="dlive-btn-sm" onclick="kira_tour.start(window.KIRA_TOUR_DASHBOARD,{{erklaermodus:true}})" title="Geführte Tour">Tour</button>
+        <button class="dlive-btn-sm" onclick="refreshBriefing()">&#x21BB; Aktualisieren</button>
+      </div>
+    </div>
+    <div class="dlive-bs-text">${{esc(b.zusammenfassung)}}</div>
+    ${{prioHtml}}
+  </div>`;
+}}
+
+/* ── Actions Card ── */
+function actionsCard(actions){{
+  if(!actions||!actions.length)return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div><div class="dlive-panel-sub">Top-Aufgaben</div><div class="dlive-empty">&#x2713; Keine priorisierten Aufgaben</div></div>`;
+  const items=actions.map(a=>{{
+    const kat=a.kategorie||"";
+    const pClass=kat==="Antwort erforderlich"?"prio-red":kat==="Neue Lead-Anfrage"?"prio-blue":kat==="Angebotsrückmeldung"?"prio-amber":"prio-gray";
+    const tag=kat==="Antwort erforderlich"?`<span class="dlive-tag dlive-tag-red">dringend</span>`:kat==="Neue Lead-Anfrage"?`<span class="dlive-tag dlive-tag-blue">neuer Lead</span>`:kat==="Angebotsrückmeldung"?`<span class="dlive-tag dlive-tag-amber">Angebot</span>`:`<span class="dlive-tag dlive-tag-gray">offen</span>`;
+    const meta=[kat,a.kunden_name,a.datum_mail].filter(Boolean).join(" \\u00B7 ");
+    const next=a.empfohlene_aktion?`<span class="dlive-prio-next">${{esc(a.empfohlene_aktion)}}</span>`:"";
+    return `<div class="dlive-prio-item ${{pClass}}">
+      <div class="dlive-prio-body"><div class="dlive-prio-title">${{esc(a.titel)}}</div><div class="dlive-prio-meta">${{esc(meta)}}</div><div class="dlive-prio-tags">${{tag}}${{next}}</div></div>
+      <div class="dlive-prio-menu"><button class="dlive-prio-dots" onclick="togglePrioMenu(this)">&#x22EE;</button><div class="dlive-prio-dropdown"><button class="dlive-pdd-btn" onclick="filterKomm('${{esc(kat)}}')">&#x2192; Öffnen</button><div class="dlive-pdd-sep"></div><button class="dlive-pdd-btn dlive-pdd-kira" onclick="openKiraWorkspace('aufgabe')">&#x2728; Mit Kira</button></div></div>
+    </div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div><div class="dlive-panel-sub">Top ${{actions.length}} &mdash; modulübergreifend kuratiert</div>${{items}}</div>`;
+}}
+
+/* ── Feed Card ── */
+function feedCard(feed){{
+  if(!feed||!feed.length)return "";
+  const iconMap={{mail:"&#x2709;",send:"&#x1F4E8;",task:"&#x2611;",kira:"&#x2728;",payment:"&#x1F4B0;",invoice:"&#x1F9FE;",receipt:"&#x1F4CB;",classify:"&#x1F3AF;",followup:"&#x1F514;",event:"&#x26A1;"}};
+  const colorMap={{mail:"var(--accent)",send:"var(--success)",task:"var(--info)",kira:"#7c3aed",payment:"var(--success)",invoice:"var(--warn)",event:"var(--muted)"}};
+  const items=feed.slice(0,12).map((f,i)=>{{
+    const icon=iconMap[f.icon]||"&#x26A1;";
+    const color=colorMap[f.icon]||"var(--muted)";
+    const ts=f.ts?f.ts.substring(11,16):"";
+    return `<div class="dlive-feed-item${{i===0&&!_initialLoad?" dlive-feed-new":""}}" style="--fi:${{i}}"><span class="dlive-feed-dot" style="background:${{color}}"></span><span class="dlive-feed-icon">${{icon}}</span><span class="dlive-feed-text">${{esc(f.text)}}</span><span class="dlive-feed-ts">${{ts}}</span></div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card dlive-feed-panel"><div class="dlive-panel-title"><span class="dlive-live-dot"></span> Live-Feed</div><div class="dlive-panel-sub">Letzte Aktivitäten in Echtzeit</div><div class="dlive-feed-list">${{items}}</div></div>`;
+}}
+
+/* ── Termine Card ── */
+function termineCard(termine){{
+  if(!termine||!termine.length)return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('organisation')">Termine & Fristen</div><div class="dlive-panel-sub">Kommende 7 Tage</div><div class="dlive-empty">Keine Termine</div></div>`;
+  const items=termine.map(t=>{{
+    const badge=t.urgency==="urgent"?(t.diff_days<0?`<span class="dlive-tag dlive-tag-red dlive-urgency-pulse">überfällig</span>`:`<span class="dlive-tag dlive-tag-red">heute</span>`):t.urgency==="soon"?`<span class="dlive-tag dlive-tag-amber">bald</span>`:"";
+    return `<div class="dlive-term-item"><span class="dlive-term-date ${{t.urgency}}">${{esc(t.datum)}}</span><span class="dlive-term-text">${{esc(t.beschreibung||t.typ)}}</span>${{badge}}</div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('organisation')">Termine & Fristen</div><div class="dlive-panel-sub">Kommende 7 Tage</div>${{items}}</div>`;
+}}
+
+/* ── Geschäft Card ── */
+function geschaeftCard(gesch){{
+  if(!gesch||!gesch.length)return "";
+  const colorMap={{green:"var(--success)",red:"var(--danger)",amber:"var(--warn)",gray:"var(--muted)"}};
+  const items=gesch.map(g=>{{
+    const col=colorMap[g.color]||"var(--muted)";
+    const prefix=g.color==="green"?"+":"";
+    const betrag=g.betrag?`${{prefix}}\\u20AC\\u00A0${{Number(g.betrag).toLocaleString("de-DE",{{minimumFractionDigits:0}})}}`:"";
+    return `<div class="dlive-biz-item"><span class="dlive-biz-dot" style="background:${{col}}"></span><span class="dlive-biz-text">${{esc(g.typ)}}${{g.typ&&g.name?": ":""}}${{esc(g.name)}}</span><span class="dlive-biz-val" style="color:${{col}}">${{betrag}}</span></div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('geschaeft')">Geschäft aktuell</div><div class="dlive-panel-sub">Letzte Bewegungen</div>${{items}}</div>`;
+}}
+
+/* ── Vorgänge Card ── */
+function vorgaengeCard(vor){{
+  if(!vor||!vor.items||!vor.items.length)return "";
+  const colorMap={{green:"var(--success)",amber:"var(--warn)",blue:"var(--accent)",purple:"#7c3aed",red:"var(--danger)",gray:"var(--muted)"}};
+  const items=vor.items.map(v=>{{
+    const col=colorMap[v.color]||"var(--muted)";
+    return `<div class="dlive-vor-item"><span class="dlive-vor-dot" style="background:${{col}}"></span><span class="dlive-vor-typ">${{esc(v.typ)}}</span><span class="dlive-vor-n">${{v.n}}</span></div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card" style="cursor:pointer" onclick="showPanel('geschaeft')"><div class="dlive-panel-title">Vorgänge aktiv</div><div class="dlive-panel-sub">${{vor.total}} offene Vorgänge</div>${{items}}</div>`;
+}}
+
+/* ── Sent Today Card ── */
+function sentCard(sent){{
+  if(!sent||!sent.length)return "";
+  const items=sent.map(s=>{{
+    const icon=s.via==="kira"?"&#x1F916;":"&#x1F464;";
+    const ts=s.ts?s.ts.substring(11,16):"";
+    return `<div class="dlive-sent-item"><span class="dlive-sent-icon">${{icon}}</span><div class="dlive-sent-body"><div class="dlive-sent-to">${{esc((s.to||"").substring(0,35))}}</div><div class="dlive-sent-subj">${{esc((s.subject||"").substring(0,40))}}</div></div><span class="dlive-sent-ts">${{ts}}</span></div>`;
+  }}).join("");
+  return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title">Heute gesendet</div><div class="dlive-panel-sub">Kira &#x1F916; & manuell &#x1F464;</div>${{items}}</div>`;
+}}
+
+/* ── Signale Card ── */
+function signaleCard(signale){{
+  if(!signale||!signale.length)return "";
+  const items=signale.map(s=>{{
+    const cls="dlive-sig-"+s.color;
+    return `<div class="dlive-sig ${{cls}}" onclick="${{s.action||""}}"><span class="dlive-sig-dot"></span><span class="dlive-sig-text">${{s.text}}</span><span class="dlive-sig-arr">&#x2192;</span></div>`;
+  }}).join("");
+  return `<div class="dlive-signals dlive-card"><div class="dlive-panel-title">Signale & Auffälligkeiten</div><div class="dlive-panel-sub">Automatisch erkannte Ausreißer</div><div class="dlive-sig-grid">${{items}}</div></div>`;
+}}
+
+/* ── Kalender Card (async) ── */
+function kalenderCard(){{
+  return `<div class="dlive-panel dlive-card" id="dlive-kal-panel"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('organisation');setTimeout(()=>{{const t=document.querySelector('.org-view-tabs .komm-view-tab:last-child');if(t)t.click();}},150)">&#x1F4C5; Kalender</div><div class="dlive-panel-sub">Nächste Termine &mdash; Outlook</div><div id="dlive-kal-list" style="min-height:40px;color:var(--muted);font-size:12px;padding:8px 0">Lade...</div></div>`;
+}}
+
+/* ═══ LAYOUT RENDERERS ═══ */
+
+/* Layout A: Bento Grid */
+function renderDashA(d){{
+  const root=document.getElementById("dash-root");
+  root.className="dlive-root dlive-layout-a";
+  root.innerHTML=
+    briefingCard(d.briefing)+
+    `<div class="dlive-kpi-grid">${{d.kpis.map((k,i)=>kpiCard(k,k.key==="volumen_offen"?buildSparkSVG(d.sparkline):"")).join("")}}</div>`+
+    `<div class="dlive-bento">`+
+      `<div class="dlive-bento-main">${{actionsCard(d.actions)}}</div>`+
+      `<div class="dlive-bento-side">${{feedCard(d.feed)}}</div>`+
+      `<div class="dlive-bento-row">`+
+        termineCard(d.termine)+
+        kalenderCard()+
+        geschaeftCard(d.geschaeft)+
+      `</div>`+
+      `<div class="dlive-bento-row">`+
+        vorgaengeCard(d.vorgaenge)+
+        sentCard(d.sent)+
+      `</div>`+
+    `</div>`+
+    signaleCard(d.signale);
+}}
+
+/* Layout B: Command Center 3-Spalten */
+function renderDashB(d){{
+  const root=document.getElementById("dash-root");
+  root.className="dlive-root dlive-layout-b";
+  root.innerHTML=
+    briefingCard(d.briefing)+
+    `<div class="dlive-kpi-grid">${{d.kpis.map((k,i)=>kpiCard(k,k.key==="volumen_offen"?buildSparkSVG(d.sparkline):"")).join("")}}</div>`+
+    `<div class="dlive-cmd-grid">`+
+      `<div class="dlive-cmd-left">${{actionsCard(d.actions)}}${{sentCard(d.sent)}}</div>`+
+      `<div class="dlive-cmd-center">${{feedCard(d.feed)}}</div>`+
+      `<div class="dlive-cmd-right">${{termineCard(d.termine)}}${{kalenderCard()}}${{vorgaengeCard(d.vorgaenge)}}${{geschaeftCard(d.geschaeft)}}</div>`+
+    `</div>`+
+    signaleCard(d.signale);
+}}
+
+/* Layout C: Smart Cards (conditional visibility) */
+function renderDashC(d){{
+  const root=document.getElementById("dash-root");
+  root.className="dlive-root dlive-layout-c";
+  // Smart: nur Karten mit Daten zeigen
+  let html=briefingCard(d.briefing);
+  // KPIs als kompakte Chips
+  html+=`<div class="dlive-kpi-chips">${{d.kpis.filter(k=>k.val>0).map(k=>`<div class="dlive-kpi-chip ${{k.trend==="danger"?"chip-danger":k.trend==="warn"?"chip-warn":k.trend==="accent"?"chip-accent":""}}" onclick="${{k.action||""}}" data-key="${{k.key}}"><span class="dlive-chip-val" data-target="${{k.val}}" data-currency="${{k.is_currency?"1":"0"}}">${{k.is_currency?fmtEur(k.val):fmt(k.val)}}</span><span class="dlive-chip-label">${{esc(k.label)}}</span></div>`).join("")}}</div>`;
+  // Smart flow: nur wenn Daten vorhanden
+  html+=`<div class="dlive-smart-flow">`;
+  if(d.actions&&d.actions.length)html+=actionsCard(d.actions);
+  if(d.feed&&d.feed.length)html+=feedCard(d.feed);
+  if(d.termine&&d.termine.length)html+=termineCard(d.termine);
+  html+=kalenderCard();
+  if(d.geschaeft&&d.geschaeft.length)html+=geschaeftCard(d.geschaeft);
+  if(d.vorgaenge&&d.vorgaenge.items&&d.vorgaenge.items.length)html+=vorgaengeCard(d.vorgaenge);
+  if(d.sent&&d.sent.length)html+=sentCard(d.sent);
+  html+=`</div>`;
+  if(d.signale&&d.signale.length)html+=signaleCard(d.signale);
+  root.innerHTML=html;
+}}
+
+/* ═══ MAIN RENDER + REFRESH ═══ */
+const renderers={{A:renderDashA,B:renderDashB,C:renderDashC}};
+
+function renderDashboard(data){{
+  const render=renderers[DCFG.layout]||renderers.B;
+  render(data);
+
+  // Animate KPI values
+  requestAnimationFrame(()=>{{
+    document.querySelectorAll(".dlive-kpi-val,.dlive-chip-val").forEach(el=>{{
+      const target=parseFloat(el.dataset.target)||0;
+      countUp(el,target,_initialLoad?900:500);
+    }});
+    // Stagger cards in
+    const cards=document.querySelectorAll(".dlive-card");
+    if(_initialLoad)staggerIn(Array.from(cards),80);
+    // Animate sparkline bars
+    document.querySelectorAll(".dlive-spark-svg rect").forEach((r,i)=>{{
+      const h=r.getAttribute("height");
+      const y=r.getAttribute("y");
+      if(!DCFG.reduced){{
+        r.setAttribute("height","0");r.setAttribute("y",String(parseFloat(y)+parseFloat(h)));
+        setTimeout(()=>{{r.style.transition="height .6s cubic-bezier(.16,1,.3,1),y .6s cubic-bezier(.16,1,.3,1)";r.setAttribute("height",h);r.setAttribute("y",y);}},200+i*80);
+      }}
+    }});
+    // Detect changes and pulse
+    if(_prevData&&!_initialLoad){{
+      _prevData.kpis.forEach((pk,i)=>{{
+        if(data.kpis[i]&&data.kpis[i].val!==pk.val){{
+          const el=document.querySelector(`[data-key="${{data.kpis[i].key}}"]`);
+          if(el)pulseEl(el);
+        }}
+      }});
+    }}
+    _prevData=JSON.parse(JSON.stringify(data));
+    _initialLoad=false;
+    // Kalender async nachladen
+    if(typeof loadDashKalender==="function")setTimeout(loadDashKalender,300);
+  }});
+}}
+
+async function fetchAndRender(){{
+  try{{
+    const resp=await fetch("/api/dashboard/live");
+    if(!resp.ok)throw new Error(resp.status);
+    const data=await resp.json();
+    const loading=document.getElementById("dashLoading");
+    if(loading)loading.style.display="none";
+    renderDashboard(data);
+  }}catch(e){{
+    console.error("Dashboard fetch error:",e);
+    const loading=document.getElementById("dashLoading");
+    if(loading)loading.innerHTML=`<div style="color:var(--danger);padding:20px">Dashboard konnte nicht geladen werden. <button class="dlive-btn-sm" onclick="fetchAndRender()">Erneut versuchen</button></div>`;
+  }}
+}}
+
+/* Auto-refresh */
+function startRefresh(){{
+  if(_refreshTimer)clearInterval(_refreshTimer);
+  if(DCFG.refresh>0)_refreshTimer=setInterval(()=>{{
+    if(document.querySelector("#panel-dashboard.active"))fetchAndRender();
+  }},DCFG.refresh);
+}}
+
+/* Switch layout dynamically */
+window._dashSetLayout=function(lay){{
+  DCFG.layout=lay;
+  _initialLoad=true;
+  if(_prevData)renderDashboard(_prevData);
+  else fetchAndRender();
+}};
+
+/* Init */
+fetchAndRender();
+startRefresh();
+}})();
+</script>'''
 
 # ── KOMMUNIKATION Panel ──────────────────────────────────────────────────────
 def build_kommunikation(tasks):
@@ -6969,15 +7137,37 @@ function esInfoPopup(btn, text) {{
   <div class="es-grp">
     <div class="es-grp-h">Dashboard-Ansicht</div>
     <div class="es-row">
-      <div class="es-rl">Auto-Refresh Intervall<div class="es-rd">Daten automatisch nachladen (0 = deaktiviert)</div></div>
-      <select class="es-sel" id="cfg-dashboard-refresh">
-        <option value="0" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==0 else ''}>Deaktiviert</option>
-        <option value="60" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==60 else ''}>1 Minute</option>
-        <option value="180" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==180 else ''}>3 Minuten</option>
-        <option value="300" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==300 else ''}>5 Minuten (Standard)</option>
-        <option value="600" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==600 else ''}>10 Minuten</option>
-        <option value="1800" {'selected' if dashboard_cfg.get('refresh_intervall_s',300)==1800 else ''}>30 Minuten</option>
+      <div class="es-rl">Dashboard-Layout<div class="es-rd">Visuelles Layout der Dashboard-Startseite</div></div>
+      <select class="es-sel" id="cfg-dashboard-layout" onchange="if(window._dashSetLayout)window._dashSetLayout(this.value)">
+        <option value="A" {'selected' if dashboard_cfg.get('layout','B')=='A' else ''}>Bento Grid</option>
+        <option value="B" {'selected' if dashboard_cfg.get('layout','B')=='B' else ''}>Command Center (Standard)</option>
+        <option value="C" {'selected' if dashboard_cfg.get('layout','B')=='C' else ''}>Smart Cards</option>
       </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Auto-Refresh Intervall<div class="es-rd">Daten automatisch nachladen</div></div>
+      <select class="es-sel" id="cfg-dashboard-refresh">
+        <option value="15" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==15 else ''}>15 Sekunden</option>
+        <option value="30" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==30 else ''}>30 Sekunden (Standard)</option>
+        <option value="60" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==60 else ''}>1 Minute</option>
+        <option value="180" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==180 else ''}>3 Minuten</option>
+        <option value="300" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==300 else ''}>5 Minuten</option>
+        <option value="0" {'selected' if dashboard_cfg.get('refresh_intervall_s',30)==0 else ''}>Deaktiviert</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Konfetti bei guten Nachrichten<div class="es-rd">Kurze Feier-Animation bei Angebotsannahme, Zahlung etc.</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-dashboard-konfetti" {'checked' if dashboard_cfg.get('konfetti', True) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Reduzierte Animationen<div class="es-rd">Weniger Bewegung f&uuml;r ruhigeres Arbeiten (respektiert auch Betriebssystem-Einstellung)</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-dashboard-reduced" {'checked' if dashboard_cfg.get('reduced_motion', False) else ''}>
+        <div class="es-toggle-vis"></div>
+      </label>
     </div>
   </div>
 
@@ -15823,14 +16013,15 @@ function esc_js(s) {{
 
 // Prio-Karte Kebab-Menu
 function togglePrioMenu(btn) {{
-  const menu = btn.closest('.dash-prio-menu');
+  const menu = btn.closest('.dash-prio-menu,.dlive-prio-menu');
+  if(!menu)return;
   const wasOpen = menu.classList.contains('open');
-  document.querySelectorAll('.dash-prio-menu.open').forEach(m => m.classList.remove('open'));
+  document.querySelectorAll('.dash-prio-menu.open,.dlive-prio-menu.open').forEach(m => m.classList.remove('open'));
   if (!wasOpen) menu.classList.add('open');
 }}
 document.addEventListener('click', function(e) {{
-  if (!e.target.closest('.dash-prio-menu')) {{
-    document.querySelectorAll('.dash-prio-menu.open').forEach(m => m.classList.remove('open'));
+  if (!e.target.closest('.dash-prio-menu') && !e.target.closest('.dlive-prio-menu')) {{
+    document.querySelectorAll('.dash-prio-menu.open,.dlive-prio-menu.open').forEach(m => m.classList.remove('open'));
   }}
 }});
 
@@ -17490,7 +17681,10 @@ function saveSettings() {{
       _provider_updates: providerUpdates
     }},
     dashboard: {{
-      refresh_intervall_s: parseInt(document.getElementById('cfg-dashboard-refresh')?.value||'300')
+      layout: document.getElementById('cfg-dashboard-layout')?.value || 'B',
+      refresh_intervall_s: parseInt(document.getElementById('cfg-dashboard-refresh')?.value||'30'),
+      konfetti: document.getElementById('cfg-dashboard-konfetti')?.checked ?? true,
+      reduced_motion: document.getElementById('cfg-dashboard-reduced')?.checked ?? false
     }},
     protokoll: {{
       max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
@@ -18996,7 +19190,7 @@ function _renderTermine(termine, listEl) {{
 }}
 
 function loadDashKalender() {{
-  const list=document.getElementById('dash-kal-list');
+  const list=document.getElementById('dash-kal-list')||document.getElementById('dlive-kal-list');
   if(!list) return;
   list.innerHTML='<span style="color:var(--muted);font-size:12px">Lade...</span>';
   fetch('/api/kira/termine?tage=7').then(function(r){{return r.json();}}).then(function(d){{
@@ -20093,9 +20287,9 @@ CSS = """
 [data-theme="light"][data-high-contrast="true"]{--text:#000;--text-secondary:rgba(0,0,0,.75);--muted:rgba(0,0,0,.6);
   --border:rgba(0,0,0,.18);--border-strong:rgba(0,0,0,.28);}
 /* Shadow modes */
-[data-shadow="none"] .task-card,[data-shadow="none"] .kpi-card,[data-shadow="none"] .dash-kpi,
+[data-shadow="none"] .task-card,[data-shadow="none"] .kpi-card,[data-shadow="none"] .dlive-kpi,[data-shadow="none"] .dlive-card,
 [data-shadow="none"] .modal,[data-shadow="none"] .kira-workspace,[data-shadow="none"] .kira-quick{box-shadow:none!important;}
-[data-shadow="strong"] .task-card,[data-shadow="strong"] .kpi-card,[data-shadow="strong"] .dash-kpi{box-shadow:0 2px 12px rgba(0,0,0,.15);}
+[data-shadow="strong"] .task-card,[data-shadow="strong"] .kpi-card,[data-shadow="strong"] .dlive-kpi,[data-shadow="strong"] .dlive-card{box-shadow:0 2px 12px rgba(0,0,0,.15);}
 /* Font size override — overrides CSS variables so all var(--fs-*) respond */
 [data-fontsize="small"]{--fs-xs:10px;--fs-sm:11px;--fs-base:12px;--fs-md:13px;--fs-lg:15px;--fs-xl:20px;--fs-xxl:26px;}
 [data-fontsize="large"]{--fs-xs:13px;--fs-sm:14px;--fs-base:16px;--fs-md:17px;--fs-lg:20px;--fs-xl:28px;--fs-xxl:34px;}
@@ -20293,201 +20487,261 @@ a:hover{text-decoration:underline;}
 .planned-feature-item{font-size:var(--fs-base);color:var(--text-secondary);padding:8px 14px;
   background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);line-height:1.5;}
 
-/* ═══ DASHBOARD — 4 Zones (reference redesign) ═══ */
+/* ═══ DASHBOARD LIVE — Dynamic Layouts + Animations ═══ */
 
-/* Zone A: Tagesbriefing */
-.dash-briefing{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
-  padding:14px 20px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px;
-  box-shadow:0 1px 4px rgba(0,0,0,.04);}
-.dash-briefing-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.dash-briefing-title{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
-.dash-briefing-ts{font-size:11px;font-weight:400;color:var(--text-muted);}
-.dash-briefing-items{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.dash-b-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);}
-.dash-b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dash-briefing-refresh{background:var(--bg);border:0.5px solid var(--border-strong);
-  border-radius:6px;padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;
-  flex-shrink:0;transition:background .12s;white-space:nowrap;}
-.dash-briefing-refresh:hover{background:var(--accent-bg);color:var(--accent);}
-/* LLM-Zusammenfassung Block */
-.dash-briefing-summary{border-top:0.5px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;}
-.dash-bs-text{font-size:13px;color:var(--text);line-height:1.55;}
-.dash-bs-prios{display:flex;flex-direction:column;gap:4px;}
-.dash-bs-prio{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--text-secondary);}
-.dash-bs-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
-/* Protokoll Panel */
+/* Loading */
+.dlive-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;color:var(--muted);}
+.dlive-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:dlive-spin .7s linear infinite;}
+@keyframes dlive-spin{to{transform:rotate(360deg)}}
+.dlive-loading-text{font-size:13px;font-weight:500;}
+.dlive-empty{text-align:center;padding:28px 0;color:var(--muted);font-size:13px;}
+
+/* Root container */
+.dlive-root{padding:0;min-height:200px;}
+
+/* ── Shared card base ── */
+.dlive-card{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
+  padding:20px 22px;box-shadow:0 1px 5px rgba(0,0,0,.05);
+  transition:box-shadow .25s cubic-bezier(.16,1,.3,1),transform .25s cubic-bezier(.16,1,.3,1),border-color .2s;}
+.dlive-card:hover{box-shadow:0 8px 30px rgba(0,0,0,.1),0 2px 8px rgba(0,0,0,.04);transform:translateY(-3px);border-color:var(--accent-border);}
+[data-reduce-motion="true"] .dlive-card{transition:none!important;transform:none!important;}
+
+/* Bounce animation on value change */
+@keyframes dlive-bounce-kf{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(.97)}100%{transform:scale(1)}}
+.dlive-bounce{animation:dlive-bounce-kf .5s cubic-bezier(.16,1,.3,1);}
+
+/* ── Briefing ── */
+.dlive-briefing{margin-bottom:18px;position:relative;overflow:hidden;}
+.dlive-briefing::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-l),var(--accent));
+  background-size:200% 100%;animation:dlive-shimmer 3s ease-in-out infinite;}
+@keyframes dlive-shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.dlive-briefing-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.dlive-briefing-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;}
+.dlive-briefing-ts{font-size:11px;font-weight:400;color:var(--muted);}
+.dlive-briefing-actions{display:flex;gap:6px;}
+.dlive-btn-sm{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;
+  padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s,transform .15s;}
+.dlive-btn-sm:hover{background:var(--accent-bg);color:var(--accent);transform:translateY(-1px);}
+.dlive-bs-text{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:8px;}
+.dlive-bs-prios{display:flex;flex-direction:column;gap:4px;border-top:0.5px solid var(--border);padding-top:10px;}
+.dlive-bs-prio{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--text-secondary);}
+.dlive-bs-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+/* Kira breathing animation */
+#kiraBriefingCard{animation:dlive-breathe 4s ease-in-out infinite;}
+@keyframes dlive-breathe{0%,100%{opacity:1}50%{opacity:.96}}
+
+/* ── KPI Grid ── */
+.dlive-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:22px;}
+@media(max-width:480px){.dlive-kpi-grid{grid-template-columns:1fr 1fr;}}
+.dlive-kpi{cursor:pointer;position:relative;overflow:hidden;}
+.dlive-kpi::after{content:"";position:absolute;inset:0;border-radius:12px;opacity:0;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),var(--accent-bg),transparent 70%);
+  transition:opacity .3s;}
+.dlive-kpi:hover::after{opacity:1;}
+.dlive-kpi-label{font-size:10px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;
+  letter-spacing:.6px;text-transform:uppercase;position:relative;z-index:1;}
+.dlive-kpi-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;position:relative;z-index:1;}
+.dlive-kpi-val{font-size:30px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.5px;
+  font-variant-numeric:tabular-nums;}
+.dlive-kpi-change{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;white-space:nowrap;}
+.dlive-kpi-change.up{background:rgba(59,109,17,.1);color:#3B6D11;}
+.dlive-kpi-change.warn{background:rgba(133,79,11,.1);color:#854F0B;}
+.dlive-kpi-change.danger{background:rgba(163,45,45,.1);color:#A32D2D;}
+.dlive-kpi-change.info{background:rgba(26,92,168,.1);color:#1a5ca8;}
+[data-theme="light"] .dlive-kpi-change.up{background:#EAF3DE;}
+[data-theme="light"] .dlive-kpi-change.warn{background:#FAEEDA;}
+[data-theme="light"] .dlive-kpi-change.danger{background:#FCEBEB;}
+[data-theme="light"] .dlive-kpi-change.info{background:#E8F0FE;}
+.dlive-kpi-spark{margin-top:14px;height:36px;overflow:hidden;position:relative;z-index:1;}
+.dlive-spark-svg{width:100%;height:36px;}
+/* KPI state variants */
+.dlive-kpi-danger{border-color:rgba(226,75,74,.35);background:rgba(226,75,74,.03);}
+.dlive-kpi-danger .dlive-kpi-val{color:var(--danger);}
+.dlive-kpi-warn{border-color:rgba(239,159,39,.35);}
+.dlive-kpi-warn .dlive-kpi-val{color:var(--warn);}
+.dlive-kpi-accent{border-color:var(--accent-border);background:var(--accent-bg);}
+.dlive-kpi-accent .dlive-kpi-val{color:var(--accent);}
+
+/* ── KPI Chips (Layout C) ── */
+.dlive-kpi-chips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;}
+.dlive-kpi-chip{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;
+  background:var(--bg-raised);border:0.5px solid var(--border);cursor:pointer;
+  transition:all .2s cubic-bezier(.16,1,.3,1);}
+.dlive-kpi-chip:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.dlive-chip-val{font-size:18px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.dlive-chip-label{font-size:11px;color:var(--text-secondary);font-weight:500;}
+.dlive-kpi-chip.chip-danger{border-color:rgba(226,75,74,.4);background:rgba(226,75,74,.04);}
+.dlive-kpi-chip.chip-danger .dlive-chip-val{color:var(--danger);}
+.dlive-kpi-chip.chip-warn{border-color:rgba(239,159,39,.4);}
+.dlive-kpi-chip.chip-warn .dlive-chip-val{color:var(--warn);}
+.dlive-kpi-chip.chip-accent{border-color:var(--accent-border);background:var(--accent-bg);}
+.dlive-kpi-chip.chip-accent .dlive-chip-val{color:var(--accent);}
+
+/* ── Panel shared ── */
+.dlive-panel{margin-bottom:0;}
+.dlive-panel-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;letter-spacing:-.1px;display:flex;align-items:center;gap:8px;}
+.dlive-panel-sub{font-size:11px;color:var(--text-secondary);margin-bottom:16px;font-weight:500;}
+
+/* ── Priority items ── */
+.dlive-prio-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+  background:var(--bg);border:0.5px solid var(--border);border-radius:9px;
+  border-left:3px solid #ccc;margin-bottom:8px;
+  transition:box-shadow .2s cubic-bezier(.16,1,.3,1),transform .2s cubic-bezier(.16,1,.3,1);}
+.dlive-prio-item:last-child{margin-bottom:0;}
+.dlive-prio-item:hover{box-shadow:0 6px 20px rgba(0,0,0,.09);transform:translateX(4px);}
+.dlive-prio-item.prio-red{border-left-color:var(--danger);}
+.dlive-prio-item.prio-amber{border-left-color:var(--warn);}
+.dlive-prio-item.prio-blue{border-left-color:var(--accent);}
+.dlive-prio-item.prio-green{border-left-color:var(--success);}
+.dlive-prio-item.prio-gray{border-left-color:var(--muted);}
+.dlive-prio-body{flex:1;min-width:0;}
+.dlive-prio-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dlive-prio-meta{font-size:11px;color:var(--text-secondary);margin-bottom:5px;font-weight:500;}
+.dlive-prio-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+.dlive-tag{font-size:10px;padding:2px 7px;border-radius:5px;white-space:nowrap;font-weight:600;}
+.dlive-tag-red{background:rgba(163,45,45,.1);color:#A32D2D;}
+.dlive-tag-amber{background:rgba(133,79,11,.1);color:#854F0B;}
+.dlive-tag-blue{background:rgba(26,92,168,.1);color:#1a5ca8;}
+.dlive-tag-gray{background:var(--bg-overlay);color:var(--text-secondary);}
+.dlive-tag-green{background:rgba(46,96,16,.1);color:#2E6010;}
+[data-theme="light"] .dlive-tag-red{background:#FCEBEB;}
+[data-theme="light"] .dlive-tag-amber{background:#FEF3E2;}
+[data-theme="light"] .dlive-tag-blue{background:#E8F0FE;}
+[data-theme="light"] .dlive-tag-green{background:#EAF3DE;}
+.dlive-prio-next{font-size:10px;color:var(--text-secondary);margin-left:2px;font-style:italic;}
+/* Kebab menu */
+.dlive-prio-menu{position:relative;flex-shrink:0;margin-left:auto;}
+.dlive-prio-dots{background:none;border:1px solid transparent;border-radius:6px;width:30px;height:30px;
+  cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;
+  font-size:18px;transition:all .15s;padding:0;font-family:inherit;}
+.dlive-prio-dots:hover{background:var(--bg-raised);color:var(--text);border-color:var(--border);}
+.dlive-prio-dropdown{position:absolute;right:0;top:calc(100% + 5px);background:var(--bg-raised);
+  border:1px solid var(--border);border-radius:10px;padding:4px;min-width:150px;
+  box-shadow:0 8px 32px rgba(0,0,0,.14);z-index:200;
+  opacity:0;transform:translateY(-8px) scale(.96);pointer-events:none;
+  transition:opacity .16s,transform .16s cubic-bezier(.4,0,.2,1);}
+.dlive-prio-menu.open .dlive-prio-dropdown{opacity:1;transform:none;pointer-events:auto;}
+.dlive-prio-menu.open .dlive-prio-dots{transform:rotate(90deg);}
+.dlive-pdd-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 12px;
+  background:none;border:none;border-radius:7px;font-size:12px;font-weight:500;color:var(--text);
+  cursor:pointer;font-family:inherit;transition:background .1s;}
+.dlive-pdd-btn:hover{background:var(--accent-bg);color:var(--accent);}
+.dlive-pdd-kira{color:#7c3aed;}.dlive-pdd-kira:hover{background:rgba(124,58,237,.08);}
+.dlive-pdd-sep{height:1px;background:var(--border);margin:3px 4px;}
+
+/* ── Feed ── */
+.dlive-feed-panel{max-height:420px;display:flex;flex-direction:column;}
+.dlive-feed-list{overflow-y:auto;scroll-behavior:smooth;flex:1;}
+.dlive-feed-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px;
+  transition:background .15s,transform .25s;animation:dlive-feed-in .4s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(var(--fi,0) * 50ms);}
+.dlive-feed-item:hover{background:var(--bg);transform:translateX(3px);}
+@keyframes dlive-feed-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.dlive-feed-new{animation:dlive-feed-glow .8s ease-out;}
+@keyframes dlive-feed-glow{0%{box-shadow:0 0 0 0 var(--accent-bg)}50%{box-shadow:0 0 12px 4px var(--accent-bg)}100%{box-shadow:none}}
+.dlive-feed-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dlive-feed-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center;}
+.dlive-feed-text{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dlive-feed-ts{color:var(--muted);font-size:11px;flex-shrink:0;font-variant-numeric:tabular-nums;}
+/* Live dot pulse */
+.dlive-live-dot{width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;
+  animation:dlive-pulse 2s ease-in-out infinite;}
+@keyframes dlive-pulse{0%,100%{box-shadow:0 0 0 0 rgba(61,174,106,.5)}50%{box-shadow:0 0 0 6px rgba(61,174,106,0)}}
+
+/* ── Urgency pulse ── */
+.dlive-urgency-pulse{animation:dlive-urgency 2s ease-in-out infinite;}
+@keyframes dlive-urgency{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px 2px rgba(226,75,74,.3)}}
+
+/* ── Termine ── */
+.dlive-term-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;color:var(--text);transition:background .12s;}
+.dlive-term-item:nth-child(odd){background:var(--bg);}
+.dlive-term-item:hover{background:var(--bg-overlay);}
+.dlive-term-date{font-size:11px;font-weight:600;min-width:80px;flex-shrink:0;font-variant-numeric:tabular-nums;}
+.dlive-term-date.urgent{color:var(--danger);}
+.dlive-term-date.soon{color:var(--warn);}
+.dlive-term-date.normal{color:var(--muted);}
+.dlive-term-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── Geschäft ── */
+.dlive-biz-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px;color:var(--text);transition:background .12s;}
+.dlive-biz-item:nth-child(odd){background:var(--bg);}
+.dlive-biz-item:hover{background:var(--bg-overlay);}
+.dlive-biz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dlive-biz-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dlive-biz-val{margin-left:auto;font-weight:600;font-size:12px;white-space:nowrap;flex-shrink:0;font-variant-numeric:tabular-nums;}
+
+/* ── Sent Today ── */
+.dlive-sent-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;transition:background .12s;}
+.dlive-sent-item:nth-child(odd){background:var(--bg);}
+.dlive-sent-item:hover{background:var(--bg-overlay);}
+.dlive-sent-icon{font-size:13px;flex-shrink:0;}
+.dlive-sent-body{flex:1;min-width:0;}
+.dlive-sent-to{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dlive-sent-subj{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
+.dlive-sent-ts{color:var(--muted);font-size:11px;flex-shrink:0;}
+
+/* ── Vorgänge ── */
+.dlive-vor-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;transition:background .12s;}
+.dlive-vor-item:nth-child(odd){background:var(--bg);}
+.dlive-vor-item:hover{background:var(--bg-overlay);}
+.dlive-vor-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dlive-vor-typ{flex:1;color:var(--text);}
+.dlive-vor-n{font-weight:700;font-size:15px;color:var(--text);flex-shrink:0;font-variant-numeric:tabular-nums;}
+
+/* ── Signale ── */
+.dlive-signals{margin-top:22px;}
+.dlive-sig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:14px;}
+.dlive-sig{padding:11px 14px;border-radius:9px;border:1px solid;display:flex;align-items:flex-start;
+  gap:8px;font-size:11px;font-weight:500;cursor:pointer;line-height:1.5;
+  transition:all .2s cubic-bezier(.16,1,.3,1);}
+.dlive-sig:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 6px 20px rgba(0,0,0,.1);}
+.dlive-sig-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:currentColor;}
+.dlive-sig-text{flex:1;}
+.dlive-sig-arr{margin-left:auto;font-size:13px;opacity:.6;flex-shrink:0;font-weight:600;
+  transition:transform .2s;}.dlive-sig:hover .dlive-sig-arr{transform:translateX(3px);}
+.dlive-sig-red{background:rgba(226,75,74,.06);border-color:rgba(226,75,74,.3);color:#A32D2D;}
+.dlive-sig-amber{background:rgba(239,159,39,.06);border-color:rgba(239,159,39,.3);color:#854F0B;}
+.dlive-sig-blue{background:rgba(79,125,249,.06);border-color:rgba(79,125,249,.3);color:#1a5ca8;}
+.dlive-sig-purple{background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.3);color:#5b21b6;}
+[data-theme="light"] .dlive-sig-red{background:#FEF2F2;border-color:#FCA5A5;color:#7C1E1E;}
+[data-theme="light"] .dlive-sig-amber{background:#FFFBEB;border-color:#FCD34D;color:#7A4A08;}
+[data-theme="light"] .dlive-sig-blue{background:#EFF6FF;border-color:#93C5FD;color:#1a4a8a;}
+[data-theme="light"] .dlive-sig-purple{background:#F5F3FF;border-color:#C4B5FD;color:#5b21b6;}
+
+/* ═══ LAYOUT A: Bento Grid ═══ */
+.dlive-layout-a .dlive-bento{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-bottom:22px;}
+.dlive-layout-a .dlive-bento-main{grid-row:span 2;}
+.dlive-layout-a .dlive-bento-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;grid-column:1/-1;}
+@media(max-width:900px){.dlive-layout-a .dlive-bento{grid-template-columns:1fr;}.dlive-layout-a .dlive-bento-main{grid-row:auto;}}
+
+/* ═══ LAYOUT B: Command Center ═══ */
+.dlive-layout-b .dlive-cmd-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:18px;margin-bottom:22px;}
+.dlive-layout-b .dlive-cmd-left,.dlive-layout-b .dlive-cmd-center,.dlive-layout-b .dlive-cmd-right{display:flex;flex-direction:column;gap:16px;}
+@media(max-width:1000px){.dlive-layout-b .dlive-cmd-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.dlive-layout-b .dlive-cmd-grid{grid-template-columns:1fr;}}
+
+/* ═══ LAYOUT C: Smart Cards Flow ═══ */
+.dlive-layout-c .dlive-smart-flow{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-bottom:22px;}
+@media(max-width:700px){.dlive-layout-c .dlive-smart-flow{grid-template-columns:1fr;}}
+
+/* ── Protokoll Panel (kept for other sections) ── */
 .proto-stats-bar{display:flex;gap:16px;padding:8px 0 14px;font-size:12px;color:var(--text-secondary);}
 .proto-stats-bar b{color:var(--text);}
 .proto-stats-bar .ps-fehler{color:var(--danger);}
-.proto-filter{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;
-  padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer;}
+.proto-filter{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer;}
 .proto-table-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:10px;}
 .proto-table{width:100%;border-collapse:collapse;font-size:12px;}
-.proto-table th{background:var(--bg-raised);padding:8px 12px;text-align:left;font-weight:600;
-  color:var(--text-secondary);border-bottom:0.5px solid var(--border);white-space:nowrap;}
+.proto-table th{background:var(--bg-raised);padding:8px 12px;text-align:left;font-weight:600;color:var(--text-secondary);border-bottom:0.5px solid var(--border);white-space:nowrap;}
 .proto-table td{padding:7px 12px;border-bottom:0.5px solid var(--border);vertical-align:top;color:var(--text);}
 .proto-table tr:last-child td{border-bottom:none;}
 .proto-table tr:hover td{background:var(--bg-raised);}
-.proto-st{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;
-  padding:2px 7px;font-size:10px;font-weight:600;white-space:nowrap;}
+.proto-st{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;white-space:nowrap;}
 .proto-st.ok{background:rgba(29,158,117,.1);color:#1d9e75;}
 .proto-st.fehler{background:rgba(220,74,74,.1);color:#d04444;}
 .proto-st.warnung{background:rgba(239,159,39,.1);color:#b87c10;}
-.proto-bereich{display:inline-block;background:var(--accent-bg);color:var(--accent);
-  border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;}
-
-/* Zone B: KPI Grid */
-.dash-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px;}
-@media(max-width:1100px){.dash-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
-@media(max-width:860px){.dash-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:480px){.dash-kpi-grid{grid-template-columns:1fr 1fr;}}
-.dash-kpi{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
-  padding:18px 20px;cursor:pointer;
-  transition:border-color .18s,box-shadow .18s,transform .15s;position:relative;
-  box-shadow:0 1px 4px rgba(0,0,0,.05);}
-.dash-kpi:hover{border-color:var(--accent);
-  box-shadow:0 6px 22px rgba(0,0,0,.1),0 1px 4px rgba(0,0,0,.05);transform:translateY(-2px);}
-.dash-kpi:active{transform:translateY(0);}
-.dash-kpi-label{font-size:10px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;
-  letter-spacing:.6px;text-transform:uppercase;}
-.dash-kpi-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
-.dash-kpi-val{font-size:30px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.5px;}
-.dash-kpi-change{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;white-space:nowrap;}
-.dash-kpi-change.up{background:#EAF3DE;color:#3B6D11;}
-.dash-kpi-change.warn{background:#FAEEDA;color:#854F0B;}
-.dash-kpi-change.danger{background:#FCEBEB;color:#A32D2D;}
-.dash-kpi-change.info{background:#E8F0FE;color:#1a5ca8;}
-.dash-kpi-spark{margin-top:14px;height:34px;overflow:hidden;}
-.dash-kpi-spark svg{width:100%;height:34px;}
-/* KPI state variants */
-.dash-kpi.kpi-danger{border-color:rgba(226,75,74,.35);background:rgba(226,75,74,.02);}
-.dash-kpi.kpi-danger .dash-kpi-val{color:#D63B3A;}
-.dash-kpi.kpi-warn{border-color:rgba(239,159,39,.35);}
-.dash-kpi.kpi-warn .dash-kpi-val{color:#C17C13;}
-.dash-kpi.kpi-accent{border-color:var(--accent-border);background:var(--accent-bg);}
-.dash-kpi.kpi-accent .dash-kpi-val{color:var(--accent);}
-
-/* Zone C: Work Blocks */
-.dash-work-grid{display:grid;grid-template-columns:63fr 37fr;gap:18px;margin-bottom:22px;}
-@media(max-width:900px){.dash-work-grid{grid-template-columns:1fr;}}
-.dash-panel{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
-  padding:20px 22px;box-shadow:0 1px 5px rgba(0,0,0,.05);}
-.dash-panel-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;letter-spacing:-.1px;}
-.dash-panel-sub{font-size:11px;color:var(--text-secondary);margin-bottom:16px;font-weight:500;}
-.dash-right-col{display:flex;flex-direction:column;gap:16px;}
-
-/* Heute priorisiert cards */
-.dash-prio-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
-  background:var(--bg);border:0.5px solid var(--border);border-radius:9px;
-  border-left:3px solid #ccc;margin-bottom:8px;
-  transition:box-shadow .15s,transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.dash-prio-item:last-child{margin-bottom:0;}
-.dash-prio-item:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);transform:translateY(-1px);}
-.dash-prio-item.prio-red{border-left-color:#D63B3A;}
-.dash-prio-item.prio-amber{border-left-color:#C17C13;}
-.dash-prio-item.prio-blue{border-left-color:#2E72C2;}
-.dash-prio-item.prio-green{border-left-color:#1D9E75;}
-.dash-prio-item.prio-gray{border-left-color:#B4B2A9;}
-.dash-prio-body{flex:1;min-width:0;}
-.dash-prio-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dash-prio-meta{font-size:11px;color:var(--text-secondary);margin-bottom:5px;font-weight:500;}
-.dash-prio-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
-.dash-tag{font-size:10px;padding:2px 7px;border-radius:5px;white-space:nowrap;font-weight:600;}
-.dash-tag-red{background:#FCEBEB;color:#8B2020;}
-.dash-tag-amber{background:#FEF3E2;color:#7A4A08;}
-.dash-tag-blue{background:#E8F0FE;color:#1a5ca8;}
-.dash-tag-gray{background:#F1EFE8;color:#5F5E5A;}
-.dash-tag-green{background:#EAF3DE;color:#2E6010;}
-.dash-prio-next{font-size:10px;color:var(--text-secondary);margin-left:2px;font-style:italic;}
-/* Kebab/dots context menu */
-.dash-prio-menu{position:relative;flex-shrink:0;margin-left:auto;}
-.dash-prio-dots{background:none;border:1px solid transparent;border-radius:6px;width:30px;height:30px;
-  cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;
-  font-size:18px;line-height:1;letter-spacing:1px;
-  transition:background .12s,color .12s,border-color .12s,transform .22s cubic-bezier(.4,0,.2,1);
-  padding:0;font-family:inherit;}
-.dash-prio-dots:hover,.dash-prio-menu.open .dash-prio-dots{
-  background:var(--bg-raised);color:var(--text);border-color:var(--border);}
-.dash-prio-menu.open .dash-prio-dots{transform:rotate(90deg);}
-.dash-prio-dropdown{position:absolute;right:0;top:calc(100% + 5px);background:var(--bg-raised);
-  border:1px solid var(--border);border-radius:10px;padding:4px;min-width:155px;
-  box-shadow:0 8px 32px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06);z-index:200;
-  opacity:0;transform:translateY(-8px) scale(.96);pointer-events:none;
-  transition:opacity .16s,transform .16s cubic-bezier(.4,0,.2,1);}
-.dash-prio-menu.open .dash-prio-dropdown{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
-.dash-prio-dd-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 12px;
-  background:none;border:none;border-radius:7px;font-size:12px;font-weight:500;color:var(--text);
-  cursor:pointer;font-family:inherit;transition:background .1s,color .1s;white-space:nowrap;}
-.dash-prio-dd-btn:hover{background:var(--accent-bg);color:var(--accent);}
-.dash-prio-dd-btn.dd-kira{color:#534AB7;}
-.dash-prio-dd-btn.dd-kira:hover{background:#EEEDFE;color:#534AB7;}
-.dash-prio-dd-sep{height:1px;background:var(--border);margin:3px 4px;}
-/* Standalone buttons (used elsewhere on dashboard) */
-.dash-btn{font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);
-  background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;white-space:nowrap;
-  transition:background .12s,color .12s,box-shadow .12s,transform .12s;
-  font-family:inherit;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.06);}
-.dash-btn:hover{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);
-  box-shadow:0 3px 10px rgba(79,125,249,.18);transform:translateY(-1px);}
-.dash-btn:active{transform:translateY(0);box-shadow:none;}
-.dash-btn-kira{background:#EEEDFE;border-color:#CECBF6;color:#534AB7;box-shadow:0 1px 3px rgba(83,74,183,.1);}
-.dash-btn-kira:hover{background:#DDD9FA;box-shadow:0 3px 10px rgba(83,74,183,.25);transform:translateY(-1px);}
-
-/* Termine & Fristen list */
-.dash-term-item{display:flex;align-items:center;gap:10px;padding:8px 10px;
-  border-radius:6px;font-size:12px;color:var(--text);}
-.dash-term-item:nth-child(odd){background:var(--bg);}
-.dash-term-date{font-size:11px;font-weight:600;min-width:48px;flex-shrink:0;}
-.dash-term-date.urgent{color:#E24B4A;}
-.dash-term-date.soon{color:#EF9F27;}
-.dash-term-date.normal{color:var(--muted);}
-.dash-term-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dash-term-badge{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:auto;white-space:nowrap;font-weight:500;}
-
-/* Geschäft aktuell list */
-.dash-biz-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
-  border-radius:6px;font-size:12px;color:var(--text);}
-.dash-biz-item:nth-child(odd){background:var(--bg);}
-.dash-biz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dash-biz-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
-.dash-biz-val{margin-left:auto;font-weight:600;font-size:12px;white-space:nowrap;flex-shrink:0;}
-
-/* Heute gesendet */
-.dash-sent-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;}
-.dash-sent-item:nth-child(odd){background:var(--bg);}
-.dash-sent-icon{font-size:13px;flex-shrink:0;}
-.dash-sent-body{flex:1;min-width:0;}
-.dash-sent-to{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dash-sent-subj{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
-.dash-sent-ts{color:var(--text-muted);font-size:11px;flex-shrink:0;margin-left:4px;}
-
-/* Vorgänge aktiv */
-.dash-vor-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;}
-.dash-vor-item:nth-child(odd){background:var(--bg);}
-.dash-vor-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dash-vor-typ{flex:1;color:var(--text);font-size:12px;}
-.dash-vor-n{font-weight:700;font-size:15px;color:var(--text);flex-shrink:0;}
-
-/* Zone D: Signals */
-.dash-signals{background:var(--bg-raised);border:0.5px solid var(--border);border-radius:12px;
-  padding:20px 22px;margin-bottom:22px;box-shadow:0 1px 5px rgba(0,0,0,.05);}
-.dash-sig-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px;}
-@media(max-width:860px){.dash-sig-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:480px){.dash-sig-grid{grid-template-columns:1fr;}}
-.dash-sig{padding:11px 14px;border-radius:9px;border:1px solid;display:flex;align-items:flex-start;
-  gap:8px;font-size:11px;font-weight:500;cursor:pointer;
-  transition:box-shadow .15s,transform .15s;line-height:1.5;}
-.dash-sig:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.1);}
-.dash-sig .sig-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;}
-.dash-sig .sig-text{flex:1;}
-.dash-sig .sig-arr{margin-left:auto;font-size:13px;opacity:.6;flex-shrink:0;font-weight:600;}
-.dash-sig.s-red{background:#FEF2F2;border-color:#FCA5A5;color:#7C1E1E;}
-.dash-sig.s-amber{background:#FFFBEB;border-color:#FCD34D;color:#7A4A08;}
-.dash-sig.s-blue{background:#EFF6FF;border-color:#93C5FD;color:#1a4a8a;}
-.dash-sig.s-coral{background:#FFF5F2;border-color:#FCA497;color:#712B13;}
-.dash-sig.s-teal{background:#F0FDF9;border-color:#6EE7C0;color:#0D5B46;}
-.dash-sig.s-gray{background:var(--bg);border-color:var(--border);color:var(--text-secondary);}
+.proto-bereich{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;}
 
 /* Lexware Office Panel (session-fff — UI Komplettausbau) */
 /* Modul-Shell */
@@ -21891,6 +22145,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             entries = alog_entries(min(limit,500), offset, bereich or None, status or None)
             stats   = alog_stats()
             self._json({'entries': entries, 'stats': stats})
+
+        elif self.path == '/api/dashboard/live':
+            try:
+                data = _dashboard_data()
+                self._json(data)
+            except Exception as ex:
+                self._json({'error': str(ex), 'kpis': [], 'briefing': {}, 'actions': [], 'feed': [], 'termine': [], 'geschaeft': [], 'vorgaenge': {'items': [], 'total': 0}, 'signale': [], 'sent': [], 'sparkline': [], 'mi_stats': {}, 'freigaben': 0, 'ts': ''})
 
         elif self.path.startswith('/api/runtime/events'):
             qs          = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
