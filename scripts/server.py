@@ -27879,6 +27879,35 @@ def _kill_old_instances(port):
         time.sleep(1.0)  # letzter Versuch
 
 
+def _sync_zahlungsstatus(db):
+    """Gleicht Lexware-Belege (paid/paidoff) mit ausgangsrechnungen ab → markiert als bezahlt."""
+    try:
+        # Finde offene Rechnungen deren Nummer in lexware_belege mit Status paid/paidoff existiert
+        rows = db.execute("""
+            SELECT a.id, a.re_nummer, a.status as ar_status, lb.status as lx_status, lb.nummer
+            FROM ausgangsrechnungen a
+            JOIN lexware_belege lb ON lb.nummer = a.re_nummer
+            WHERE a.status = 'offen'
+              AND lb.status IN ('paid', 'paidoff', 'sepadebit')
+              AND lb.typ = 'invoice'
+        """).fetchall()
+        markiert = 0
+        for r in rows:
+            db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=datetime('now') WHERE id=?", (r["id"],))
+            markiert += 1
+        if markiert > 0:
+            db.commit()
+            try:
+                rlog('system', 'zahlungsabgleich',
+                     f'{markiert} Rechnung{"en" if markiert>1 else ""} automatisch als bezahlt markiert',
+                     source='server', modul='lexware', actor_type='system', status='ok')
+            except Exception:
+                pass
+        return {"markiert": markiert, "geprueft": len(rows) if rows else 0}
+    except Exception as e:
+        return {"error": str(e), "markiert": 0}
+
+
 # ── Lexware Office POST-Handler (session-eee) ────────────────────────────────
 def _handle_lexware_post(handler, path, body):
     """
@@ -27972,6 +28001,10 @@ def _handle_lexware_post(handler, path, body):
                 (ts,)
             )
             db.commit()
+            # Zahlungsstatus automatisch abgleichen
+            zahl_stats = _sync_zahlungsstatus(db)
+            if zahl_stats.get("markiert", 0) > 0:
+                stats["zahlungsabgleich"] = zahl_stats
             db.close()
             rlog('system', 'lexware_sync', f"Sync abgeschlossen: {stats}",
                  source='server', modul='lexware', actor_type='system', status='ok')

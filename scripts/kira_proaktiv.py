@@ -882,6 +882,36 @@ def scan_auto_backup(state: dict) -> dict:
         return {}
 
 
+def scan_lexware_zahlungsabgleich(db, state: dict) -> dict:
+    """Gleicht Lexware-Belege (paid/paidoff) mit offenen Ausgangsrechnungen ab (alle 6h)."""
+    if _already_done(state, "lexware_zahlungsabgleich", ttl_hours=6):
+        return {}
+    try:
+        rows = db.execute("""
+            SELECT a.id, a.re_nummer, lb.status as lx_status
+            FROM ausgangsrechnungen a
+            JOIN lexware_belege lb ON lb.nummer = a.re_nummer
+            WHERE a.status = 'offen'
+              AND lb.status IN ('paid', 'paidoff', 'sepadebit')
+              AND lb.typ = 'invoice'
+        """).fetchall()
+        markiert = 0
+        nummern = []
+        for r in rows:
+            db.execute("UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=datetime('now') WHERE id=?", (r["id"],))
+            nummern.append(r["re_nummer"] or "?")
+            markiert += 1
+        if markiert > 0:
+            db.commit()
+            _elog('system', 'zahlungsabgleich',
+                 f'{markiert} Rechnung(en) als bezahlt markiert: {", ".join(nummern[:5])}',
+                 source='kira_proaktiv', modul='lexware', actor_type='system', status='ok')
+        _mark_done(state, "lexware_zahlungsabgleich")
+        return {"markiert": markiert, "nummern": nummern} if markiert > 0 else {}
+    except Exception:
+        return {}
+
+
 # ── Haupt-Scan ────────────────────────────────────────────────────────────────
 def run_proaktiver_scan() -> dict:
     """
@@ -955,6 +985,14 @@ def run_proaktiver_scan() -> dict:
         backup_result = scan_auto_backup(state)
         if backup_result:
             ergebnisse['auto_backup'] = backup_result
+
+        # Scan 12: Lexware-Zahlungsabgleich (alle 6h)
+        zahl_abgl = scan_lexware_zahlungsabgleich(db, state)
+        if zahl_abgl:
+            ergebnisse['lexware_zahlungsabgleich'] = zahl_abgl
+            if zahl_abgl.get('markiert', 0) > 0:
+                _push("Kira: Zahlungsabgleich",
+                      f'{zahl_abgl["markiert"]} Rechnung(en) automatisch als bezahlt markiert')
 
         db.close()
         _save_state(state)
