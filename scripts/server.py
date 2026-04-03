@@ -5923,9 +5923,7 @@ def build_einstellungen():
               <span style="font-size:10px;color:var(--muted)">{esc(ptype_info.get("name",""))}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:10px;color:var(--muted)">Prio {pprio}</span>
-              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',-1)" title="Höhere Priorität">▲</button>
-              <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="moveProvider('{js_esc(pid)}',1)" title="Niedrigere Priorität">▼</button>
+              <span style="font-size:10px;color:var(--muted);background:var(--bg);padding:1px 6px;border-radius:4px">{'Lokal (kostenlos)' if ptyp in ('ollama','custom') else 'Günstig' if ptyp in ('openai','openrouter') else 'Premium'}</span>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#0891b2;border:1px solid #0891b2;border-radius:4px;cursor:pointer" onclick="testProvider('{js_esc(pid)}')" title="Verbindung testen">⚡ Test</button>
               <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;background:transparent;color:#8a6ff0;border:1px solid #8a6ff0;border-radius:4px;cursor:pointer" onclick="checkProviderModel('{js_esc(pid)}')" title="Modell jetzt prüfen">🔍 Modell</button>
               <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="paktiv-{esc(pid)}" {aktiv_checked} onchange="toggleProvider('{js_esc(pid)}',this.checked)"> Aktiv</label>
@@ -7027,7 +7025,13 @@ function esInfoPopup(btn, text) {{
 
   <div class="es-grp" id="llm-grp-provider">
     <div class="es-grp-h">KI-Provider</div>
-    <div class="es-grp-sub">Verbundene Sprachmodell-Provider. Der erste aktive Provider mit g&uuml;ltigem API-Key wird verwendet.</div>
+    <div class="es-grp-sub">Verbundene Sprachmodell-Provider. KIRA w&auml;hlt automatisch das g&uuml;nstigste passende Modell je Aufgabe.</div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--muted)">
+      <b style="color:var(--text)">Automatische Modellwahl:</b><br>
+      Klassifizierung &amp; Extraktion &rarr; g&uuml;nstigstes Modell (GPT-4o-mini / Haiku)<br>
+      Chat &amp; Antwort-Generierung &rarr; leistungsf&auml;higstes Modell (Claude Sonnet / GPT-4o)<br>
+      <span style="color:var(--accent)">Kein manuelles Priorisieren n&ouml;tig</span> &mdash; KIRA w&auml;hlt pro Aufgabe selbst.
+    </div>
     <div id="provider-list">
       {provider_cards}
     </div>
