@@ -1,7 +1,7 @@
 # KIRA Mail-Klassifizierung — Master-Checkliste
 
 > Arbeitsliste fuer das Klassifizierungs-Reparatur-Projekt
-> Erstellt: 2026-04-02 · Letzte Aktualisierung: 2026-04-02
+> Erstellt: 2026-04-02 · Letzte Aktualisierung: 2026-04-03
 
 ---
 
@@ -24,8 +24,8 @@
 | # | Was | Status | Commit | Anmerkung |
 |---|-----|--------|--------|-----------|
 | B1 | LLM-Fehler sichtbar machen (Runtime-Log + Marker) | ✅ Erledigt (session-vvv) | 27acc81 | llm_classifier.py: Logging statt silent pass, _llm_fallback=True |
-| B2 | "LLM nicht verbunden" Warnung im Dashboard-Header | ⚠️ Offen | — | Toast + roter Header-Chip wenn kein Provider aktiv |
-| B3 | ntfy-Push bei LLM-Ausfall | ⚠️ Offen | — | Wenn Provider komplett fehlt/fehlschlaegt |
+| B2 | "LLM nicht verbunden" Warnung im Dashboard-Header | ✅ Erledigt (session-xxx-intelligence) | b71b3a0 | Header-Chip #llmPauseChip + Toast bei Pause |
+| B3 | ntfy-Push bei LLM-Ausfall | ✅ Erledigt (session-xxx-intelligence) | b71b3a0 | _send_qualify_pause_push() in daily_check.py |
 
 ### C. System-Prompt
 
@@ -47,6 +47,20 @@
 | D5 | Pflegbare Keywords in config.json | ✅ Erledigt (session-vvv) | 27acc81 | mail_klassifizierung.eigene_keywords Array |
 | D6 | **Pflegbare Keywords in Einstellungen-UI** | ⚠️ Offen | — | Input-Feld in Einstellungen > Mail-Klassifizierung |
 | D7 | **Historische Qualifizierung (12.000+ Mails)** | ✅ Erledigt (session-www) | cbf5401 | 11.652/12.071 (96,5%) klassifiziert. Phase 1+2 komplett |
+
+---
+
+## Phase 2.5 — Routing-System (Task-Erstellung nur bei Handlung)
+
+| # | Was | Status | Commit | Anmerkung |
+|---|-----|--------|--------|-----------|
+| R1 | LLM-Prompt: erfordert_handlung + routing Felder | ✅ Erledigt (session-bbbb) | be52f1d | 2 Pflichtfelder im JSON-Schema + Routing-Anweisung |
+| R2 | Regelbasiertes Routing in mail_classifier.py | ✅ Erledigt (session-bbbb) | be52f1d | _default_routing() + alle Branches mit routing/erfordert_handlung |
+| R3 | Routing-Dispatch in daily_check.py + mail_monitor.py | ✅ Erledigt (session-bbbb) | be52f1d | archivieren/buchhaltung/feed/kira_vorschlag/task |
+| R4 | Bulk-Cleanup bestehender Tasks | ✅ Erledigt (session-bbbb) | be52f1d | 118→30 offene Tasks (88 archiviert) |
+| R5 | Kira-Vorschlag Danke-Mail bei Absagen | ✅ Erledigt (session-bbbb) | be52f1d | _route_kira_vorschlag() → mail_approve_queue |
+| R6 | Konversations-Gruppierung Kommunikation | ✅ Erledigt (session-bbbb) | be52f1d | thread_id-basiert, conv_badge lila |
+| R7 | Bot-Icon im Postfach (hat_task Badge) | ✅ Erledigt (session-bbbb) | be52f1d | Lila "Aufgabe" Badge in beiden Mail-APIs |
 
 ---
 
