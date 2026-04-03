@@ -8723,7 +8723,7 @@ function esInfoPopup(btn, text) {{
         html += '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg-raised);border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:12px">\\u2709 ' + em + '</span>';
       }});
       autoDomains.forEach(d => {{
-        html += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:2px 10px;font-size:12px;color:#7c3aed">\\u{1F310} ' + d + '</span>';
+        html += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:2px 10px;font-size:12px;color:#7c3aed">&#x1F310; ' + d + '</span>';
       }});
       if(!html) html = '<em>Keine Konten konfiguriert</em>';
       autoBox.innerHTML = html;
