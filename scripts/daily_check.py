@@ -1070,21 +1070,69 @@ def _check_datev_duplicate(betr, text, anhaenge_pfad, konto, tasks_db) -> dict:
 
 # ── Routing-Helfer ────────────────────────────────────────────────────────────
 def _route_kira_vorschlag_dc(cl, kunden_email, betreff, text, msgid, konto):
-    """Bei kira_vorschlag: Auto-Entwurf in mail_approve_queue einfügen (daily_check)."""
+    """Bei kira_vorschlag: Auto-Entwurf / Wiedervorlage / Signal je nach Kategorie (daily_check)."""
     try:
         kat = cl.get("kategorie", "")
         aktion = cl.get("angebot_aktion", "")
+        zusammenfassung = cl.get("zusammenfassung", "")
+        combined = (betreff + " " + (text or "")[:500]).lower()
+
+        # Firmendaten aus config.json
+        try:
+            _cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8", errors="replace"))
+            _firma = _cfg.get("firma_name", "")
+            _inhaber = _cfg.get("firma_inhaber", "")
+            _sig = f"\n\nMit freundlichen Grüßen\n{_inhaber or 'Team'}\n{_firma}" if _firma else ""
+        except Exception:
+            _sig = ""
+
         body_plain = ""
+        notiz = f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"
+
+        # ── Angebotsabsage → Danke-Mail-Entwurf ──
         if kat == "Angebotsrueckmeldung" and aktion == "abgelehnt":
             body_plain = (
                 "Sehr geehrte Damen und Herren,\n\n"
                 "vielen Dank für Ihre Rückmeldung zu unserem Angebot.\n\n"
                 "Wir bedanken uns für die ehrliche Rückmeldung und das entgegengebrachte Vertrauen. "
-                "Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen jederzeit gerne zur Verfügung.\n\n"
-                "Mit freundlichen Grüßen\nKai Marienfeld\nrauMKult® Sichtbeton"
+                "Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen "
+                "jederzeit gerne zur Verfügung."
+                + _sig
             )
+
+        # ── Schulungs-/Workshop-Interesse → Wiedervorlage 4 Wochen ──
+        elif any(kw in combined for kw in ["schulung", "workshop", "seminar",
+                 "weiterbildung", "kurs", "training", "fortbildung"]):
+            wv = (datetime.now() + timedelta(days=28)).strftime("%Y-%m-%d")
+            tdb = sqlite3.connect(str(TASKS_DB))
+            tdb.execute("""INSERT OR IGNORE INTO tasks
+                (message_id, kunden_email, betreff, kategorie, task_typ, prioritaet,
+                 status, erstellt_am, konto, routing, routing_grund, faellig)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (msgid, kunden_email, f"Wiedervorlage: {betreff[:150]}",
+                 "Zur Kenntnis", "wiedervorlage", "normal",
+                 "offen", datetime.now().isoformat(), konto,
+                 "kira_vorschlag", "Schulungs-Interesse → Wiedervorlage 4 Wochen", wv))
+            tdb.commit()
+            tdb.close()
+            return
+
+        # ── Zahlungsproblem → Signal Stufe B ──
+        elif any(kw in combined for kw in ["kreditkarte abgelehnt", "zahlung fehlgeschlagen",
+                 "payment failed", "card declined", "zahlungsfehler"]):
+            try:
+                from case_engine import add_signal
+                add_signal(None, "zahlungsproblem",
+                           f"Zahlungsproblem: {betreff[:120]} — {zusammenfassung[:200]}",
+                           stufe="B", quelle="kira_routing", kontext={"msg_id": msgid})
+            except Exception:
+                pass
+            return
+
+        # ── Fallback ──
         else:
             body_plain = f"Kira-Vorschlag: {cl.get('empfohlene_aktion', 'Prüfen')}"
+
         if not body_plain:
             return
         tdb = sqlite3.connect(str(TASKS_DB))
@@ -1092,8 +1140,7 @@ def _route_kira_vorschlag_dc(cl, kunden_email, betreff, text, msgid, konto):
             (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, notiz_intern)
             VALUES (?,?,?,?,?,?,?,?,?)""",
             (kunden_email, f"Re: {betreff[:180]}", body_plain, konto, msgid,
-             "kira_routing", "entwurf", datetime.now().isoformat(),
-             f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"))
+             "kira_routing", "entwurf", datetime.now().isoformat(), notiz))
         tdb.commit()
         tdb.close()
     except Exception:

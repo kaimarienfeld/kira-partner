@@ -1218,43 +1218,101 @@ def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: st
 
 
 # ── Routing-Helfer ───────────────────────────────────────────────────────────
+def _load_firma_signatur():
+    """Lädt Firmenname + Inhaber für Signatur aus config.json."""
+    try:
+        cfg = json.loads((Path(__file__).parent / "config.json").read_text("utf-8", errors="replace"))
+        return cfg.get("firma_name", ""), cfg.get("firma_inhaber", "")
+    except Exception:
+        return "", ""
+
+
 def _route_kira_vorschlag(result, kunden_email, betreff, text, msg_id, konto):
-    """Bei kira_vorschlag: Auto-Entwurf in mail_approve_queue einfügen."""
+    """Bei kira_vorschlag: Auto-Entwurf / Wiedervorlage / Signal je nach Kategorie."""
     try:
         kat = result.get("kategorie", "")
         aktion = result.get("angebot_aktion", "")
         zusammenfassung = result.get("zusammenfassung", "")
+        firma, inhaber = _load_firma_signatur()
+        signatur = f"\n\nMit freundlichen Grüßen\n{inhaber or 'Team'}\n{firma}" if firma else ""
 
         body_plain = ""
+        notiz = f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"
+        vorschlag_typ = "entwurf"  # entwurf | wiedervorlage | signal
+
+        # ── Angebotsabsage → Danke-Mail-Entwurf ──
         if kat == "Angebotsrueckmeldung" and aktion == "abgelehnt":
             body_plain = (
-                f"Sehr geehrte Damen und Herren,\n\n"
-                f"vielen Dank für Ihre Rückmeldung zu unserem Angebot.\n\n"
-                f"Wir bedanken uns für die ehrliche Rückmeldung und das entgegengebrachte Vertrauen. "
-                f"Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen jederzeit gerne zur Verfügung.\n\n"
-                f"Mit freundlichen Grüßen\nKai Marienfeld\nrauMKult® Sichtbeton"
+                "Sehr geehrte Damen und Herren,\n\n"
+                "vielen Dank für Ihre Rückmeldung zu unserem Angebot.\n\n"
+                "Wir bedanken uns für die ehrliche Rückmeldung und das entgegengebrachte Vertrauen. "
+                "Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen "
+                "jederzeit gerne zur Verfügung."
+                + signatur
             )
+
+        # ── Schulungs-/Workshop-Interesse → Wiedervorlage 4 Wochen ──
+        elif _kw_in_text(["schulung", "workshop", "seminar", "weiterbildung", "kurs",
+                          "training", "fortbildung"], (betreff + " " + (text or "")[:500]).lower()):
+            wiedervorlage = (datetime.now() + timedelta(days=28)).strftime("%Y-%m-%d")
+            vorschlag_typ = "wiedervorlage"
+            body_plain = f"Kira: Schulungs-/Workshop-Interesse erkannt — Wiedervorlage am {wiedervorlage}"
+            notiz = f"Routing: kira_vorschlag | Wiedervorlage: {wiedervorlage} | {zusammenfassung[:100]}"
+            # Wiedervorlage als Task mit Datum
+            db = sqlite3.connect(str(TASKS_DB))
+            db.execute("""INSERT OR IGNORE INTO tasks
+                (message_id, kunden_email, betreff, kategorie, task_typ, prioritaet,
+                 status, erstellt_am, konto, routing, routing_grund, faellig)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (msg_id, kunden_email, f"Wiedervorlage: {betreff[:150]}",
+                 "Zur Kenntnis", "wiedervorlage", "normal",
+                 "offen", datetime.now().isoformat(), konto,
+                 "kira_vorschlag", "Schulungs-Interesse → Wiedervorlage 4 Wochen",
+                 wiedervorlage))
+            db.commit()
+            db.close()
+            _elog('kira', 'kira_vorschlag_wiedervorlage',
+                  f"Kira-Vorschlag: Wiedervorlage {wiedervorlage} | {betreff[:60]}",
+                  source='mail_monitor', modul='routing', actor_type='kira', status='ok',
+                  context_type='mail', context_id=msg_id)
+            return
+
+        # ── Zahlungsproblem (Kreditkarte abgelehnt, Zahlung fehlgeschlagen) → Signal ──
+        elif _kw_in_text(["kreditkarte abgelehnt", "zahlung fehlgeschlagen", "payment failed",
+                          "card declined", "zahlungsfehler", "payment error"],
+                         (betreff + " " + (text or "")[:500]).lower()):
+            vorschlag_typ = "signal"
+            try:
+                from case_engine import add_signal
+                add_signal(None, "zahlungsproblem",
+                           f"Zahlungsproblem: {betreff[:120]} — {zusammenfassung[:200]}",
+                           stufe="B", quelle="kira_routing", kontext={"msg_id": msg_id})
+            except Exception:
+                pass
+            _elog('kira', 'kira_vorschlag_signal',
+                  f"Kira-Signal: Zahlungsproblem | {betreff[:60]}",
+                  source='mail_monitor', modul='routing', actor_type='kira', status='ok',
+                  context_type='mail', context_id=msg_id)
+            return
+
+        # ── Zur Kenntnis ──
         elif kat == "Zur Kenntnis":
             body_plain = f"Kira-Vorschlag: Mail zur Kenntnis genommen — {zusammenfassung}"
+
+        # ── Fallback ──
         else:
             body_plain = f"Kira-Vorschlag: {result.get('empfohlene_aktion', 'Prüfen')}"
 
         if not body_plain:
             return
 
+        # Entwurf in Freigabe-Queue
         db = sqlite3.connect(str(TASKS_DB))
         db.execute("""INSERT INTO mail_approve_queue
             (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, notiz_intern)
             VALUES (?,?,?,?,?,?,?,?,?)""",
-            (kunden_email,
-             f"Re: {betreff[:180]}",
-             body_plain,
-             konto,
-             msg_id,
-             "kira_routing",
-             "entwurf",
-             datetime.now().isoformat(),
-             f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"))
+            (kunden_email, f"Re: {betreff[:180]}", body_plain, konto, msg_id,
+             "kira_routing", "entwurf", datetime.now().isoformat(), notiz))
         db.commit()
         db.close()
         _elog('kira', 'kira_vorschlag_entwurf',
@@ -1263,6 +1321,11 @@ def _route_kira_vorschlag(result, kunden_email, betreff, text, msg_id, konto):
               context_type='mail', context_id=msg_id)
     except Exception as e:
         log.error(f"Kira-Vorschlag fehlgeschlagen: {e}")
+
+
+def _kw_in_text(keywords, text):
+    """Prüft ob mindestens ein Keyword im Text vorkommt."""
+    return any(kw in text for kw in keywords)
 
 
 # ── Verarbeitung ─────────────────────────────────────────────────────────────

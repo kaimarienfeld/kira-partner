@@ -756,8 +756,8 @@ def build_dashboard(tasks, db):
     except Exception:
         pass
 
-    # Organisation-Daten
-    try: n_org = db.execute("SELECT COUNT(*) FROM organisation").fetchone()[0]
+    # Organisation-Daten — nur aktuelle/zukünftige Termine (ab heute -7 Tage)
+    try: n_org = db.execute("SELECT COUNT(*) FROM organisation WHERE datum_erkannt >= date('now','-7 days')").fetchone()[0]
     except: n_org = 0
 
     # Ausgangsrechnungen offen
@@ -974,7 +974,7 @@ def build_dashboard(tasks, db):
 
     # ── Zone C2: Nächste Termine & Fristen ──
     try:
-        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
+        org_rows = db.execute("SELECT typ,datum_erkannt,beschreibung,kunden_email FROM organisation WHERE datum_erkannt >= date('now','-7 days') ORDER BY datum_erkannt ASC LIMIT 5").fetchall()
         term_html = ""
         _ORG_TYP = {"termin": "Termin", "frist": "Frist", "rueckruf": "Rückruf"}
         for r in org_rows:
