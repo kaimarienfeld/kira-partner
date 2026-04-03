@@ -1,20 +1,20 @@
 {
   "_schema": "v3",
-  "_updated": "session-rrr",
+  "_updated": "session-cccc",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
       "id": "dashboard-ui",
-      "name": "Dashboard Hauptseite",
+      "name": "Dashboard Live-Redesign",
       "icon": "🏠",
       "leni_name": "Das Cockpit — alles auf einen Blick",
-      "leni_desc": "Auf einen Blick siehst du hier alles Wichtige: offene Aufgaben, wie viel Geld noch aussteht, was heute ansteht und was zuletzt passiert ist. Wie ein Kontrollzentrum — immer griffbereit.",
+      "leni_desc": "Auf einen Blick siehst du hier alles Wichtige: offene Aufgaben, wie viel Geld noch aussteht, was heute ansteht und was zuletzt passiert ist. 3 wählbare Layouts mit Live-Animationen — dynamisch und lebendig.",
       "leni_visible": true,
       "leni_note": null,
       "module": "server.py",
       "status": "done",
-      "last_updated": "2026-03-25",
-      "description": "KPI-Karten, Top-Aufgaben, letzte Geschäftsvorgänge, Sparklines"
+      "last_updated": "2026-04-03",
+      "description": "3 wählbare Layouts (Bento Grid, Command Center, Smart Cards), JSON-API /api/dashboard/live, Animation-Engine (Count-Up, Stagger, Bounce, Shimmer, Pulse), Auto-Refresh, Hell/Dunkel CSS-Variablen"
     },
     {
       "id": "kommunikation-panel",
@@ -240,6 +240,19 @@
       "status": "done",
       "last_updated": "2026-03-25",
       "description": "8-Spalten SQLite, einfaches Log für Server-Start/Task-Status/Kira-Chat. Backward-Compat bleibt."
+    },
+    {
+      "id": "activity-window-multi-trigger",
+      "name": "Activity Window Multi-Trigger",
+      "icon": "🔔",
+      "leni_name": "Intelligente Desktop-Benachrichtigungen",
+      "leni_desc": "KIRA meldet sich direkt auf dem Desktop wenn etwas Wichtiges passiert: überfällige Rechnungen, neue Kundenanfragen oder Entwürfe die auf deine Freigabe warten. Immer zur richtigen Zeit.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "activity_window.py",
+      "status": "done",
+      "last_updated": "2026-04-03",
+      "description": "6 Signal-Quellen: Case-Engine C/B, Qualifizierung-Pause, Überfällige Rechnungen (>14d/30d), Kira-Freigaben >2h, Neue Leads. Cooldown 1h, Presence-Detection, Desktop-Overlay + Browser-Polling."
     },
     {
       "id": "change-log",

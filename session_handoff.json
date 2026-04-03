@@ -1,6 +1,6 @@
 {
-  "last_session": "session-bbbb-routing",
-  "date": "2026-04-03 12:30",
+  "last_session": "session-cccc-dashboard",
+  "date": "2026-04-03 15:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -239,7 +239,14 @@
     "routing-5-stufen-system",
     "konversations-gruppierung-kommunikation",
     "bot-icon-postfach-hat-task-badge",
-    "eigene-domains-konfigurierbar-load-eigene-config"
+    "eigene-domains-konfigurierbar-load-eigene-config",
+    "session-cccc (2026-04-03): Dashboard Live-Redesign komplett implementiert. (1) /api/dashboard/live JSON-Endpoint: _dashboard_data() sammelt KPIs/Feed/Actions/Termine/Geschäft/Vorgänge/Signale/Briefing/Freigaben aus tasks.db+mail_index.db+runtime_events.db. (2) build_dashboard() komplett neu: Minimaler HTML-Container + ~340 Zeilen JS mit Animation-Engine (countUp/staggerIn/pulseEl), Card-Builder-Funktionen, 3 Layout-Renderer (A: Bento Grid, B: Command Center 3-col, C: Smart Cards). (3) CSS: ~200 Zeilen .dlive-* Klassen mit var(--bg)/var(--text)/var(--accent), Hell/Dunkel automatisch. (4) Animationen: Count-Up KPI-Zahlen, Staggered Slide-In, Bounce bei Wertänderung, Shimmer-Gradient Briefing, Feed-Glow, Live-Dot-Pulse, Urgency-Pulse, Breathing-Card. (5) Auto-Refresh alle 30s mit animierten Übergängen. (6) Einstellungen: Layout-Dropdown A/B/C, Refresh-Intervall (15s-5m/aus), Konfetti-Toggle, Reduzierte Animationen. (7) config.json dashboard-Sektion erweitert. 0 JS-Fehler via Playwright verifiziert.",
+    "dashboard-live-api-endpoint",
+    "dashboard-3-layouts-js-renderer",
+    "dashboard-animation-engine-countup-stagger-pulse",
+    "dashboard-css-dlive-theme-variables",
+    "dashboard-auto-refresh-30s",
+    "dashboard-einstellungen-layout-konfetti-motion"
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -264,7 +271,7 @@
     "session-vvv-cont: Lexware-Kontext in LLM-Klassifizierung eingebaut (_get_lexware_kontext() in llm_classifier.py). Commit bdc4552.",
     "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren."
   ],
-  "next_step": "Routing-System komplett: Server starten + Live-Verifikation. Eigene Domains UI in Einstellungen > Mail > Klassifizierung prüfen. Plan Schritte 5-7 optional: Kira-Vorschlag-Aktionen (Danke-Mail, Wiedervorlage), Konversations-Gruppierung bereits eingebaut. Offene Plan-Items: Stufe 5 Kira-Vorschlag-Aktionen erweitern (Schulungs-Interesse Wiedervorlage, Kreditkarte abgelehnt Signal).",
+  "next_step": "Dashboard Live-Redesign KOMPLETT (alle 6 Phasen). Commits: cd25025 (Phasen 1-4+6) + 3488d46 (Phase 5 Activity Trigger). Kai prüft Dashboard + Activity Window live. Nächster Schritt: Kais Feedback abwarten, dann ggf. Feinschliff.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
