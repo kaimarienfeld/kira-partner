@@ -220,20 +220,88 @@ def get_config():
 
 
 def get_providers():
-    """Gibt aktive Provider sortiert nach Priorität zurück."""
+    """Gibt aktive Provider sortiert nach Kosten zurück (günstigste zuerst)."""
     config = get_config()
     providers = config.get("providers", [])
     active = [p for p in providers if p.get("aktiv", True)]
-    active.sort(key=lambda p: p.get("prioritaet", 99))
+    active.sort(key=lambda p: _provider_cost_rank(p))
     return active
 
 
 def get_all_providers():
-    """Gibt ALLE Provider zurück (auch inaktive)."""
+    """Gibt ALLE Provider zurück (auch inaktive), sortiert nach Kosten."""
     config = get_config()
     providers = config.get("providers", [])
-    providers.sort(key=lambda p: p.get("prioritaet", 99))
+    providers.sort(key=lambda p: _provider_cost_rank(p))
     return providers
+
+
+# Kosten-Ranking: niedrigere Zahl = günstiger = wird bevorzugt
+_COST_RANK = {
+    "ollama": 0,      # Lokal = kostenlos
+    "custom": 1,      # Eigener Server = sehr günstig
+    "openai": 10,     # GPT-4o-mini = günstig
+    "openrouter": 11, # OpenRouter = günstig
+    "anthropic": 20,  # Claude = teurer
+}
+
+def _provider_cost_rank(provider: dict) -> int:
+    """Sortier-Schlüssel: günstigster Provider zuerst."""
+    typ = provider.get("typ", "")
+    return _COST_RANK.get(typ, 50)
+
+
+# Günstigstes Modell je Provider-Typ für einfache Aufgaben
+_BUDGET_MODELS = {
+    "anthropic":  "claude-haiku-4-5-20251001",
+    "openai":     "gpt-4o-mini",
+    "openrouter": "openai/gpt-4o-mini",
+}
+
+# Leistungsfähiges Modell je Provider-Typ für komplexe Aufgaben
+_CAPABLE_MODELS = {
+    "anthropic":  "claude-sonnet-4-6",
+    "openai":     "gpt-4o",
+    "openrouter": "anthropic/claude-sonnet-4-6",
+}
+
+
+def get_provider_for_task(task_type: str = "classify") -> tuple:
+    """Wählt den besten Provider + Modell für eine Aufgabe.
+
+    task_type:
+      - "classify"  → günstigstes Modell (GPT-4o-mini, Haiku)
+      - "extract"   → günstigstes Modell (Wissen-Extraktion, Zusammenfassungen)
+      - "chat"      → leistungsfähiges Modell (Kira-Chat, komplexe Analyse)
+      - "generate"  → leistungsfähiges Modell (Antwort-Generierung)
+
+    Returns: (provider_dict_with_model, model_name) oder (None, None)
+    """
+    providers = get_providers()
+    if not providers:
+        return None, None
+
+    is_simple = task_type in ("classify", "extract")
+    model_map = _BUDGET_MODELS if is_simple else _CAPABLE_MODELS
+
+    for p in providers:
+        typ = p.get("typ", "")
+        # Für einfache Aufgaben: günstiges Modell erzwingen
+        if is_simple and typ in model_map:
+            provider = dict(p)
+            provider["model"] = model_map[typ]
+            return provider, provider["model"]
+        elif is_simple and typ in ("ollama", "custom"):
+            return p, p.get("model", "?")
+        # Für komplexe Aufgaben: leistungsfähiges Modell bevorzugen
+        elif not is_simple and typ in model_map:
+            provider = dict(p)
+            provider["model"] = model_map[typ]
+            return provider, provider["model"]
+        else:
+            return p, p.get("model", "?")
+
+    return providers[0], providers[0].get("model", "?")
 
 
 def _get_provider_key(provider):
@@ -2981,42 +3049,29 @@ def _parse_text_tool_call(text):
 # ── Klassifizierungs-Aufruf (leichter System-Prompt, Haiku) ─────────────────
 def classify_direct(prompt: str, max_tokens: int = 768) -> dict:
     """
-    Direkter, günstiger LLM-Aufruf NUR für Mail-Klassifizierung.
-    Wählt automatisch das günstigste verfügbare Modell je Provider:
-      Anthropic  → claude-haiku-4-5-20251001  (~10× billiger als Sonnet)
-      OpenAI     → gpt-4o-mini               (~10× billiger als gpt-4o)
-      OpenRouter → openai/gpt-4o-mini        (günstig + gut)
-      Ollama/Custom → konfiguriertes Modell  (lokal = kostenlos)
-    System-Prompt universell aus config.json, keine Tools.
+    Direkter, günstiger LLM-Aufruf für Mail-Klassifizierung + Wissen-Extraktion.
+    Wählt automatisch das günstigste Modell und probiert ALLE Provider durch.
+    Bei Guthaben-Leer/Fehler → nächster Provider → erst wenn ALLE scheitern: Error.
     """
-    # Günstigstes Modell je Provider-Typ
-    _BUDGET_MODELS = {
-        "anthropic":  "claude-haiku-4-5-20251001",
-        "openai":     "gpt-4o-mini",
-        "openrouter": "openai/gpt-4o-mini",
-        # ollama / custom: behalten ihr konfiguriertes Modell (lokal = kein Cost)
-    }
-
     providers = get_providers()
     if not providers:
         return {"error": "Kein Provider konfiguriert", "antwort": ""}
 
-    # Budget-Provider bauen: günstigstes Modell für den ersten verfügbaren Typ
-    budget_provider = None
-    fallback_provider = providers[0]
-
+    # Budget-Provider-Liste: günstigstes Modell pro Provider
+    budget_providers = []
     for p in providers:
         typ = p.get("typ", "")
         if typ in _BUDGET_MODELS:
-            budget_provider = dict(p)
-            budget_provider["model"] = _BUDGET_MODELS[typ]
-            break
+            bp = dict(p)
+            bp["model"] = _BUDGET_MODELS[typ]
+            budget_providers.append(bp)
         elif typ in ("ollama", "custom"):
-            # Lokal = kostenlos, direkt nehmen
-            budget_provider = p
-            break
+            budget_providers.append(p)
+        else:
+            budget_providers.append(p)
 
-    provider = budget_provider or fallback_provider
+    if not budget_providers:
+        budget_providers = providers
 
     # ── Universeller System-Prompt aus config.json ──
     _classify_sys = (
@@ -3039,17 +3094,27 @@ def classify_direct(prompt: str, max_tokens: int = 768) -> dict:
     except Exception:
         pass
 
-    try:
-        if provider.get("typ") == "anthropic":
-            result = _call_anthropic(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
-        else:
-            result = _call_openai_compat(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
-        return {"antwort": result.get("text", ""),
-                "tokens_in":  result.get("tokens_in", 0),
-                "tokens_out": result.get("tokens_out", 0),
-                "model": provider.get("model", "?")}
-    except Exception as e:
-        return {"error": str(e), "antwort": ""}
+    # Alle Provider durchprobieren (günstigste zuerst)
+    errors = []
+    for provider in budget_providers:
+        try:
+            if provider.get("typ") == "anthropic":
+                result = _call_anthropic(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
+            else:
+                result = _call_openai_compat(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
+            return {"antwort": result.get("text", ""),
+                    "tokens_in":  result.get("tokens_in", 0),
+                    "tokens_out": result.get("tokens_out", 0),
+                    "model": provider.get("model", "?")}
+        except Exception as e:
+            err_msg = str(e)
+            errors.append(f"{provider.get('name', provider.get('id', '?'))}: {err_msg}")
+            log.warning(f"classify_direct Provider-Fehler ({provider.get('name', '?')}): {err_msg}")
+            continue
+
+    # Alle Provider gescheitert
+    return {"error": "Alle Provider gescheitert: " + " | ".join(errors),
+            "antwort": "", "all_providers_failed": True}
 
 
 # ── Auto-Wissen Extraktion ───────────────────────────────────────────────────
@@ -3067,8 +3132,8 @@ def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str
     def _extract():
         try:
             import threading
-            providers = get_providers()
-            if not providers:
+            provider, model_name = get_provider_for_task("extract")
+            if not provider:
                 return
             prompt_extract = (
                 "Analysiere das folgende Gespräch und extrahiere bis zu 2 wichtige Geschäftsregeln "
@@ -3077,8 +3142,11 @@ def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str
                 "Format: JSON-Array [{\"titel\": \"...\", \"inhalt\": \"...\"}]\n\n"
                 f"Nutzer: {user_msg[:500]}\n\nKira: {kira_antwort[:500]}"
             )
-            result = _call_provider(providers[0], [{"role": "user", "content": prompt_extract}],
-                                     system="Du extrahierst Geschäftsregeln als kompaktes JSON.", tools=[])
+            sys_extract = "Du extrahierst Geschäftsregeln als kompaktes JSON."
+            if provider.get("typ") == "anthropic":
+                result = _call_anthropic(provider, prompt_extract, sys_extract, [])
+            else:
+                result = _call_openai_compat(provider, prompt_extract, sys_extract, [])
             raw = result.get("text", "").strip()
             # JSON aus Antwort extrahieren
             start = raw.find("[")
@@ -3114,7 +3182,18 @@ def _auto_extract_wissen_async(user_msg: str, kira_antwort: str, session_id: str
 def chat(user_message, session_id=None, history=None, bild=None):
     """Chat mit automatischem Provider-Fallback. bild={type,media_type,data} fuer Foto-Analyse."""
     config = get_config()
-    providers = get_providers()
+
+    # Chat-Provider: leistungsfähiges Modell erzwingen (Claude Sonnet / GPT-4o)
+    raw_providers = get_providers()
+    providers = []
+    for p in raw_providers:
+        typ = p.get("typ", "")
+        if typ in _CAPABLE_MODELS:
+            cp = dict(p)
+            cp["model"] = _CAPABLE_MODELS[typ]
+            providers.append(cp)
+        else:
+            providers.append(p)
 
     if not providers:
         return {
