@@ -377,7 +377,8 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
     # ── 1. Gesendete Mails ──
     if is_sent or "Gesendete" in folder or "Sent" in folder:
         return _r("Abgeschlossen", rolle, betreff, False,
-                  "Eigene Mail – kein Handlungsbedarf", "Gesendete Mail", "niedrig")
+                  "Eigene Mail – kein Handlungsbedarf", "Gesendete Mail", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
 
     # ── 1b. Formular-Benachrichtigungen (noreply@ → Lead) ──
     # Landing-Page/Kontaktformular-Mails von noreply@ enthalten echte Kundenanfragen
@@ -400,26 +401,32 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
         if _kw_in(["mahnung","zahlungserinnerung","payment reminder","overdue"], comb):
             return _r("Rechnung / Beleg", "Mahnung", betreff, True,
                       "Mahnung pruefen", f"System-Mahnung von {domain}", "hoch",
-                      geschaeft=_extr_gesc(betreff, text, "mahnung"))
+                      geschaeft=_extr_gesc(betreff, text, "mahnung"),
+                      routing="task", erfordert_handlung=True)
         if _kw_in(RECHNUNG_KEYWORDS[:4], comb):
             return _r("Rechnung / Beleg", "Rechnung / Beleg", betreff, False,
                       "Zur Kenntnis / Ablegen", f"Beleg von {domain}", "niedrig",
-                      geschaeft=_extr_gesc(betreff, text, "beleg"))
+                      geschaeft=_extr_gesc(betreff, text, "beleg"),
+                      routing="buchhaltung", erfordert_handlung=False)
         if is_newsletter(absender, betreff, text):
             return _r("Newsletter / Werbung", "Newsletter / Werbung", betreff, False,
-                      "Ignorieren", f"Newsletter von {domain}", "niedrig")
+                      "Ignorieren", f"Newsletter von {domain}", "niedrig",
+                      routing="archivieren", erfordert_handlung=False)
         return _r("Ignorieren", "System", betreff, False,
-                  "Ignorieren", f"Systemnachricht von {domain}", "niedrig")
+                  "Ignorieren", f"Systemnachricht von {domain}", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
 
     # ── 3. Newsletter (auch nicht-System) ──
     if is_newsletter(absender, betreff, text):
         return _r("Newsletter / Werbung", "Newsletter / Werbung", betreff, False,
-                  "Ignorieren", "Newsletter-Keywords erkannt", "niedrig")
+                  "Ignorieren", "Newsletter-Keywords erkannt", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
 
     # ── 4. Ausschluss-Betreffs (Prompt 01 § 7) ──
     if is_exclude_subject(betreff):
         return _r("Ignorieren", rolle, betreff, False,
-                  "Ignorieren", "Betreff faellt unter Ausschlusslogik", "niedrig")
+                  "Ignorieren", "Betreff faellt unter Ausschlusslogik", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
 
     # ── 5. Rechnungen / Belege ──
     if _kw_in(RECHNUNG_KEYWORDS, comb):
@@ -428,20 +435,24 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
             return _r("Antwort erforderlich", "Rechnung / Beleg", betreff, True,
                       "Rueckfrage zur Rechnung beantworten",
                       "Rechnung/Beleg mit offener Frage", "hoch",
-                      geschaeft=_extr_gesc(betreff, text, "rechnung"))
+                      geschaeft=_extr_gesc(betreff, text, "rechnung"),
+                      routing="task", erfordert_handlung=True)
         return _r("Rechnung / Beleg", "Rechnung / Beleg", betreff, False,
                   "Zur Kenntnis / Ablegen",
                   "Rechnungsbeleg ohne offene Frage", "niedrig",
-                  geschaeft=_extr_gesc(betreff, text, "rechnung"))
+                  geschaeft=_extr_gesc(betreff, text, "rechnung"),
+                  routing="buchhaltung", erfordert_handlung=False)
 
     # ── 6. Shop ──
     if konto == "shop" or _kw_in(["bestellung","order","bestell","neue bestellung"], bl):
         hat_frage = has_open_question(text)
         if hat_frage:
             return _r("Antwort erforderlich", "Shop", betreff, True,
-                      "Shop-Anfrage beantworten", "Shop-Mail mit Frage", "mittel")
+                      "Shop-Anfrage beantworten", "Shop-Mail mit Frage", "mittel",
+                      routing="task", erfordert_handlung=True)
         return _r("Shop / System", "Shop", betreff, False,
-                  "Zur Kenntnis", "Shop-Vorgang ohne Frage", "niedrig")
+                  "Zur Kenntnis", "Shop-Vorgang ohne Frage", "niedrig",
+                  routing="archivieren", erfordert_handlung=False)
 
     # ── 7. Echte Kundenanfragen (inkl. eigener Keywords aus Einstellungen) ──
     eigene = _load_eigene_keywords()
@@ -492,27 +503,55 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
 
     # ── 9. Zur Kenntnis ──
     return _r("Zur Kenntnis", rolle, betreff, False,
-              "Keine Aktion nötig", "Kein Handlungsbedarf erkannt", "niedrig")
+              "Keine Aktion nötig", "Kein Handlungsbedarf erkannt", "niedrig",
+              routing="feed", erfordert_handlung=False)
 
 
 # ── Ergebnis-Builder ──────────────────────────────────────────────────
 def _r(kategorie, rolle, betreff, antwort_noetig, empfohlene_aktion,
-       kategorie_grund, prioritaet, organisation=None, geschaeft=None):
+       kategorie_grund, prioritaet, organisation=None, geschaeft=None,
+       routing=None, erfordert_handlung=None):
     z = betreff[:100].strip()
     for prefix in ("re: ","aw: ","fwd: ","wg: "):
         if z.lower().startswith(prefix):
             z = z[len(prefix):].strip()
+
+    # Routing-Defaults ableiten wenn nicht explizit gesetzt
+    if routing is None:
+        routing = _default_routing(kategorie, antwort_noetig)
+    if erfordert_handlung is None:
+        erfordert_handlung = routing == "task"
+
     return {
-        "kategorie":        kategorie,
-        "absender_rolle":   rolle,
-        "zusammenfassung":  z,
-        "antwort_noetig":   antwort_noetig,
-        "empfohlene_aktion":empfohlene_aktion,
-        "kategorie_grund":  kategorie_grund,
-        "prioritaet":       prioritaet,
-        "organisation":     organisation,
-        "geschaeft":        geschaeft,
+        "kategorie":          kategorie,
+        "absender_rolle":     rolle,
+        "zusammenfassung":    z,
+        "antwort_noetig":     antwort_noetig,
+        "empfohlene_aktion":  empfohlene_aktion,
+        "kategorie_grund":    kategorie_grund,
+        "prioritaet":         prioritaet,
+        "erfordert_handlung": erfordert_handlung,
+        "routing":            routing,
+        "organisation":       organisation,
+        "geschaeft":          geschaeft,
     }
+
+
+def _default_routing(kategorie, antwort_noetig):
+    """Leitet Routing aus Kategorie ab — Fallback wenn LLM kein Routing liefert."""
+    if kategorie in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
+        return "archivieren"
+    if kategorie == "Rechnung / Beleg" and not antwort_noetig:
+        return "buchhaltung"
+    if kategorie in ("Shop / System",) and not antwort_noetig:
+        return "archivieren"
+    if kategorie == "Zur Kenntnis":
+        return "feed"
+    if kategorie in ("Antwort erforderlich", "Neue Lead-Anfrage"):
+        return "task"
+    if kategorie == "Angebotsrueckmeldung":
+        return "task"
+    return "task"
 
 
 # ── Organisations-Extraktion ─────────────────────────────────────────

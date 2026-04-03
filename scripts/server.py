@@ -1229,10 +1229,10 @@ def build_dashboard(tasks, db):
 
 # ── KOMMUNIKATION Panel ──────────────────────────────────────────────────────
 def build_kommunikation(tasks):
-    # Stats
+    # Stats (Gesamt-Mails, nicht gruppiert)
     n_offen = len(tasks)
     n_leads    = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
-    n_angebote = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung")
+    n_angebote = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung" or t.get("kategorie") == "Angebotsrueckmeldung")
     n_dringend = sum(1 for t in tasks if (t.get("prioritaet","") or "").lower() == "hoch")
 
     # Segment counts
@@ -1374,6 +1374,8 @@ def build_kommunikation(tasks):
 
         accent    = _wi_accent(t)
         tags_html = _wi_tags(t)
+        conv_cnt  = t.get("_conv_count", 1)
+        conv_badge = f'<span class="km-tg km-tg-conv" title="{conv_cnt} Mails in Konversation">{conv_cnt} Mails</span>' if conv_cnt > 1 else ""
         meta_str  = (rolle + (" &middot; " + email[:30] if email else "")) if (rolle or email) else ""
 
         kenntnis_btn = f'<button class="wi-quick-btn wi-btn-k" onclick="setStatusLernen({tid},\'zur_kenntnis\',\'{js_esc(kat)}\');event.stopPropagation()" title="Zur Kenntnis nehmen">&#x2714; Zur Kenntnis</button>'
@@ -1390,7 +1392,7 @@ def build_kommunikation(tasks):
   <div class="wi-accent" style="background:{accent}"></div>
   <div class="wi-body">
     <div class="wi-top">
-      <div class="wi-tags-row">{tags_html}{"<span class='konto-badge'>"+konto+"</span>" if konto else ""}</div>
+      <div class="wi-tags-row">{conv_badge}{tags_html}{"<span class='konto-badge'>"+konto+"</span>" if konto else ""}</div>
       <div class="wi-time">{datum_fmt}</div>
     </div>
     <div class="wi-title">{titel}</div>
@@ -1402,7 +1404,43 @@ def build_kommunikation(tasks):
   </div>
 </div>"""
 
-    items_html = "".join(_wi_item(t) for t in tasks)
+    # ── Konversations-Gruppierung: Thread-basiert + Kunden-E-Mail Fallback ──
+    def _norm_betreff(b):
+        b = (b or "").strip().lower()
+        for pfx in ("re: ","aw: ","fwd: ","wg: ","re:","aw:","fwd:","wg:"):
+            while b.startswith(pfx):
+                b = b[len(pfx):].strip()
+        return b
+
+    conv_groups = {}  # key → [tasks...]
+    for t in tasks:
+        tid_val = t.get("thread_id", "")
+        email_val = (t.get("kunden_email","") or "").lower().strip()
+        betr_n = _norm_betreff(t.get("betreff","") or t.get("titel",""))
+
+        # Gruppierungsschlüssel: thread_id bevorzugt, sonst email+betreff
+        if tid_val:
+            key = f"T:{tid_val}"
+        elif email_val:
+            key = f"E:{email_val}:{betr_n[:40]}"
+        else:
+            key = f"ID:{t['id']}"
+
+        conv_groups.setdefault(key, []).append(t)
+
+    # Pro Gruppe: neuester Task als Haupt-Karte, Rest als Zähler
+    grouped_tasks = []
+    for key, group in conv_groups.items():
+        group.sort(key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
+        main_task = group[0]
+        main_task["_conv_count"] = len(group)
+        main_task["_conv_ids"] = [t["id"] for t in group]
+        grouped_tasks.append(main_task)
+
+    # Sortierung: neueste zuerst
+    grouped_tasks.sort(key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
+
+    items_html = "".join(_wi_item(t) for t in grouped_tasks)
     if not items_html:
         items_html = '<div class="km-empty">&#x2709;<br>Keine offenen Kommunikationsaufgaben.</div>'
 
@@ -1972,6 +2010,7 @@ def build_postfach():
 .pf-item-flag-badge{color:#f59e0b;font-size:12px;flex-shrink:0;line-height:1}
 .pf-item-pin-badge{color:#3b82f6;font-size:11px;flex-shrink:0;line-height:1;margin-left:2px}
 .pf-item-kira-badge{background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid rgba(139,92,246,.3);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4}
+.pf-item-task-badge{background:rgba(124,58,237,.12);color:#7c3aed;border:1px solid rgba(124,58,237,.25);border-radius:4px;font-size:10px;padding:1px 5px;flex-shrink:0;line-height:1.4;font-weight:600}
 .pf-thread-badge{background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);border-radius:10px;font-size:10px;padding:0 6px;font-weight:700;flex-shrink:0;line-height:1.6;cursor:pointer}
 .pf-thread-child{margin-left:28px;border-left:2px solid var(--border);opacity:.85;transition:all .2s}
 .pf-thread-child:hover{opacity:1}
@@ -3625,6 +3664,7 @@ function pfRenderMailItem(m, container) {
       +(m.flagged?'<span class="pf-item-flag-badge" title="Gekennzeichnet">&#x2691;</span>':'<span class="pf-item-flag-badge" style="display:none" title="Gekennzeichnet">&#x2691;</span>')
       +(m.pinned?'<span class="pf-item-pin-badge" title="Angeheftet">&#x1F4CD;</span>':'<span class="pf-item-pin-badge" style="display:none" title="Angeheftet">&#x1F4CD;</span>')
       +(m.ist_buchhaltung?'<span style="font-size:11px;margin-left:3px;opacity:.7" title="Buchhaltung / Lexware">&#x1F4B2;</span>':'')
+      +(m.hat_task?'<span class="pf-item-task-badge" title="Als Aufgabe erfasst">&#x2611; Aufgabe</span>':'')
       +(m.kira_verwendet?'<span class="pf-item-kira-badge" title="Von Kira verwendet">Kira</span>':'')
       +(m.snooze_until?'<span class="pf-item-snooze-badge" title="Erneut erinnern: '+esc(m.snooze_until)+'">&#x23F0;</span>':'')
       +(m.hat_thread&&m.thread_count>1?'<span class="pf-thread-badge" title="'+m.thread_count+' Nachrichten in diesem Thread">'+m.thread_count+'</span>':'')
@@ -20549,6 +20589,7 @@ tr.lx-selected{background:rgba(99,102,241,.08) !important}
 .km-tg-green{background:rgba(80,180,80,.1);color:#3a8a3a;}
 .km-tg-purple{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
 .km-tg-warn{background:rgba(212,147,62,.12);color:var(--warn);border:1px solid rgba(212,147,62,.2);}
+.km-tg-conv{background:rgba(124,58,237,.1);color:#7c3aed;border:1px solid rgba(124,58,237,.25);font-weight:600;}
 /* Context panel */
 .km-ctx-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3;letter-spacing:-.01em;}
 .km-ctx-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
@@ -23105,6 +23146,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 f"FROM mails WHERE {where} ORDER BY datum DESC LIMIT ? OFFSET ?",
                 params + [limit, offset]
             ).fetchall()
+
+            # Task-Verknüpfung: welche Mails haben einen zugehörigen Task?
+            _task_msgids_c = set()
+            try:
+                _tdb_c = sqlite3.connect(str(TASKS_DB))
+                _task_rows_c = _tdb_c.execute(
+                    "SELECT message_id FROM tasks WHERE message_id IS NOT NULL AND message_id != ''"
+                ).fetchall()
+                _task_msgids_c = {r[0] for r in _task_rows_c}
+                _tdb_c.close()
+            except Exception:
+                pass
+
             mails = []
             for r in rows:
                 af = r['absender'] or ''
@@ -23127,6 +23181,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'pinned':         bool(r['pinned']),
                     'kira_verwendet': bool(r['kira_verwendet']),
                     'snooze_until':   r['snooze_until'] or '',
+                    'hat_task':       r['message_id'] in _task_msgids_c,
                 })
             conn.close()
             self._json({'total': total, 'mails': mails})
@@ -23168,8 +23223,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params + [limit, offset]
             ).fetchall()
 
-            # Buchhaltungs-Flag aus tasks.db (message_id → typ)
+            # Buchhaltungs-Flag + Task-Verknüpfung aus tasks.db
             _buch_msgids = set()
+            _task_msgids = set()
             try:
                 _tdb = sqlite3.connect(str(TASKS_DB))
                 _tdb.row_factory = sqlite3.Row
@@ -23179,6 +23235,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     "AND message_id IS NOT NULL"
                 ).fetchall()
                 _buch_msgids = {r['message_id'] for r in _buch_rows}
+                _task_rows = _tdb.execute(
+                    "SELECT message_id FROM tasks WHERE message_id IS NOT NULL AND message_id != ''"
+                ).fetchall()
+                _task_msgids = {r['message_id'] for r in _task_rows}
                 _tdb.close()
             except Exception:
                 pass
@@ -23216,6 +23276,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'kira_verwendet': bool(r['kira_verwendet']),
                     'snooze_until':  r['snooze_until'] or '',
                     'ist_buchhaltung': r['message_id'] in _buch_msgids,
+                    'hat_task': r['message_id'] in _task_msgids,
                 })
 
             conn.close()

@@ -1055,6 +1055,38 @@ def _check_datev_duplicate(betr, text, anhaenge_pfad, konto, tasks_db) -> dict:
     return _NO_DUP
 
 
+# ── Routing-Helfer ────────────────────────────────────────────────────────────
+def _route_kira_vorschlag_dc(cl, kunden_email, betreff, text, msgid, konto):
+    """Bei kira_vorschlag: Auto-Entwurf in mail_approve_queue einfügen (daily_check)."""
+    try:
+        kat = cl.get("kategorie", "")
+        aktion = cl.get("angebot_aktion", "")
+        body_plain = ""
+        if kat == "Angebotsrueckmeldung" and aktion == "abgelehnt":
+            body_plain = (
+                "Sehr geehrte Damen und Herren,\n\n"
+                "vielen Dank für Ihre Rückmeldung zu unserem Angebot.\n\n"
+                "Wir bedanken uns für die ehrliche Rückmeldung und das entgegengebrachte Vertrauen. "
+                "Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen jederzeit gerne zur Verfügung.\n\n"
+                "Mit freundlichen Grüßen\nKai Marienfeld\nrauMKult® Sichtbeton"
+            )
+        else:
+            body_plain = f"Kira-Vorschlag: {cl.get('empfohlene_aktion', 'Prüfen')}"
+        if not body_plain:
+            return
+        tdb = sqlite3.connect(str(TASKS_DB))
+        tdb.execute("""INSERT INTO mail_approve_queue
+            (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, notiz_intern)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
+            (kunden_email, f"Re: {betreff[:180]}", body_plain, konto, msgid,
+             "kira_routing", "entwurf", datetime.now().isoformat(),
+             f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"))
+        tdb.commit()
+        tdb.close()
+    except Exception:
+        pass
+
+
 # ── Mails klassifizieren und in DBs eintragen ────────────────────────────────
 def process_new_mails(new_mails, stats):
     """Klassifiziert neue Mails mit mail_classifier und trägt sie ein."""
@@ -1167,13 +1199,33 @@ def process_new_mails(new_mails, stats):
                            is_sent=is_sent, mail_datum=datum, kanal="email")
         kat = cl["kategorie"]
 
-        # Ignorieren / Newsletter → kein Task
-        # "Zur Kenntnis" NICHT mehr skippen — konsistent mit mail_monitor.py
-        if kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
+        # ── Routing-Dispatch: Nicht jede Klassifizierung erzeugt einen Task ──
+        routing = cl.get("routing", "task")
+        erfordert_handlung = cl.get("erfordert_handlung", True)
+
+        # Archivieren: kein Task, nur in mail_index.db (bereits gespeichert)
+        if routing == "archivieren" or kat in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
             stats['ignoriert'] = stats.get('ignoriert',0)+1
             continue
 
-        if kat in ("Shop / System", "Rechnung / Beleg") and not cl["antwort_noetig"]:
+        # Buchhaltung: Rechnung/Beleg ohne Frage → kein Task
+        if routing == "buchhaltung":
+            stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
+            continue
+
+        # Feed: Info-Mails → kein Task (Dashboard-Feed)
+        if routing == "feed":
+            stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
+            continue
+
+        # Kira-Vorschlag: Kira bereitet Aktion vor → kein manueller Task
+        if routing == "kira_vorschlag":
+            _route_kira_vorschlag_dc(cl, k_email, betr, text, msgid, konto)
+            stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
+            continue
+
+        # Sicherheits-Check: nur Tasks erstellen wenn Handlung erforderlich
+        if not erfordert_handlung and routing != "task":
             stats['zur_kenntnis'] = stats.get('zur_kenntnis',0)+1
             continue
 

@@ -133,6 +133,15 @@ REGELN:
   Mail mit Anhang wie "Rechnung_*.pdf" oder "Invoice_*.pdf" → "Rechnung / Beleg" (auch wenn Betreff unklar)
   Mail mit Foto-Anhaengen (*.jpg, *.png) von Kunden → koennte Projektanfrage sein
 
+ROUTING-ENTSCHEIDUNG (PFLICHT — vor der Klassifizierung überlegen!):
+Muss der Geschäftsinhaber PERSÖNLICH handeln? Oder kann das System die Mail automatisch verarbeiten?
+- Eingangsrechnungen, Belege, Zahlungsbestätigungen → KEIN Task, sondern Buchhaltung
+- System-Mails, Login-Infos, Bestellbestätigungen, Testmails → KEIN Task, archivieren
+- Newsletter, Werbung, Marketing → KEIN Task, archivieren
+- Angebotsabsagen → KEIN Task, sondern Kira-Vorschlag (Danke-Mail vorbereiten)
+- Preisänderungen, Brancheninfos, Zulieferer-Updates → KEIN Task, sondern Feed
+- Nur wenn Kai PERSÖNLICH antworten/entscheiden/handeln muss → Task
+
 Antworte NUR als JSON:
 {{
   "kategorie": "...",
@@ -143,6 +152,8 @@ Antworte NUR als JSON:
   "kategorie_grund": "Warum diese Kategorie",
   "prioritaet": "hoch" | "mittel" | "niedrig",
   "konfidenz": "hoch" | "mittel" | "niedrig",
+  "erfordert_handlung": true/false,
+  "routing": "task" | "buchhaltung" | "feed" | "kira_vorschlag" | "archivieren",
   "mit_termin": true/false,
   "manuelle_pruefung": true/false,
   "beantwortet": true/false,
@@ -150,6 +161,9 @@ Antworte NUR als JSON:
   "angebot_aktion": "angenommen" | "abgelehnt" | "rueckfrage" | null,
   "angebot_nummer": "ANF-2026-001" | null
 }}
+
+erfordert_handlung=true NUR wenn der Geschäftsinhaber persönlich etwas tun muss (antworten, entscheiden, unterschreiben).
+routing: "task" = echte Aufgabe, "buchhaltung" = Rechnung/Beleg zur Prüfung, "feed" = Dashboard-Info, "kira_vorschlag" = Kira bereitet Aktion vor, "archivieren" = nur ablegen.
 
 mit_termin=true wenn Mail konkretes Datum, Besichtigungstermin oder Terminvereinbarung enthält.
 manuelle_pruefung=true wenn Kira unsicher ist oder der Fall ungewöhnlich komplex ist.
@@ -187,6 +201,20 @@ def _parse_llm_response(text):
         data["konfidenz"] = "mittel"
     else:
         data["konfidenz"] = konfidenz
+
+    # Routing-Felder validieren
+    VALID_ROUTING = ("task", "buchhaltung", "feed", "kira_vorschlag", "archivieren")
+    routing = data.get("routing", "task")
+    if routing not in VALID_ROUTING:
+        data["routing"] = "task"
+    else:
+        data["routing"] = routing
+
+    # erfordert_handlung: Default True (sicherer Fallback)
+    if "erfordert_handlung" not in data:
+        data["erfordert_handlung"] = True
+    else:
+        data["erfordert_handlung"] = bool(data["erfordert_handlung"])
 
     # Geschaeft-Daten aus Text extrahieren (Regex, schnell + zuverlässig)
     data.setdefault("geschaeft", None)
@@ -671,6 +699,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                 "kategorie_grund":    parsed.get("kategorie_grund", "LLM-klassifiziert"),
                 "prioritaet":         parsed.get("prioritaet", "mittel"),
                 "konfidenz":          parsed.get("konfidenz", "mittel"),
+                "erfordert_handlung": parsed.get("erfordert_handlung", True),
+                "routing":            parsed.get("routing", "task"),
                 "mit_termin":         1 if parsed.get("mit_termin") else 0,
                 "manuelle_pruefung":  1 if parsed.get("manuelle_pruefung") else 0,
                 "beantwortet":        1 if parsed.get("beantwortet") else 0,

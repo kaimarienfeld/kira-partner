@@ -1217,6 +1217,54 @@ def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: st
               status='fehler', context_id=msg_id)
 
 
+# ── Routing-Helfer ───────────────────────────────────────────────────────────
+def _route_kira_vorschlag(result, kunden_email, betreff, text, msg_id, konto):
+    """Bei kira_vorschlag: Auto-Entwurf in mail_approve_queue einfügen."""
+    try:
+        kat = result.get("kategorie", "")
+        aktion = result.get("angebot_aktion", "")
+        zusammenfassung = result.get("zusammenfassung", "")
+
+        body_plain = ""
+        if kat == "Angebotsrueckmeldung" and aktion == "abgelehnt":
+            body_plain = (
+                f"Sehr geehrte Damen und Herren,\n\n"
+                f"vielen Dank für Ihre Rückmeldung zu unserem Angebot.\n\n"
+                f"Wir bedanken uns für die ehrliche Rückmeldung und das entgegengebrachte Vertrauen. "
+                f"Sollte sich in Zukunft ein neues Projekt ergeben, stehen wir Ihnen jederzeit gerne zur Verfügung.\n\n"
+                f"Mit freundlichen Grüßen\nKai Marienfeld\nrauMKult® Sichtbeton"
+            )
+        elif kat == "Zur Kenntnis":
+            body_plain = f"Kira-Vorschlag: Mail zur Kenntnis genommen — {zusammenfassung}"
+        else:
+            body_plain = f"Kira-Vorschlag: {result.get('empfohlene_aktion', 'Prüfen')}"
+
+        if not body_plain:
+            return
+
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""INSERT INTO mail_approve_queue
+            (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, notiz_intern)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
+            (kunden_email,
+             f"Re: {betreff[:180]}",
+             body_plain,
+             konto,
+             msg_id,
+             "kira_routing",
+             "entwurf",
+             datetime.now().isoformat(),
+             f"Routing: kira_vorschlag | Kategorie: {kat} | Aktion: {aktion}"))
+        db.commit()
+        db.close()
+        _elog('kira', 'kira_vorschlag_entwurf',
+              f"Kira-Vorschlag: {kat} → Entwurf erstellt | {betreff[:60]}",
+              source='mail_monitor', modul='routing', actor_type='kira', status='ok',
+              context_type='mail', context_id=msg_id)
+    except Exception as e:
+        log.error(f"Kira-Vorschlag fehlgeschlagen: {e}")
+
+
 # ── Verarbeitung ─────────────────────────────────────────────────────────────
 def _process_mail(mail_data, konto_label, folder_name):
     """Verarbeitet eine neue Mail: Klassifizierung + Task-Erstellung."""
@@ -1294,14 +1342,14 @@ def _process_mail(mail_data, konto_label, folder_name):
           duration_ms=kat_ms, context_type='mail', context_id=msg_id,
           result=f"{kategorie} | {konfidenz} | {absender[:60]}")
 
-    # Nur handlungsrelevante Kategorien als Task anlegen
-    skip_kategorien = ["Ignorieren", "Newsletter / Werbung", "Abgeschlossen"]
-    skip_task = kategorie in skip_kategorien
+    # ── Routing-Dispatch: Nicht jede Klassifizierung erzeugt einen Task ──
+    routing = result.get("routing", "task")
+    erfordert_handlung = result.get("erfordert_handlung", True)
 
     # In mail_index.db speichern — IMMER, unabhängig von Kategorie
     _index_mail(mail_data, konto_label, folder_name)
 
-    # Klassifizierung in mail_index.db speichern (Kategorie, Konfidenz etc.)
+    # Klassifizierung + Routing in mail_index.db speichern
     try:
         from datetime import datetime as _dt
         _mi = sqlite3.connect(str(MAIL_INDEX_DB))
@@ -1315,8 +1363,29 @@ def _process_mail(mail_data, konto_label, folder_name):
     except Exception:
         pass
 
-    # Gefilterte Mails (Newsletter, Spam etc.) → kein Task, aber indexiert
-    if skip_task:
+    # Archivieren: kein Task
+    if routing == "archivieren" or kategorie in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
+        db.close()
+        return result
+
+    # Buchhaltung: Rechnung/Beleg ohne Frage → kein Task
+    if routing == "buchhaltung":
+        db.close()
+        return result
+
+    # Feed: Info-Mails → kein Task
+    if routing == "feed":
+        db.close()
+        return result
+
+    # Kira-Vorschlag: Kira bereitet Aktion vor → kein manueller Task
+    if routing == "kira_vorschlag":
+        _route_kira_vorschlag(result, _kunden_email_resolved, betreff, text, msg_id, konto_label)
+        db.close()
+        return result
+
+    # Sicherheits-Check: nur Tasks erstellen wenn Handlung erforderlich
+    if not erfordert_handlung and routing != "task":
         db.close()
         return result
 
