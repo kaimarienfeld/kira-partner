@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-04-03 22:15 — Session-eeee-dokumente (Modul Dokumente — Multi-Agent-Planung)
+
+**Auftrag:** Nachtmodus — Arbeitsanweisung_Dokumente_ClaudeCode_mit_Einleitung_v2.md vollständig abarbeiten. Modul "Dokumente" planen: Plan-Agent, Repo-Audit, Internet-Recherche, Gap-Analyse, Architektur, 7 Plan-Dateien + Checklisten. Kein Code — nur Planung. Nach Abschluss Commit + Checklisten + PC herunterfahren.
+**Status:** offen
+
+---
+
+## 2026-04-03 02:30 — Session-xxx-intelligence (Dashboard-Intelligence Plan komplett)
+
+**Auftrag:** "starte bitte jetzt die 13 Aufgaben hintereinander strukturiert ab, stoppe nicht bis fertig" — alle 13 Aufgaben des KIRA Dashboard-Intelligence Plans
+
+**Erledigt:**
+1. **Modellwahl-Umbau** (kira_llm.py): _COST_RANK, _BUDGET_MODELS, _CAPABLE_MODELS, get_provider_for_task(task_type) — günstigstes Modell automatisch, kein Prio-Feld mehr
+2. **Guthaben-Warnung + Pause** (daily_check.py, llm_classifier.py): qualify_state.json Persistenz, Pause bei 402/RateLimit statt Regelbasiert-Fallback, ntfy-Push, resume_qualify_mails()
+3. **Provider-Karten fix** (server.py): Prio ▲▼ entfernt, Kosten-Rang-Badge (Lokal/Günstig/Premium), Auto-Modellwahl Info-Box
+4. **Dashboard KPI** (server.py): mail_index.db Query, "Mails klassifiziert" KPI-Karte + Mail-Intelligence Signal
+5. **Lexware Zahlungsabgleich** (server.py, kira_proaktiv.py): _sync_zahlungsstatus() JOIN lexware_belege → ausgangsrechnungen, Scan 12 alle 6h
+6. **Kosten-Schätzung** (server.py): Vorprüfung-Button, Alle-Mails-Button, esQualVorcheck()/esQualAlles() JS
+7. **Persistentes Polling** (server.py): _qualPollTimer + _startQualPolling() überlebt Panel-Wechsel
+8. **beforeunload** (server.py): Warnung bei laufender Qualifizierung + einstellbare Schließen-Warnung (localStorage)
+9. **Activity Window** (activity_window.py): 3 Signal-Quellen statt nur Stufe-C (+ qualify_state.json Pause)
+10. **Schreibstil-Lernen** (kira_llm.py): extract_schreibstil() per GPT-4o-mini, Auto-Approve bei Konfidenz ≥ 0.9
+11. **Geschäftsmuster-Extraktion** (kira_llm.py): Phase 1 Statistik + Phase 2 LLM-Summary, Auto-Approve-Logik
+12. **Mail-Lernen Tab** (server.py): Wissen-Panel Tab mit KPIs, Vorschläge-Review, Extract-Buttons, wissenExtractStil()/wissenExtractGM()
+13. **419 Mails** — Code bereit, nachklassifizieren per "Alle Mails" Button wenn Provider aktiv
+
+**10 Commits:** 54e76cd, b71b3a0, fd9ce02, 3fdfd65, b74fe38, f062867, 365aa77, 0dc04a0, ae949ca, a547d0d
+**Status:** erledigt
+
+---
+
 ## 2026-04-02 18:25 — Session-aaaa Fortsetzung (3-Spalten-Layout)
 
 **Auftrag:** Belegarten als Sub-Nav in Sidebar + Sticky Sidebar/Detail + nur Mittelspalte scrollt

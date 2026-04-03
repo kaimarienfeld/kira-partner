@@ -1118,6 +1118,28 @@ def _build_data_context(config, kira_cfg=None):
     except Exception:
         pass
 
+    # Dokumente — letzte Eingänge und offene Dokumente (session-eeee)
+    _k_dokumente = kira_cfg.get("kontext_dokumente", "immer")
+    if _k_dokumente != "nie":
+        try:
+            dok_rows = db.execute(
+                "SELECT id, titel, dateiname, kategorie, dokumentrolle, quelle, status, "
+                "routing_ziel, zielmodul, erstellt_am, konfidenz "
+                "FROM dokumente WHERE geloescht_am IS NULL "
+                "ORDER BY erstellt_am DESC LIMIT 15"
+            ).fetchall()
+            if (_k_dokumente == "immer" or dok_rows) and dok_rows:
+                neue = [r for r in dok_rows if r['status'] == 'neu']
+                ctx += f"\n=== DOKUMENTE ({len(dok_rows)} letzte, {len(neue)} neu) ===\n"
+                for r in dok_rows:
+                    datum = (r['erstellt_am'] or '')[:16]
+                    konfidenz = f" ({r['konfidenz']*100:.0f}%)" if r['konfidenz'] else ""
+                    ctx += (f"  [{r['id']}] {datum} | {r['titel'] or r['dateiname']} | "
+                            f"{r['kategorie'] or '?'} | {r['status']} | "
+                            f"Routing: {r['routing_ziel'] or '?'} → {r['zielmodul'] or '?'}{konfidenz}\n")
+        except Exception:
+            pass
+
     db.close()
     return ctx
 
@@ -1700,6 +1722,65 @@ def get_tools(config=None):
         }
     })
 
+    # ── Dokument-Tools (session-eeee) ──
+    tools.append({
+        "name": "dokument_suchen",
+        "description": (
+            "Sucht in Dokumenten (PDFs, Rechnungen, Angebote, Verträge, Briefe, Scans). "
+            "Nutze dieses Tool wenn Kai nach einem Dokument sucht oder wissen will welche Dokumente vorliegen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "suchbegriff": {"type": "string", "description": "Freitext-Suchbegriff"},
+                "status": {
+                    "type": "string",
+                    "enum": ["neu", "zugeordnet", "in_bearbeitung", "archiviert", "entwurf", "alle"],
+                    "description": "Status-Filter"
+                },
+                "kategorie": {"type": "string", "description": "Kategorie: rechnung, angebot, mahnung, vertrag, brief, sonstiges"},
+                "limit": {"type": "integer", "description": "Max. Anzahl Ergebnisse (Standard: 10)"}
+            },
+            "required": []
+        }
+    })
+    tools.append({
+        "name": "dokument_erstellen",
+        "description": (
+            "Erstellt ein neues Dokument im Dokument-Studio. "
+            "Nutze dieses Tool wenn Kai ein Schreiben, eine Mahnung, ein Angebot oder ein anderes Dokument erstellen möchte."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "titel": {"type": "string", "description": "Titel des Dokuments"},
+                "kategorie": {
+                    "type": "string",
+                    "enum": ["brief", "rechnung", "angebot", "mahnung", "anschreiben", "memo", "protokoll", "auswertung", "frei"],
+                    "description": "Dokumentkategorie"
+                },
+                "inhalt": {"type": "string", "description": "HTML-Inhalt des Dokuments"},
+                "vorgang_id": {"type": "integer", "description": "Vorgang-ID für die Zuordnung"}
+            },
+            "required": ["titel"]
+        }
+    })
+    tools.append({
+        "name": "dokument_zuordnen",
+        "description": (
+            "Ordnet ein Dokument einem Vorgang zu. "
+            "Nutze dieses Tool wenn ein Dokument einem bestimmten Geschäftsvorgang zugewiesen werden soll."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dokument_id": {"type": "integer", "description": "ID des Dokuments"},
+                "vorgang_id": {"type": "integer", "description": "ID des Vorgangs"}
+            },
+            "required": ["dokument_id", "vorgang_id"]
+        }
+    })
+
     return tools
 
 
@@ -1758,6 +1839,9 @@ def execute_tool(name, params):
             "lexware_eingangsbeleg_klassifizieren": _tool_lexware_eingangsbeleg_klassifizieren,
             "capture_suchen": _tool_capture_suchen,
             "capture_zuordnen": _tool_capture_zuordnen,
+            "dokument_suchen": _tool_dokument_suchen,
+            "dokument_erstellen": _tool_dokument_erstellen,
+            "dokument_zuordnen": _tool_dokument_zuordnen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -3976,6 +4060,85 @@ def _tool_capture_zuordnen(p):
         except Exception:
             pass
         return {"ok": True, "message": f"Capture #{cap_id} erfolgreich {entity_type}#{entity_id} zugeordnet."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Dokument-Tools (session-eeee) ────────────────────────────────────────────
+
+def _tool_dokument_suchen(p):
+    """Sucht Dokumente nach Kriterien."""
+    suchbegriff = (p.get("suchbegriff") or "").strip()
+    status = p.get("status", "")
+    kategorie = p.get("kategorie", "")
+    limit = min(int(p.get("limit", 10)), 30)
+    try:
+        from dokument_storage import list_dokumente, _ensure_tables
+        _ensure_tables()
+        docs = list_dokumente(
+            status=status if status else None,
+            limit=limit,
+        )
+        if suchbegriff:
+            q = suchbegriff.lower()
+            docs = [d for d in docs if q in (d.get("titel","") + d.get("dateiname","") + d.get("kategorie","") + d.get("ocr_text","")[:500]).lower()]
+        if kategorie:
+            docs = [d for d in docs if d.get("kategorie") == kategorie]
+        if not docs:
+            return {"ok": True, "message": "Keine Dokumente gefunden.", "anzahl": 0}
+        lines = [f"Dokumente ({len(docs)} Ergebnisse):"]
+        for d in docs:
+            ts = (d.get("erstellt_am") or "")[:16]
+            lines.append(f"  #{d['id']} [{d['status']}] {ts} | {d.get('titel') or d.get('dateiname','?')} | {d.get('kategorie','?')} | Routing: {d.get('routing_ziel','?')}")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(docs)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_dokument_erstellen(p):
+    """Erstellt ein neues Dokument im Studio."""
+    titel = p.get("titel", "Kira-Dokument")
+    kategorie = p.get("kategorie", "frei")
+    inhalt = p.get("inhalt", "")
+    vorgang_id = p.get("vorgang_id")
+    try:
+        from dokument_storage import create_dokument, _ensure_tables
+        _ensure_tables()
+        dok_id = create_dokument(
+            titel=titel,
+            dateityp="html",
+            quelle="kira",
+            kategorie=kategorie,
+            status="entwurf",
+            erstellt_von="kira",
+            vorgang_id=int(vorgang_id) if vorgang_id else None,
+        )
+        try:
+            _elog("dokument", "doc_create", f"Kira hat Dokument erstellt: {titel}",
+                  source="kira_llm", modul="dokumente", status="ok")
+        except Exception:
+            pass
+        return {"ok": True, "message": f"Dokument #{dok_id} '{titel}' erstellt (Kategorie: {kategorie}). Kann im Dokument-Studio bearbeitet werden.", "id": dok_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_dokument_zuordnen(p):
+    """Ordnet ein Dokument einem Vorgang zu."""
+    dok_id = int(p.get("dokument_id", 0))
+    vorgang_id = int(p.get("vorgang_id", 0))
+    if not dok_id or not vorgang_id:
+        return {"ok": False, "error": "dokument_id und vorgang_id erforderlich"}
+    try:
+        from dokument_storage import update_dokument, _ensure_tables
+        _ensure_tables()
+        update_dokument(dok_id, vorgang_id=vorgang_id, status="zugeordnet")
+        try:
+            _elog("dokument", "doc_assign", f"Kira: Dokument #{dok_id} → Vorgang #{vorgang_id}",
+                  source="kira_llm", modul="dokumente", status="ok")
+        except Exception:
+            pass
+        return {"ok": True, "message": f"Dokument #{dok_id} wurde Vorgang #{vorgang_id} zugeordnet."}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

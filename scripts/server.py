@@ -6070,6 +6070,7 @@ def build_einstellungen():
     _nf_d_aktiv = _nf_digest.get("aktiv", True)
     _nf_d_max = _nf_digest.get("max_items", 5)
     rtlog_cfg = config.get("runtime_log", {})
+    _dok_cfg  = config.get("dokumente", {})
     kira_cfg  = config.get("kira", {})
     launcher_variant = kira_cfg.get("launcher_variant", "B")
     kira_size        = kira_cfg.get("size", 112)
@@ -6672,6 +6673,7 @@ function esInfoPopup(btn, text) {{
   <div class="es-snav-h">System</div>
   <div class="es-sn" data-essec="provider" onclick="esShowSec('provider')"><span class="es-sico">&#x25C8;</span>Kira / LLM / Provider<span class="es-scnt">{len(providers)}</span></div>
   <div class="es-sn" data-essec="mail" onclick="esShowSec('mail')"><span class="es-sico">&#x2709;</span>Mail &amp; Konten</div>
+  <div class="es-sn" data-essec="dokumente-einst" onclick="esShowSec('dokumente-einst')"><span class="es-sico">&#x1F4C4;</span>Dokumente</div>
   <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
   <div class="es-sn" data-essec="lexware" onclick="esShowSec('lexware')"><span class="es-sico">&#x1F4CB;</span>Lexware Office</div>
   <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
@@ -9986,6 +9988,80 @@ setTimeout(esRenderRssFeeds,100);
     }}).catch(()=>{{if(btn)btn.disabled=false;showToast('Fehler','fehler');}});
   }};
   </script>
+</div>
+
+<!-- ── SECTION: DOKUMENTE (session-eeee) ──────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-dokumente-einst">
+  <div class="es-sec-h">Dokumente</div>
+  <div class="es-sec-sub">Dokumenten-Modul: Eingang, Studio, Vorlagen, Export, Archiv.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">&#x2699; Modul-Status</div>
+    <div class="es-row"><label class="es-label">Modul aktiv</label>
+      <select id="cfg-dok-aktiv" class="es-input" style="width:180px">
+        <option value="freigeschaltet" {"selected" if _dok_cfg.get("feature_status")=="freigeschaltet" else ""}>Freigeschaltet</option>
+        <option value="sichtbar_gesperrt" {"selected" if _dok_cfg.get("feature_status")=="sichtbar_gesperrt" else ""}>Sichtbar (gesperrt)</option>
+        <option value="nicht_gebucht" {"selected" if _dok_cfg.get("feature_status")=="nicht_gebucht" else ""}>Nicht gebucht</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F4C1; Überwachter Ordner</div>
+    <div class="es-row"><label class="es-label">Ordnerpfad</label>
+      <input type="text" id="cfg-dok-ordner" class="es-input" value="{_dok_cfg.get('ueberwachter_ordner','')}" placeholder="C:/Pfad/zu/Dokumenten" style="width:350px">
+    </div>
+    <div class="es-row"><label class="es-label">Unterordner überwachen</label>
+      <input type="checkbox" id="cfg-dok-unterordner" {"checked" if _dok_cfg.get("unterordner_ueberwachen", True) else ""}>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F4BE; Externe Ablage</div>
+    <div class="es-row"><label class="es-label">Ablage-Pfad</label>
+      <input type="text" id="cfg-dok-ablage" class="es-input" value="{_dok_cfg.get('ablage_pfad','')}" placeholder="Automatisch neben Mail-Archiv" style="width:350px">
+    </div>
+    <div class="es-row"><label class="es-label">Ordnerstruktur</label>
+      <select id="cfg-dok-ordnerstruktur" class="es-input" style="width:200px">
+        <option value="jahr_kunde" {"selected" if _dok_cfg.get("ordner_struktur")=="jahr_kunde" else ""}>Jahr / Kunde</option>
+        <option value="jahr_typ" {"selected" if _dok_cfg.get("ordner_struktur")=="jahr_typ" else ""}>Jahr / Dokumenttyp</option>
+        <option value="kunde_jahr" {"selected" if _dok_cfg.get("ordner_struktur")=="kunde_jahr" else ""}>Kunde / Jahr</option>
+        <option value="flach" {"selected" if _dok_cfg.get("ordner_struktur")=="flach" else ""}>Flach (nur Jahr)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F50D; Analyse &amp; OCR</div>
+    <div class="es-row"><label class="es-label">OCR aktiv</label>
+      <input type="checkbox" id="cfg-dok-ocr" {"checked" if _dok_cfg.get("ocr_aktiv", True) else ""}>
+    </div>
+    <div class="es-row"><label class="es-label">OCR-Sprache</label>
+      <input type="text" id="cfg-dok-ocr-sprache" class="es-input" value="{_dok_cfg.get('ocr_sprache','deu+eng')}" style="width:150px">
+    </div>
+    <div class="es-row"><label class="es-label">Auto-Klassifizierung</label>
+      <input type="checkbox" id="cfg-dok-auto-klass" {"checked" if _dok_cfg.get("auto_klassifizierung", True) else ""}>
+    </div>
+    <div class="es-row"><label class="es-label">Konfidenz-Schwelle</label>
+      <input type="number" id="cfg-dok-konfidenz" class="es-input" value="{_dok_cfg.get('konfidenz_schwelle', 0.75)}" min="0" max="1" step="0.05" style="width:80px">
+    </div>
+    <div class="es-row"><label class="es-label">Dublettenerkennung</label>
+      <input type="checkbox" id="cfg-dok-dedup" {"checked" if _dok_cfg.get("dubletten_erkennung", True) else ""}>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">&#x1F916; Kira-Regeln</div>
+    <div class="es-row"><label class="es-label">Kira darf Dokumente erstellen</label>
+      <input type="checkbox" id="cfg-dok-kira-erstellen" {"checked" if _dok_cfg.get("kira_darf_erstellen", True) else ""}>
+    </div>
+    <div class="es-row"><label class="es-label">Kira darf zuordnen</label>
+      <input type="checkbox" id="cfg-dok-kira-zuordnen" {"checked" if _dok_cfg.get("kira_darf_zuordnen", True) else ""}>
+    </div>
+    <div class="es-row"><label class="es-label">Max. Upload (MB)</label>
+      <input type="number" id="cfg-dok-max-upload" class="es-input" value="{_dok_cfg.get('max_upload_mb', 25)}" min="1" max="100" style="width:80px">
+    </div>
+  </div>
 </div>
 
 <!-- ── SECTION: INTEGRATIONEN ─────────────────────────────────────────── -->
@@ -13760,6 +13836,175 @@ def _capture_status_css(status):
     return m.get(status, "cap-status-eingegangen")
 
 
+def build_dokumente():
+    """Dokumente-Modul: Eingang, Zugeordnet, Studio, Vorlagen, Archiv (session-eeee)."""
+    # Statistiken laden
+    try:
+        from dokument_storage import count_dokumente, _ensure_tables
+        _ensure_tables()
+        counts = count_dokumente()
+    except Exception:
+        counts = {}
+    n_neu = counts.get("neu", 0)
+    n_zugeordnet = counts.get("zugeordnet", 0)
+    n_bearbeitung = counts.get("in_bearbeitung", 0)
+    n_archiv = counts.get("archiviert", 0)
+    n_gesamt = sum(counts.values())
+
+    return f"""
+<div class="page-header">
+  <h1 class="page-title">&#x1F4C4; Dokumente</h1>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm" onclick="dokShowStudio()">&#x2795; Neues Dokument</button>
+    <button class="btn btn-sec btn-sm" onclick="dokUploadClick()">&#x1F4E5; Upload</button>
+    <button class="btn btn-sec btn-sm" onclick="dokLoadList()">&#x21BB; Aktualisieren</button>
+    <input type="file" id="dokUploadInput" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.tiff,.tif,.txt,.csv,.xlsx" style="display:none" onchange="dokUploadFiles(this.files)">
+  </div>
+</div>
+
+<!-- Status-Kacheln -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+  <div class="es-group-card" style="flex:1;min-width:120px;cursor:pointer;text-align:center" onclick="dokFilter('neu')">
+    <div style="font-size:28px;font-weight:700;color:#7c3aed" id="dokCountNeu">{n_neu}</div>
+    <div style="font-size:12px;color:var(--text-muted)">Neu / Eingang</div>
+  </div>
+  <div class="es-group-card" style="flex:1;min-width:120px;cursor:pointer;text-align:center" onclick="dokFilter('zugeordnet')">
+    <div style="font-size:28px;font-weight:700;color:#2563eb" id="dokCountZugeordnet">{n_zugeordnet}</div>
+    <div style="font-size:12px;color:var(--text-muted)">Zugeordnet</div>
+  </div>
+  <div class="es-group-card" style="flex:1;min-width:120px;cursor:pointer;text-align:center" onclick="dokFilter('in_bearbeitung')">
+    <div style="font-size:28px;font-weight:700;color:#d97706" id="dokCountBearbeitung">{n_bearbeitung}</div>
+    <div style="font-size:12px;color:var(--text-muted)">In Bearbeitung</div>
+  </div>
+  <div class="es-group-card" style="flex:1;min-width:120px;cursor:pointer;text-align:center" onclick="dokFilter('archiviert')">
+    <div style="font-size:28px;font-weight:700;color:#6b7280" id="dokCountArchiv">{n_archiv}</div>
+    <div style="font-size:12px;color:var(--text-muted)">Archiviert</div>
+  </div>
+</div>
+
+<!-- 3-Spalten-Layout -->
+<div style="display:flex;gap:12px;height:calc(100vh - 260px);min-height:400px">
+  <!-- Linke Spalte: Filter + Navigation -->
+  <div style="width:200px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding-right:12px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-muted)">Ansicht</div>
+    <div class="dok-nav-item active" id="dokNavEingang" onclick="dokFilter('neu')" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:2px">&#x1F4E5; Eingang</div>
+    <div class="dok-nav-item" id="dokNavZugeordnet" onclick="dokFilter('zugeordnet')" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:2px">&#x1F517; Zugeordnet</div>
+    <div class="dok-nav-item" id="dokNavStudio" onclick="dokShowStudio()" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:2px">&#x270F; Studio</div>
+    <div class="dok-nav-item" id="dokNavVorlagen" onclick="dokShowVorlagen()" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:2px">&#x1F4CB; Vorlagen</div>
+    <div class="dok-nav-item" id="dokNavArchiv" onclick="dokFilter('archiviert')" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:2px">&#x1F4C2; Archiv</div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-muted)">Filter</div>
+    <select id="dokFilterQuelle" onchange="dokLoadList()" style="width:100%;font-size:12px;margin-bottom:6px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+      <option value="">Alle Quellen</option>
+      <option value="upload">Upload</option>
+      <option value="mail_anhang">Mail-Anhang</option>
+      <option value="watched_folder">Ordner</option>
+      <option value="studio">Studio</option>
+      <option value="kira">Kira</option>
+    </select>
+    <input type="text" id="dokFilterSuche" placeholder="Suche..." onkeyup="dokLoadList()" style="width:100%;font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+  </div>
+
+  <!-- Mittlere Spalte: Dokumenten-Liste -->
+  <div style="flex:1;overflow-y:auto;min-width:300px" id="dokListeWrap">
+    <div id="dokListe" style="font-size:13px">
+      <div style="color:var(--text-muted);padding:40px;text-align:center">
+        Lade Dokumente...
+      </div>
+    </div>
+  </div>
+
+  <!-- Rechte Spalte: Preview + Detail -->
+  <div style="width:380px;flex-shrink:0;overflow-y:auto;border-left:1px solid var(--border);padding-left:12px;display:none" id="dokDetailPanel">
+    <div id="dokDetail">
+      <div style="color:var(--text-muted);padding:40px;text-align:center">Dokument auswählen</div>
+    </div>
+  </div>
+</div>
+
+<!-- Dokument-Studio (versteckt, wird eingeblendet) -->
+<div id="dokStudioOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:var(--bg-base)">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg-raised)">
+      <button class="btn btn-sec btn-sm" onclick="dokCloseStudio()">&#x2190; Zurück</button>
+      <h2 style="margin:0;font-size:16px;flex:1">Dokument-Studio</h2>
+      <select id="dokStudioVorlage" onchange="dokLoadVorlage(this.value)" style="font-size:13px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+        <option value="">Leeres Dokument</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="dokExportPDF()">&#x1F4C4; PDF</button>
+      <button class="btn btn-sec btn-sm" onclick="dokExportDOCX()">&#x1F4DD; DOCX</button>
+      <button class="btn btn-sec btn-sm" onclick="dokSave()">&#x1F4BE; Speichern</button>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden">
+      <!-- Studio Links: Variablen -->
+      <div style="width:220px;overflow-y:auto;border-right:1px solid var(--border);padding:12px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:8px">Platzhalter</div>
+        <div id="dokStudioVars" style="display:flex;flex-direction:column;gap:4px">
+          <div class="dok-var-chip" onclick="dokInsertVar('kunde.name')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F464; Kunde Name</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('kunde.firma')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F3E2; Firma</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('kunde.adresse')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F4CD; Adresse</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('datum')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F4C5; Datum</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('rechnung.nummer')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F4B0; Rechnungsnr.</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('angebot.nummer')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F4CB; Angebotsnr.</div>
+          <div class="dok-var-chip" onclick="dokInsertVar('betreff')" style="padding:4px 8px;background:var(--bg-raised);border-radius:4px;cursor:pointer;font-size:12px">&#x1F4E8; Betreff</div>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+        <div style="font-weight:600;margin-bottom:8px">Briefkopf</div>
+        <select id="dokStudioBriefkopf" style="width:100%;font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+          <option value="">Kein Briefkopf</option>
+        </select>
+        <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+        <div style="font-weight:600;margin-bottom:8px">Dokument-Info</div>
+        <label style="font-size:11px;color:var(--text-muted)">Titel</label>
+        <input type="text" id="dokStudioTitel" placeholder="Dokumenttitel" style="width:100%;font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary);margin-bottom:6px">
+        <label style="font-size:11px;color:var(--text-muted)">Kategorie</label>
+        <select id="dokStudioKategorie" style="width:100%;font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+          <option value="brief">Brief</option>
+          <option value="rechnung">Rechnung</option>
+          <option value="angebot">Angebot</option>
+          <option value="mahnung">Mahnung</option>
+          <option value="anschreiben">Anschreiben</option>
+          <option value="memo">Internes Memo</option>
+          <option value="protokoll">Protokoll</option>
+          <option value="auswertung">Auswertung</option>
+          <option value="frei">Freies Dokument</option>
+        </select>
+      </div>
+      <!-- Studio Mitte: Editor -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div id="dokStudioToolbar" style="border-bottom:1px solid var(--border)"></div>
+        <div id="dokStudioEditor" style="flex:1;overflow-y:auto;padding:20px;background:#fff;color:#222;font-size:14px;line-height:1.6;min-height:300px" contenteditable="true"></div>
+      </div>
+      <!-- Studio Rechts: Aktionen -->
+      <div style="width:200px;overflow-y:auto;border-left:1px solid var(--border);padding:12px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:8px">Aktionen</div>
+        <button class="btn btn-primary btn-sm" onclick="dokExportPDF()" style="width:100%;margin-bottom:6px">&#x1F4C4; Als PDF exportieren</button>
+        <button class="btn btn-sec btn-sm" onclick="dokExportDOCX()" style="width:100%;margin-bottom:6px">&#x1F4DD; Als DOCX exportieren</button>
+        <button class="btn btn-sec btn-sm" onclick="dokPrint()" style="width:100%;margin-bottom:6px">&#x1F5A8; Drucken</button>
+        <button class="btn btn-sec btn-sm" onclick="dokAttachMail()" style="width:100%;margin-bottom:6px">&#x2709; An Mail anhängen</button>
+        <button class="btn btn-sec btn-sm" onclick="dokSave()" style="width:100%;margin-bottom:6px">&#x1F4BE; Speichern</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+        <div style="font-weight:600;margin-bottom:8px">Vorgang</div>
+        <input type="text" id="dokStudioVorgang" placeholder="Vorgang-ID" style="width:100%;font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview-Overlay fuer PDF/Bild -->
+<div id="dokPreviewOverlay" style="display:none;position:fixed;inset:0;z-index:9001;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center" onclick="this.style.display='none'">
+  <div style="background:var(--bg-base);border-radius:12px;padding:12px;max-width:90vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">
+    <div id="dokPreviewContent"></div>
+  </div>
+</div>
+
+<!-- Drop-Zone Overlay -->
+<div id="dokDropZone" style="display:none;position:absolute;inset:0;z-index:100;background:rgba(124,58,237,.08);border:3px dashed #7c3aed;border-radius:12px;display:none;justify-content:center;align-items:center">
+  <div style="font-size:18px;font-weight:600;color:#7c3aed">&#x1F4E5; Dateien hier ablegen</div>
+</div>
+"""
+
+
 def build_capture(db):
     """Desktop-Panel fuer Capture / Mobile Memo (session-hhh)."""
     # Statistiken laden
@@ -13913,6 +14158,345 @@ def build_capture(db):
   </div>
 
 </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// ██  DOKUMENTE JS  (session-eeee)
+// ═══════════════════════════════════════════════════════════════════════════
+window._dokFilter = '';
+window._dokSelectedId = null;
+
+window.dokLoadList = function() {{
+  const status = window._dokFilter || '';
+  const quelle = (document.getElementById('dokFilterQuelle')||{{}}).value || '';
+  const q = (document.getElementById('dokFilterSuche')||{{}}).value || '';
+  let url = '/api/dokumente?limit=200';
+  if(status) url += '&status=' + encodeURIComponent(status);
+  if(quelle) url += '&quelle=' + encodeURIComponent(quelle);
+  if(q) url += '&q=' + encodeURIComponent(q);
+  fetch(url).then(r=>r.json()).then(d=>{{
+    if(!d.ok) {{ document.getElementById('dokListe').innerHTML='<div style="color:var(--danger);padding:20px">Fehler: '+d.error+'</div>'; return; }}
+    const docs = d.dokumente || [];
+    if(!docs.length) {{
+      document.getElementById('dokListe').innerHTML='<div style="color:var(--text-muted);padding:40px;text-align:center">Keine Dokumente gefunden</div>';
+      return;
+    }}
+    let html = '';
+    docs.forEach(doc => {{
+      const sel = doc.id === window._dokSelectedId ? 'background:var(--bg-raised);border-left:3px solid #7c3aed;' : 'border-left:3px solid transparent;';
+      const statusBadge = _dokStatusBadge(doc.status);
+      const quellIcon = {{upload:'&#x1F4E5;',mail_anhang:'&#x2709;',watched_folder:'&#x1F4C1;',studio:'&#x270F;',kira:'&#x1F916;'}}[doc.quelle] || '&#x1F4C4;';
+      const datum = (doc.erstellt_am||'').substring(0,16).replace('T',' ');
+      html += '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);'+sel+'transition:background .15s" onclick="dokSelect('+doc.id+')" onmouseover="this.style.background=\\'var(--bg-raised)\\'" onmouseout="this.style.background=\\'\\'">';
+      html += '<div style="display:flex;align-items:center;gap:8px"><span>'+quellIcon+'</span><span style="font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(doc.titel||doc.dateiname||'Unbenannt')+'</span>'+statusBadge+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">'+datum+' &middot; '+(doc.kategorie||'–')+' &middot; '+(doc.dateityp||'')+'</div>';
+      html += '</div>';
+    }});
+    document.getElementById('dokListe').innerHTML = html;
+  }}).catch(e=>{{
+    document.getElementById('dokListe').innerHTML='<div style="color:var(--danger);padding:20px">Fehler: '+e+'</div>';
+  }});
+  // Counts aktualisieren
+  fetch('/api/dokumente/counts').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const c = d.counts || {{}};
+    const el = (id,v) => {{ const e=document.getElementById(id); if(e) e.textContent=v||0; }};
+    el('dokCountNeu', c.neu);
+    el('dokCountZugeordnet', c.zugeordnet);
+    el('dokCountBearbeitung', c.in_bearbeitung);
+    el('dokCountArchiv', c.archiviert);
+    const badge = document.getElementById('nav-dokumente-badge');
+    if(badge) {{ if(c.neu>0) {{ badge.textContent=c.neu; badge.style.display=''; }} else {{ badge.style.display='none'; }} }}
+  }});
+}};
+
+function _dokStatusBadge(s) {{
+  const colors = {{neu:'#7c3aed',zugeordnet:'#2563eb',in_bearbeitung:'#d97706',archiviert:'#6b7280',entwurf:'#10b981',erledigt:'#059669'}};
+  const labels = {{neu:'Neu',zugeordnet:'Zugeordnet',in_bearbeitung:'Bearbeitung',archiviert:'Archiv',entwurf:'Entwurf',erledigt:'Erledigt'}};
+  const c = colors[s] || '#6b7280';
+  return '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:'+c+'18;color:'+c+';border:1px solid '+c+'30">'+(labels[s]||s)+'</span>';
+}}
+
+window.dokFilter = function(status) {{
+  window._dokFilter = status;
+  document.querySelectorAll('.dok-nav-item').forEach(n=>n.classList.remove('active'));
+  const navMap = {{neu:'dokNavEingang',zugeordnet:'dokNavZugeordnet',archiviert:'dokNavArchiv'}};
+  const nav = document.getElementById(navMap[status]||'');
+  if(nav) nav.classList.add('active');
+  dokLoadList();
+}};
+
+window.dokSelect = function(id) {{
+  window._dokSelectedId = id;
+  const dp = document.getElementById('dokDetailPanel');
+  if(dp) dp.style.display = '';
+  fetch('/api/dokumente/'+id).then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const doc = d.dokument;
+    let html = '<div style="margin-bottom:12px">';
+    html += '<h3 style="margin:0 0 4px 0;font-size:15px">'+(doc.titel||doc.dateiname||'Unbenannt')+'</h3>';
+    html += '<div style="font-size:11px;color:var(--text-muted)">'+(doc.erstellt_am||'').substring(0,16).replace('T',' ')+'</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+    html += _dokStatusBadge(doc.status);
+    if(doc.kategorie) html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg-raised);border:1px solid var(--border)">'+doc.kategorie+'</span>';
+    if(doc.dokumentrolle) html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg-raised);border:1px solid var(--border)">'+doc.dokumentrolle+'</span>';
+    html += '</div>';
+    // Preview
+    if(doc.dateityp==='pdf' || doc.dateityp==='bild') {{
+      html += '<div style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;overflow:hidden;height:300px">';
+      html += '<iframe src="/api/dokumente/preview/'+doc.id+'" style="width:100%;height:100%;border:none"></iframe>';
+      html += '</div>';
+    }} else if(doc.ocr_text) {{
+      html += '<div style="margin-bottom:12px;padding:8px;background:var(--bg-raised);border-radius:6px;font-size:12px;max-height:200px;overflow-y:auto;white-space:pre-wrap">'+doc.ocr_text.substring(0,1000)+'</div>';
+    }}
+    // Metadaten
+    html += '<table style="font-size:12px;width:100%">';
+    html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Datei</td><td>'+doc.dateiname+'</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Typ</td><td>'+doc.dateityp+'</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Größe</td><td>'+_dokFormatSize(doc.dateigroesse)+'</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Quelle</td><td>'+doc.quelle+'</td></tr>';
+    if(doc.routing_ziel) html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Routing</td><td>'+doc.routing_ziel+' &rarr; '+doc.zielmodul+'</td></tr>';
+    if(doc.konfidenz) html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Konfidenz</td><td>'+Math.round(doc.konfidenz*100)+'%</td></tr>';
+    if(doc.vorgang_id) html += '<tr><td style="color:var(--text-muted);padding:3px 8px 3px 0">Vorgang</td><td>#'+doc.vorgang_id+'</td></tr>';
+    html += '</table>';
+    // Aktionen
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">';
+    if(doc.externer_pfad) html += '<button class="btn btn-sec btn-xs" onclick="dokOpenFile('+doc.id+')">&#x1F4C2; Öffnen</button>';
+    html += '<button class="btn btn-sec btn-xs" onclick="dokReclassify('+doc.id+')">&#x1F50D; Neu klassifizieren</button>';
+    html += '<button class="btn btn-sec btn-xs" onclick="dokArchive('+doc.id+')">&#x1F4C2; Archivieren</button>';
+    html += '<button class="btn btn-sec btn-xs" style="color:var(--danger)" onclick="dokDelete('+doc.id+')">&#x1F5D1; Löschen</button>';
+    html += '</div>';
+    document.getElementById('dokDetail').innerHTML = html;
+  }});
+  dokLoadList(); // Markierung aktualisieren
+}};
+
+function _dokFormatSize(bytes) {{
+  if(!bytes) return '0 B';
+  if(bytes<1024) return bytes+' B';
+  if(bytes<1048576) return (bytes/1024).toFixed(1)+' KB';
+  return (bytes/1048576).toFixed(1)+' MB';
+}}
+
+window.dokUploadClick = function() {{
+  document.getElementById('dokUploadInput').click();
+}};
+
+window.dokUploadFiles = function(files) {{
+  if(!files||!files.length) return;
+  const fd = new FormData();
+  for(let i=0;i<files.length;i++) fd.append('file_'+i, files[i]);
+  showToast('Lade '+files.length+' Datei(en) hoch...','info');
+  fetch('/api/dokumente/upload', {{method:'POST', body:fd}}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{
+      const n = (d.results||[]).length;
+      const dupes = (d.results||[]).filter(r=>r.duplicate).length;
+      if(dupes>0) showToast(dupes+' Dublette(n) übersprungen','warn');
+      showToast(n+' Dokument(e) importiert','ok');
+      dokLoadList();
+    }} else {{
+      showToast('Upload-Fehler: '+(d.error||'unbekannt'),'error');
+    }}
+  }}).catch(e=>showToast('Upload fehlgeschlagen: '+e,'error'));
+}};
+
+window.dokReclassify = function(id) {{
+  fetch('/api/dokumente/classify',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id}})}}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Neu klassifiziert: '+(d.klassifizierung||{{}}).kategorie,'ok'); dokSelect(id); }}
+    else showToast('Fehler: '+d.error,'error');
+  }});
+}};
+
+window.dokArchive = function(id) {{
+  fetch('/api/dokumente/save',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id,status:'archiviert'}})}}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Archiviert','ok'); dokLoadList(); }}
+  }});
+}};
+
+window.dokDelete = function(id) {{
+  if(!confirm('Dokument wirklich löschen?')) return;
+  fetch('/api/dokumente/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:id}})}}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Gelöscht','ok'); document.getElementById('dokDetailPanel').style.display='none'; dokLoadList(); }}
+  }});
+}};
+
+window.dokOpenFile = function(id) {{
+  window.open('/api/dokumente/preview/'+id, '_blank');
+}};
+
+// ── Dokument-Studio ──
+window.dokShowStudio = function() {{
+  document.getElementById('dokStudioOverlay').style.display='';
+  // Vorlagen laden
+  fetch('/api/dokumente/vorlagen').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const sel = document.getElementById('dokStudioVorlage');
+    sel.innerHTML = '<option value="">Leeres Dokument</option>';
+    (d.vorlagen||[]).forEach(v=>{{
+      sel.innerHTML += '<option value="'+v.id+'">'+v.name+' ('+v.kategorie+')</option>';
+    }});
+  }});
+  // Briefköpfe laden
+  fetch('/api/dokumente/briefkoepfe').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const sel = document.getElementById('dokStudioBriefkopf');
+    sel.innerHTML = '<option value="">Kein Briefkopf</option>';
+    (d.briefkoepfe||[]).forEach(b=>{{
+      sel.innerHTML += '<option value="'+b.id+'">'+b.name+'</option>';
+    }});
+  }});
+}};
+
+window.dokCloseStudio = function() {{
+  document.getElementById('dokStudioOverlay').style.display='none';
+}};
+
+window.dokInsertVar = function(varName) {{
+  const editor = document.getElementById('dokStudioEditor');
+  const sel = window.getSelection();
+  const range = sel.getRangeAt(0);
+  const node = document.createTextNode('{{{{' + varName + '}}}}');
+  range.insertNode(node);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  editor.focus();
+}};
+
+window.dokLoadVorlage = function(vid) {{
+  if(!vid) {{ document.getElementById('dokStudioEditor').innerHTML = ''; return; }}
+  fetch('/api/dokumente/vorlagen').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const v = (d.vorlagen||[]).find(x=>x.id==vid);
+    if(v) {{
+      document.getElementById('dokStudioEditor').innerHTML = v.inhalt || '';
+      document.getElementById('dokStudioTitel').value = v.name || '';
+      document.getElementById('dokStudioKategorie').value = v.kategorie || 'frei';
+    }}
+  }});
+}};
+
+window.dokExportPDF = function() {{
+  const html = document.getElementById('dokStudioEditor').innerHTML;
+  const titel = document.getElementById('dokStudioTitel').value || 'dokument';
+  const bkId = document.getElementById('dokStudioBriefkopf').value;
+  fetch('/api/dokumente/export/pdf', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{html:html, titel:titel, briefkopf_id:bkId?parseInt(bkId):null}})
+  }}).then(r=>{{
+    if(r.ok) return r.blob();
+    return r.json().then(d=>{{throw new Error(d.error||'PDF-Export fehlgeschlagen')}});
+  }}).then(blob=>{{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = titel+'.pdf'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF exportiert','ok');
+  }}).catch(e=>showToast('PDF-Fehler: '+e.message,'error'));
+}};
+
+window.dokExportDOCX = function() {{
+  const html = document.getElementById('dokStudioEditor').innerHTML;
+  const titel = document.getElementById('dokStudioTitel').value || 'dokument';
+  const bkId = document.getElementById('dokStudioBriefkopf').value;
+  fetch('/api/dokumente/export/docx', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{html:html, titel:titel, briefkopf_id:bkId?parseInt(bkId):null}})
+  }}).then(r=>{{
+    if(r.ok) return r.blob();
+    return r.json().then(d=>{{throw new Error(d.error||'DOCX-Export fehlgeschlagen')}});
+  }}).then(blob=>{{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = titel+'.docx'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('DOCX exportiert','ok');
+  }}).catch(e=>showToast('DOCX-Fehler: '+e.message,'error'));
+}};
+
+window.dokPrint = function() {{
+  const html = document.getElementById('dokStudioEditor').innerHTML;
+  const w = window.open('','_blank');
+  w.document.write('<html><head><title>Drucken</title><style>body{{font-family:Segoe UI,Arial,sans-serif;padding:2cm;font-size:11pt;line-height:1.6}}</style></head><body>'+html+'</body></html>');
+  w.document.close();
+  w.print();
+}};
+
+window.dokSave = function() {{
+  const html = document.getElementById('dokStudioEditor').innerHTML;
+  const titel = document.getElementById('dokStudioTitel').value || 'Unbenannt';
+  const kat = document.getElementById('dokStudioKategorie').value || 'frei';
+  const vorgang = document.getElementById('dokStudioVorgang').value;
+  fetch('/api/dokumente/save', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{
+      titel: titel, kategorie: kat, dateityp: 'html',
+      quelle: 'studio', status: 'entwurf', erstellt_von: 'user',
+      vorgang_id: vorgang ? parseInt(vorgang) : null
+    }})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Dokument gespeichert (ID: '+d.id+')','ok'); dokLoadList(); }}
+    else showToast('Fehler: '+d.error,'error');
+  }});
+}};
+
+window.dokAttachMail = function() {{
+  showToast('Mail-Anhang: Exportiere zuerst als PDF, dann im Postfach anhängen','info');
+}};
+
+window.dokShowVorlagen = function() {{
+  // Vorlagen in Liste anzeigen
+  document.querySelectorAll('.dok-nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('dokNavVorlagen').classList.add('active');
+  fetch('/api/dokumente/vorlagen').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    let html = '<div style="padding:12px"><h3 style="margin:0 0 12px 0">Dokument-Vorlagen</h3>';
+    html += '<button class="btn btn-primary btn-sm" onclick="dokShowStudio()" style="margin-bottom:12px">&#x2795; Neue Vorlage erstellen</button>';
+    const vorlagen = d.vorlagen || [];
+    if(!vorlagen.length) {{
+      html += '<div style="color:var(--text-muted);padding:20px;text-align:center">Noch keine Vorlagen angelegt</div>';
+    }}
+    vorlagen.forEach(v=>{{
+      html += '<div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer" onclick="dokLoadVorlageInStudio('+v.id+')">';
+      html += '<div style="font-weight:500">'+v.name+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-muted)">'+v.kategorie+' &middot; '+(v.dokumenttyp||'html')+'</div>';
+      html += '</div>';
+    }});
+    html += '</div>';
+    document.getElementById('dokListe').innerHTML = html;
+  }});
+}};
+
+window.dokLoadVorlageInStudio = function(vid) {{
+  dokShowStudio();
+  setTimeout(()=>dokLoadVorlage(vid), 300);
+}};
+
+// Drag & Drop
+(function() {{
+  const panel = document.getElementById('panel-dokumente');
+  if(!panel) return;
+  panel.addEventListener('dragover', function(e) {{
+    e.preventDefault();
+    const dz = document.getElementById('dokDropZone');
+    if(dz) dz.style.display = 'flex';
+  }});
+  panel.addEventListener('dragleave', function(e) {{
+    const dz = document.getElementById('dokDropZone');
+    if(dz) dz.style.display = 'none';
+  }});
+  panel.addEventListener('drop', function(e) {{
+    e.preventDefault();
+    const dz = document.getElementById('dokDropZone');
+    if(dz) dz.style.display = 'none';
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {{
+      dokUploadFiles(e.dataTransfer.files);
+    }}
+  }});
+}})();
+
+</script>
 
 <script>
 window._capPage = 1;
@@ -14551,6 +15135,7 @@ def generate_html() -> str:
     einstell_html  = build_einstellungen()
     lexware_html   = build_lexware(db)
     capture_html   = build_capture(db)
+    dokumente_html = build_dokumente()
     admin_html     = build_admin()
     # Lexware Badge-Zaehler fuer Sidebar (session-fff)
     try:
@@ -14566,6 +15151,13 @@ def generate_html() -> str:
         ).fetchone()[0]
     except Exception:
         _cap_inbox_count = 0
+    # Dokumente Badge-Zaehler fuer Sidebar (session-eeee)
+    try:
+        _dok_neu_count = get_db().execute(
+            "SELECT COUNT(*) FROM dokumente WHERE status='neu' AND geloescht_am IS NULL"
+        ).fetchone()[0]
+    except Exception:
+        _dok_neu_count = 0
     db.close()
 
     # Kira Launcher — SVG-Varianten
@@ -14629,6 +15221,10 @@ def generate_html() -> str:
       </div>
       <div class="sidebar-item" id="nav-postfach" onclick="showPanel('postfach')" data-label="Postfach">
         <span class="si-icon">&#x1F4EC;</span><span class="si-label">Postfach</span><span id="nav-postfach-badge" class="si-badge" style="display:none;background:rgba(200,60,60,.12);color:#c83c3c;border-color:rgba(200,60,60,.25);font-size:11px"></span>
+      </div>
+      <div class="sidebar-item" id="nav-dokumente" onclick="showPanel('dokumente');dokLoadList()" data-label="Dokumente">
+        <span class="si-icon">&#x1F4C4;</span><span class="si-label">Dokumente</span>
+        {f'<span class="si-badge" id="nav-dokumente-badge" style="background:rgba(124,58,237,.12);color:#7c3aed;border-color:rgba(124,58,237,.25)">{_dok_neu_count}</span>' if _dok_neu_count > 0 else '<span class="si-badge" id="nav-dokumente-badge" style="display:none"></span>'}
       </div>
       <div class="sidebar-item" id="nav-organisation" onclick="showPanel('organisation')" data-label="Organisation">
         <span class="si-icon">&#x1F4C5;</span><span class="si-label">Organisation</span>
@@ -14716,6 +15312,7 @@ def generate_html() -> str:
   <div class="panel" id="panel-geschaeft">{gesch_html}</div>
   <div class="panel" id="panel-lexware">{lexware_html}</div>
   <div class="panel" id="panel-wissen">{wissen_html}</div>
+  <div class="panel" id="panel-dokumente">{dokumente_html}</div>
   <div class="panel" id="panel-capture">{capture_html}</div>
   <div class="panel" id="panel-admin">{admin_html}</div>
   <div class="panel" id="panel-einstellungen">{einstell_html}</div>
@@ -15331,7 +15928,7 @@ let kiraOpen = false;
 
 // ═══ SIDEBAR & NAV ═══
 const PANEL_TITLES = {{
-  dashboard:'Start', kommunikation:'Kommunikation', organisation:'Organisation',
+  dashboard:'Start', kommunikation:'Kommunikation', dokumente:'Dokumente', organisation:'Organisation',
   geschaeft:'Gesch\u00e4ft', lexware:'Lexware Office', wissen:'Wissen', einstellungen:'Einstellungen',
   kunden:'Kunden', marketing:'Marketing',
   social:'Social / DMs', automationen:'Automationen', analysen:'Analysen',
@@ -15354,6 +15951,7 @@ function showPanel(name) {{
   if(name==='dashboard') {{ setTimeout(loadDashKalender, 400); }}
   if(name==='geschaeft') {{ setTimeout(loadGeschKiraSignale, 500); }}
   if(name==='capture' && typeof window.capLoadStats==='function') {{ setTimeout(window.capLoadStats, 400); }}
+  if(name==='dokumente' && typeof window.dokLoadList==='function') {{ setTimeout(window.dokLoadList, 200); }}
 }}
 
 // === Lexware Office JS (session-eee) ===
@@ -18020,6 +18618,22 @@ function saveSettings() {{
       neue_mails_archivieren:       document.getElementById('cfg-archiv-aktiv')?.checked ?? true,
       geloeschte_bereinigung_aktiv: document.getElementById('cfg-archiv-bereinigung-aktiv')?.checked ?? true,
       bereinigung_frist_tage:       parseInt(document.getElementById('cfg-archiv-bereinigung-frist')?.value || '90', 10)
+    }},
+    dokumente: {{
+      aktiv:                  true,
+      feature_status:         document.getElementById('cfg-dok-aktiv')?.value || 'freigeschaltet',
+      ueberwachter_ordner:    document.getElementById('cfg-dok-ordner')?.value.trim() || '',
+      unterordner_ueberwachen: document.getElementById('cfg-dok-unterordner')?.checked ?? true,
+      ablage_pfad:            document.getElementById('cfg-dok-ablage')?.value.trim() || '',
+      ordner_struktur:        document.getElementById('cfg-dok-ordnerstruktur')?.value || 'jahr_kunde',
+      ocr_aktiv:              document.getElementById('cfg-dok-ocr')?.checked ?? true,
+      ocr_sprache:            document.getElementById('cfg-dok-ocr-sprache')?.value.trim() || 'deu+eng',
+      auto_klassifizierung:   document.getElementById('cfg-dok-auto-klass')?.checked ?? true,
+      konfidenz_schwelle:     parseFloat(document.getElementById('cfg-dok-konfidenz')?.value || '0.75'),
+      dubletten_erkennung:    document.getElementById('cfg-dok-dedup')?.checked ?? true,
+      kira_darf_erstellen:    document.getElementById('cfg-dok-kira-erstellen')?.checked ?? true,
+      kira_darf_zuordnen:     document.getElementById('cfg-dok-kira-zuordnen')?.checked ?? true,
+      max_upload_mb:          parseInt(document.getElementById('cfg-dok-max-upload')?.value || '25')
     }},
     backup: {{
       aktiv:  document.getElementById('cfg-backup-aktiv')?.checked ?? false,
@@ -21823,6 +22437,16 @@ footer{color:var(--muted);font-size:var(--fs-sm);text-align:center;padding:13px;
 .cap-conf-bar{height:4px;border-radius:2px;background:var(--border);overflow:hidden;width:60px;display:inline-block;vertical-align:middle;}
 .cap-conf-fill{height:100%;background:var(--accent);transition:width .3s;}
 .cap-quick-form{background:var(--bg-raised);border:1px solid var(--accent);border-radius:10px;padding:16px;margin-bottom:20px;}
+.dok-nav-item{transition:background .12s,color .12s;}
+.dok-nav-item:hover{background:var(--bg-raised);color:var(--text);}
+.dok-nav-item.active{background:var(--accent);color:#fff;font-weight:600;}
+.dok-status-card{background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:12px 16px;text-align:center;transition:border-color .15s;}
+.dok-status-card:hover{border-color:var(--accent);}
+.dok-list-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .12s,background .12s;background:var(--bg-raised);font-size:13px;}
+.dok-list-item:hover{border-color:var(--accent);background:var(--bg);}
+.dok-list-item.selected{border-color:var(--accent);background:rgba(59,130,246,.06);}
+.dok-drop-zone{border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .2s,background .2s;}
+.dok-drop-zone.drag-over{border-color:var(--accent);background:rgba(59,130,246,.06);}
 .cap-quick-textarea{width:100%;min-height:80px;resize:vertical;font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;box-sizing:border-box;outline:none;}
 .cap-quick-textarea:focus{border-color:var(--accent);}
 .cap-file-zone{border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;margin-top:8px;display:block;transition:border-color .12s,color .12s;}
@@ -22677,6 +23301,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._api_admin_data_get()
 
         # Capture / Mobile Memo (session-hhh)
+        # ── Dokumente API (GET) — session-eeee ──
+        elif self.path == '/api/dokumente':
+            self._api_dokumente_list()
+        elif self.path.startswith('/api/dokumente/') and '/vorlagen' not in self.path and '/briefkoepfe' not in self.path and '/export' not in self.path and '/preview' not in self.path:
+            self._api_dokument_get()
+        elif self.path == '/api/dokumente/vorlagen':
+            self._api_dokument_vorlagen_list()
+        elif self.path == '/api/dokumente/briefkoepfe':
+            self._api_dokument_briefkoepfe_list()
+        elif self.path.startswith('/api/dokumente/preview/'):
+            self._api_dokument_preview()
+        elif self.path == '/api/dokumente/counts':
+            self._api_dokumente_counts()
+
         elif self.path.startswith('/api/capture/'):
             self._api_capture_get()
 
@@ -26311,6 +26949,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length) or b'{}'
         self._raw_post_body = raw_body  # für HMAC-Prüfung (WhatsApp)
+        # Dokumente Datei-Upload: multipart/form-data VOR json.loads abfangen (session-eeee)
+        if self.path == '/api/dokumente/upload':
+            self._api_dokument_upload(raw_body)
+            return
         # Capture Datei-Upload: multipart/form-data VOR json.loads abfangen (session-hhh)
         if self.path == '/api/capture/upload':
             self._api_capture_upload(raw_body)
@@ -26329,6 +26971,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if self.path == '/api/admin/cf/status':
             self._api_admin_cf_status()
+            return
+
+        # ── Dokumente API (POST) — session-eeee ──
+        if self.path == '/api/dokumente/save':
+            self._api_dokument_save(body)
+            return
+        if self.path == '/api/dokumente/delete':
+            self._api_dokument_delete(body)
+            return
+        if self.path == '/api/dokumente/vorlagen/save':
+            self._api_dokument_vorlage_save(body)
+            return
+        if self.path == '/api/dokumente/vorlagen/delete':
+            self._api_dokument_vorlage_delete(body)
+            return
+        if self.path == '/api/dokumente/briefkoepfe/save':
+            self._api_dokument_briefkopf_save(body)
+            return
+        if self.path == '/api/dokumente/export/pdf':
+            self._api_dokument_export_pdf(body)
+            return
+        if self.path == '/api/dokumente/export/docx':
+            self._api_dokument_export_docx(body)
+            return
+        if self.path == '/api/dokumente/classify':
+            self._api_dokument_classify(body)
+            return
+        if self.path == '/api/dokumente/assign':
+            self._api_dokument_assign(body)
             return
 
         if self.path == '/api/mail/oauth/connect':
@@ -28522,6 +29193,292 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": str(e)})
 
     # ── Capture / Mobile Memo API (session-hhh) ───────────────────────────────
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ██  DOKUMENTE API  (session-eeee)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _api_dokumente_list(self):
+        """GET /api/dokumente?status=X&quelle=Y&limit=N&offset=N&q=SUCHE"""
+        try:
+            from dokument_storage import list_dokumente, _ensure_tables
+            _ensure_tables()
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            status = qs.get("status", [None])[0]
+            quelle = qs.get("quelle", [None])[0]
+            vorgang = qs.get("vorgang_id", [None])[0]
+            limit = int(qs.get("limit", [100])[0])
+            offset = int(qs.get("offset", [0])[0])
+            q = qs.get("q", [""])[0]
+            docs = list_dokumente(status=status, quelle=quelle,
+                                  vorgang_id=int(vorgang) if vorgang else None,
+                                  limit=limit, offset=offset)
+            if q:
+                q_lower = q.lower()
+                docs = [d for d in docs if q_lower in (d.get("titel","") + d.get("dateiname","") + d.get("kategorie","")).lower()]
+            self._json({"ok": True, "dokumente": docs, "count": len(docs)})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_get(self):
+        """GET /api/dokumente/{id}"""
+        try:
+            from dokument_storage import get_dokument, _ensure_tables
+            _ensure_tables()
+            dok_id = int(self.path.split("/")[-1])
+            doc = get_dokument(dok_id)
+            if doc:
+                self._json({"ok": True, "dokument": doc})
+            else:
+                self._json({"ok": False, "error": "Nicht gefunden"})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokumente_counts(self):
+        """GET /api/dokumente/counts"""
+        try:
+            from dokument_storage import count_dokumente, _ensure_tables
+            _ensure_tables()
+            self._json({"ok": True, "counts": count_dokumente()})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_vorlagen_list(self):
+        """GET /api/dokumente/vorlagen"""
+        try:
+            from dokument_storage import list_vorlagen, _ensure_tables
+            _ensure_tables()
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            kat = qs.get("kategorie", [None])[0]
+            vorlagen = list_vorlagen(kategorie=kat)
+            self._json({"ok": True, "vorlagen": vorlagen})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_briefkoepfe_list(self):
+        """GET /api/dokumente/briefkoepfe"""
+        try:
+            from dokument_storage import list_briefkoepfe, _ensure_tables
+            _ensure_tables()
+            self._json({"ok": True, "briefkoepfe": list_briefkoepfe()})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_preview(self):
+        """GET /api/dokumente/preview/{id} — liefert Datei zum Anzeigen"""
+        try:
+            from dokument_storage import get_dokument, _ensure_tables
+            _ensure_tables()
+            dok_id = int(self.path.split("/")[-1])
+            doc = get_dokument(dok_id)
+            if not doc or not doc.get("externer_pfad"):
+                self._respond(404, "text/plain", b"Nicht gefunden")
+                return
+            fp = Path(doc["externer_pfad"])
+            if not fp.exists():
+                self._respond(404, "text/plain", b"Datei nicht gefunden")
+                return
+            mime = mimetypes.guess_type(str(fp))[0] or "application/octet-stream"
+            data = fp.read_bytes()
+            self._respond(200, mime, data)
+        except Exception as e:
+            self._respond(500, "text/plain", str(e).encode())
+
+    def _api_dokument_upload(self, raw_body):
+        """POST /api/dokumente/upload — multipart Datei-Upload"""
+        try:
+            content_type = self.headers.get("Content-Type", "")
+            if "multipart/form-data" not in content_type:
+                self._json({"ok": False, "error": "multipart/form-data erwartet"})
+                return
+            boundary = content_type.split("boundary=")[-1].strip()
+            parts = raw_body.split(f"--{boundary}".encode())
+            results = []
+            import tempfile
+            for part in parts:
+                if b"filename=" not in part:
+                    continue
+                header_end = part.find(b"\\r\\n\\r\\n")
+                if header_end == -1:
+                    header_end = part.find(b"\r\n\r\n")
+                if header_end == -1:
+                    continue
+                headers_raw = part[:header_end].decode("utf-8", errors="replace")
+                file_data = part[header_end+4:]
+                if file_data.endswith(b"\\r\\n"):
+                    file_data = file_data[:-2]
+                elif file_data.endswith(b"\r\n"):
+                    file_data = file_data[:-2]
+                # Dateiname extrahieren
+                import re as _re
+                fn_match = _re.search(r'filename="([^"]+)"', headers_raw)
+                if not fn_match:
+                    continue
+                filename = fn_match.group(1)
+                # Temp-Datei schreiben
+                tmp = Path(tempfile.gettempdir()) / f"kira_dok_{filename}"
+                tmp.write_bytes(file_data)
+                # Pipeline
+                from dokument_pipeline import process_file
+                result = process_file(tmp, quelle="upload")
+                results.append(result)
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+            self._json({"ok": True, "results": results})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_save(self, body):
+        """POST /api/dokumente/save — Dokument erstellen oder aktualisieren"""
+        try:
+            from dokument_storage import create_dokument, update_dokument, _ensure_tables
+            _ensure_tables()
+            dok_id = body.get("id")
+            if dok_id:
+                update_dokument(dok_id, **{k: v for k, v in body.items() if k != "id"})
+                self._json({"ok": True, "id": dok_id})
+            else:
+                new_id = create_dokument(
+                    titel=body.get("titel", "Unbenannt"),
+                    dateiname=body.get("dateiname", ""),
+                    dateityp=body.get("dateityp", "html"),
+                    quelle=body.get("quelle", "studio"),
+                    kategorie=body.get("kategorie", ""),
+                    status=body.get("status", "entwurf"),
+                    erstellt_von=body.get("erstellt_von", "user"),
+                )
+                self._json({"ok": True, "id": new_id})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_delete(self, body):
+        """POST /api/dokumente/delete"""
+        try:
+            from dokument_storage import delete_dokument, _ensure_tables
+            _ensure_tables()
+            dok_id = body.get("id")
+            if not dok_id:
+                self._json({"ok": False, "error": "ID fehlt"})
+                return
+            delete_dokument(dok_id, soft=True)
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_vorlage_save(self, body):
+        """POST /api/dokumente/vorlagen/save"""
+        try:
+            from dokument_storage import save_vorlage, _ensure_tables
+            _ensure_tables()
+            vid = save_vorlage(body)
+            self._json({"ok": True, "id": vid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_vorlage_delete(self, body):
+        """POST /api/dokumente/vorlagen/delete"""
+        try:
+            from dokument_storage import delete_vorlage, _ensure_tables
+            _ensure_tables()
+            delete_vorlage(body.get("id"))
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_briefkopf_save(self, body):
+        """POST /api/dokumente/briefkoepfe/save"""
+        try:
+            from dokument_storage import save_briefkopf, _ensure_tables
+            _ensure_tables()
+            bid = save_briefkopf(body)
+            self._json({"ok": True, "id": bid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_export_pdf(self, body):
+        """POST /api/dokumente/export/pdf — erzeugt PDF aus HTML"""
+        try:
+            from dokument_pipeline import export_pdf
+            from dokument_storage import list_briefkoepfe, _ensure_tables
+            _ensure_tables()
+            html = body.get("html", "")
+            briefkopf_id = body.get("briefkopf_id")
+            briefkopf = None
+            if briefkopf_id:
+                bks = list_briefkoepfe()
+                briefkopf = next((b for b in bks if b["id"] == briefkopf_id), None)
+            pdf_bytes = export_pdf(html, briefkopf)
+            titel = body.get("titel", "dokument")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Length", str(len(pdf_bytes)))
+            self.send_header("Content-Disposition", f'attachment; filename="{titel}.pdf"')
+            self.end_headers()
+            self.wfile.write(pdf_bytes)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_export_docx(self, body):
+        """POST /api/dokumente/export/docx — erzeugt DOCX aus HTML"""
+        try:
+            from dokument_pipeline import export_docx_from_html
+            from dokument_storage import list_briefkoepfe, _ensure_tables
+            _ensure_tables()
+            html = body.get("html", "")
+            briefkopf_id = body.get("briefkopf_id")
+            briefkopf = None
+            if briefkopf_id:
+                bks = list_briefkoepfe()
+                briefkopf = next((b for b in bks if b["id"] == briefkopf_id), None)
+            docx_bytes = export_docx_from_html(html, briefkopf)
+            titel = body.get("titel", "dokument")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            self.send_header("Content-Length", str(len(docx_bytes)))
+            self.send_header("Content-Disposition", f'attachment; filename="{titel}.docx"')
+            self.end_headers()
+            self.wfile.write(docx_bytes)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_classify(self, body):
+        """POST /api/dokumente/classify — Nachklassifizierung"""
+        try:
+            from dokument_storage import get_dokument, update_dokument, _ensure_tables
+            from dokument_pipeline import classify_dokument, route_dokument
+            _ensure_tables()
+            dok_id = body.get("id")
+            doc = get_dokument(dok_id)
+            if not doc:
+                self._json({"ok": False, "error": "Nicht gefunden"})
+                return
+            klass = classify_dokument(doc.get("ocr_text", ""), doc["dateiname"], doc["dateityp"])
+            routing = route_dokument(klass)
+            update_dokument(dok_id,
+                           kategorie=klass.get("kategorie", ""),
+                           dokumentrolle=klass.get("dokumentrolle", ""),
+                           klassifizierung=klass,
+                           erfordert_handlung=klass.get("erfordert_handlung", False),
+                           routing_ziel=routing["routing_ziel"],
+                           zielmodul=routing["zielmodul"],
+                           konfidenz=klass.get("konfidenz", 0))
+            self._json({"ok": True, "klassifizierung": klass, "routing": routing})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_dokument_assign(self, body):
+        """POST /api/dokumente/assign — Vorgang zuordnen"""
+        try:
+            from dokument_storage import update_dokument, _ensure_tables
+            _ensure_tables()
+            dok_id = body.get("id")
+            vorgang_id = body.get("vorgang_id")
+            update_dokument(dok_id, vorgang_id=vorgang_id, status="zugeordnet")
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
 
     def _api_capture_get(self):
         """GET /api/capture/* — Dispatcht Capture-Lese-Endpunkte."""

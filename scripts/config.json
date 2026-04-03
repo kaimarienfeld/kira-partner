@@ -290,6 +290,25 @@
     "pfad": "",
     "keep_n": 7
   },
+  "dokumente": {
+    "aktiv": true,
+    "_erklaerung": "Zentrales Dokumente-Modul: Eingang, Studio, Vorlagen, Export, Archiv",
+    "ueberwachter_ordner": "",
+    "unterordner_ueberwachen": true,
+    "ablage_pfad": "",
+    "dateitypen": [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png", ".tiff", ".txt", ".csv", ".xlsx"],
+    "ocr_aktiv": true,
+    "ocr_sprache": "deu+eng",
+    "auto_klassifizierung": true,
+    "auto_zuordnung": false,
+    "konfidenz_schwelle": 0.75,
+    "dubletten_erkennung": true,
+    "ordner_struktur": "jahr_kunde",
+    "kira_darf_erstellen": true,
+    "kira_darf_zuordnen": true,
+    "max_upload_mb": 25,
+    "feature_status": "freigeschaltet"
+  },
   "capture": {
     "active": true,
     "auto_analyse": true,
