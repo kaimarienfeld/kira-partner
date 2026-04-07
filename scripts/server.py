@@ -1699,8 +1699,29 @@ def build_kommunikation(tasks):
         conv_badge = f'<span class="km-tg km-tg-conv" title="{conv_cnt} Mails in Konversation">{conv_cnt} Mails</span>' if conv_cnt > 1 else ""
         meta_str  = (rolle + (" &middot; " + email[:30] if email else "")) if (rolle or email) else ""
 
-        kenntnis_btn = f'<button class="wi-quick-btn wi-btn-k" onclick="setStatusLernen({tid},\'zur_kenntnis\',\'{js_esc(kat)}\');event.stopPropagation()" title="Zur Kenntnis nehmen">&#x2714; Zur Kenntnis</button>'
-        check_html   = f'<label class="wi-check" title="Auswählen" onclick="event.stopPropagation()"><input type="checkbox" onchange="toggleSelect({tid},this)"></label>'
+        # ── Action-Buttons basierend auf Kategorie ──────────────────────────
+        _stop = "event.stopPropagation()"
+        btn_erledigt = f'<button class="wi-quick-btn wi-btn-done" onclick="setStatusLernen({tid},\'erledigt\',\'{js_esc(kat)}\');{_stop}" title="Erledigt">&#x2714; Erledigt</button>'
+        btn_kenntnis = f'<button class="wi-quick-btn wi-btn-k" onclick="setStatusLernen({tid},\'zur_kenntnis\',\'{js_esc(kat)}\');{_stop}" title="Zur Kenntnis">Zur Kenntnis</button>'
+        btn_kira     = f'<button class="wi-quick-btn wi-btn-kira" onclick="openKira({tid});{_stop}" title="Mit Kira besprechen">&#x1F4AC; Kira fragen</button>'
+        btn_spaeter  = f'<button class="wi-quick-btn wi-btn-later" onclick="openSpaeterDialog({tid});{_stop}" title="Später">&#x23F0; Später</button>'
+        btn_ignore   = f'<button class="wi-quick-btn wi-btn-ign" onclick="setStatusLernen({tid},\'ignorieren\',\'{js_esc(kat)}\');{_stop}" title="Ignorieren">Ignorieren</button>'
+
+        if kat in ("Antwort erforderlich", "Neue Lead-Anfrage"):
+            action_btns = f"{btn_kira}{btn_erledigt}{btn_spaeter}{btn_ignore}"
+        elif kat in ("Angebotsrueckmeldung", "Angebotsrückmeldung"):
+            action_btns = f"{btn_kira}{btn_erledigt}{btn_kenntnis}"
+        elif kat in ("Zur Kenntnis", "Rechnung / Beleg", "Shop / System"):
+            action_btns = f"{btn_kenntnis}{btn_erledigt}"
+        else:
+            action_btns = f"{btn_erledigt}{btn_kenntnis}{btn_ignore}"
+
+        # Bei antwort_noetig: Kira-Button immer vorne
+        if antwort and kat not in ("Antwort erforderlich", "Neue Lead-Anfrage",
+                                    "Angebotsrueckmeldung", "Angebotsrückmeldung"):
+            action_btns = f"{btn_kira}{action_btns}"
+
+        check_html = f'<label class="wi-check" title="Auswählen" onclick="event.stopPropagation()"><input type="checkbox" onchange="toggleSelect({tid},this)"></label>'
 
         return f"""<div class="wi" id="task-{tid}"
   data-tid="{tid}" data-kat="{js_esc(kat)}" data-prio="{prio}"
@@ -1721,7 +1742,7 @@ def build_kommunikation(tasks):
     {"<div class='wi-sum'>" + summ + "</div>" if summ else ""}
     {"<div class='wi-empfehlung'>&#x279C; " + empf + "</div>" if empf else ""}
     {"<div class='wi-grund'>" + grund + "</div>" if grund else ""}
-    <div class="wi-acts">{kenntnis_btn}</div>
+    <div class="wi-acts">{action_btns}</div>
   </div>
 </div>"""
 
@@ -21890,6 +21911,22 @@ tr.lx-selected{background:rgba(99,102,241,.08) !important}
 .wi-quick-btn{font-size:var(--fs-xs);padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;transition:all .15s;font-weight:600;}
 .wi-btn-k{background:var(--accent-bg);border:1px solid var(--accent-border);color:var(--accent);}
 .wi-btn-k:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.wi-btn-done{background:#e8f5e9;border:1px solid #81c784;color:#2e7d32;}
+.wi-btn-done:hover{background:#2e7d32;color:#fff;border-color:#2e7d32;}
+.wi-btn-kira{background:#ede7f6;border:1px solid #9575cd;color:#5e35b1;}
+.wi-btn-kira:hover{background:#5e35b1;color:#fff;border-color:#5e35b1;}
+.wi-btn-later{background:#fff3e0;border:1px solid #ffb74d;color:#e65100;}
+.wi-btn-later:hover{background:#e65100;color:#fff;border-color:#e65100;}
+.wi-btn-ign{background:#fafafa;border:1px solid #bdbdbd;color:#757575;}
+.wi-btn-ign:hover{background:#757575;color:#fff;border-color:#757575;}
+[data-theme='dark'] .wi-btn-done{background:#1b3a1b;border-color:#4a7c4a;color:#81c784;}
+[data-theme='dark'] .wi-btn-done:hover{background:#4a7c4a;color:#fff;}
+[data-theme='dark'] .wi-btn-kira{background:#2a1f3a;border-color:#7e57c2;color:#b39ddb;}
+[data-theme='dark'] .wi-btn-kira:hover{background:#7e57c2;color:#fff;}
+[data-theme='dark'] .wi-btn-later{background:#3a2a1a;border-color:#bf7830;color:#ffb74d;}
+[data-theme='dark'] .wi-btn-later:hover{background:#bf7830;color:#fff;}
+[data-theme='dark'] .wi-btn-ign{background:#2a2a2a;border-color:#555;color:#999;}
+[data-theme='dark'] .wi-btn-ign:hover{background:#555;color:#fff;}
 /* Tags (km-) */
 .km-tg{font-size:9px;padding:2px 7px;border-radius:4px;white-space:nowrap;}
 .km-tg-red{background:rgba(220,74,74,.12);color:#d06060;}
