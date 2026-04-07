@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ffff-bereinigung",
-  "date": "2026-04-08 00:15",
+  "last_session": "session-ffff-anhang-extraktion",
+  "date": "2026-04-08 01:30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -282,7 +282,7 @@
     "session-vvv-cont: Lexware-Kontext in LLM-Klassifizierung eingebaut (_get_lexware_kontext() in llm_classifier.py). Commit bdc4552.",
     "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren."
   ],
-  "next_step": "Feed-Widgets KOMPLETT (alle 5 Phasen + Bugfix). Commits: e3d0efc (Phasen 1-5) + f1407e0 (Race-Condition-Fix). Wetter+News+Newsletter live im Dashboard. Kais Feedback abwarten, ggf. Feinschliff (z.B. mehr RSS-Feeds, Design-Tuning).",
+  "next_step": "Anhang-Text-Extraktion implementiert (fc74427). Nächste Schritte: (1) Nachklassifizierung mit Anhängen nochmal laufen lassen — bestehende Mails profitieren jetzt von Anhang-Kontext. (2) Kundenmonitor als eigenes großes Projekt planen. (3) Kai nach RE-SB240038 Status, Tasks #10/#50 Relevanz fragen.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-dddd",
+  "_updated": "session-ffff",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -1002,6 +1002,25 @@
       "session": "session-ffff",
       "last_updated": "2026-04-07",
       "description": "Geplant: Verständliche Dokumentation der Klassifizierungspipeline, Lernsystem, Routing und Entscheidungslogik."
+    },
+    {
+      "id": "anhang-extraktion",
+      "name": "Anhang-Text-Extraktion bei Klassifizierung",
+      "icon": "📎",
+      "leni_name": "Anhang-Analyse — KI liest PDFs, Bilder und Dokumente",
+      "leni_desc": "KIRA liest jetzt den Inhalt von Mail-Anhängen (PDF, Word, ZIP, Bilder) bevor sie eine Mail einsortiert. Sogar Fotos werden per OCR gelesen oder direkt der KI gezeigt.",
+      "leni_visible": true,
+      "status": "done",
+      "session": "session-ffff",
+      "module": "llm_classifier",
+      "files": [
+        "scripts/llm_classifier.py",
+        "scripts/kira_llm.py",
+        "scripts/daily_check.py",
+        "scripts/mail_monitor.py",
+        "scripts/server.py",
+        "scripts/config.json"
+      ]
     }
   ],
   "_total": 77
