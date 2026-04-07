@@ -591,6 +591,9 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ⬜ | Feed-Widgets Design-Tuning | Kais Live-Feedback auswerten: Karussell-Optik, Bildgrößen, Animationen, Farben anpassen |
 | ⬜ | Weitere RSS-Feeds | Mehr Feed-Quellen hinzufügen (Business, Branche, regional) |
 | ⬜ | Newsletter-Digest Qualität | LLM-Prompt verbessern: bessere Zusammenfassungen, relevantere Highlights, deutsche Ausgabe |
+| ✅ | KIRA Komplett-Reparatur (6 Phasen) · 2026-04-07 23:30 | session-ffff: Daten-Cleanup + UI-Buttons + Thread-Zuweisung + Auto-Cleanup + Lernsystem-Fix + Relevanz-Auswahl + Konsolidierung |
+| ⬜ | "Wie KIRA funktioniert" Dokumentation | Verständliche Erklärung der Klassifizierungspipeline, Lernsystem, Routing — geplant als Feature |
+| ⬜ | Kais weitere Urlaubs-Probleme | Kai wollte morgen noch mehr Schmerzen erzählen — nachfragen |
 
 ---
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-dddd · 2026-04-03_
+_Erstellt: session-r · 2026-03-27 · Zuletzt: session-ffff · 2026-04-07_

@@ -87,3 +87,49 @@
 ### 2026-04-03 13:38 — To-Do: Feed-Widget Design-Tuning auf nächste Woche
 **Was:** 3 Aufgaben (Design-Tuning, weitere RSS-Feeds, Newsletter-Digest Qualität) in Todo_checkliste.md Sektion "NÄCHSTE WOCHE (ab 2026-04-07)" eingetragen
 **Status:** erledigt
+
+---
+## 2026-04-07 22:00 — Session-Start (session-ffff-kira-reparatur)
+**Auftrag:** KIRA Komplett-Reparatur nach Kai's Urlaub — 6 Phasen Nacht-Plan. Alle 26 offenen Tasks zeigten nur "Zur Kenntnis" Button. Keine Konversations-Verknüpfung. "Schon beantwortet" greift nicht. Lernsystem hat Bugs (auto_gelernt ignoriert, harte Limits).
+**Status:** erledigt (6/6 Phasen)
+
+### 2026-04-07 22:15 — Phase 0: Daten-Cleanup
+**Was:** Python-Script: 7 Tasks als beantwortet markiert (gesendete Mail nach Eingang), 8 Tasks älter 60 Tage erledigt, 5 Thread-IDs nachträglich gesetzt
+**Commit:** c15eef6
+**Status:** erledigt
+
+### 2026-04-07 22:30 — Phase 1: UI-Buttons
+**Was:** _wi_item() in server.py:1702-1724 — kategorie-basierte Buttons (Kira fragen/Erledigt/Später/Ignorieren/Zur Kenntnis) statt nur kenntnis_btn. CSS für .wi-btn-done/.wi-btn-kira/.wi-btn-later/.wi-btn-ign + Dark-Mode
+**Commit:** c15eef6
+**Status:** erledigt
+
+### 2026-04-07 22:45 — Phase 4: Lernsystem Sofort-Fixes
+**Was:** llm_classifier.py: auto_gelernt+stil zu SQL-Filter hinzugefügt (waren komplett ignoriert!), Limits 10→50/12→30, Snippet 120→200 Zeichen
+**Commit:** f675be5
+**Status:** erledigt
+
+### 2026-04-07 23:00 — Phase 2: Thread-Zuweisung
+**Was:** daily_check.py:445-457 — 60-Tage-Fenster statt 30, Betreff-Normalisierung als Fallback (_norm_betreff_dc)
+**Commit:** 902024d
+**Status:** erledigt
+
+### 2026-04-07 23:10 — Phase 3: Auto-Cleanup
+**Was:** _cleanup_answered_tasks() in server.py beim Server-Start + POST /api/tasks/cleanup Endpoint für manuellen Trigger
+**Commit:** 546fd99
+**Status:** erledigt
+
+### 2026-04-07 23:15 — Phase 5: Relevanz-basierte Auswahl
+**Was:** Neue Funktionen _get_kira_wissen_relevant() und _get_correction_beispiele_relevant() in llm_classifier.py. Scoring: Keyword-Overlap 35%, Domain-Match 25%, Absender 15%, Aktualität 10%, Kategorie-Bonus 15%. ALLE Regeln geladen (kein Limit), nach Relevanz sortiert, Zeichenbudget 12k/6k
+**Commit:** 546fd99
+**Status:** erledigt
+
+### 2026-04-07 23:25 — Phase 6: Korrektur-Konsolidierung
+**Was:** Schema-Migration (_ensure_correction_columns): konsolidiert_am in corrections, gewicht+quell_anzahl in wissen_regeln. _consolidate_corrections() in daily_check.py (>=3 gleiche → permanente Regel). Sofort-Konsolidierung im Korrektur-Endpoint (server.py)
+**Commit:** 81ef2cd
+**Status:** erledigt
+
+---
+## 2026-04-07 23:30 — Session-Ende (session-ffff-kira-reparatur)
+**Erledigt:** KIRA Komplett-Reparatur ALLE 6 Phasen. Daten-Cleanup, UI-Buttons, Thread-Zuweisung, Auto-Cleanup, Lernsystem-Fixes, Relevanz-Auswahl, Konsolidierung.
+**Offen geblieben:** Kai möchte morgen weitere Urlaubs-Probleme erzählen. "Wie KIRA funktioniert" Doku als neues Feature geplant.
+**Status:** erledigt (6/6 Phasen)

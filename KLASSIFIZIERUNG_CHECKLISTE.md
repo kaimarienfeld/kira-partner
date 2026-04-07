@@ -1,7 +1,7 @@
 # KIRA Mail-Klassifizierung — Master-Checkliste
 
 > Arbeitsliste fuer das Klassifizierungs-Reparatur-Projekt
-> Erstellt: 2026-04-02 · Letzte Aktualisierung: 2026-04-03
+> Erstellt: 2026-04-02 · Letzte Aktualisierung: 2026-04-07
 
 ---
 
@@ -73,7 +73,7 @@
 | E3 | **Dashboard News-Kachel** | ⚠️ Offen | — | Relevante Newsletter, Branchennews, abonnierte Inhalte |
 | E4 | Daumen hoch/runter Feedback-Buttons | ⚠️ Offen | — | Pro News-Karte, speichert in corrections-Tabelle |
 | E5 | Mini-Prompt bei "Daumen runter" | ⚠️ Offen | — | "Was stimmt nicht?" → Kira lernt daraus |
-| E6 | Few-Shot-Beispiele aus Corrections in Klassifizierung | ⚠️ Offen | — | Bisherige 12 Korrekturen + neue Bewertungen |
+| E6 | Few-Shot-Beispiele aus Corrections in Klassifizierung | ✅ Erledigt (session-ffff) | 546fd99 | Relevanz-basierte Auswahl: ALLE Korrekturen nach Score, kein Limit |
 
 ---
 
@@ -159,3 +159,10 @@
 | 2026-04-02 | session-vvv | Lexware-Kontext in LLM-Klassifizierung (bdc4552) |
 | 2026-04-02 | session-www | qualify_mails() + Einstellungen-UI + API-Endpoints (cbf5401) |
 | 2026-04-02 | session-www | Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren |
+| 2026-04-07 | session-ffff | Phase 0: Daten-Cleanup (7 beantwortet, 8 zu alt, 5 Thread-IDs) |
+| 2026-04-07 | session-ffff | Phase 1: UI-Buttons kategorie-basiert (ISS-032 fix) |
+| 2026-04-07 | session-ffff | Phase 4: auto_gelernt Bug gefixt, Limits aufgehoben (ISS-033 fix) |
+| 2026-04-07 | session-ffff | Phase 2: Thread-Zuweisung 60d + Betreff-Fallback (ISS-034 fix) |
+| 2026-04-07 | session-ffff | Phase 3: Auto-Cleanup Server-Start + API-Endpoint |
+| 2026-04-07 | session-ffff | Phase 5: Relevanz-basierte Wissens+Korrektur-Auswahl (E6 erledigt) |
+| 2026-04-07 | session-ffff | Phase 6: Korrektur-Konsolidierung (Schema + daily_check + inline) |

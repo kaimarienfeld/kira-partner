@@ -1,5 +1,5 @@
 {
-  "_updated": "2026-04-02 20:15 session-aaaa — Sticky-Fix + Umlaute Runde 2",
+  "_updated": "2026-04-07 23:30 session-ffff — KIRA Komplett-Reparatur 6 Phasen",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
@@ -437,6 +437,45 @@
       "fixed": "2026-04-02 18:00 MEZ",
       "session": "session-aaaa",
       "fix_summary": "Alle ~30 UI-Labels auf echte Umlaute korrigiert. Regel in CLAUDE.md und Memory gespeichert."
+    },
+    {
+      "id": "ISS-032",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/server.py",
+      "area": "ui, kommunikation",
+      "title": "Nur 'Zur Kenntnis' Button bei allen Tasks",
+      "description": "_wi_item() generierte nur kenntnis_btn — egal welche Kategorie. Echte Aktionen (Kira fragen, Erledigt, Später, Ignorieren) fehlten komplett.",
+      "discovered": "2026-04-07 22:00 MEZ",
+      "fixed": "2026-04-07 22:30 MEZ",
+      "session": "session-ffff",
+      "fix_summary": "Kategorie-basierte Button-Zusammenstellung in _wi_item(): Antwort/Lead → Kira+Erledigt+Später+Ignorieren, Angebot → Kira+Erledigt+Kenntnis, Kenntnis/Rechnung → Kenntnis+Erledigt, etc."
+    },
+    {
+      "id": "ISS-033",
+      "status": "fixed",
+      "priority": "high",
+      "module": "scripts/llm_classifier.py",
+      "area": "klassifizierung, lernsystem",
+      "title": "auto_gelernt Regeln komplett ignoriert",
+      "description": "SQL-Filter in _get_kira_wissen() schloss 'auto_gelernt' und 'stil' Kategorien aus — alle automatisch aus Kira-Chats extrahierten Lernregeln waren write-only.",
+      "discovered": "2026-04-07 22:00 MEZ",
+      "fixed": "2026-04-07 22:45 MEZ",
+      "session": "session-ffff",
+      "fix_summary": "Kategorien 'auto_gelernt' und 'stil' zum SQL-IN-Filter hinzugefügt. Limits von 10→50 / 12→30 erhöht. Neue relevanzbasierte Auswahl ohne Limits."
+    },
+    {
+      "id": "ISS-034",
+      "status": "fixed",
+      "priority": "medium",
+      "module": "scripts/daily_check.py",
+      "area": "klassifizierung, threads",
+      "title": "Thread-Zuweisung nur 30-Tage-Fenster, kein Betreff-Fallback",
+      "description": "Thread-ID-Suche hatte nur 30-Tage cutoff und nur per kunden_email — längere Konversationen und gleiche Betreffs wurden nicht verknüpft.",
+      "discovered": "2026-04-07 22:00 MEZ",
+      "fixed": "2026-04-07 23:00 MEZ",
+      "session": "session-ffff",
+      "fix_summary": "Cutoff auf 60 Tage erweitert. _norm_betreff_dc() als Fallback für Subject-basierte Thread-Suche."
     }
   ]
 }

@@ -911,7 +911,63 @@
       "session": "session-eeee",
       "last_updated": "2026-04-03",
       "description": "Vollständiges Dokumenten-Modul: dokument_storage.py (DB-CRUD, Vorlagen, Briefköpfe, Hash-Dedup), dokument_pipeline.py (OCR, LLM-Klassifizierung, Routing, Folder-Watcher, PDF/DOCX-Export), 3 Kira-Tools, Sidebar+Panel+Studio-Overlay+Preview, 20 API-Endpoints, Einstellungen-Sektion, config.json dokumente-Sektion."
+    },
+    {
+      "id": "kira-relevanz-wissen",
+      "name": "Relevanz-basierte Wissensauswahl",
+      "icon": "🧠",
+      "leni_name": "Kira lernt intelligent",
+      "leni_desc": "Kira nutzt jetzt ALLE gelernten Regeln und Korrekturen — nicht mehr nur die neuesten 12. Bei jeder Mail wählt sie die relevantesten Erkenntnisse aus, basierend auf Absender, Betreff-Ähnlichkeit und Aktualität.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "llm_classifier.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-07",
+      "description": "_get_kira_wissen_relevant() + _get_correction_beispiele_relevant() mit Scoring (Keyword 35%, Domain 25%, Absender 15%, Aktualität 10%, Kategorie 15%). Alle Regeln geladen, nach Relevanz sortiert, Zeichenbudget 12k/6k."
+    },
+    {
+      "id": "korrektur-konsolidierung",
+      "name": "Automatische Korrektur-Konsolidierung",
+      "icon": "🔄",
+      "leni_name": "Kira lernt aus Wiederholungen",
+      "leni_desc": "Wenn du dreimal die gleiche Korrektur machst, erstellt Kira daraus automatisch eine permanente Regel. So musst du den gleichen Fehler nicht immer wieder korrigieren.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "daily_check.py + server.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-07",
+      "description": "Schema: konsolidiert_am/gewicht/quell_anzahl. _consolidate_corrections() in daily_check.py (>=3 gleiche → permanente Regel). Sofort-Konsolidierung im Korrektur-Endpoint."
+    },
+    {
+      "id": "task-auto-cleanup",
+      "name": "Automatischer Task-Cleanup",
+      "icon": "🧹",
+      "leni_name": "Aufgaben automatisch aufräumen",
+      "leni_desc": "Aufgaben für bereits beantwortete Mails werden automatisch als erledigt markiert — beim Serverstart und auf Knopfdruck.",
+      "leni_visible": false,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-07",
+      "description": "_cleanup_answered_tasks() beim Server-Start + POST /api/tasks/cleanup manueller Endpoint."
+    },
+    {
+      "id": "kira-doku",
+      "name": "Wie KIRA funktioniert — Dokumentation",
+      "icon": "📖",
+      "leni_name": "Wie Kira funktioniert",
+      "leni_desc": "Eine verständliche Erklärung, wie Kira Mails klassifiziert, lernt und Entscheidungen trifft — damit du nachvollziehen kannst, warum Kira was macht.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "docs",
+      "status": "planned",
+      "session": "session-ffff",
+      "last_updated": "2026-04-07",
+      "description": "Geplant: Verständliche Dokumentation der Klassifizierungspipeline, Lernsystem, Routing und Entscheidungslogik."
     }
   ],
-  "_total": 69
+  "_total": 73
 }
