@@ -955,6 +955,41 @@
       "description": "_cleanup_answered_tasks() beim Server-Start + POST /api/tasks/cleanup manueller Endpoint."
     },
     {
+      "id": "entwurf-ablauf-logik",
+      "name": "Automatischer Entwurf-Ablauf",
+      "icon": "⏰",
+      "leni_visible": false,
+      "module": "server.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-08",
+      "description": "_expire_stale_drafts() beim Server-Start: pending Entwürfe mit abgelaufenem ablauf_am oder älter 7 Tage werden automatisch als abgelaufen markiert."
+    },
+    {
+      "id": "reclassify-low-confidence",
+      "name": "Nachklassifizierung regelbasierter Mails",
+      "icon": "🔄",
+      "leni_name": "Mails nachklassifizieren",
+      "leni_desc": "Mails die nur per Regeln klassifiziert wurden, werden nochmal per KI nachklassifiziert — für bessere Erkennung.",
+      "leni_visible": false,
+      "module": "daily_check.py + server.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-08",
+      "description": "reclassify_low_confidence() in daily_check.py: klassifiziert Mails mit konfidenz=0/NULL per LLM nach. POST /api/mail/reclassify + GET status. Pause-Logik bei LLM-Ausfall."
+    },
+    {
+      "id": "llm-ausfall-schutz",
+      "name": "LLM-Ausfall-Schutz im Mail-Monitor",
+      "icon": "🛡️",
+      "leni_visible": false,
+      "module": "mail_monitor.py",
+      "status": "done",
+      "session": "session-ffff",
+      "last_updated": "2026-04-08",
+      "description": "Bei _all_providers_failed wird Mail nur indexiert, kein regelbasierter Task erstellt. Verhindert falsche Klassifizierung bei LLM-Budget=0."
+    },
+    {
       "id": "kira-doku",
       "name": "Wie KIRA funktioniert — Dokumentation",
       "icon": "📖",
@@ -969,5 +1004,5 @@
       "description": "Geplant: Verständliche Dokumentation der Klassifizierungspipeline, Lernsystem, Routing und Entscheidungslogik."
     }
   ],
-  "_total": 73
+  "_total": 77
 }

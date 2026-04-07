@@ -129,7 +129,29 @@
 **Status:** erledigt
 
 ---
-## 2026-04-07 23:30 — Session-Ende (session-ffff-kira-reparatur)
-**Erledigt:** KIRA Komplett-Reparatur ALLE 6 Phasen. Daten-Cleanup, UI-Buttons, Thread-Zuweisung, Auto-Cleanup, Lernsystem-Fixes, Relevanz-Auswahl, Konsolidierung.
-**Offen geblieben:** Kai möchte morgen weitere Urlaubs-Probleme erzählen. "Wie KIRA funktioniert" Doku als neues Feature geplant.
+## 2026-04-07 23:30 — Session-Ende (session-ffff-kira-reparatur, Teil 1)
+**Erledigt:** KIRA Komplett-Reparatur ALLE 6 Phasen.
 **Status:** erledigt (6/6 Phasen)
+
+---
+## 2026-04-07 23:45 — Session-Fortsetzung (session-ffff Teil 2: Bereinigung + Nachklassifizierung)
+**Auftrag:** App komplett sauber machen — alle veralteten Tasks/Entwürfe/Angebote/Vorgänge bereinigen. 945 Mails (544 unklassifiziert + 401 regelbasiert) per LLM nachklassifizieren. mail_monitor bei LLM-Ausfall absichern.
+**Status:** läuft (Nachklassifizierung im Hintergrund)
+
+### 2026-04-08 00:00 — Phase A: Daten-Cleanup
+**Was:** 8 Tasks erledigt (3 bleiben offen: #10, #50, #237), 14 Kira-Entwürfe abgelaufen, 16 alte Angebote archiviert, 16+2 Vorgänge abgeschlossen, RE-SB240038 bezahlt
+**Status:** erledigt
+
+### 2026-04-08 00:05 — Phase B: Server-Start Ablauf-Logik
+**Was:** _expire_stale_drafts() — 7-Tage-Ablauf für pending Entwürfe beim Server-Start. ablauf_am in Kira-Vorschlag (daily_check.py)
+**Status:** erledigt
+
+### 2026-04-08 00:10 — Phase C: Nachklassifizierung
+**Was:** reclassify_low_confidence() in daily_check.py (Pause-Logik wie qualify_mails). POST /api/mail/reclassify + GET /api/mail/reclassify/status in server.py. Nachtlauf gestartet für 945 Mails.
+**Commit:** 155cdf5
+**Status:** läuft (Hintergrund)
+
+### 2026-04-08 00:15 — Phase D: mail_monitor LLM-Ausfall
+**Was:** _all_providers_failed Check in _process_mail() — Mail nur indexieren bei LLM-Budget=0, keinen regelbasierten Task erstellen
+**Commit:** f1e5e7f
+**Status:** erledigt

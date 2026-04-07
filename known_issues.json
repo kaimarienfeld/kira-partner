@@ -1,5 +1,5 @@
 {
-  "_updated": "2026-04-07 23:30 session-ffff — KIRA Komplett-Reparatur 6 Phasen",
+  "_updated": "2026-04-08 00:15 session-ffff — Bereinigung + Nachklassifizierung + LLM-Ausfall-Schutz",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
@@ -476,6 +476,19 @@
       "fixed": "2026-04-07 23:00 MEZ",
       "session": "session-ffff",
       "fix_summary": "Cutoff auf 60 Tage erweitert. _norm_betreff_dc() als Fallback für Subject-basierte Thread-Suche."
+    },
+    {
+      "id": "ISS-035",
+      "status": "fixed",
+      "priority": "high",
+      "module": "scripts/mail_monitor.py",
+      "area": "klassifizierung, mail",
+      "title": "LLM-Ausfall → regelbasierte Tasks mit falscher Klassifizierung",
+      "description": "Bei LLM-Budget=0 klassifizierte mail_monitor.py Mails regelbasiert (konfidenz=0) und erstellte trotzdem Tasks. 401 Mails mit falscher/fehlender Klassifizierung.",
+      "discovered": "2026-04-07 23:00 MEZ",
+      "fixed": "2026-04-08 00:15 MEZ",
+      "session": "session-ffff",
+      "fix_summary": "_all_providers_failed Check: Mail nur indexieren, keinen Task erstellen. reclassify_low_confidence() holt nach wenn Budget wieder da."
     }
   ]
 }
