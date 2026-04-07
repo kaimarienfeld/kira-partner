@@ -5,7 +5,7 @@ llm_classifier.py — LLM-gestützte Mail-Klassifizierung für rauMKult®.
 Strategie: Fast-Path (regelbasiert) → LLM → Fallback (regelbasiert).
 Drop-in-Replacement für mail_classifier.classify_mail().
 """
-import json, math, re, sqlite3
+import base64, json, math, re, sqlite3, tempfile, zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -51,7 +51,8 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
                                   angebote_kontext: str = "", correction_beispiele: str = "",
                                   kira_wissen: str = "", kunden_profil: str = "",
                                   mail_verlauf: str = "", anhaenge: list = None,
-                                  lexware_kontext: str = ""):
+                                  lexware_kontext: str = "",
+                                  anhang_texte: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:3000]
 
@@ -111,6 +112,7 @@ MAIL-DATEN:
 - Betreff: {betreff}
 - Ordner: {folder}
 - Anhaenge: {', '.join(str(a) for a in (anhaenge or [])) or 'Keine'}
+{anhang_texte}
 - Text (Auszug): {text_snippet}
 
 KATEGORIEN (wähle GENAU eine):
@@ -448,6 +450,262 @@ def _get_lexware_kontext(email: str) -> str:
         return ""
 
 
+# ── Anhang-Text-Extraktion für Klassifizierung ─────────────────────────────
+
+_BILD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"}
+_BILD_MEDIA_TYPES = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".tiff": "image/tiff", ".tif": "image/tiff", ".bmp": "image/bmp",
+    ".webp": "image/webp",
+}
+
+def _ensure_anhang_cache_table():
+    """Erstellt anhang_text_cache Tabelle in mail_index.db falls nicht vorhanden."""
+    try:
+        db = sqlite3.connect(str(MAIL_INDEX_DB))
+        db.execute("""CREATE TABLE IF NOT EXISTS anhang_text_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id TEXT NOT NULL,
+            dateiname TEXT NOT NULL,
+            extrahierter_text TEXT,
+            ist_bild_ohne_text INTEGER DEFAULT 0,
+            bild_base64 TEXT,
+            bild_media_type TEXT,
+            dateigroesse INTEGER,
+            extrahiert_am TEXT,
+            UNIQUE(message_id, dateiname)
+        )""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_atc_msgid ON anhang_text_cache(message_id)")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+_ensure_anhang_cache_table()
+
+
+def _load_anhang_config() -> dict:
+    """Lädt anhang_extraktion Config mit Defaults."""
+    try:
+        cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8"))
+        return cfg.get("anhang_extraktion", {})
+    except Exception:
+        return {}
+
+
+def _extract_attachment_texts(anhaenge: list, anhaenge_pfad: str,
+                               message_id: str = "") -> dict:
+    """
+    Extrahiert Text aus Mail-Anhängen für die LLM-Klassifizierung.
+    Nutzt dokument_pipeline.py für PDF/DOCX/OCR. Cached Ergebnisse in DB.
+    Bei Bildern ohne OCR-Text → base64-Bild für Vision-Fallback.
+
+    Returns: {"text_block": str, "vision_images": [...], "stats": {...}}
+    """
+    empty = {"text_block": "", "vision_images": [], "stats": {}}
+    cfg = _load_anhang_config()
+    if not cfg.get("aktiv", False):
+        return empty
+    if not anhaenge or not anhaenge_pfad:
+        return empty
+
+    att_dir = Path(anhaenge_pfad)
+    if not att_dir.exists():
+        return empty
+
+    # Lazy import — dokument_pipeline ist im gleichen scripts/ Ordner
+    try:
+        from dokument_pipeline import extract_text, extract_text_image, is_supported as dp_is_supported
+    except ImportError:
+        return empty
+
+    max_size = cfg.get("max_dateigroesse_mb", 20) * 1024 * 1024
+    max_per = cfg.get("max_text_zeichen_pro_anhang", 3000)
+    max_total = cfg.get("max_text_zeichen_gesamt", 8000)
+    vision_on = cfg.get("vision_fallback", True)
+    vision_max_kb = cfg.get("vision_max_bild_kb", 500) * 1024
+    zip_on = cfg.get("zip_entpacken", True)
+    zip_max_files = cfg.get("zip_max_dateien", 10)
+    zip_max_size = cfg.get("zip_max_groesse_mb", 50) * 1024 * 1024
+    ocr_on = cfg.get("ocr_aktiv", True)
+
+    text_parts = []
+    vision_images = []
+    stats = {"extracted": 0, "skipped": 0, "ocr_failed": 0, "vision": 0}
+    total_chars = 0
+
+    # DB-Verbindung für Cache
+    try:
+        cache_db = sqlite3.connect(str(MAIL_INDEX_DB))
+        cache_db.row_factory = sqlite3.Row
+    except Exception:
+        cache_db = None
+
+    for fname in anhaenge:
+        if total_chars >= max_total:
+            break
+        fname = str(fname).strip()
+        if not fname:
+            continue
+
+        fp = att_dir / fname
+        suffix = Path(fname).suffix.lower()
+
+        # ── Cache prüfen ──
+        cached = None
+        if cache_db and message_id:
+            try:
+                cached = cache_db.execute(
+                    "SELECT extrahierter_text, ist_bild_ohne_text, bild_base64, bild_media_type "
+                    "FROM anhang_text_cache WHERE message_id=? AND dateiname=?",
+                    (message_id, fname)
+                ).fetchone()
+            except Exception:
+                pass
+
+        if cached:
+            if cached["extrahierter_text"]:
+                txt = cached["extrahierter_text"][:max_per]
+                text_parts.append(f"\U0001F4CE {fname}:\n  {txt}")
+                total_chars += len(txt)
+                stats["extracted"] += 1
+            elif cached["ist_bild_ohne_text"] and vision_on and cached["bild_base64"]:
+                vision_images.append({
+                    "data": cached["bild_base64"],
+                    "media_type": cached["bild_media_type"] or "image/jpeg",
+                    "name": fname,
+                })
+                text_parts.append(f"\U0001F4CE {fname} (Bild \u2014 wird visuell analysiert)")
+                stats["vision"] += 1
+            continue
+
+        # ── Datei existiert? ──
+        if not fp.exists():
+            stats["skipped"] += 1
+            continue
+
+        # ── Dateigröße ──
+        try:
+            fsize = fp.stat().st_size
+        except Exception:
+            stats["skipped"] += 1
+            continue
+        if fsize > max_size:
+            text_parts.append(f"\U0001F4CE {fname} (\u00fcbersprungen \u2014 {fsize // 1024 // 1024} MB > {max_size // 1024 // 1024} MB)")
+            stats["skipped"] += 1
+            continue
+
+        extracted_text = ""
+        is_bild_ohne_text = False
+        bild_b64 = None
+        bild_mt = None
+
+        # ── ZIP ──
+        if suffix == ".zip" and zip_on:
+            try:
+                extracted_text = _extract_zip_contents(fp, zip_max_files, zip_max_size, max_per)
+            except Exception:
+                extracted_text = ""
+
+        # ── Bild ──
+        elif suffix in _BILD_EXTENSIONS:
+            if ocr_on:
+                try:
+                    extracted_text = extract_text_image(fp)
+                except Exception:
+                    extracted_text = ""
+
+            if not extracted_text.strip() and vision_on and fsize <= vision_max_kb:
+                # Kein Text per OCR → Vision-Fallback
+                try:
+                    raw = fp.read_bytes()
+                    bild_b64 = base64.b64encode(raw).decode("ascii")
+                    bild_mt = _BILD_MEDIA_TYPES.get(suffix, "image/jpeg")
+                    is_bild_ohne_text = True
+                except Exception:
+                    pass
+
+        # ── PDF / DOCX / TXT / CSV ──
+        elif dp_is_supported(fp):
+            try:
+                extracted_text = extract_text(fp)
+            except Exception:
+                extracted_text = ""
+
+        else:
+            stats["skipped"] += 1
+            continue
+
+        # ── Cache schreiben ──
+        if cache_db and message_id:
+            try:
+                cache_db.execute(
+                    "INSERT OR REPLACE INTO anhang_text_cache "
+                    "(message_id, dateiname, extrahierter_text, ist_bild_ohne_text, "
+                    "bild_base64, bild_media_type, dateigroesse, extrahiert_am) "
+                    "VALUES (?,?,?,?,?,?,?,?)",
+                    (message_id, fname,
+                     extracted_text[:50000] if extracted_text else None,
+                     1 if is_bild_ohne_text else 0,
+                     bild_b64, bild_mt, fsize,
+                     datetime.now().isoformat())
+                )
+                cache_db.commit()
+            except Exception:
+                pass
+
+        # ── Ergebnis sammeln ──
+        if extracted_text.strip():
+            txt = extracted_text.strip()[:max_per]
+            text_parts.append(f"\U0001F4CE {fname}:\n  {txt}")
+            total_chars += len(txt)
+            stats["extracted"] += 1
+        elif is_bild_ohne_text and bild_b64:
+            vision_images.append({"data": bild_b64, "media_type": bild_mt, "name": fname})
+            text_parts.append(f"\U0001F4CE {fname} (Bild \u2014 wird visuell analysiert)")
+            stats["vision"] += 1
+        else:
+            stats["ocr_failed"] += 1
+
+    if cache_db:
+        try:
+            cache_db.close()
+        except Exception:
+            pass
+
+    if not text_parts and not vision_images:
+        return empty
+
+    # Gesamt-Text kürzen
+    block = "ANHANG-INHALTE (extrahierter Text):\n" + "\n".join(text_parts)
+    if len(block) > max_total + 200:
+        block = block[:max_total + 200] + "\n[... gekürzt]"
+
+    return {"text_block": block, "vision_images": vision_images, "stats": stats}
+
+
+def _extract_zip_contents(zip_path: Path, max_files: int, max_size: int, max_per: int) -> str:
+    """Extrahiert Text aus Dateien innerhalb eines ZIP-Archivs."""
+    from dokument_pipeline import extract_text as dp_extract, is_supported as dp_ok
+    parts = []
+    with zipfile.ZipFile(str(zip_path), 'r') as zf:
+        total = sum(i.file_size for i in zf.infolist() if not i.is_dir())
+        if total > max_size:
+            return f"[ZIP zu gro\u00df: {total // 1024 // 1024} MB]"
+        inner = [i for i in zf.infolist() if not i.is_dir()][:max_files]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for info in inner:
+                try:
+                    extracted = Path(zf.extract(info, tmpdir))
+                    if dp_ok(extracted):
+                        txt = dp_extract(extracted)
+                        if txt.strip():
+                            parts.append(f"  [{info.filename}]: {txt.strip()[:max_per]}")
+                except Exception:
+                    continue
+    return "\n".join(parts)
+
+
 def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
     """
     Lädt die letzten Mails von/an diesen Absender aus mail_index.db.
@@ -721,7 +979,8 @@ def _get_correction_beispiele_relevant(absender: str, betreff: str, text: str,
 def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                       anhaenge: list = None, folder: str = "",
                       is_sent: bool = False, mail_datum: str = "",
-                      kanal: str = "email") -> dict:
+                      kanal: str = "email",
+                      anhaenge_pfad: str = "") -> dict:
     """
     kanal: "email" | "whatsapp" | "instagram" | "sms" | ...
     Alle Kanäle durchlaufen dieselbe LLM-Pipeline.
@@ -784,6 +1043,14 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw)
         lexware_kontext      = _get_lexware_kontext(kunden_email_raw)
 
+        # Anhang-Text-Extraktion (PDF/DOCX/ZIP/OCR + Vision-Fallback)
+        anhang_result = _extract_attachment_texts(
+            anhaenge=anhaenge or [], anhaenge_pfad=anhaenge_pfad,
+            message_id=mail_datum,
+        )
+        anhang_texte = anhang_result.get("text_block", "")
+        vision_images = anhang_result.get("vision_images", [])
+
         prompt = _build_classification_prompt(
             konto, absender, betreff, text, folder, is_sent,
             angebote_kontext=angebote_kontext,
@@ -793,10 +1060,11 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             mail_verlauf=mail_verlauf,
             lexware_kontext=lexware_kontext,
             anhaenge=anhaenge,
+            anhang_texte=anhang_texte,
         )
 
-        # Klassifizierungs-Aufruf (Haiku, 768 max_tokens)
-        result = classify_direct(prompt, max_tokens=768)
+        # Klassifizierungs-Aufruf (Haiku, 768 max_tokens) — mit Vision wenn Bilder vorhanden
+        result = classify_direct(prompt, max_tokens=768, vision_images=vision_images or None)
 
         if result.get("error"):
             if result.get("all_providers_failed"):
@@ -870,7 +1138,9 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
 def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   anhaenge: list = None, folder: str = "",
                   is_sent: bool = False, mail_datum: str = "",
-                  kanal: str = "email") -> dict:
+                  kanal: str = "email",
+                  anhaenge_pfad: str = "") -> dict:
     """Alias — Drop-in-Replacement, bereit für Multi-Kanal (kanal='whatsapp' etc.)."""
     return classify_mail_llm(konto, absender, betreff, text, anhaenge, folder,
-                             is_sent, mail_datum=mail_datum, kanal=kanal)
+                             is_sent, mail_datum=mail_datum, kanal=kanal,
+                             anhaenge_pfad=anhaenge_pfad)

@@ -6111,6 +6111,7 @@ def build_einstellungen():
     _nf_d_max = _nf_digest.get("max_items", 5)
     rtlog_cfg = config.get("runtime_log", {})
     _dok_cfg  = config.get("dokumente", {})
+    anh_cfg   = config.get("anhang_extraktion", {})
     kira_cfg  = config.get("kira", {})
     launcher_variant = kira_cfg.get("launcher_variant", "B")
     kira_size        = kira_cfg.get("size", 112)
@@ -8153,6 +8154,33 @@ setTimeout(esRenderRssFeeds,100);
       </div>
     </div>
     <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
+  </div>
+
+  <!-- ── Anhang-Extraktion ── -->
+  <div class="es-grp">
+    <div class="es-grp-h">Anhang-Extraktion bei Klassifizierung</div>
+    <div class="es-grp-sub">Extrahiert Text aus PDF, DOCX, Bildern (OCR) in Mail-Anh&auml;ngen f&uuml;r bessere LLM-Klassifizierung. Wenn OCR keinen Text findet, kann das Bild direkt an die KI gesendet werden (Vision).</div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Anh&auml;nge bei Klassifizierung lesen</span><span class="es-row-hint">PDF, DOCX, ZIP, TXT werden ge&ouml;ffnet und der Text dem LLM mitgegeben</span></div>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-anh-aktiv" {'checked' if anh_cfg.get('aktiv',True) else ''}><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Vision-Fallback (Bilder an KI)</span><span class="es-row-hint">Wenn OCR keinen Text erkennt, wird das Bild direkt an die KI gesendet (h&ouml;here Kosten)</span></div>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-anh-vision" {'checked' if anh_cfg.get('vision_fallback',True) else ''}><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>OCR f&uuml;r Bilder</span><span class="es-row-hint">Bild-Anh&auml;nge (JPG, PNG, TIFF) per OCR in Text umwandeln</span></div>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-anh-ocr" {'checked' if anh_cfg.get('ocr_aktiv',True) else ''}><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>ZIP-Dateien entpacken</span><span class="es-row-hint">Inhalt von ZIP-Dateien wird extrahiert und analysiert</span></div>
+      <label class="es-toggle-wrap"><input class="es-toggle-inp" type="checkbox" id="cfg-anh-zip" {'checked' if anh_cfg.get('zip_entpacken',True) else ''}><div class="es-toggle-vis"></div></label>
+    </div>
+    <div class="es-row" style="border-bottom:none">
+      <div class="es-row-label"><span>Max. Dateigr&ouml;&szlig;e (MB)</span><span class="es-row-hint">Anh&auml;nge gr&ouml;&szlig;er als dieser Wert werden &uuml;bersprungen</span></div>
+      <input type="number" id="cfg-anh-max-mb" value="{anh_cfg.get('max_dateigroesse_mb',20)}" min="1" max="100"
+             style="width:80px;background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;color:var(--text);text-align:center">
+    </div>
   </div>
 
   <!-- ── Eigene Domains / Kopie-Erkennung ── -->
@@ -18575,6 +18603,13 @@ function saveSettings() {{
         aktiv: document.getElementById('cfg-nf-newsletter-aktiv')?.checked ?? true,
         max_items: parseInt(document.getElementById('cfg-nf-newsletter-max')?.value||'5')
       }}
+    }},
+    anhang_extraktion: {{
+      aktiv:                document.getElementById('cfg-anh-aktiv')?.checked ?? true,
+      vision_fallback:      document.getElementById('cfg-anh-vision')?.checked ?? true,
+      ocr_aktiv:            document.getElementById('cfg-anh-ocr')?.checked ?? true,
+      zip_entpacken:        document.getElementById('cfg-anh-zip')?.checked ?? true,
+      max_dateigroesse_mb:  parseInt(document.getElementById('cfg-anh-max-mb')?.value || '20')
     }},
     protokoll: {{
       max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,

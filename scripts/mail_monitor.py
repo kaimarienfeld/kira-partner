@@ -1385,13 +1385,21 @@ def _process_mail(mail_data, konto_label, folder_name):
             (thread_id,)
         ).fetchone()
 
+    # Anhang-Pfad für Text-Extraktion ableiten
+    _att_pfad = ""
+    if mail_data.get("mail_folder_pfad"):
+        _candidate = Path(mail_data["mail_folder_pfad"]) / "attachments"
+        if _candidate.exists():
+            _att_pfad = str(_candidate)
+
     # Klassifizierung
     t0 = time.monotonic()
     result = classify_mail(konto_label, absender, betreff, text,
                           anhaenge=mail_data.get("anhaenge", []),
                           folder=folder_name, is_sent=is_sent,
                           mail_datum=mail_data.get("datum", ""),
-                          kanal="email")
+                          kanal="email",
+                          anhaenge_pfad=_att_pfad)
     kat_ms = int((time.monotonic() - t0) * 1000)
 
     # Bei LLM-Ausfall: Mail nur indexieren, keinen Task erstellen

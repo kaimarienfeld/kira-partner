@@ -155,3 +155,14 @@
 **Was:** _all_providers_failed Check in _process_mail() — Mail nur indexieren bei LLM-Budget=0, keinen regelbasierten Task erstellen
 **Commit:** f1e5e7f
 **Status:** erledigt
+
+### 2026-04-08 01:00 — Anhang-Text-Extraktion für Mail-Klassifizierung
+**Auftrag:** Mail-Anhänge (PDF, DOCX, ZIP, Bilder) vor LLM-Klassifizierung auslesen. OCR für Bilder, Vision-Fallback wenn OCR keinen Text findet.
+**Was:** 5 Phasen implementiert:
+- Phase 1: config.json `anhang_extraktion` Sektion (10 Config-Keys) + `anhang_text_cache` SQLite-Tabelle in mail_index.db
+- Phase 2: `_extract_attachment_texts()` in llm_classifier.py (~160 Zeilen) — nutzt dokument_pipeline.py (extract_text/extract_text_image), ZIP-Entpackung, base64 Vision-Fallback, DB-Cache. `_build_classification_prompt()` + `classify_mail()` + `classify_mail_llm()` um anhang_texte/anhaenge_pfad erweitert.
+- Phase 3: `classify_direct()` in kira_llm.py — `vision_images` Parameter, Anthropic Content-Block-Liste, OpenAI image_url Format-Konvertierung in `_call_openai_compat()`
+- Phase 4: mail_monitor.py, daily_check.py (4 Stellen) — anhaenge_pfad ableiten und an classify_mail() übergeben. reclassify_low_confidence() jetzt mit echten Anhängen + Pfad.
+- Phase 5: Einstellungen-UI (server.py) — 5 Toggles/Inputs in "Anhang-Extraktion bei Klassifizierung" Gruppe + saveSettings() erweitert
+**Verifiziert:** Syntax-Check alle 4 .py-Dateien OK, config.json valide, Server 0 JS-Fehler, alle UI-Elemente im DOM, saveSettings() sendet anhang_extraktion korrekt
+**Status:** erledigt

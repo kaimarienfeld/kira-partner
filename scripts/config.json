@@ -11,7 +11,7 @@
     "urlaub_modus": false,
     "urlaub_von": "2026-03-28T09:29",
     "urlaub_bis": "2026-03-29T09:29",
-    "prioritaet": "default",
+    "prioritaet": "low",
     "urlaub_autoreply_aktiv": false,
     "urlaub_autoreply_betreff": "Abwesenheitsnotiz: Ich bin derzeit im Urlaub",
     "urlaub_autoreply_text": "Vielen Dank fuer Ihre Nachricht. Ich befinde mich derzeit im Urlaub und werde mich nach meiner Rueckkehr bei Ihnen melden."
@@ -31,7 +31,7 @@
     "erinnerung_intervall_stunden": 24,
     "_kommentar2": "Nach wie vielen Stunden an offene Aufgaben erinnern",
     "deadline_warnung_tage": 1,
-    "erinnerung_typ": "beide",
+    "erinnerung_typ": "toast",
     "default_prioritaet": "normal",
     "auto_archiv_tage": 1
   },
@@ -55,8 +55,8 @@
     "_kommentar": "0 = niemals löschen. Aktivitätsprotokoll (aktivitaeten-Tabelle in tasks.db). change_log.jsonl ist davon unabhängig und wird nie automatisch bereinigt."
   },
   "mail_monitor": {
-    "aktiv": true,
-    "intervall_sekunden": 900,
+    "aktiv": false,
+    "intervall_sekunden": 300,
     "_kommentar": "Echtzeit-Mail-Ueberwachung alle 5 Minuten via IMAP/OAuth2"
   },
   "mail_archiv": {
@@ -217,17 +217,31 @@
     }
   },
   "mail_klassifizierung": {
-    "classify": true,
-    "auto_tasks": true,
+    "classify": false,
+    "auto_tasks": false,
     "ignore_newsletter": false,
     "eigene_keywords": [],
     "eigene_domains_extra": [
-      "invoicefetcher.email"
+      "invoicefetcher.email",
+      "sichtbeton-cire.de",
+      "raumkult.ei"
     ]
   },
+  "anhang_extraktion": {
+    "aktiv": true,
+    "max_dateigroesse_mb": 20,
+    "max_text_zeichen_pro_anhang": 3000,
+    "max_text_zeichen_gesamt": 8000,
+    "vision_fallback": true,
+    "vision_max_bild_kb": 500,
+    "zip_entpacken": true,
+    "zip_max_dateien": 10,
+    "zip_max_groesse_mb": 50,
+    "ocr_aktiv": true
+  },
   "mail_postfach": {
-    "refresh_intervall_min": 2,
-    "lese_markierung": "manuell"
+    "refresh_intervall_min": 0,
+    "lese_markierung": "sofort"
   },
   "mail_konto_labels": {
     "kaimrf@rauMKultSichtbeton.onmicrosoft.com": "rauMKult Microsoft",
@@ -267,8 +281,16 @@
       "standort": "Düsseldorf"
     },
     "rss_feeds": [
-      {"url": "https://www.tagesschau.de/xml/rss2_https/", "label": "tagesschau", "kategorie": "allgemein"},
-      {"url": "https://www.spiegel.de/schlagzeilen/index.rss", "label": "Spiegel", "kategorie": "allgemein"}
+      {
+        "url": "https://www.tagesschau.de/xml/rss2_https/",
+        "label": "tagesschau",
+        "kategorie": "allgemein"
+      },
+      {
+        "url": "https://www.spiegel.de/schlagzeilen/index.rss",
+        "label": "Spiegel",
+        "kategorie": "allgemein"
+      }
     ],
     "newsletter_digest": {
       "aktiv": true,
@@ -296,7 +318,18 @@
     "ueberwachter_ordner": "",
     "unterordner_ueberwachen": true,
     "ablage_pfad": "",
-    "dateitypen": [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png", ".tiff", ".txt", ".csv", ".xlsx"],
+    "dateitypen": [
+      ".pdf",
+      ".docx",
+      ".doc",
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".tiff",
+      ".txt",
+      ".csv",
+      ".xlsx"
+    ],
     "ocr_aktiv": true,
     "ocr_sprache": "deu+eng",
     "auto_klassifizierung": true,

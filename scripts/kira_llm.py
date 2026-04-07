@@ -3026,9 +3026,26 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
     if tools and not supports_tools:
         sys_content += "\n\n" + _tools_to_prompt(tools)
 
+    # Vision-Content: Anthropic-Format → OpenAI-Format konvertieren
+    oai_user_content = user_message
+    if isinstance(user_message, list):
+        oai_content = []
+        for block in user_message:
+            if isinstance(block, dict) and block.get("type") == "image":
+                src = block.get("source", {})
+                oai_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{src.get('media_type', 'image/jpeg')};base64,{src.get('data', '')}"}
+                })
+            elif isinstance(block, dict) and block.get("type") == "text":
+                oai_content.append({"type": "text", "text": block["text"]})
+            else:
+                oai_content.append({"type": "text", "text": str(block)})
+        oai_user_content = oai_content
+
     messages = [
         {"role": "system", "content": sys_content},
-        {"role": "user", "content": user_message}
+        {"role": "user", "content": oai_user_content}
     ]
 
     final_text = ""
@@ -3131,7 +3148,8 @@ def _parse_text_tool_call(text):
 
 
 # ── Klassifizierungs-Aufruf (leichter System-Prompt, Haiku) ─────────────────
-def classify_direct(prompt: str, max_tokens: int = 768) -> dict:
+def classify_direct(prompt: str, max_tokens: int = 768,
+                    vision_images: list = None) -> dict:
     """
     Direkter, günstiger LLM-Aufruf für Mail-Klassifizierung + Wissen-Extraktion.
     Wählt automatisch das günstigste Modell und probiert ALLE Provider durch.
@@ -3178,14 +3196,30 @@ def classify_direct(prompt: str, max_tokens: int = 768) -> dict:
     except Exception:
         pass
 
+    # Vision-Content aufbereiten (Bilder + Text als Content-Block-Liste)
+    user_msg = prompt
+    if vision_images:
+        content_blocks = []
+        for img in vision_images:
+            content_blocks.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": img.get("media_type", "image/jpeg"),
+                    "data": img["data"],
+                }
+            })
+        content_blocks.append({"type": "text", "text": prompt})
+        user_msg = content_blocks
+
     # Alle Provider durchprobieren (günstigste zuerst)
     errors = []
     for provider in budget_providers:
         try:
             if provider.get("typ") == "anthropic":
-                result = _call_anthropic(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
+                result = _call_anthropic(provider, user_msg, _classify_sys, [], max_tokens=max_tokens)
             else:
-                result = _call_openai_compat(provider, prompt, _classify_sys, [], max_tokens=max_tokens)
+                result = _call_openai_compat(provider, user_msg, _classify_sys, [], max_tokens=max_tokens)
             return {"antwort": result.get("text", ""),
                     "tokens_in":  result.get("tokens_in", 0),
                     "tokens_out": result.get("tokens_out", 0),

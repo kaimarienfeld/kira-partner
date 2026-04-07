@@ -378,12 +378,14 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
         except Exception:
             pass
 
-        # Klassifizieren
+        # Klassifizieren (mit Anhang-Text-Extraktion)
+        _att_pfad = m.get("anhaenge_pfad") or ""
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
                 anhaenge=anhaenge_list, folder=folder, is_sent=False,
                 mail_datum=datum, kanal="email",
+                anhaenge_pfad=_att_pfad,
             )
         except Exception as e:
             stats["fehler"] += 1
@@ -736,11 +738,13 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
             pass
 
         # Klassifizieren — bei totalem LLM-Ausfall: PAUSE statt Fallback
+        _att_pfad2 = m.get("anhaenge_pfad") or ""
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
                 anhaenge=anhaenge_list, folder=folder, is_sent=False,
                 mail_datum=datum, kanal="email",
+                anhaenge_pfad=_att_pfad2,
             )
             # Alle Provider gescheitert → SOFORT pausieren
             if cl.get("_llm_fallback") and cl.get("_all_providers_failed"):
@@ -920,7 +924,7 @@ def reclassify_low_confidence() -> dict:
     mi_db.row_factory = sqlite3.Row
     kandidaten = mi_db.execute("""
         SELECT message_id, konto, konto_label, absender, betreff, text_plain,
-               folder, datum, an, anhaenge, kategorie
+               folder, datum, an, anhaenge, kategorie, anhaenge_pfad
         FROM mails
         WHERE folder NOT LIKE '%Sent%' AND folder NOT LIKE '%Gesendete%'
           AND folder NOT LIKE '%Draft%' AND folder NOT LIKE '%Entwu%'
@@ -948,6 +952,16 @@ def reclassify_low_confidence() -> dict:
         datum = mail["datum"] or ""
         alte_kat = mail["kategorie"] or ""
 
+        # Anhänge parsen + Pfad
+        anhaenge_list = []
+        try:
+            raw_anh = mail["anhaenge"] or ""
+            if raw_anh:
+                anhaenge_list = json.loads(raw_anh)
+        except Exception:
+            pass
+        _att_pfad_rc = mail["anhaenge_pfad"] or ""
+
         stats["geprueft"] += 1
         _reclassify_progress.update({
             "geprueft": stats["geprueft"],
@@ -957,8 +971,9 @@ def reclassify_low_confidence() -> dict:
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
-                anhaenge=[], folder=folder, is_sent=False,
+                anhaenge=anhaenge_list, folder=folder, is_sent=False,
                 mail_datum=datum, kanal="email",
+                anhaenge_pfad=_att_pfad_rc,
             )
 
             # Alle Provider gescheitert → SOFORT pausieren
@@ -1430,7 +1445,8 @@ def process_new_mails(new_mails, stats):
 
         # Klassifizieren — Datum übergeben für zeitlichen Angebote-Abgleich
         cl = classify_mail(konto, absnd, betr, text, folder=folder,
-                           is_sent=is_sent, mail_datum=datum, kanal="email")
+                           is_sent=is_sent, mail_datum=datum, kanal="email",
+                           anhaenge_pfad=m.get("anhaenge_pfad") or "")
         kat = cl["kategorie"]
 
         # ── Routing-Dispatch: Nicht jede Klassifizierung erzeugt einen Task ──
