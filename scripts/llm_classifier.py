@@ -522,7 +522,7 @@ def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
         return ""
 
 
-def _get_kira_wissen(limit: int = 10) -> str:
+def _get_kira_wissen(limit: int = 50) -> str:
     """
     Lädt Kiras gelernte Erkenntnisse aus wissen_regeln, die für die
     Mail-Klassifizierung relevant sind (Kategorien: klassifizierung, vorschlag, gelernt).
@@ -534,7 +534,7 @@ def _get_kira_wissen(limit: int = 10) -> str:
             SELECT kategorie, titel, inhalt, erstellt_am
             FROM wissen_regeln
             WHERE status = 'aktiv'
-              AND kategorie IN ('klassifizierung','vorschlag','gelernt','kira')
+              AND kategorie IN ('klassifizierung','vorschlag','gelernt','kira','auto_gelernt','stil')
             ORDER BY erstellt_am DESC LIMIT ?
         """, (limit,)).fetchall()
         db.close()
@@ -543,14 +543,14 @@ def _get_kira_wissen(limit: int = 10) -> str:
         lines = []
         for r in rows:
             titel  = (r["titel"] or "")[:60]
-            inhalt = (r["inhalt"] or "")[:120]
+            inhalt = (r["inhalt"] or "")[:200]
             lines.append(f"  • {titel}: {inhalt}")
         return "\n".join(lines)
     except Exception:
         return ""
 
 
-def _get_correction_beispiele(limit: int = 12) -> str:
+def _get_correction_beispiele(limit: int = 30) -> str:
     """
     Lädt die letzten Korrekturen als Few-Shot-Lernbeispiele für den LLM-Prompt.
     So lernt der Classifier aus Kais Korrekturen.
