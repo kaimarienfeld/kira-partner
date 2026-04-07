@@ -5,7 +5,8 @@ llm_classifier.py — LLM-gestützte Mail-Klassifizierung für rauMKult®.
 Strategie: Fast-Path (regelbasiert) → LLM → Fallback (regelbasiert).
 Drop-in-Replacement für mail_classifier.classify_mail().
 """
-import json, re, sqlite3
+import json, math, re, sqlite3
+from datetime import datetime
 from pathlib import Path
 
 # Bestehender Klassifizierer als Fallback
@@ -583,6 +584,140 @@ def _get_correction_beispiele(limit: int = 30) -> str:
         return ""
 
 
+def _get_kira_wissen_relevant(absender: str, betreff: str, text: str,
+                               max_chars: int = 12000) -> str:
+    """Lädt ALLE aktiven Wissensregeln, scored nach Relevanz zur aktuellen Mail."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute("""
+            SELECT id, kategorie, titel, inhalt, erstellt_am
+            FROM wissen_regeln
+            WHERE status = 'aktiv'
+              AND kategorie IN ('klassifizierung','vorschlag','gelernt','kira','auto_gelernt','stil')
+        """).fetchall()
+        db.close()
+        if not rows:
+            return ""
+
+        abs_lower = (absender or "").lower()
+        abs_domain = abs_lower.split("@")[-1] if "@" in abs_lower else ""
+        mail_words = set((betreff + " " + (text or "")[:500]).lower().split())
+
+        scored = []
+        for r in rows:
+            regel_text = ((r["titel"] or "") + " " + (r["inhalt"] or "")).lower()
+            regel_words = set(regel_text.split())
+
+            # Keyword-Overlap (Jaccard-ähnlich)
+            overlap = len(mail_words & regel_words)
+            union = len(mail_words | regel_words) or 1
+            kw_score = overlap / union
+
+            # Domain-Match
+            domain_score = 1.0 if abs_domain and abs_domain in regel_text else 0.0
+
+            # Absender-Match
+            abs_score = 1.0 if abs_lower and abs_lower in regel_text else 0.0
+
+            # Aktualität (logarithmisch, max 1.0)
+            try:
+                days_old = (datetime.now() - datetime.fromisoformat(r["erstellt_am"][:19])).days
+            except Exception:
+                days_old = 365
+            time_score = 1.0 / (1.0 + math.log1p(days_old / 30))
+
+            total = kw_score * 0.35 + domain_score * 0.25 + abs_score * 0.15 + time_score * 0.10
+            if r["kategorie"] == "klassifizierung":
+                total += 0.15
+
+            scored.append((total, r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        lines = []
+        chars_used = 0
+        for score, r in scored:
+            titel = (r["titel"] or "")[:80]
+            inhalt = (r["inhalt"] or "")[:200]
+            line = f"  • {titel}: {inhalt}"
+            if chars_used + len(line) > max_chars:
+                break
+            lines.append(line)
+            chars_used += len(line)
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _get_correction_beispiele_relevant(absender: str, betreff: str, text: str,
+                                        max_chars: int = 6000) -> str:
+    """Lädt Korrekturen scored nach Relevanz zur aktuellen Mail."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute("""
+            SELECT c.alter_typ, c.neuer_typ, c.notiz, c.erstellt_am,
+                   t.betreff, t.zusammenfassung, t.absender_rolle, t.kunden_email
+            FROM corrections c
+            LEFT JOIN tasks t ON t.id = c.task_id
+            WHERE c.alter_typ != c.neuer_typ
+        """).fetchall()
+        db.close()
+        if not rows:
+            return ""
+
+        abs_lower = (absender or "").lower()
+        abs_domain = abs_lower.split("@")[-1] if "@" in abs_lower else ""
+        betr_lower = (betreff or "").lower()
+
+        scored = []
+        for r in rows:
+            score = 0.0
+            corr_email = (r["kunden_email"] or "").lower()
+            corr_domain = corr_email.split("@")[-1] if "@" in corr_email else ""
+            if abs_domain and corr_domain == abs_domain:
+                score += 0.4
+            if abs_lower and corr_email == abs_lower:
+                score += 0.3
+
+            corr_betr = (r["betreff"] or "").lower()
+            if corr_betr and betr_lower:
+                corr_words = set(corr_betr.split())
+                betr_words = set(betr_lower.split())
+                overlap = len(corr_words & betr_words)
+                if overlap > 0:
+                    score += 0.2 * min(overlap / max(len(corr_words), 1), 1.0)
+
+            try:
+                days = (datetime.now() - datetime.fromisoformat(r["erstellt_am"][:19])).days
+            except Exception:
+                days = 365
+            score += 0.1 / (1.0 + math.log1p(days / 30))
+
+            scored.append((score, r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        lines = []
+        chars_used = 0
+        for sc, r in scored:
+            betr_short = (r["betreff"] or "")[:60]
+            zusamm = (r["zusammenfassung"] or "")[:60]
+            kontext = betr_short or zusamm
+            notiz = f' (Grund: {r["notiz"]})' if r["notiz"] else ""
+            line = f'  • "{kontext}" → war: {r["alter_typ"]} → richtig: {r["neuer_typ"]}{notiz}'
+            if chars_used + len(line) > max_chars:
+                break
+            lines.append(line)
+            chars_used += len(line)
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                       anhaenge: list = None, folder: str = "",
                       is_sent: bool = False, mail_datum: str = "",
@@ -643,8 +778,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         # Kontext-Anreicherung: Angebote + Korrekturen + Wissen + Kundenprofil + Verlauf + Lexware
         kunden_email_raw     = extract_email(absender)
         angebote_kontext     = _get_angebote_kontext(absender, text, mail_datum=mail_datum)
-        correction_beispiele = _get_correction_beispiele()
-        kira_wissen          = _get_kira_wissen()
+        correction_beispiele = _get_correction_beispiele_relevant(absender, betreff, text)
+        kira_wissen          = _get_kira_wissen_relevant(absender, betreff, text)
         kunden_profil        = _get_kunden_profil(kunden_email_raw)
         mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw)
         lexware_kontext      = _get_lexware_kontext(kunden_email_raw)

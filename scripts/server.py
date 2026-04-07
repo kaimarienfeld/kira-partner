@@ -28103,6 +28103,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Task-Cleanup: beantwortete Tasks manuell bereinigen
+        if self.path == '/api/tasks/cleanup':
+            try:
+                cleaned = _cleanup_answered_tasks()
+                self._json({'ok': True, 'cleaned': cleaned})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+            return
+
         # Config zurücksetzen auf Werkseinstellungen
         if self.path == '/api/config/reset':
             try:
@@ -30410,6 +30419,48 @@ DashboardHandler._api_admin_cf_download = _method_api_admin_cf_download
 DashboardHandler._api_admin_cf_status   = _method_api_admin_cf_status
 
 
+def _cleanup_answered_tasks():
+    """Markiert offene Tasks als erledigt wenn bereits beantwortet (gesendete Mail nach Eingang)."""
+    try:
+        tasks_db = sqlite3.connect(str(TASKS_DB))
+        tasks_db.row_factory = sqlite3.Row
+        sent_db_path = KNOWLEDGE_DIR / "sent_mails.db"
+        if not sent_db_path.exists():
+            tasks_db.close()
+            return 0
+        sent_db = sqlite3.connect(str(sent_db_path))
+        sent_db.row_factory = sqlite3.Row
+
+        sent_index = {}
+        for r in sent_db.execute("SELECT kunden_email, datum FROM gesendete_mails"):
+            em = (r["kunden_email"] or "").lower().strip()
+            if em:
+                sent_index.setdefault(em, []).append(r["datum"])
+        sent_db.close()
+
+        cleaned = 0
+        for t in tasks_db.execute(
+            "SELECT id, kunden_email, datum_mail FROM tasks "
+            "WHERE status='offen' AND kunden_email IS NOT NULL AND kunden_email != ''"
+        ):
+            k = (t["kunden_email"] or "").lower().strip()
+            datum = t["datum_mail"] or ""
+            if k and datum and any(d > datum for d in sent_index.get(k, [])):
+                tasks_db.execute(
+                    "UPDATE tasks SET status='erledigt', "
+                    "notiz=COALESCE(notiz,'')||' [Auto: beantwortet]' WHERE id=?",
+                    (t["id"],))
+                cleaned += 1
+
+        if cleaned:
+            tasks_db.commit()
+        tasks_db.close()
+        return cleaned
+    except Exception as e:
+        log.warning(f"Task-Cleanup-Fehler: {e}")
+        return 0
+
+
 def run_server(open_browser=True):
     config = {}
     try:
@@ -30488,6 +30539,16 @@ def run_server(open_browser=True):
         print("[Signal-Watcher] Desktop-Overlay aktiv (15s Intervall)")
     except Exception as _sw_err:
         print(f"[Signal-Watcher] Nicht verfügbar: {_sw_err}")
+
+    # Task-Cleanup: beantwortete Tasks automatisch als erledigt markieren
+    try:
+        _cleaned = _cleanup_answered_tasks()
+        if _cleaned:
+            print(f"[Task-Cleanup] {_cleaned} Tasks als beantwortet markiert")
+            rlog('system', 'tasks_auto_cleanup', f"{_cleaned} Tasks als beantwortet markiert",
+                 source='server', modul='cleanup', actor_type='system', status='ok')
+    except Exception as _cl_err:
+        print(f"[Task-Cleanup] Fehler: {_cl_err}")
 
     # News-Feed Widget-Cache vorwärmen (Wetter, RSS, Newsletter-Digest)
     try:
