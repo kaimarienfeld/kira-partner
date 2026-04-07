@@ -1653,6 +1653,58 @@ def main():
     except Exception as _me:
         print(f"  [WARN] DB-Autopflege fehlgeschlagen: {_me}")
 
+    # ── Korrektur-Konsolidierung (Phase 6) ──
+    _consolidate_corrections()
+
+
+def _consolidate_corrections():
+    """Fasst wiederholte Korrekturen (>=3 gleiche alter_typ→neuer_typ) zu permanenten Wissensregeln zusammen."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        gruppen = db.execute("""
+            SELECT c.alter_typ, c.neuer_typ, COUNT(*) AS cnt, GROUP_CONCAT(c.id) AS ids,
+                   GROUP_CONCAT(COALESCE(t.betreff,''), '|||') AS betreffs
+            FROM corrections c
+            LEFT JOIN tasks t ON t.id = c.task_id
+            WHERE c.alter_typ != c.neuer_typ AND c.konsolidiert_am IS NULL
+            GROUP BY c.alter_typ, c.neuer_typ
+            HAVING cnt >= 3
+        """).fetchall()
+
+        consolidated = 0
+        for g in gruppen:
+            titel = f"Korrektur: {g['alter_typ']} → {g['neuer_typ']} ({g['cnt']}x bestätigt)"
+            betreffs = (g["betreffs"] or "").split("|||")
+            inhalt = f"Mails dieses Typs wurden {g['cnt']}x korrigiert. Typische Betreffs: {', '.join(set(b[:30] for b in betreffs if b.strip()))}"
+
+            exists = db.execute(
+                "SELECT id FROM wissen_regeln WHERE titel=? AND status='aktiv'",
+                (titel,)).fetchone()
+
+            if not exists:
+                db.execute("""INSERT INTO wissen_regeln
+                    (kategorie, titel, inhalt, status, quelle, gewicht, quell_anzahl)
+                    VALUES ('klassifizierung', ?, ?, 'aktiv', 'auto_konsolidierung', ?, ?)""",
+                    (titel, inhalt[:300], g["cnt"], g["cnt"]))
+                consolidated += 1
+
+            ids = (g["ids"] or "").split(",")
+            for cid in ids:
+                cid = cid.strip()
+                if cid:
+                    db.execute("UPDATE corrections SET konsolidiert_am=datetime('now') WHERE id=?", (cid,))
+
+        db.commit()
+        db.close()
+        if consolidated:
+            print(f"  Konsolidierung: {consolidated} neue Wissensregeln aus Korrekturen erstellt")
+            _elog('system', 'corrections_consolidated',
+                  f'{consolidated} Regeln aus wiederholten Korrekturen',
+                  modul='daily_check', source='daily_check', actor_type='system', status='ok')
+    except Exception as e:
+        print(f"  [WARN] Konsolidierung fehlgeschlagen: {e}")
+
 
 if __name__ == "__main__":
     import argparse

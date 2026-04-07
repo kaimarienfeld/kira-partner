@@ -579,6 +579,25 @@ def _ensure_capture_tables():
         db.close()
 
 
+def _ensure_correction_columns():
+    """Erweitert corrections + wissen_regeln für Konsolidierung (Phase 6, idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        cols_c = {r[1] for r in db.execute("PRAGMA table_info(corrections)")}
+        if "konsolidiert_am" not in cols_c:
+            db.execute("ALTER TABLE corrections ADD COLUMN konsolidiert_am TEXT DEFAULT NULL")
+
+        cols_w = {r[1] for r in db.execute("PRAGMA table_info(wissen_regeln)")}
+        if "gewicht" not in cols_w:
+            db.execute("ALTER TABLE wissen_regeln ADD COLUMN gewicht INTEGER DEFAULT 1")
+        if "quell_anzahl" not in cols_w:
+            db.execute("ALTER TABLE wissen_regeln ADD COLUMN quell_anzahl INTEGER DEFAULT 1")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
 def _ensure_capture_config_defaults():
     """Schreibt Capture-Feature-Flags als Defaults in config.json (session-hhh, idempotent)."""
     cfg_path = SCRIPTS_DIR / "config.json"
@@ -28477,6 +28496,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if neu and neu != alter:
                     db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neu, task_id))
                 db.commit()
+
+                # Sofort-Konsolidierung: >= 3 gleiche Korrekturen → permanente Regel
+                if neu and alter and neu != alter:
+                    try:
+                        cnt_row = db.execute(
+                            "SELECT COUNT(*) AS c FROM corrections "
+                            "WHERE alter_typ=? AND neuer_typ=? AND konsolidiert_am IS NULL",
+                            (alter, neu)).fetchone()
+                        cnt = cnt_row["c"] if cnt_row else 0
+                        if cnt >= 3:
+                            titel = f"Korrektur: {alter} → {neu} ({cnt}x bestätigt)"
+                            exists = db.execute(
+                                "SELECT id FROM wissen_regeln WHERE titel=? AND status='aktiv'",
+                                (titel,)).fetchone()
+                            if not exists:
+                                db.execute("""INSERT INTO wissen_regeln
+                                    (kategorie, titel, inhalt, status, quelle, gewicht, quell_anzahl)
+                                    VALUES ('klassifizierung', ?, ?, 'aktiv', 'auto_konsolidierung', ?, ?)""",
+                                    (titel, f"Mails vom Typ '{alter}' werden {cnt}x zu '{neu}' korrigiert.", cnt, cnt))
+                            db.execute(
+                                "UPDATE corrections SET konsolidiert_am=datetime('now') "
+                                "WHERE alter_typ=? AND neuer_typ=? AND konsolidiert_am IS NULL",
+                                (alter, neu))
+                            db.commit()
+                    except Exception:
+                        pass
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
                 db.close()
@@ -30483,6 +30528,7 @@ def run_server(open_browser=True):
     _ensure_case_engine_tables()
     _ensure_lexware_tables()
     _ensure_capture_tables()
+    _ensure_correction_columns()
     _ensure_capture_config_defaults()
     CAPTURE_FILES_DIR.mkdir(exist_ok=True)
     rlog_ensure_cfg()
