@@ -23296,6 +23296,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/mail/qualifizieren/status'):
             self._api_mail_qualifizieren_status()
 
+        elif self.path.startswith('/api/mail/reclassify/status'):
+            try:
+                from daily_check import get_reclassify_progress
+                self._json(get_reclassify_progress())
+            except Exception as e:
+                self._json({"error": str(e)})
+
         elif self.path == '/api/mail/insights':
             self._api_mail_insights()
 
@@ -27201,6 +27208,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._api_mail_qualifizieren_fortsetzen()
             return
 
+        if self.path == '/api/mail/reclassify':
+            try:
+                from daily_check import reclassify_low_confidence, get_reclassify_progress
+                prog = get_reclassify_progress()
+                if prog.get("running"):
+                    self._json({"ok": False, "error": "Nachklassifizierung läuft bereits"})
+                    return
+                import threading
+                threading.Thread(target=reclassify_low_confidence, daemon=True).start()
+                self._json({"ok": True, "message": "Nachklassifizierung gestartet"})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+            return
+
         if self.path == '/api/mail/microsoft-app/test':
             self._api_mail_microsoft_app_test()
             return
@@ -30506,6 +30527,31 @@ def _cleanup_answered_tasks():
         return 0
 
 
+def _expire_stale_drafts():
+    """Markiert abgelaufene mail_approve_queue-Einträge als 'abgelaufen'."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        now = datetime.now().isoformat()
+        c1 = db.execute(
+            "UPDATE mail_approve_queue SET status='abgelaufen' "
+            "WHERE status='pending' AND ablauf_am IS NOT NULL AND ablauf_am < ?",
+            (now,)).rowcount
+        cutoff = (datetime.now() - timedelta(days=7)).isoformat()
+        c2 = db.execute(
+            "UPDATE mail_approve_queue SET status='abgelaufen' "
+            "WHERE status='pending' AND (ablauf_am IS NULL OR ablauf_am='') AND erstellt_am < ?",
+            (cutoff,)).rowcount
+        total = c1 + c2
+        if total:
+            db.commit()
+            log.info(f"Entwurf-Cleanup: {total} abgelaufen ({c1} nach Datum, {c2} nach Alter)")
+        db.close()
+        return total
+    except Exception as e:
+        log.warning(f"Entwurf-Cleanup-Fehler: {e}")
+        return 0
+
+
 def run_server(open_browser=True):
     config = {}
     try:
@@ -30595,6 +30641,14 @@ def run_server(open_browser=True):
                  source='server', modul='cleanup', actor_type='system', status='ok')
     except Exception as _cl_err:
         print(f"[Task-Cleanup] Fehler: {_cl_err}")
+
+    # Entwurf-Cleanup: abgelaufene Kira-Entwürfe markieren
+    try:
+        _expired = _expire_stale_drafts()
+        if _expired:
+            print(f"[Entwurf-Cleanup] {_expired} Entwürfe als abgelaufen markiert")
+    except Exception as _ed_err:
+        print(f"[Entwurf-Cleanup] Fehler: {_ed_err}")
 
     # News-Feed Widget-Cache vorwärmen (Wetter, RSS, Newsletter-Digest)
     try:

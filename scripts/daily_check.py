@@ -874,6 +874,156 @@ def resume_qualify_mails() -> dict:
     return qualify_mails(seit, bis, modus)
 
 
+# ── Nachklassifizierung: niedrige Konfidenz / regelbasierte Mails ────────────
+
+_reclassify_progress: dict = {
+    "running": False, "finished": True, "paused": False,
+    "gesamt": 0, "geprueft": 0, "reklassifiziert": 0,
+    "unveraendert": 0, "fehler": 0, "aktuell": "",
+    "pause_grund": "",
+}
+_RECLASSIFY_STATE_FILE = KNOWLEDGE_DIR / "reclassify_state.json"
+
+
+def _save_reclassify_state():
+    try:
+        _RECLASSIFY_STATE_FILE.write_text(
+            json.dumps(_reclassify_progress, ensure_ascii=False, indent=2), 'utf-8')
+    except Exception:
+        pass
+
+
+def get_reclassify_progress() -> dict:
+    if _reclassify_progress.get("running"):
+        return dict(_reclassify_progress)
+    try:
+        if _RECLASSIFY_STATE_FILE.exists():
+            return json.loads(_RECLASSIFY_STATE_FILE.read_text('utf-8'))
+    except Exception:
+        pass
+    return dict(_reclassify_progress)
+
+
+def reclassify_low_confidence() -> dict:
+    """Klassifiziert Mails mit fehlender oder regelbasierter Klassifizierung per LLM nach."""
+    from llm_classifier import classify_mail
+
+    _reclassify_progress.update({
+        "running": True, "finished": False, "paused": False,
+        "gesamt": 0, "geprueft": 0, "reklassifiziert": 0,
+        "unveraendert": 0, "fehler": 0, "aktuell": "Initialisiere…",
+        "pause_grund": "",
+    })
+    _save_reclassify_state()
+
+    mi_db = sqlite3.connect(str(MAIL_INDEX_DB))
+    mi_db.row_factory = sqlite3.Row
+    kandidaten = mi_db.execute("""
+        SELECT message_id, konto, konto_label, absender, betreff, text_plain,
+               folder, datum, an, anhaenge, kategorie
+        FROM mails
+        WHERE folder NOT LIKE '%Sent%' AND folder NOT LIKE '%Gesendete%'
+          AND folder NOT LIKE '%Draft%' AND folder NOT LIKE '%Entwu%'
+          AND (
+            kategorie IS NULL OR kategorie = ''
+            OR konfidenz = '0' OR konfidenz IS NULL OR konfidenz = ''
+          )
+        ORDER BY datum DESC
+    """).fetchall()
+    mi_db.close()
+
+    stats = {"gesamt": len(kandidaten), "geprueft": 0, "reklassifiziert": 0,
+             "unveraendert": 0, "fehler": 0}
+    _reclassify_progress["gesamt"] = len(kandidaten)
+    _reclassify_progress["aktuell"] = f"{len(kandidaten)} Mails gefunden"
+    _save_reclassify_state()
+
+    for mail in kandidaten:
+        msgid = mail["message_id"]
+        absnd = mail["absender"] or ""
+        betr = mail["betreff"] or ""
+        text = mail["text_plain"] or ""
+        konto = mail["konto_label"] or mail["konto"] or ""
+        folder = mail["folder"] or "INBOX"
+        datum = mail["datum"] or ""
+        alte_kat = mail["kategorie"] or ""
+
+        stats["geprueft"] += 1
+        _reclassify_progress.update({
+            "geprueft": stats["geprueft"],
+            "aktuell": f'{stats["geprueft"]}/{stats["gesamt"]} — {betr[:50]}',
+        })
+
+        try:
+            cl = classify_mail(
+                konto=konto, absender=absnd, betreff=betr, text=text,
+                anhaenge=[], folder=folder, is_sent=False,
+                mail_datum=datum, kanal="email",
+            )
+
+            # Alle Provider gescheitert → SOFORT pausieren
+            if cl.get("_llm_fallback") and cl.get("_all_providers_failed"):
+                pause_msg = "Alle LLM-Provider nicht erreichbar — Guthaben leer oder Netzwerkfehler"
+                _reclassify_progress.update({
+                    "running": False, "finished": False, "paused": True,
+                    "pause_grund": pause_msg, **stats,
+                    "aktuell": f"Pausiert: {pause_msg}",
+                })
+                _save_reclassify_state()
+                try:
+                    _send_qualify_pause_push(pause_msg, stats)
+                except Exception:
+                    pass
+                return {**stats, "paused": True, "pause_grund": pause_msg}
+
+        except Exception as e:
+            stats["fehler"] += 1
+            continue
+
+        neue_kat = cl.get("kategorie", "")
+        konfidenz = cl.get("konfidenz", "mittel")
+
+        # In mail_index.db aktualisieren
+        try:
+            mi = sqlite3.connect(str(MAIL_INDEX_DB))
+            mi.execute(
+                "UPDATE mails SET kategorie=?, konfidenz=?, antwort_noetig=?, klassifiziert_am=? "
+                "WHERE message_id=?",
+                (neue_kat, str(konfidenz), 1 if cl.get("antwort_noetig") else 0,
+                 datetime.now().isoformat(), msgid))
+            mi.commit()
+            mi.close()
+        except Exception:
+            stats["fehler"] += 1
+            continue
+
+        if neue_kat and neue_kat != alte_kat:
+            stats["reklassifiziert"] += 1
+        else:
+            stats["unveraendert"] += 1
+
+        _reclassify_progress.update({
+            "reklassifiziert": stats["reklassifiziert"],
+            "unveraendert": stats["unveraendert"],
+            "fehler": stats["fehler"],
+        })
+
+        # State alle 10 Mails persistieren
+        if stats["geprueft"] % 10 == 0:
+            _save_reclassify_state()
+
+    # Fertig
+    _reclassify_progress.update({
+        "running": False, "finished": True, "paused": False,
+        **stats, "aktuell": "Fertig",
+    })
+    _save_reclassify_state()
+    _elog('system', 'reclassify_done',
+          f'{stats["reklassifiziert"]} Mails reklassifiziert, {stats["unveraendert"]} unverändert, {stats["fehler"]} Fehler',
+          modul='daily_check', source='daily_check', actor_type='system', status='ok')
+    return stats
+
+
 # ── Angebot-Status Auto-Update ───────────────────────────────────────────────
 def _try_update_angebot_from_mail(k_email: str, text: str, tasks_db):
     """
@@ -1160,10 +1310,11 @@ def _route_kira_vorschlag_dc(cl, kunden_email, betreff, text, msgid, konto):
             return
         tdb = sqlite3.connect(str(TASKS_DB))
         tdb.execute("""INSERT INTO mail_approve_queue
-            (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, notiz_intern)
-            VALUES (?,?,?,?,?,?,?,?,?)""",
+            (an, betreff, body_plain, konto, in_reply_to, erstellt_von, status, erstellt_am, ablauf_am, notiz_intern)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (kunden_email, f"Re: {betreff[:180]}", body_plain, konto, msgid,
-             "kira_routing", "entwurf", datetime.now().isoformat(), notiz))
+             "kira_routing", "entwurf", datetime.now().isoformat(),
+             (datetime.now() + timedelta(days=3)).isoformat(), notiz))
         tdb.commit()
         tdb.close()
     except Exception:
