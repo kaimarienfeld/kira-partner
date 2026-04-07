@@ -114,6 +114,15 @@ def save_status(data):
     STATUS_FILE.write_text(json.dumps(data,ensure_ascii=False,indent=2),'utf-8')
 
 
+def _norm_betreff_dc(b: str) -> str:
+    """Normalisiert Betreff: entfernt Re:/Aw:/Fwd:/WG: Prefixe."""
+    b = (b or "").strip().lower()
+    for pfx in ("re: ", "aw: ", "fwd: ", "wg: ", "re:", "aw:", "fwd:", "wg:"):
+        while b.startswith(pfx):
+            b = b[len(pfx):].strip()
+    return b
+
+
 def resolve_alias(email: str) -> str:
     """Löst E-Mail-Alias auf die Haupt-E-Mail auf (aus kunden_aliases in tasks.db)."""
     if not email:
@@ -442,15 +451,29 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
                 except Exception:
                     pass
 
-            # Thread-ID
+            # Thread-ID — erweitert: 60-Tage-Fenster + Betreff-Fallback
             thread_id = None
             try:
-                cutoff30 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+                cutoff60 = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d %H:%M:%S")
+                # Suche 1: gleiche kunden_email (häufigster Fall)
                 ex_t = tasks_db.execute(
                     "SELECT id, thread_id FROM tasks "
-                    "WHERE kunden_email=? AND erstellt_am >= ? ORDER BY id ASC LIMIT 1",
-                    (k_email, cutoff30)
+                    "WHERE kunden_email=? AND erstellt_am >= ? ORDER BY id DESC LIMIT 1",
+                    (k_email, cutoff60)
                 ).fetchone()
+                # Suche 2: Betreff-Match als Fallback (z.B. Formular-Mails ohne kunden_email)
+                if not ex_t and betr:
+                    norm_b = _norm_betreff_dc(betr)
+                    if len(norm_b) > 10:
+                        candidates = tasks_db.execute(
+                            "SELECT id, thread_id, betreff FROM tasks "
+                            "WHERE erstellt_am >= ? ORDER BY id DESC LIMIT 50",
+                            (cutoff60,)
+                        ).fetchall()
+                        for cand in candidates:
+                            if _norm_betreff_dc(cand["betreff"] or "") == norm_b:
+                                ex_t = cand
+                                break
                 if ex_t:
                     thread_id = ex_t["thread_id"] or f"T{ex_t['id']}"
             except Exception:
