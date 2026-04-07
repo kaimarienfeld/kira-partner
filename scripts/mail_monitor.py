@@ -1394,6 +1394,15 @@ def _process_mail(mail_data, konto_label, folder_name):
                           kanal="email")
     kat_ms = int((time.monotonic() - t0) * 1000)
 
+    # Bei LLM-Ausfall: Mail nur indexieren, keinen Task erstellen
+    if result.get("_llm_fallback") and result.get("_all_providers_failed"):
+        log.warning(f"LLM nicht verfügbar, Mail nur indexiert (kein Task): {betreff[:60]}")
+        _elog('system', 'llm_unavailable_queued',
+              f"LLM nicht verfügbar, Mail nur indexiert: {betreff[:60]}",
+              source='mail_monitor', modul='mail_monitor', status='warnung',
+              context_type='mail', context_id=msg_id)
+        return result
+
     kategorie = result.get("kategorie", "Zur Kenntnis")
     konfidenz = result.get("konfidenz", "?")
 
