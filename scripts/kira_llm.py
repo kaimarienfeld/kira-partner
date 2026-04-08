@@ -698,6 +698,28 @@ def init_conversations_db():
     db.close()
 
 
+def _call_llm_simple(prompt: str, max_tokens: int = 2000, temperature: float = 0.3) -> str:
+    """Einfacher LLM-Aufruf ohne Tools/Konversation — für interne Aufgaben wie Website-Import."""
+    try:
+        provider, _cost = get_provider_for_task("classify")
+        if not provider:
+            return ""
+        api_key = _get_provider_key(provider)
+        if not api_key:
+            return ""
+        typ = provider.get("typ", "openai")
+        if typ == "anthropic":
+            result = _call_anthropic(provider, prompt, "Du bist ein hilfreicher Assistent.", tools=[], max_tokens=max_tokens, temperature=temperature)
+        else:
+            result = _call_openai_compat(provider, prompt, "Du bist ein hilfreicher Assistent.", tools=[], max_tokens=max_tokens, temperature=temperature)
+        if isinstance(result, dict):
+            return result.get("text", "") or result.get("content", "")
+        return str(result) if result else ""
+    except Exception as e:
+        logging.error(f"_call_llm_simple Fehler: {e}")
+        return ""
+
+
 def _build_leistungs_prompt(leistungen: dict) -> str:
     """Baut den Leistungskatalog-Block für Kiras System-Prompt."""
     if not leistungen:
@@ -4377,6 +4399,24 @@ def _build_briefing_stats(db):
         ]
     except:
         pass
+
+    # Leistungskatalog-Status
+    try:
+        from task_manager import get_active_profile, get_kategorien
+        _profil = get_active_profile()
+        _leist = _profil.get("leistungen", {})
+        stats["leistungskatalog"] = {
+            "anzahl": len(_leist.get("katalog", [])),
+            "nicht_leistungen": len(_leist.get("nicht_leistungen", [])),
+            "leer": not _leist.get("katalog"),
+            "quelle": _leist.get("quelle", ""),
+        }
+        # Dynamische Kategorien in Lernphase
+        dyn_kats = [k for k in get_kategorien(include_lernphase=True) if k.get("ist_dynamisch") and k.get("lernphase")]
+        stats["dynamische_kategorien_lernphase"] = len(dyn_kats)
+    except:
+        pass
+
     return stats
 
 

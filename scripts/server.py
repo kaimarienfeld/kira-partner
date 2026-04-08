@@ -1040,6 +1040,28 @@ def _dashboard_data(tasks=None, db=None):
         n_mi_antw = kat.get("Antwort erforderlich", 0)
         signale.append({"color": "purple", "text": f'{mi_stats["klassifiziert"]:,} Mails eingeordnet: {n_mi_leads} Leads, {n_mi_angebr} Angebotsrückmeldungen, {n_mi_antw} Business-Mails', "action": "esShowSec('mail');showPanel('einstellungen')"})
 
+    # Leistungskatalog-Hinweise
+    try:
+        from task_manager import get_active_profile
+        _profil = get_active_profile()
+        _leist = _profil.get("leistungen", {})
+        _katalog = _leist.get("katalog", [])
+        if not _katalog:
+            signale.append({"color": "amber", "text": "Leistungskatalog leer \u2014 Kira kann Anfragen nicht qualifizieren. In Einstellungen > Benutzerprofile hinterlegen.", "action": "esShowSec('benutzerprofile');showPanel('einstellungen')"})
+    except Exception:
+        pass
+
+    # Dynamische Kategorien: Anfragen außerhalb Leistungsspektrum zählen
+    try:
+        from task_manager import get_kategorien
+        dyn_kats = [k for k in get_kategorien(include_lernphase=True) if k.get("ist_dynamisch") and k.get("lernphase")]
+        if dyn_kats:
+            _dyn_names = ", ".join(k["name"] for k in dyn_kats[:3])
+            _more = f" +{len(dyn_kats)-3}" if len(dyn_kats) > 3 else ""
+            signale.append({"color": "blue", "text": f'{len(dyn_kats)} neue Kategorie{"n" if len(dyn_kats) > 1 else ""} in Lernphase: {_dyn_names}{_more}', "action": "esShowSec('mail');showPanel('einstellungen')"})
+    except Exception:
+        pass
+
     # Feed (runtime events)
     feed = []
     try:
@@ -1210,12 +1232,26 @@ function briefingCard(b){{
 }}
 
 /* ── Actions Card ── */
+const _KAT_TAG_MAP={{
+  "Antwort erforderlich":{{cls:"dlive-tag-red",text:"dringend"}},
+  "Neue Lead-Anfrage":{{cls:"dlive-tag-blue",text:"neuer Lead"}},
+  "Angebotsrückmeldung":{{cls:"dlive-tag-amber",text:"Angebot"}},
+  "Rechnung / Beleg":{{cls:"dlive-tag-green",text:"Rechnung"}},
+  "Shop / System":{{cls:"dlive-tag-purple",text:"Shop/System"}},
+  "Zur Kenntnis":{{cls:"dlive-tag-cyan",text:"Info"}},
+}};
+function _katTag(kat){{
+  const m=_KAT_TAG_MAP[kat];
+  if(m)return `<span class="dlive-tag ${{m.cls}}">${{m.text}}</span>`;
+  if(kat)return `<span class="dlive-tag dlive-tag-gray">${{kat.length>20?kat.substring(0,18)+"\u2026":kat}}</span>`;
+  return `<span class="dlive-tag dlive-tag-gray">offen</span>`;
+}}
 function actionsCard(actions){{
   if(!actions||!actions.length)return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div><div class="dlive-panel-sub">Top-Aufgaben</div><div class="dlive-empty">&#x2713; Keine priorisierten Aufgaben</div></div>`;
   const items=actions.map(a=>{{
     const kat=a.kategorie||"";
     const pClass=kat==="Antwort erforderlich"?"prio-red":kat==="Neue Lead-Anfrage"?"prio-blue":kat==="Angebotsrückmeldung"?"prio-amber":"prio-gray";
-    const tag=kat==="Antwort erforderlich"?`<span class="dlive-tag dlive-tag-red">dringend</span>`:kat==="Neue Lead-Anfrage"?`<span class="dlive-tag dlive-tag-blue">neuer Lead</span>`:kat==="Angebotsrückmeldung"?`<span class="dlive-tag dlive-tag-amber">Angebot</span>`:`<span class="dlive-tag dlive-tag-gray">offen</span>`;
+    const tag=_katTag(kat);
     const meta=[kat,a.kunden_name,a.datum_mail].filter(Boolean).join(" \\u00B7 ");
     const next=a.empfohlene_aktion?`<span class="dlive-prio-next">${{esc(a.empfohlene_aktion)}}</span>`:"";
     return `<div class="dlive-prio-item ${{pClass}}">
@@ -6185,6 +6221,10 @@ def build_einstellungen():
     _profil_branche = esc(_profil.get("firma_branche", ""))
     _profil_beschreibung = esc(_profil.get("firma_beschreibung", ""))
     _profil_domains = _profil.get("eigene_domains", [])
+    _profil_leistungen = _profil.get("leistungen", {})
+    _profil_katalog = _profil_leistungen.get("katalog", [])
+    _profil_nicht_leistungen = _profil_leistungen.get("nicht_leistungen", [])
+    _profil_website_url = _profil_leistungen.get("website_url", "")
     _alle_konten = config.get("combined_postfach", {}).get("konten", [])
     # Dynamische Kategorien für Korrektur-Modal
     try:
@@ -7115,6 +7155,50 @@ function esInfoPopup(btn, text) {{
         {"".join(f'<div class="bp-domain-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-domain-val" value="{esc(d)}" placeholder="beispiel.de" style="flex:1;max-width:320px"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for d in _profil_domains)}
       </div>
       <button class="es-btn" onclick="bpAddDomain()" style="margin-top:4px;align-self:flex-start">+ Domain hinzuf&uuml;gen</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Leistungskatalog
+      <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">Kira pr&uuml;ft bei jeder Anfrage ob die Leistung zu eurem Spektrum passt</span>
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Website-URL<div class="es-rd">Kira kann eure Website scannen und Leistungen automatisch importieren</div></div>
+      <div style="display:flex;gap:6px;flex:1;align-items:center">
+        <input class="es-inp" id="cfg-leistungen-url" value="{esc(_profil_website_url)}" placeholder="https://beispiel.de" style="flex:1">
+        <button class="es-btn" onclick="leistungenImportieren()" id="btn-leistungen-import" style="white-space:nowrap">Von Website importieren</button>
+      </div>
+    </div>
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-rl" style="margin-bottom:6px">Angebotene Leistungen<div class="es-rd">Kira nutzt diese bei der Klassifizierung und bei Antwort-Entw&uuml;rfen</div></div>
+      <div id="bp-leistungen-list">
+        {"".join(f'''<div class="bp-leistung-card" style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <input class="es-inp bp-l-name" value="{esc(l.get("name",""))}" placeholder="Leistungsname" style="flex:1;min-width:180px;font-weight:600">
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern" {"checked" if l.get("ist_kernleistung") else ""}> Kernleistung</label>
+            <button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>
+          </div>
+          <textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px" placeholder="Beschreibung der Leistung&hellip;">{esc(l.get("beschreibung",""))}</textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>
+              <input class="es-inp bp-l-stichworte" value="{esc(", ".join(l.get("stichworte",[])))}" placeholder="Stichwort1, Stichwort2&hellip;" style="width:100%">
+            </div>
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:10px;color:var(--muted)">Zielgruppe</div>
+              <input class="es-inp bp-l-zielgruppe" value="{esc(l.get("zielgruppe",""))}" placeholder="z.B. Architekten, Bauherren&hellip;" style="width:100%">
+            </div>
+          </div>
+        </div>''' for l in _profil_katalog)}
+      </div>
+      <button class="es-btn" onclick="bpAddLeistung()" style="margin-top:4px;align-self:flex-start">+ Leistung hinzuf&uuml;gen</button>
+    </div>
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-rl" style="margin-bottom:4px">Nicht angebotene Leistungen<div class="es-rd">Kira stuft Anfragen zu diesen Themen NICHT als Lead ein</div></div>
+      <div id="bp-nicht-leistungen-list">
+        {"".join(f'<div class="bp-nl-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-nl-val" value="{esc(nl)}" placeholder="z.B. Kostenlose Beratung f&uuml;r Heimwerker" style="flex:1"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for nl in _profil_nicht_leistungen)}
+      </div>
+      <button class="es-btn" onclick="bpAddNichtLeistung()" style="margin-top:4px;align-self:flex-start">+ Ausschluss hinzuf&uuml;gen</button>
     </div>
   </div>
 
@@ -17296,6 +17380,112 @@ function _bpCollectDomains() {{
   const rows = document.querySelectorAll('#bp-domain-list .bp-domain-val');
   return Array.from(rows).map(inp => inp.value.trim()).filter(Boolean);
 }}
+// ── Benutzerprofile: Leistungskatalog verwalten ──
+function bpAddLeistung() {{
+  const list = document.getElementById('bp-leistungen-list');
+  if(!list) return;
+  const card = document.createElement('div');
+  card.className = 'bp-leistung-card';
+  card.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)';
+  card.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">`
+    +`<input class="es-inp bp-l-name" value="" placeholder="Leistungsname" style="flex:1;min-width:180px;font-weight:600">`
+    +`<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern"> Kernleistung</label>`
+    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>`
+    +`</div>`
+    +`<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px" placeholder="Beschreibung der Leistung\u2026"></textarea>`
+    +`<div style="display:flex;gap:8px;flex-wrap:wrap">`
+    +`<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>`
+    +`<input class="es-inp bp-l-stichworte" value="" placeholder="Stichwort1, Stichwort2\u2026" style="width:100%"></div>`
+    +`<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Zielgruppe</div>`
+    +`<input class="es-inp bp-l-zielgruppe" value="" placeholder="z.B. Architekten, Bauherren\u2026" style="width:100%"></div>`
+    +`</div>`;
+  list.appendChild(card);
+  card.querySelector('.bp-l-name').focus();
+}}
+function bpAddNichtLeistung() {{
+  const list = document.getElementById('bp-nicht-leistungen-list');
+  if(!list) return;
+  const row = document.createElement('div');
+  row.className = 'bp-nl-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  row.innerHTML = `<input class="es-inp bp-nl-val" value="" placeholder="z.B. Kostenlose Beratung f\u00fcr Heimwerker" style="flex:1">`
+    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}}
+function _bpCollectLeistungen() {{
+  const katalog = [];
+  document.querySelectorAll('#bp-leistungen-list .bp-leistung-card').forEach(card => {{
+    const name = (card.querySelector('.bp-l-name')?.value || '').trim();
+    if(!name) return;
+    katalog.push({{
+      name: name,
+      beschreibung: (card.querySelector('.bp-l-beschr')?.value || '').trim(),
+      stichworte: (card.querySelector('.bp-l-stichworte')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      zielgruppe: (card.querySelector('.bp-l-zielgruppe')?.value || '').trim(),
+      ist_kernleistung: card.querySelector('.bp-l-kern')?.checked ?? false
+    }});
+  }});
+  const nicht = [];
+  document.querySelectorAll('#bp-nicht-leistungen-list .bp-nl-val').forEach(inp => {{
+    const v = inp.value.trim();
+    if(v) nicht.push(v);
+  }});
+  return {{
+    website_url: (document.getElementById('cfg-leistungen-url')?.value || '').trim(),
+    letzte_aktualisierung: new Date().toISOString().slice(0,10),
+    katalog: katalog,
+    nicht_leistungen: nicht,
+    quelle: 'manuell'
+  }};
+}}
+function leistungenImportieren() {{
+  const url = (document.getElementById('cfg-leistungen-url')?.value || '').trim();
+  if(!url) {{ showToast('Bitte erst Website-URL eingeben'); return; }}
+  const btn = document.getElementById('btn-leistungen-import');
+  if(btn) {{ btn.disabled=true; btn.textContent='Importiere\u2026'; }}
+  fetch('/api/leistungen/import', {{
+    method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{url: url}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Von Website importieren'; }}
+    if(d.ok && d.leistungen) {{
+      // Importierte Leistungen als Karten einf\u00fcgen
+      const list = document.getElementById('bp-leistungen-list');
+      (d.leistungen.katalog || []).forEach(l => {{
+        // Pr\u00fcfen ob Name schon existiert
+        const existing = Array.from(list.querySelectorAll('.bp-l-name')).map(i=>i.value.trim().toLowerCase());
+        if(existing.includes(l.name.toLowerCase())) return;
+        // Neue Karte hinzuf\u00fcgen
+        bpAddLeistung();
+        const cards = list.querySelectorAll('.bp-leistung-card');
+        const last = cards[cards.length-1];
+        if(!last) return;
+        last.querySelector('.bp-l-name').value = l.name || '';
+        last.querySelector('.bp-l-beschr').value = l.beschreibung || '';
+        last.querySelector('.bp-l-stichworte').value = (l.stichworte||[]).join(', ');
+        last.querySelector('.bp-l-zielgruppe').value = l.zielgruppe || '';
+        if(l.ist_kernleistung) last.querySelector('.bp-l-kern').checked = true;
+      }});
+      // Nicht-Leistungen
+      const nlList = document.getElementById('bp-nicht-leistungen-list');
+      const existingNl = Array.from(nlList.querySelectorAll('.bp-nl-val')).map(i=>i.value.trim().toLowerCase());
+      (d.leistungen.nicht_leistungen || []).forEach(nl => {{
+        if(existingNl.includes(nl.toLowerCase())) return;
+        bpAddNichtLeistung();
+        const rows = nlList.querySelectorAll('.bp-nl-val');
+        rows[rows.length-1].value = nl;
+      }});
+      showToast(`${{(d.leistungen.katalog||[]).length}} Leistungen importiert`);
+    }} else {{
+      showToast(d.error||'Import fehlgeschlagen');
+    }}
+  }}).catch(()=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Von Website importieren'; }}
+    showToast('Import-Fehler');
+  }});
+}}
 function _bpCollectProfile() {{
   return {{
     aktives_profil: 'profil_1',
@@ -17306,6 +17496,7 @@ function _bpCollectProfile() {{
         firma_beschreibung: (document.getElementById('cfg-profil-beschreibung')?.value || '').trim(),
         team: _bpCollectTeam(),
         eigene_domains: _bpCollectDomains(),
+        leistungen: _bpCollectLeistungen(),
         social_media: {{}}
       }}
     }}
@@ -22116,10 +22307,14 @@ a:hover{text-decoration:underline;}
 .dlive-tag-blue{background:rgba(26,92,168,.1);color:#1a5ca8;}
 .dlive-tag-gray{background:var(--bg-overlay);color:var(--text-secondary);}
 .dlive-tag-green{background:rgba(46,96,16,.1);color:#2E6010;}
+.dlive-tag-purple{background:rgba(124,58,237,.1);color:#7c3aed;}
+.dlive-tag-cyan{background:rgba(6,182,212,.1);color:#0891b2;}
 [data-theme="light"] .dlive-tag-red{background:#FCEBEB;}
 [data-theme="light"] .dlive-tag-amber{background:#FEF3E2;}
 [data-theme="light"] .dlive-tag-blue{background:#E8F0FE;}
 [data-theme="light"] .dlive-tag-green{background:#EAF3DE;}
+[data-theme="light"] .dlive-tag-purple{background:#F3EEFF;}
+[data-theme="light"] .dlive-tag-cyan{background:#E0F7FA;}
 .dlive-prio-next{font-size:10px;color:var(--text-secondary);margin-left:2px;font-style:italic;}
 /* Kebab menu */
 .dlive-prio-menu{position:relative;flex-shrink:0;margin-left:auto;}
@@ -29473,6 +29668,83 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "message": f"Leistungskatalog gespeichert: {len(leistungen.get('katalog', []))} Leistungen, {len(leistungen.get('nicht_leistungen', []))} Ausschlüsse"})
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)})
+
+        # Leistungskatalog von Website importieren
+        if self.path == '/api/leistungen/import':
+            try:
+                url = body.get("url", "").strip()
+                if not url:
+                    return self._json({"ok": False, "error": "Keine URL angegeben"})
+                # Website-Inhalt abrufen
+                import urllib.request
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 KiraBot/1.0"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    html_content = resp.read().decode('utf-8', errors='replace')
+                # HTML-Tags entfernen, nur sichtbaren Text behalten
+                import re as _re
+                # Script/Style-Blöcke entfernen
+                text = _re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', html_content, flags=_re.DOTALL|_re.IGNORECASE)
+                text = _re.sub(r'<[^>]+>', ' ', text)
+                text = _re.sub(r'\s+', ' ', text).strip()
+                # Auf sinnvolle Länge begrenzen
+                if len(text) > 8000:
+                    text = text[:8000]
+                # LLM-Analyse: Leistungen extrahieren
+                config = load_config()
+                providers = config.get("llm", {}).get("providers", [])
+                aktive = [p for p in providers if p.get("aktiv")]
+                if not aktive:
+                    return self._json({"ok": False, "error": "Kein aktiver LLM-Provider konfiguriert"})
+                from task_manager import get_active_profile
+                profil = get_active_profile(config)
+                firma_name = profil.get("firma_name", "")
+                firma_branche = profil.get("firma_branche", "")
+                prompt = f"""Analysiere den folgenden Website-Text von "{firma_name}" (Branche: {firma_branche}).
+Extrahiere die angebotenen Leistungen/Dienstleistungen und erstelle einen strukturierten Leistungskatalog.
+
+Website-Text:
+{text}
+
+Antworte NUR als JSON-Objekt (kein Markdown, kein Code-Block):
+{{
+  "katalog": [
+    {{
+      "name": "Leistungsname",
+      "beschreibung": "Kurze Beschreibung",
+      "stichworte": ["Stichwort1", "Stichwort2"],
+      "zielgruppe": "z.B. Architekten, Bauherren",
+      "ist_kernleistung": true
+    }}
+  ],
+  "nicht_leistungen": ["Dinge die das Unternehmen NICHT anbietet, wenn erkennbar"]
+}}
+
+Regeln:
+- Nur TATSÄCHLICH angebotene Leistungen aufnehmen
+- ist_kernleistung=true für die Hauptleistungen (max. 3-5)
+- nicht_leistungen: häufige Verwechslungen oder Anfragen die NICHT bedient werden
+- Maximal 15 Leistungen, fokussiere auf die wichtigsten"""
+
+                from kira_llm import _call_llm_simple
+                llm_response = _call_llm_simple(prompt, max_tokens=2000)
+                if not llm_response:
+                    return self._json({"ok": False, "error": "LLM konnte keine Antwort generieren"})
+                # JSON parsen
+                import re as _re2
+                json_match = _re2.search(r'\{[\s\S]*\}', llm_response)
+                if not json_match:
+                    return self._json({"ok": False, "error": "LLM-Antwort konnte nicht geparst werden"})
+                leistungen = json.loads(json_match.group())
+                leistungen["website_url"] = url
+                leistungen["letzte_aktualisierung"] = datetime.now().strftime("%Y-%m-%d")
+                leistungen["quelle"] = "website-import"
+                rlog('settings', 'leistungen_import', f'Website-Import von {url}: {len(leistungen.get("katalog", []))} Leistungen',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
+                return self._json({"ok": True, "leistungen": leistungen})
+            except json.JSONDecodeError:
+                return self._json({"ok": False, "error": "LLM-Antwort war kein gültiges JSON"})
+            except Exception as e:
+                return self._json({"ok": False, "error": f"Import-Fehler: {str(e)}"})
 
         # Config zurücksetzen auf Werkseinstellungen
         if self.path == '/api/config/reset':
