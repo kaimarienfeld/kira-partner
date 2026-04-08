@@ -171,10 +171,13 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
             for _nl in nicht_leistungen:
                 _teile.append(f"  ✗ {_nl}")
         _teile.append(
-            "\n→ PFLICHT: Prüfe bei jeder Anfrage ob die angefragte Leistung zum Spektrum passt!"
-            "\n  Anfragen die NICHT zum Leistungsspektrum passen → KEINE 'Neue Lead-Anfrage'!"
-            "\n  Stattdessen: 'Zur Kenntnis' mit empfohlene_aktion = Höfliche Absage vorschlagen."
-            "\n  DIY-Beratung / kostenlose Telefonhilfe ohne Auftragsbezug → kein Lead."
+            "\n→ PFLICHT: Prüfe bei JEDER Anfrage (Mail, WhatsApp, Chat, alle Kanäle) ob die angefragte Leistung zum Spektrum passt!"
+            "\n  Anfragen die NICHT zum Leistungsspektrum passen:"
+            "\n  - KEINE 'Neue Lead-Anfrage', KEINE 'Antwort erforderlich', KEINE 'Angebotsrückmeldung'"
+            "\n  - Stattdessen: 'Zur Kenntnis' oder 'VORSCHLAG: Außerhalb Leistungsspektrum'"
+            "\n  - empfohlene_aktion = 'Höfliche Absage: Leistung wird nicht angeboten. Ggf. Weiterempfehlung.'"
+            "\n  - zusammenfassung MUSS erwähnen dass die Anfrage nicht zum Leistungsspektrum passt"
+            "\n  DIY-Beratung / kostenlose Telefonhilfe ohne Auftragsbezug → kein Lead, kein Handlungsbedarf."
         )
         leistungs_block = "\n".join(_teile) + "\n"
 

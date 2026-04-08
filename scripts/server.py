@@ -6580,6 +6580,7 @@ def build_einstellungen():
 .es-toggle-inp:checked ~ .es-toggle-vis::after{{transform:translateX(18px);}}
 .es-sel{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;}}
 .es-inp{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:200px;}}
+.bp-leistung-card .es-inp,.bp-nl-row .es-inp{{width:auto;flex:1;min-width:0;box-sizing:border-box;}}
 .es-inp-sm{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:100px;}}
 .es-badge{{font-size:var(--fs-xs);padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0;white-space:nowrap;}}
 .es-badge.on{{background:#EAF3DE;color:#3B6D11;}}
@@ -7162,10 +7163,10 @@ function esInfoPopup(btn, text) {{
     <div class="es-grp-h">Leistungskatalog
       <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">Kira pr&uuml;ft bei jeder Anfrage ob die Leistung zu eurem Spektrum passt</span>
     </div>
-    <div class="es-row">
-      <div class="es-rl">Website-URL<div class="es-rd">Kira kann eure Website scannen und Leistungen automatisch importieren</div></div>
-      <div style="display:flex;gap:6px;flex:1;align-items:center">
-        <input class="es-inp" id="cfg-leistungen-url" value="{esc(_profil_website_url)}" placeholder="https://beispiel.de" style="flex:1">
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-rl" style="margin-bottom:4px">Website-URL<div class="es-rd">Kira kann eure Website scannen und Leistungen automatisch importieren</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="es-inp" id="cfg-leistungen-url" value="{esc(_profil_website_url)}" placeholder="https://beispiel.de" style="flex:1;width:auto">
         <button class="es-btn" onclick="leistungenImportieren()" id="btn-leistungen-import" style="white-space:nowrap">Von Website importieren</button>
       </div>
     </div>
@@ -7178,7 +7179,7 @@ function esInfoPopup(btn, text) {{
             <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern" {"checked" if l.get("ist_kernleistung") else ""}> Kernleistung</label>
             <button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>
           </div>
-          <textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px" placeholder="Beschreibung der Leistung&hellip;">{esc(l.get("beschreibung",""))}</textarea>
+          <textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung der Leistung&hellip;">{esc(l.get("beschreibung",""))}</textarea>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <div style="flex:1;min-width:200px">
               <div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>
@@ -7194,7 +7195,7 @@ function esInfoPopup(btn, text) {{
       <button class="es-btn" onclick="bpAddLeistung()" style="margin-top:4px;align-self:flex-start">+ Leistung hinzuf&uuml;gen</button>
     </div>
     <div class="es-row" style="flex-direction:column;align-items:stretch">
-      <div class="es-rl" style="margin-bottom:4px">Nicht angebotene Leistungen<div class="es-rd">Kira stuft Anfragen zu diesen Themen NICHT als Lead ein</div></div>
+      <div class="es-rl" style="margin-bottom:4px">Nicht angebotene Leistungen<div class="es-rd">Kira ber&uuml;cksichtigt diese &uuml;berall: Klassifizierung, Antwort-Entw&uuml;rfe, Chat, WhatsApp &mdash; unpassende Anfragen werden erkannt</div></div>
       <div id="bp-nicht-leistungen-list">
         {"".join(f'<div class="bp-nl-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-nl-val" value="{esc(nl)}" placeholder="z.B. Kostenlose Beratung f&uuml;r Heimwerker" style="flex:1"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for nl in _profil_nicht_leistungen)}
       </div>
@@ -17392,7 +17393,7 @@ function bpAddLeistung() {{
     +`<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern"> Kernleistung</label>`
     +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>`
     +`</div>`
-    +`<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px" placeholder="Beschreibung der Leistung\u2026"></textarea>`
+    +`<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung der Leistung\u2026"></textarea>`
     +`<div style="display:flex;gap:8px;flex-wrap:wrap">`
     +`<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>`
     +`<input class="es-inp bp-l-stichworte" value="" placeholder="Stichwort1, Stichwort2\u2026" style="width:100%"></div>`
@@ -29656,13 +29657,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # Leistungskatalog verwalten
         if self.path == '/api/leistungen':
             try:
-                config = load_config()
+                cfg_path = SCRIPTS_DIR / "config.json"
+                config = json.loads(cfg_path.read_text('utf-8'))
                 bp = config.setdefault("benutzer_profile", {})
                 aktiv = bp.get("aktives_profil", "profil_1")
                 profil = bp.setdefault("profile", {}).setdefault(aktiv, {})
                 leistungen = body.get("leistungen", {})
                 profil["leistungen"] = leistungen
-                save_config(config)
+                cfg_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), 'utf-8')
                 rlog('settings', 'leistungen_updated', f'Leistungskatalog aktualisiert: {len(leistungen.get("katalog", []))} Leistungen',
                      source='server', modul='einstellungen', actor_type='user', status='ok')
                 return self._json({"ok": True, "message": f"Leistungskatalog gespeichert: {len(leistungen.get('katalog', []))} Leistungen, {len(leistungen.get('nicht_leistungen', []))} Ausschlüsse"})
@@ -29690,13 +29692,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if len(text) > 8000:
                     text = text[:8000]
                 # LLM-Analyse: Leistungen extrahieren
-                config = load_config()
-                providers = config.get("llm", {}).get("providers", [])
+                _cfg_import = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
+                providers = _cfg_import.get("llm", {}).get("providers", [])
                 aktive = [p for p in providers if p.get("aktiv")]
                 if not aktive:
                     return self._json({"ok": False, "error": "Kein aktiver LLM-Provider konfiguriert"})
                 from task_manager import get_active_profile
-                profil = get_active_profile(config)
+                profil = get_active_profile(_cfg_import)
                 firma_name = profil.get("firma_name", "")
                 firma_branche = profil.get("firma_branche", "")
                 prompt = f"""Analysiere den folgenden Website-Text von "{firma_name}" (Branche: {firma_branche}).

@@ -739,9 +739,11 @@ def _build_leistungs_prompt(leistungen: dict) -> str:
         for nl in nicht_l:
             lines.append(f"  ✗ {nl}")
     lines.append(
-        "\n→ Wenn eine Anfrage NICHT zum Leistungsspektrum passt: "
-        "Weise darauf hin und schlage eine höfliche Absage vor. "
-        "Berücksichtige das Leistungsspektrum bei Antwort-Entwürfen."
+        "\n→ PFLICHT bei JEDER Anfrage (Mail, Chat, WhatsApp, alle Kanäle):"
+        "\n  - Prüfe ob die angefragte Leistung zum Spektrum passt"
+        "\n  - Wenn NICHT: Weise sofort darauf hin, schlage höfliche Absage vor"
+        "\n  - Bei Antwort-Entwürfen: Leistungsspektrum berücksichtigen"
+        "\n  - Bei Nicht-Leistungen: Klar kommunizieren, ggf. Weiterempfehlung anbieten"
     )
     return "\n".join(lines)
 
