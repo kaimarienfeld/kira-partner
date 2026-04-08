@@ -1,5 +1,40 @@
 # Session Log
 
+## 2026-04-08 14:00 — Session-Start (session-ffff-intelligenz)
+**Auftrag:** Kira Intelligenz-Upgrade — Plan "gleaming-sauteeing-sun" (6 Schritte). Mails wirklich lesen, Aktionen vorschlagen, Follow-ups tracken. Universelle Benutzerprofile statt hardcoded.
+**Status:** erledigt
+
+### 2026-04-08 14:05 — Schritt 1: Benutzerprofile
+**Was:** get_active_profile() in task_manager.py, Legacy-Fallback, Einstellungen-UI (Firma/Team/Domains)
+**Status:** erledigt
+
+### 2026-04-08 14:10 — Schritt 2: Klassifizierer profil-basiert + tiefer lesen
+**Was:** llm_classifier.py: Profil-Prompt, Text-Limit 3000→6000, 3 neue LLM-Felder (vorgeschlagene_aktionen, erkannte_termine, mail_zusammenhang), Tiefer-Lesen + Gesendete-Mail-Analyse
+**Status:** erledigt
+
+### 2026-04-08 14:15 — Schritt 3: Aktionen bei ALLEN Mails verarbeiten
+**Was:** mail_monitor.py: mail_commitments DB-Tabelle, _process_vorgeschlagene_aktionen() + _process_erkannte_termine() VOR Early-Returns
+**Status:** erledigt
+
+### 2026-04-08 14:20 — Schritt 4: scan_offene_zusagen() Proaktiv-Scan
+**Was:** kira_proaktiv.py: Scan 13, überfällige + bald fällige Commitments, Stufe-B Signale via kira_notify()
+**Status:** erledigt
+
+### 2026-04-08 14:25 — Schritt 5+6: UI + kira_llm.py profil-basiert
+**Was:** server.py: Benutzerprofile-Sektion, Offene Zusagen Tab, Activity-Feed Kacheln, /api/zusagen. kira_llm.py: System-Prompt + Kontext aus Profil, OFFENE ZUSAGEN Sektion. daily_check.py: Profil-basiert.
+**Status:** erledigt
+
+### 2026-04-08 14:30 — Commit
+**Commit:** 08fcf7a — feat(kira): Intelligenz-Upgrade — Mails tiefer lesen, Aktionen vorschlagen, Zusagen tracken
+**Status:** erledigt
+
+---
+## 2026-04-08 14:30 — Session-Ende (session-ffff-intelligenz)
+**Erledigt:** Kira Intelligenz-Upgrade ALLE 6 Schritte komplett. 7 Dateien, 758 Insertions, 54 Deletions.
+**Offen geblieben:** Playwright-Test der neuen UI-Elemente. Nachklassifizierung mit neuen LLM-Feldern testen.
+**Status:** erledigt
+
+---
 ## 2026-04-03 14:00 — Session-Start (session-cccc-dashboard)
 **Auftrag:** Dashboard Live-Redesign implementieren — Plan "whimsical-frolicking-dawn" (6 Phasen). Statisches Server-Side-HTML durch dynamisches Client-Side-JS ersetzen. 3 wählbare Layouts (A: Bento Grid, B: Command Center, C: Smart Cards). JSON-API /api/dashboard/live. Animationen (Count-Up, Stagger, Bounce, Shimmer, Pulse). Auto-Refresh. Einstellungen UI.
 **Status:** erledigt (Phasen 1-4 + 6)
