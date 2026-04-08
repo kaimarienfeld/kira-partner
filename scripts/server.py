@@ -6154,6 +6154,7 @@ def build_einstellungen():
     kira_feedback_cfg  = kira_cfg.get("feedback", {})
     kira_sicherheit_cfg = kira_cfg.get("sicherheit", {})
     kira_proaktiv_cfg  = config.get("kira_proaktiv", {})
+    af_cfg             = config.get("activity_feed", {})
     backup_cfg_es      = config.get("backup", {})
     capture_cfg_es     = config.get("capture", {})
     cf_tunnel_cfg      = config.get("cloudflare_tunnel", {})
@@ -11064,6 +11065,15 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
     <div class="es-grp-sub">Diese Scans laufen im Hintergrund. Intervall und Schwellen einstellbar unter Kira / LLM / Provider.</div>
     <div id="auto-scan-status">
       <div style="color:var(--muted);font-size:11px;padding:8px 0">Lade Scan-Status&hellip;</div>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Activity Feed</div>
+    <div class="es-grp-sub">Einstellungen f&uuml;r den Kira Activity-Drawer (Widget-Kacheln).</div>
+    <div class="es-row">
+      <div class="es-rl">Revival-Tage<div class="es-rd">Weggeklickte Meldungen erscheinen nach dieser Anzahl Tagen wieder, sofern das Problem noch besteht.</div></div>
+      <input class="es-inp-sm" type="number" id="cfg-af-revival-tage" value="{af_cfg.get('revival_tage', 7)}" min="1" max="90" style="width:80px">
     </div>
   </div>
 
@@ -18806,6 +18816,9 @@ function saveSettings() {{
       kira_darf_erstellen:    document.getElementById('cfg-dok-kira-erstellen')?.checked ?? true,
       kira_darf_zuordnen:     document.getElementById('cfg-dok-kira-zuordnen')?.checked ?? true,
       max_upload_mb:          parseInt(document.getElementById('cfg-dok-max-upload')?.value || '25')
+    }},
+    activity_feed: {{
+      revival_tage: parseInt(document.getElementById('cfg-af-revival-tage')?.value || '7', 10)
     }},
     backup: {{
       aktiv:  document.getElementById('cfg-backup-aktiv')?.checked ?? false,
