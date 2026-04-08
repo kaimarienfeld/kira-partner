@@ -1285,11 +1285,13 @@ def _route_kira_vorschlag_dc(cl, kunden_email, betreff, text, msgid, konto):
         zusammenfassung = cl.get("zusammenfassung", "")
         combined = (betreff + " " + (text or "")[:500]).lower()
 
-        # Firmendaten aus config.json
+        # Firmendaten aus Profil laden
         try:
-            _cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8", errors="replace"))
-            _firma = _cfg.get("firma_name", "")
-            _inhaber = _cfg.get("firma_inhaber", "")
+            from task_manager import get_active_profile as _gap_dc
+            _profil_dc = _gap_dc()
+            _firma = _profil_dc.get("firma_name", "")
+            _team_dc = _profil_dc.get("team", [])
+            _inhaber = _team_dc[0].get("name", "") if _team_dc else ""
             _sig = f"\n\nMit freundlichen Grüßen\n{_inhaber or 'Team'}\n{_firma}" if _firma else ""
         except Exception:
             _sig = ""

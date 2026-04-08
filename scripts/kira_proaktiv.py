@@ -915,6 +915,97 @@ def scan_lexware_zahlungsabgleich(db, state: dict) -> dict:
         return {}
 
 
+# ── Scan 13: Offene Zusagen + Fällige Commitments ───────────────────────────
+def scan_offene_zusagen(db, state: dict) -> list:
+    """
+    Zwei Teile:
+    1) Fällige Commitments aus mail_commitments signalisieren
+    2) Bald fällige Commitments als Vorwarnung
+    """
+    signale = []
+    try:
+        # Tabelle existiert?
+        tables = [r[0] for r in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='mail_commitments'").fetchall()]
+        if "mail_commitments" not in tables:
+            return signale
+
+        heute = date.today().isoformat()
+
+        # Teil 1: Überfällige + heute fällige Commitments
+        rows = db.execute("""
+            SELECT id, typ, text, datum_faellig, absender, betreff, erstellt_am
+            FROM mail_commitments
+            WHERE status='offen' AND datum_faellig IS NOT NULL AND datum_faellig <= ?
+            ORDER BY datum_faellig
+            LIMIT 20
+        """, (heute,)).fetchall()
+
+        for row in rows:
+            row = dict(row)
+            tage_ueber = (date.today() - date.fromisoformat(row["datum_faellig"])).days
+            label = f"seit {tage_ueber} Tag(en) überfällig" if tage_ueber > 0 else "heute fällig"
+            text_kurz = (row.get("text") or "")[:80]
+            absender_kurz = (row.get("absender") or "").split("<")[0].strip()[:40]
+
+            signale.append({
+                "id": row["id"],
+                "typ": row.get("typ", ""),
+                "text": text_kurz,
+                "absender": absender_kurz,
+                "betreff": (row.get("betreff") or "")[:60],
+                "datum_faellig": row["datum_faellig"],
+                "label": label,
+                "stufe": "B"
+            })
+
+            # Stufe-B Signal via kira_notify
+            try:
+                from case_engine import kira_notify
+                kira_notify(
+                    event_type="zusage_faellig",
+                    titel=f"⏰ {text_kurz}" if text_kurz else f"⏰ Zusage an {absender_kurz}",
+                    text=f"{label} — {row.get('betreff', '')}",
+                    stufe="B",
+                    cooldown_key=f"zusage_{row['id']}",
+                    cooldown_h=12
+                )
+            except Exception:
+                pass
+
+        # Teil 2: Vorwarnungen (Erinnerungsdatum erreicht, aber noch nicht fällig)
+        vorwarnungen = db.execute("""
+            SELECT id, typ, text, datum_faellig, datum_erinnerung, absender, betreff
+            FROM mail_commitments
+            WHERE status='offen' AND datum_erinnerung IS NOT NULL
+              AND datum_erinnerung <= ? AND (datum_faellig IS NULL OR datum_faellig > ?)
+            ORDER BY datum_erinnerung
+            LIMIT 10
+        """, (heute, heute)).fetchall()
+
+        for row in vorwarnungen:
+            row = dict(row)
+            text_kurz = (row.get("text") or "")[:80]
+            signale.append({
+                "id": row["id"],
+                "typ": row.get("typ", ""),
+                "text": text_kurz,
+                "datum_faellig": row.get("datum_faellig"),
+                "label": f"fällig am {row.get('datum_faellig', '?')}",
+                "stufe": "A"
+            })
+
+        if signale:
+            _elog('system', 'zusagen_scan',
+                  f"{len(signale)} offene Zusage(n) gefunden ({len(rows)} fällig, {len(vorwarnungen)} Vorwarnungen)",
+                  source='kira_proaktiv', modul='zusagen', actor_type='system', status='ok')
+
+        _mark_done(state, "offene_zusagen")
+    except Exception as e:
+        log.error(f"scan_offene_zusagen: {e}")
+    return signale
+
+
 # ── Haupt-Scan ────────────────────────────────────────────────────────────────
 def run_proaktiver_scan() -> dict:
     """
@@ -996,6 +1087,15 @@ def run_proaktiver_scan() -> dict:
             if zahl_abgl.get('markiert', 0) > 0:
                 _push("Kira: Zahlungsabgleich",
                       f'{zahl_abgl["markiert"]} Rechnung(en) automatisch als bezahlt markiert')
+
+        # Scan 13: Offene Zusagen + fällige Commitments
+        zusagen = scan_offene_zusagen(db, state)
+        if zusagen:
+            ergebnisse['offene_zusagen'] = zusagen
+            n_faellig = len([s for s in zusagen if s.get("stufe") == "B"])
+            if n_faellig:
+                _push("Kira: Offene Zusagen",
+                      f"{n_faellig} Zusage(n) fällig oder überfällig")
 
         db.close()
         _save_state(state)

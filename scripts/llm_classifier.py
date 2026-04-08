@@ -17,6 +17,7 @@ from mail_classifier import (
     KATEGORIE_ZU_TASK_TYP,
     _extr_org, _extr_gesc
 )
+from task_manager import get_active_profile
 
 SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
@@ -54,7 +55,7 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
                                   lexware_kontext: str = "",
                                   anhang_texte: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
-    text_snippet = (text or "")[:3000]
+    text_snippet = (text or "")[:6000]
 
     angebote_block = ""
     if angebote_kontext:
@@ -104,7 +105,36 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
   Überfällige Rechnungen + Mail vom Kunden → könnte Zahlungsbezug haben.
 """
 
-    return f"""Klassifiziere diese E-Mail für rauMKult® Sichtbeton (Betonkosmetik-Fachbetrieb).
+    # ── Profil-basierte Benutzer-Identität laden ──
+    profil = get_active_profile()
+    team = profil.get("team", [])
+    hauptbenutzer = team[0] if team else {}
+    benutzer_name = hauptbenutzer.get("name", "")
+    benutzer_rolle = hauptbenutzer.get("rolle", "")
+    benutzer_anreden = ", ".join(hauptbenutzer.get("anrede_varianten", []))
+    benutzer_konten = ", ".join(hauptbenutzer.get("email_konten", []))
+    firma_name = profil.get("firma_name", "")
+    firma_branche = profil.get("firma_branche", "")
+    firma_beschreibung = profil.get("firma_beschreibung", "")
+
+    # Team-Mitglieder-Block (alle Namen + Anreden)
+    team_block = ""
+    if len(team) > 1:
+        team_lines = []
+        for tm in team[1:]:
+            tm_anreden = ", ".join(tm.get("anrede_varianten", []))
+            team_lines.append(f"  - {tm.get('name', '')} ({tm.get('rolle', '')}){f' — Anreden: {tm_anreden}' if tm_anreden else ''}")
+        team_block = "\nWeitere Team-Mitglieder:\n" + "\n".join(team_lines)
+
+    return f"""Klassifiziere diese E-Mail für {benutzer_name or 'den Benutzer'}{f' ({benutzer_rolle})' if benutzer_rolle else ''} bei {firma_name}{f' ({firma_branche})' if firma_branche else ''}.
+{firma_beschreibung}
+
+BENUTZER-IDENTITÄT:
+- E-Mail-Konten des Benutzers: {benutzer_konten}
+{f'- Bekannte Anreden: {benutzer_anreden}' if benutzer_anreden else ''}{team_block}
+Wenn die E-Mail den Benutzer persönlich anspricht (z.B. {benutzer_anreden or benutzer_name}), ist sie an ihn gerichtet — das ist KEINE anonyme Werbung.
+Prüfe genau ob sie geschäftsrelevant ist, bevor du "Ignorieren" vergibst.
+
 {angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}
 MAIL-DATEN:
 - Konto: {konto}
@@ -115,9 +145,21 @@ MAIL-DATEN:
 {anhang_texte}
 - Text (Auszug): {text_snippet}
 
+WICHTIG — Lies die E-Mail KOMPLETT und gründlich. Achte besonders auf:
+- Termine, Fristen, Fälligkeiten (auch beiläufig erwähnt, z.B. "nächste Rate am 4.5.")
+- Ob jemand auf eine Antwort wartet
+- Beträge, Raten, Zahlungsziele
+- Kontext: Eigene Zahlung? Kundenzahlung? Dienstleister?
+- Ob der Benutzer persönlich angesprochen wird
+
+Wenn im Mail-Verlauf gesendete Mails des Benutzers stehen (←):
+- Hat der Benutzer etwas zugesagt? ("Ich melde mich", "schicke Ihnen", "komme auf Sie zurück")
+- Wartet der Gesprächspartner seit >3 Tagen auf Antwort?
+→ Trage in "vorgeschlagene_aktionen" ein (typ: "nachfass").
+
 KATEGORIEN (wähle GENAU eine):
 1. "Antwort erforderlich" — Kunde/Partner erwartet eine Antwort, offene Fragen
-2. "Neue Lead-Anfrage" — Erstanfrage von Interessenten (Betonkosmetik, Sichtbeton, Betonretusche etc.)
+2. "Neue Lead-Anfrage" — Erstanfrage von Interessenten
 3. "Angebotsrueckmeldung" — Reaktion auf ein gesendetes Angebot (Zusage, Absage, Rückfragen)
 4. "Rechnung / Beleg" — Rechnungen, Belege, Zahlungsbestätigungen, Mahnungen
 5. "Shop / System" — Shop-Bestellungen, Systembenachrichtigungen
@@ -127,23 +169,20 @@ KATEGORIEN (wähle GENAU eine):
 9. "Ignorieren" — Spam, irrelevante Systemmails
 
 REGELN:
-- rauMKult macht Betonkosmetik: Sichtbeton, Betonretusche, Betonbeschichtung, Mikrozement
+- {firma_branche or 'Branche des Unternehmens beachten'}
 - Erstanfragen mit konkretem Projekt → Neue Lead-Anfrage
 - Re:/AW: mit Bezug auf Angebote → Angebotsrueckmeldung
 - Mails von bekanntem Angebots-Kunden (auch anderer Account!) → Angebotsrueckmeldung
 - Bei Unsicherheit: lieber "Antwort erforderlich" als "Ignorieren"
 - ANHAENGE BERUECKSICHTIGEN: PDF/ZIP/Bild-Anhaenge koennen Rechnungen, Angebote, Fotos, Vertraege enthalten.
-  Mail mit Anhang wie "Rechnung_*.pdf" oder "Invoice_*.pdf" → "Rechnung / Beleg" (auch wenn Betreff unklar)
-  Mail mit Foto-Anhaengen (*.jpg, *.png) von Kunden → koennte Projektanfrage sein
 
 ROUTING-ENTSCHEIDUNG (PFLICHT — vor der Klassifizierung überlegen!):
-Muss der Geschäftsinhaber PERSÖNLICH handeln? Oder kann das System die Mail automatisch verarbeiten?
+Muss der Benutzer PERSÖNLICH handeln? Oder kann das System die Mail automatisch verarbeiten?
 - Eingangsrechnungen, Belege, Zahlungsbestätigungen → KEIN Task, sondern Buchhaltung
-- System-Mails, Login-Infos, Bestellbestätigungen, Testmails → KEIN Task, archivieren
+- System-Mails, Login-Infos, Bestellbestätigungen → KEIN Task, archivieren
 - Newsletter, Werbung, Marketing → KEIN Task, archivieren
-- Angebotsabsagen → KEIN Task, sondern Kira-Vorschlag (Danke-Mail vorbereiten)
-- Preisänderungen, Brancheninfos, Zulieferer-Updates → KEIN Task, sondern Feed
-- Nur wenn Kai PERSÖNLICH antworten/entscheiden/handeln muss → Task
+- Angebotsabsagen → KEIN Task, sondern Kira-Vorschlag
+- Nur wenn der Benutzer PERSÖNLICH antworten/entscheiden/handeln muss → Task
 
 Antworte NUR als JSON:
 {{
@@ -151,7 +190,7 @@ Antworte NUR als JSON:
   "absender_rolle": "Interessent / Lead" | "Bestandskunde" | "Rechnung / Beleg" | "Newsletter / Werbung" | "Shop" | "System" | "Intern",
   "zusammenfassung": "1 Satz was die Mail will",
   "antwort_noetig": true/false,
-  "empfohlene_aktion": "Was Kai tun sollte",
+  "empfohlene_aktion": "Was der Benutzer tun sollte",
   "kategorie_grund": "Warum diese Kategorie",
   "prioritaet": "hoch" | "mittel" | "niedrig",
   "konfidenz": "hoch" | "mittel" | "niedrig",
@@ -162,15 +201,23 @@ Antworte NUR als JSON:
   "beantwortet": true/false,
   "organisation": {{"termin": "...", "rueckruf": true, "frist": "..."}} oder null,
   "angebot_aktion": "angenommen" | "abgelehnt" | "rueckfrage" | null,
-  "angebot_nummer": "ANF-2026-001" | null
+  "angebot_nummer": "ANF-2026-001" | null,
+  "vorgeschlagene_aktionen": [
+    {{"typ": "erinnerung|nachfass|termin", "text": "Kurzbeschreibung", "datum": "YYYY-MM-DD oder null", "prioritaet": "hoch|mittel|niedrig"}}
+  ],
+  "erkannte_termine": [
+    {{"text": "Beschreibung", "datum": "YYYY-MM-DD", "typ": "zahlung|frist|treffen|deadline"}}
+  ],
+  "mail_zusammenhang": "1-Satz-Kontext der Mail im Geschäftszusammenhang"
 }}
 
-erfordert_handlung=true NUR wenn der Geschäftsinhaber persönlich etwas tun muss (antworten, entscheiden, unterschreiben).
+erfordert_handlung=true NUR wenn der Benutzer persönlich etwas tun muss (antworten, entscheiden, unterschreiben).
 routing: "task" = echte Aufgabe, "buchhaltung" = Rechnung/Beleg zur Prüfung, "feed" = Dashboard-Info, "kira_vorschlag" = Kira bereitet Aktion vor, "archivieren" = nur ablegen.
-
 mit_termin=true wenn Mail konkretes Datum, Besichtigungstermin oder Terminvereinbarung enthält.
-manuelle_pruefung=true wenn Kira unsicher ist oder der Fall ungewöhnlich komplex ist.
-beantwortet=true wenn diese Mail eine Antwort AUF eine vorangegangene eigene Mail ist (Re:/AW: + Inhalts-Bezug)."""
+
+vorgeschlagene_aktionen: Aktionen die der Benutzer durchführen sollte. Auch bei "Ignorieren"/"Zur Kenntnis": wenn Termine, Fristen oder Beträge den Benutzer betreffen → hier eintragen!
+erkannte_termine: Alle Termine, Fristen, Fälligkeiten aus der Mail (auch beiläufig erwähnte).
+mail_zusammenhang: Kurze Einordnung der Mail (z.B. "Rückzahlung Darlehen — nächste Rate fällig")."""
 
 
 def _parse_llm_response(text):
@@ -221,6 +268,17 @@ def _parse_llm_response(text):
 
     # Geschaeft-Daten aus Text extrahieren (Regex, schnell + zuverlässig)
     data.setdefault("geschaeft", None)
+
+    # Neue Felder: Aktionen, Termine, Zusammenhang (Kira Intelligenz-Upgrade)
+    data.setdefault("vorgeschlagene_aktionen", [])
+    data.setdefault("erkannte_termine", [])
+    data.setdefault("mail_zusammenhang", "")
+
+    # Validierung: Listen müssen Listen sein
+    if not isinstance(data.get("vorgeschlagene_aktionen"), list):
+        data["vorgeschlagene_aktionen"] = []
+    if not isinstance(data.get("erkannte_termine"), list):
+        data["erkannte_termine"] = []
 
     return data
 

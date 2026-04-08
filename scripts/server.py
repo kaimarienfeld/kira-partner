@@ -1590,6 +1590,16 @@ setInterval(()=>{{
 
 # ── KOMMUNIKATION Panel ──────────────────────────────────────────────────────
 def build_kommunikation(tasks):
+    # Offene Zusagen zählen
+    n_zusagen = 0
+    try:
+        _zdb = sqlite3.connect(str(TASKS_DB))
+        _zt = _zdb.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mail_commitments'").fetchone()
+        if _zt:
+            n_zusagen = _zdb.execute("SELECT COUNT(*) FROM mail_commitments WHERE status='offen'").fetchone()[0]
+        _zdb.close()
+    except Exception:
+        pass
     # Stats (Gesamt-Mails, nicht gruppiert)
     n_offen = len(tasks)
     n_leads    = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
@@ -1634,6 +1644,7 @@ def build_kommunikation(tasks):
         ("Angebotsrückmeldung",   "Angebotsrückm.",       seg_counts["Angebotsrückmeldung"]),
         ("Zur Kenntnis",          "Zur Kenntnis",         seg_counts["Zur Kenntnis"]),
         ("Shop / System",         "Newsletter / System",  seg_counts["Shop / System"]),
+        ("zusagen",               "Offene Zusagen",       n_zusagen),
     ]
     segs_html = '<div class="km-seg" id="km-seg-nav">'
     for key, label, cnt in seg_tabs:
@@ -6159,6 +6170,14 @@ def build_einstellungen():
     capture_cfg_es     = config.get("capture", {})
     cf_tunnel_cfg      = config.get("cloudflare_tunnel", {})
     cf_public_url      = cf_tunnel_cfg.get("public_url", "")
+    # Benutzerprofile laden
+    from task_manager import get_active_profile as _gap
+    _profil = _gap(config)
+    _profil_team = _profil.get("team", [])
+    _profil_firma = esc(_profil.get("firma_name", ""))
+    _profil_branche = esc(_profil.get("firma_branche", ""))
+    _profil_beschreibung = esc(_profil.get("firma_beschreibung", ""))
+    _profil_domains = _profil.get("eigene_domains", [])
     # Circuit Breaker Status laden
     circuit_state = {}
     try:
@@ -6727,6 +6746,7 @@ function esInfoPopup(btn, text) {{
   </div>
   <div class="es-snav-h">Konfiguration</div>
   <div class="es-sn act" data-essec="design" onclick="esShowSec('design')"><span class="es-sico">&#x25D0;</span>Design</div>
+  <div class="es-sn" data-essec="benutzerprofile" onclick="esShowSec('benutzerprofile')"><span class="es-sico">&#x1F464;</span>Benutzerprofile</div>
   <div class="es-sn" data-essec="benachrichtigungen" onclick="esShowSec('benachrichtigungen')"><span class="es-sico">&#x1F514;</span>Benachrichtigungen</div>
   <div class="es-sn" data-essec="aufgaben" onclick="esShowSec('aufgaben')"><span class="es-sico">&#x2611;</span>Aufgabenlogik</div>
   <div class="es-sn" data-essec="nachfass" onclick="esShowSec('nachfass')"><span class="es-sico">&#x21BB;</span>Nachfass-Intervalle</div>
@@ -7006,6 +7026,69 @@ function esInfoPopup(btn, text) {{
   <div class="es-save-bar">
     <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
     <span style="font-size:11px;color:var(--muted)">Design-Einstellungen werden lokal gespeichert</span>
+  </div>
+</div>
+
+<!-- ── SECTION: BENUTZERPROFILE ──────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-benutzerprofile">
+  <div class="es-sec-h">Benutzerprofile</div>
+  <div class="es-sec-sub">Firmen- und Teamdaten f&uuml;r die intelligente Mail-Klassifizierung, Kira-Chat und Aktionsvorschl&auml;ge.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Unternehmensprofil</div>
+    <div class="es-row">
+      <div class="es-rl">Firmenname<div class="es-rd">Name des Unternehmens &mdash; wird in Kira-Prompts und Klassifizierung verwendet</div></div>
+      <input class="es-inp" id="cfg-profil-firma" value="{_profil_firma}" placeholder="z.B. Meine Firma GmbH">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Branche<div class="es-rd">Gesch&auml;ftsfeld &mdash; hilft Kira beim Einordnen von Mails</div></div>
+      <input class="es-inp" id="cfg-profil-branche" value="{_profil_branche}" placeholder="z.B. IT-Dienstleistungen">
+    </div>
+    <div class="es-row">
+      <div class="es-rl">Beschreibung<div class="es-rd">Kurzbeschreibung des Unternehmens f&uuml;r Kontext</div></div>
+      <textarea class="es-inp" id="cfg-profil-beschreibung" rows="3" style="resize:vertical" placeholder="Was macht Ihr Unternehmen? Zielgruppe, Projektgr&ouml;&szlig;en, Besonderheiten&hellip;">{_profil_beschreibung}</textarea>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Team-Mitglieder</div>
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-rd" style="margin-bottom:8px">Kira erkennt diese Personen in E-Mails und wei&szlig;, wer angesprochen wird. Anrede-Varianten helfen bei der Zuordnung (z.B. &quot;Herr M&uuml;ller&quot;, &quot;Max&quot;).</div>
+      <div id="bp-team-list">
+        {"".join(f'''<div class="bp-team-card" data-idx="{i}" style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input class="es-inp bp-tm-name" value="{esc(m.get("name",""))}" placeholder="Name" style="flex:1;min-width:140px">
+            <input class="es-inp bp-tm-rolle" value="{esc(m.get("rolle",""))}" placeholder="Rolle" style="width:120px">
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-tm-admin" {"checked" if m.get("ist_admin") else ""}> Admin</label>
+            <button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="bpRemoveTeamMember({i})" title="Entfernen">&times;</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:2px">E-Mail-Konten (kommagetrennt)</div>
+              <input class="es-inp bp-tm-emails" value="{esc(", ".join(m.get("email_konten",[])))}" placeholder="info@firma.de, shop@firma.de" style="width:100%">
+            </div>
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Anrede-Varianten (kommagetrennt)</div>
+              <input class="es-inp bp-tm-anreden" value="{esc(", ".join(m.get("anrede_varianten",[])))}" placeholder="Herr M&uuml;ller, Max, Hr. M&uuml;ller" style="width:100%">
+            </div>
+          </div>
+        </div>''' for i, m in enumerate(_profil_team))}
+      </div>
+      <button class="es-btn" onclick="bpAddTeamMember()" style="margin-top:4px;align-self:flex-start">+ Team-Mitglied hinzuf&uuml;gen</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Eigene Domains</div>
+    <div class="es-row">
+      <div class="es-rl">Domains<div class="es-rd">Domains die zum Unternehmen geh&ouml;ren &mdash; Mails von diesen Domains werden als eigene erkannt</div></div>
+      <input class="es-inp" id="cfg-profil-domains" value="{esc(", ".join(_profil_domains))}" placeholder="firma.de, shop.firma.de">
+    </div>
+  </div>
+
+  <div class="es-save-bar">
+    <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
+    <span style="font-size:11px;color:var(--muted)">Profildaten werden f&uuml;r Klassifizierung und Kira-Chat verwendet</span>
   </div>
 </div>
 
@@ -17123,6 +17206,73 @@ function resetAccent() {{
   document.getElementById('cfg-accent').value = def;
   applyAccent(def);
 }}
+// ── Benutzerprofile: Team-Mitglieder verwalten ──
+function bpAddTeamMember() {{
+  const list = document.getElementById('bp-team-list');
+  if(!list) return;
+  const idx = list.querySelectorAll('.bp-team-card').length;
+  const card = document.createElement('div');
+  card.className = 'bp-team-card';
+  card.dataset.idx = idx;
+  card.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)';
+  card.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">`
+    +`<input class="es-inp bp-tm-name" value="" placeholder="Name" style="flex:1;min-width:140px">`
+    +`<input class="es-inp bp-tm-rolle" value="" placeholder="Rolle" style="width:120px">`
+    +`<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-tm-admin"> Admin</label>`
+    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="bpRemoveTeamMember(${{idx}})" title="Entfernen">&times;</button>`
+    +`</div>`
+    +`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">`
+    +`<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">E-Mail-Konten (kommagetrennt)</div>`
+    +`<input class="es-inp bp-tm-emails" value="" placeholder="info@firma.de, shop@firma.de" style="width:100%"></div>`
+    +`<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Anrede-Varianten (kommagetrennt)</div>`
+    +`<input class="es-inp bp-tm-anreden" value="" placeholder="Herr M\\u00fcller, Max" style="width:100%"></div>`
+    +`</div>`;
+  list.appendChild(card);
+}}
+function bpRemoveTeamMember(idx) {{
+  const list = document.getElementById('bp-team-list');
+  if(!list) return;
+  const cards = list.querySelectorAll('.bp-team-card');
+  if(cards[idx]) cards[idx].remove();
+  // Re-index
+  list.querySelectorAll('.bp-team-card').forEach((c,i) => {{
+    c.dataset.idx = i;
+    const btn = c.querySelector('button[onclick*="bpRemoveTeamMember"]');
+    if(btn) btn.setAttribute('onclick', `bpRemoveTeamMember(${{i}})`);
+  }});
+}}
+function _bpCollectTeam() {{
+  const cards = document.querySelectorAll('#bp-team-list .bp-team-card');
+  const team = [];
+  cards.forEach(c => {{
+    const name = (c.querySelector('.bp-tm-name')?.value || '').trim();
+    if(!name) return;
+    team.push({{
+      name: name,
+      rolle: (c.querySelector('.bp-tm-rolle')?.value || '').trim(),
+      email_konten: (c.querySelector('.bp-tm-emails')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      anrede_varianten: (c.querySelector('.bp-tm-anreden')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      ist_admin: c.querySelector('.bp-tm-admin')?.checked ?? false
+    }});
+  }});
+  return team;
+}}
+function _bpCollectProfile() {{
+  return {{
+    aktives_profil: 'profil_1',
+    profile: {{
+      profil_1: {{
+        firma_name: (document.getElementById('cfg-profil-firma')?.value || '').trim(),
+        firma_branche: (document.getElementById('cfg-profil-branche')?.value || '').trim(),
+        firma_beschreibung: (document.getElementById('cfg-profil-beschreibung')?.value || '').trim(),
+        team: _bpCollectTeam(),
+        eigene_domains: (document.getElementById('cfg-profil-domains')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+        social_media: {{}}
+      }}
+    }}
+  }};
+}}
+
 function applyFontSize(size) {{
   if(size) document.documentElement.dataset.fontsize = size;
   else delete document.documentElement.dataset.fontsize;
@@ -17360,7 +17510,72 @@ function kommSegFilter(el, kat) {{
   document.querySelectorAll('.km-seg-t').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   _kommActiveTab = kat;
+  // Zusagen-Tab: eigene Liste laden
+  const kmItems = document.getElementById('km-items');
+  const zusBox  = document.getElementById('km-zusagen-panel');
+  if(kat === 'zusagen') {{
+    if(kmItems) kmItems.style.display = 'none';
+    if(!zusBox) {{
+      const p = document.createElement('div');
+      p.id = 'km-zusagen-panel';
+      p.style.cssText = 'padding:12px';
+      kmItems?.parentNode?.insertBefore(p, kmItems.nextSibling);
+    }}
+    _loadZusagenPanel();
+    return;
+  }} else {{
+    if(kmItems) kmItems.style.display = '';
+    if(zusBox) zusBox.style.display = 'none';
+  }}
   applyKommFilters2();
+}}
+function _loadZusagenPanel() {{
+  const box = document.getElementById('km-zusagen-panel');
+  if(!box) return;
+  box.style.display = '';
+  box.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">Lade offene Zusagen&hellip;</div>';
+  fetch('/api/zusagen').then(r=>r.json()).then(d=>{{
+    if(!d.ok || !d.zusagen?.length) {{
+      box.innerHTML = '<div style="color:var(--muted);padding:30px;text-align:center;font-size:13px">\u2714 Keine offenen Zusagen</div>';
+      return;
+    }}
+    const today = new Date().toISOString().slice(0,10);
+    let html = '<div style="font-size:13px;color:var(--muted);margin-bottom:12px">' + d.total + ' offene Zusage(n)</div>';
+    d.zusagen.forEach(z=>{{
+      const faellig = z.datum_faellig || '';
+      const isUeber = faellig && faellig < today;
+      const isHeute = faellig === today;
+      const accent = isUeber ? '#ef4444' : (isHeute ? '#f59e0b' : '#f97316');
+      const label = isUeber ? '\u00dcberf\u00e4llig' : (isHeute ? 'Heute f\u00e4llig' : (faellig || ''));
+      const abs = (z.absender||'').split('<')[0].trim().slice(0,35);
+      html += `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised);border-left:3px solid ${{accent}}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;font-size:13px;color:var(--text)">\u23f0 ${{z.text||'Zusage'}}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${{abs}} \u00b7 ${{z.betreff||''}}</div>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:11px;font-weight:600;color:${{accent}}">${{label}}</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px">
+          <button class="es-btn" style="font-size:11px;padding:3px 10px;background:#22c55e;color:#fff;border:none;border-radius:4px;cursor:pointer" onclick="_zusageErledigt(${{z.id}})">\u2714 Erledigt</button>
+          <button class="es-btn" style="font-size:11px;padding:3px 10px;cursor:pointer" onclick="_zusageVerschieben(${{z.id}})">Verschieben</button>
+        </div>
+      </div>`;
+    }});
+    box.innerHTML = html;
+  }}).catch(()=>{{box.innerHTML='<div style="color:var(--muted);padding:20px">Fehler beim Laden</div>';}});
+}}
+function _zusageErledigt(id) {{
+  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'erledigt'}})}})
+    .then(r=>r.json()).then(d=>{{ if(d.ok){{ showToast('Zusage erledigt'); _loadZusagenPanel(); }} else showToast(d.error||'Fehler'); }});
+}}
+function _zusageVerschieben(id) {{
+  const datum = prompt('Neues F\u00e4lligkeitsdatum (YYYY-MM-DD):');
+  if(!datum) return;
+  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'verschieben',datum}})}})
+    .then(r=>r.json()).then(d=>{{ if(d.ok){{ showToast('Zusage verschoben'); _loadZusagenPanel(); }} else showToast(d.error||'Fehler'); }});
 }}
 // Keep old filterKommView alias for Organisation panel tabs (uses .komm-view-tab)
 function filterKommView(el, kat) {{
@@ -18824,7 +19039,11 @@ function saveSettings() {{
       aktiv:  document.getElementById('cfg-backup-aktiv')?.checked ?? false,
       pfad:   document.getElementById('cfg-backup-pfad')?.value.trim() || '',
       keep_n: parseInt(document.getElementById('cfg-backup-keep')?.value || '7', 10)
-    }}
+    }},
+    benutzer_profile: _bpCollectProfile(),
+    firma_name:         (document.getElementById('cfg-profil-firma')?.value || '').trim(),
+    firma_branche:      (document.getElementById('cfg-profil-branche')?.value || '').trim(),
+    firma_beschreibung: (document.getElementById('cfg-profil-beschreibung')?.value || '').trim()
   }};
   fetch('/api/einstellungen',{{
     method:'POST',headers:{{'Content-Type':'application/json'}},
@@ -23409,6 +23628,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/kira/activity-feed'):
             self._api_kira_activity_feed()
 
+        elif self.path == '/api/zusagen':
+            self._api_zusagen_list()
+
         elif self.path == '/api/kira/circuit_breaker':
             self._api_kira_circuit_breaker_get()
 
@@ -25837,6 +26059,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
             pass
         self._json({"ok": True, "jobs": jobs, "active": len(jobs) > 0})
 
+    def _api_zusagen_list(self):
+        """GET /api/zusagen — Alle offenen Zusagen/Commitments."""
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            # Tabelle existiert?
+            _tbl = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mail_commitments'").fetchone()
+            if not _tbl:
+                self._json({"ok": True, "zusagen": [], "total": 0})
+                return
+            rows = db.execute("""
+                SELECT id, mail_message_id, typ, text, datum_faellig, datum_erinnerung,
+                       prioritaet, status, absender, betreff, konto_label, erstellt_am, erledigt_am
+                FROM mail_commitments
+                WHERE status='offen'
+                ORDER BY CASE WHEN datum_faellig IS NULL THEN '9999' ELSE datum_faellig END ASC
+                LIMIT 50
+            """).fetchall()
+            zusagen = [dict(r) for r in rows]
+            total = db.execute("SELECT COUNT(*) FROM mail_commitments WHERE status='offen'").fetchone()[0]
+            db.close()
+            self._json({"ok": True, "zusagen": zusagen, "total": total})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _api_kira_activity_feed(self):
         """GET /api/kira/activity-feed — Individuelle Activity-Items für den Drawer (Win11 Widget-Style)."""
         try:
@@ -26117,6 +26364,57 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         "action": {"type": "navigate", "target": "showPanel('kommunikation')"},
                         "ts": dl,
                     })
+            except Exception:
+                pass
+
+            # ── 8. Offene Zusagen + fällige Commitments ──
+            zusagen_count = 0
+            try:
+                # Tabelle existiert?
+                _tbl = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mail_commitments'").fetchone()
+                if _tbl:
+                    for r in db.execute("""
+                        SELECT id, typ, text, datum_faellig, absender, betreff
+                        FROM mail_commitments
+                        WHERE status='offen' AND datum_faellig IS NOT NULL
+                          AND datum_faellig <= date('now', '+7 days')
+                        ORDER BY datum_faellig ASC LIMIT 8
+                    """):
+                        key = f"zusage:{r['id']}"
+                        if key in dismissed:
+                            continue
+                        dat = str(r["datum_faellig"] or "")[:10]
+                        try:
+                            diff = (datetime.strptime(dat, "%Y-%m-%d").date() - today).days
+                        except Exception:
+                            diff = 99
+                        absender_kurz = (r["absender"] or "").split("<")[0].strip()[:30]
+                        text_kurz = (r["text"] or "")[:60]
+                        if diff < 0:
+                            kira_text = f"Seit {abs(diff)} Tag(en) \u00fcberf\u00e4llig!"
+                            prio = "urgent"
+                            accent = "#ef4444"
+                        elif diff == 0:
+                            kira_text = "Heute f\u00e4llig."
+                            prio = "high"
+                            accent = "#f59e0b"
+                        else:
+                            kira_text = f"In {diff} Tag(en)."
+                            prio = "normal"
+                            accent = "#f97316"
+                        items.append({{
+                            "key": key, "type": "zusage",
+                            "priority": prio,
+                            "size": "half",
+                            "title": f"\u23f0 {{text_kurz}}" if text_kurz else f"\u23f0 Zusage an {{absender_kurz}}",
+                            "subtitle": absender_kurz,
+                            "detail": dat,
+                            "kira_says": kira_text,
+                            "accent": accent,
+                            "action": {{"type": "navigate", "target": "showPanel('kommunikation')"}},
+                            "ts": dat,
+                        }})
+                        zusagen_count += 1
             except Exception:
                 pass
 
@@ -28546,6 +28844,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             finally:
                 db.close()
+            return
+
+        # Zusagen-Status ändern
+        if self.path == '/api/zusagen/status':
+            try:
+                zid = body.get("id")
+                new_status = body.get("status", "erledigt")
+                if not zid:
+                    self._json({"ok": False, "error": "id fehlt"})
+                    return
+                db = sqlite3.connect(str(TASKS_DB))
+                now = datetime.now().isoformat()
+                if new_status == "erledigt":
+                    db.execute("UPDATE mail_commitments SET status='erledigt', erledigt_am=? WHERE id=?", (now, zid))
+                elif new_status == "verschieben":
+                    neues_datum = body.get("datum")
+                    if neues_datum:
+                        db.execute("UPDATE mail_commitments SET datum_faellig=?, datum_erinnerung=? WHERE id=?",
+                                   (neues_datum, neues_datum, zid))
+                db.commit()
+                db.close()
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
             return
 
         # Einstellungen speichern

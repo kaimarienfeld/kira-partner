@@ -101,5 +101,49 @@ def increment_reminder(task_id: int):
 def load_config() -> dict:
     try:
         return json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
-    except:
+    except Exception:
         return {}
+
+
+def get_active_profile(config=None) -> dict:
+    """Gibt das aktive Benutzerprofil zurück. Fallback auf Legacy-Felder.
+
+    Zentrale Funktion — alle Module importieren diese statt hardcoded Werte.
+    Rückgabe-Struktur:
+    {
+        "firma_name": str,
+        "firma_branche": str,
+        "firma_beschreibung": str,
+        "team": [{"name": str, "rolle": str, "email_konten": [str],
+                  "anrede_varianten": [str], "ist_admin": bool}],
+        "eigene_domains": [str],
+        "social_media": {}
+    }
+    """
+    if not config:
+        config = load_config()
+    bp = config.get("benutzer_profile", {})
+    aktiv = bp.get("aktives_profil", "profil_1")
+    profil = bp.get("profile", {}).get(aktiv)
+    if profil and profil.get("team"):
+        return profil
+    # Fallback: Legacy-Felder zu Profil-Struktur konvertieren
+    konten = []
+    cp = config.get("combined_postfach", {})
+    if isinstance(cp, dict):
+        konten = cp.get("konten", [])
+    inhaber_name = config.get("firma_inhaber", "")
+    return {
+        "firma_name": config.get("firma_name", ""),
+        "firma_branche": config.get("firma_branche", ""),
+        "firma_beschreibung": config.get("firma_beschreibung", ""),
+        "team": [{
+            "name": inhaber_name,
+            "rolle": "Inhaber",
+            "email_konten": konten if isinstance(konten, list) else [],
+            "anrede_varianten": [],
+            "ist_admin": True
+        }],
+        "eigene_domains": config.get("mail_klassifizierung", {}).get("eigene_domains_extra", []),
+        "social_media": {}
+    }

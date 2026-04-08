@@ -1217,6 +1217,136 @@ def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: st
               status='fehler', context_id=msg_id)
 
 
+# ── Vorgeschlagene Aktionen + Erkannte Termine verarbeiten ───────────────────
+
+def _ensure_commitments_table():
+    """Erstellt mail_commitments-Tabelle falls nicht vorhanden."""
+    db = sqlite3.connect(str(TASKS_DB))
+    db.execute("""CREATE TABLE IF NOT EXISTS mail_commitments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mail_message_id TEXT,
+        typ TEXT NOT NULL,
+        text TEXT,
+        datum_faellig TEXT,
+        datum_erinnerung TEXT,
+        prioritaet TEXT DEFAULT 'mittel',
+        status TEXT DEFAULT 'offen',
+        absender TEXT,
+        betreff TEXT,
+        konto_label TEXT,
+        erstellt_am TEXT,
+        erledigt_am TEXT
+    )""")
+    db.commit()
+    db.close()
+
+_commitments_table_ready = False
+
+def _get_commitments_db():
+    """Gibt DB-Verbindung zurück und stellt sicher dass Tabelle existiert."""
+    global _commitments_table_ready
+    if not _commitments_table_ready:
+        _ensure_commitments_table()
+        _commitments_table_ready = True
+    db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def _process_vorgeschlagene_aktionen(result, mail_data, konto_label, msg_id, absender, betreff):
+    """Verarbeitet vorgeschlagene_aktionen aus der LLM-Klassifizierung."""
+    aktionen = result.get("vorgeschlagene_aktionen", [])
+    if not aktionen or not isinstance(aktionen, list):
+        return
+    db = _get_commitments_db()
+    try:
+        now = datetime.now().isoformat()
+        for aktion in aktionen:
+            if not isinstance(aktion, dict):
+                continue
+            typ = aktion.get("typ", "")
+            aktion_text = aktion.get("text", "")
+            datum = aktion.get("datum")
+            prio = aktion.get("prioritaet", "mittel")
+            if not typ or not aktion_text:
+                continue
+            # Duplikat-Check
+            existing = db.execute(
+                "SELECT id FROM mail_commitments WHERE mail_message_id=? AND text=?",
+                (msg_id, aktion_text)).fetchone()
+            if existing:
+                continue
+            # Erinnerungsdatum: 3 Tage vor Fälligkeitsdatum
+            datum_erinnerung = None
+            if datum:
+                try:
+                    from datetime import timedelta
+                    d = datetime.fromisoformat(datum)
+                    datum_erinnerung = (d - timedelta(days=3)).isoformat()[:10]
+                except Exception:
+                    pass
+            db.execute("""INSERT INTO mail_commitments
+                (mail_message_id, typ, text, datum_faellig, datum_erinnerung,
+                 prioritaet, status, absender, betreff, konto_label, erstellt_am)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (msg_id, typ, aktion_text, datum, datum_erinnerung,
+                 prio, "offen", absender, betreff, konto_label, now))
+        db.commit()
+        n = len([a for a in aktionen if isinstance(a, dict) and a.get("typ")])
+        if n:
+            _elog("mail_monitor", f"💡 {n} Aktion(en) aus Mail erkannt: {betreff[:60]}")
+    except Exception as e:
+        _elog("mail_monitor", f"Fehler _process_vorgeschlagene_aktionen: {e}")
+    finally:
+        db.close()
+
+
+def _process_erkannte_termine(result, mail_data, msg_id, absender, betreff):
+    """Verarbeitet erkannte_termine aus der LLM-Klassifizierung."""
+    termine = result.get("erkannte_termine", [])
+    if not termine or not isinstance(termine, list):
+        return
+    db = _get_commitments_db()
+    try:
+        now = datetime.now().isoformat()
+        for termin in termine:
+            if not isinstance(termin, dict):
+                continue
+            termin_text = termin.get("text", "")
+            datum = termin.get("datum")
+            typ = termin.get("typ", "deadline")
+            if not termin_text or not datum:
+                continue
+            # Duplikat-Check: gleiche Mail + gleiches Datum
+            existing = db.execute(
+                "SELECT id FROM mail_commitments WHERE mail_message_id=? AND datum_faellig=?",
+                (msg_id, datum)).fetchone()
+            if existing:
+                continue
+            # Erinnerungsdatum: 3 Tage vor Termin
+            datum_erinnerung = None
+            try:
+                from datetime import timedelta
+                d = datetime.fromisoformat(datum)
+                datum_erinnerung = (d - timedelta(days=3)).isoformat()[:10]
+            except Exception:
+                pass
+            db.execute("""INSERT INTO mail_commitments
+                (mail_message_id, typ, text, datum_faellig, datum_erinnerung,
+                 prioritaet, status, absender, betreff, konto_label, erstellt_am)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (msg_id, f"termin_{typ}", termin_text, datum, datum_erinnerung,
+                 "mittel", "offen", absender, betreff, "", now))
+        db.commit()
+        n = len([t for t in termine if isinstance(t, dict) and t.get("datum")])
+        if n:
+            _elog("mail_monitor", f"📅 {n} Termin(e) aus Mail erkannt: {betreff[:60]}")
+    except Exception as e:
+        _elog("mail_monitor", f"Fehler _process_erkannte_termine: {e}")
+    finally:
+        db.close()
+
+
 # ── Zahlungseingangs-Verarbeitung ────────────────────────────────────────────
 _ZAHLUNG_PATTERNS = [
     r'zahlung\s+eingegangen', r'zahlung\s+erhalten', r'zahlung\s+best[aä]tigt',
@@ -1321,10 +1451,13 @@ def _process_zahlungseingang(mail_data: dict, konto_label: str, kategorie: str,
 
 # ── Routing-Helfer ───────────────────────────────────────────────────────────
 def _load_firma_signatur():
-    """Lädt Firmenname + Inhaber für Signatur aus config.json."""
+    """Lädt Firmenname + Inhaber aus Profil."""
     try:
-        cfg = json.loads((Path(__file__).parent / "config.json").read_text("utf-8", errors="replace"))
-        return cfg.get("firma_name", ""), cfg.get("firma_inhaber", "")
+        from task_manager import get_active_profile
+        profil = get_active_profile()
+        team = profil.get("team", [])
+        inhaber = team[0].get("name", "") if team else ""
+        return profil.get("firma_name", ""), inhaber
     except Exception:
         return "", ""
 
@@ -1557,6 +1690,10 @@ def _process_mail(mail_data, konto_label, folder_name):
     _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
     _scan_eingangsbeleg_lexware(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
     _process_zahlungseingang(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+
+    # ── Aktionen + Termine IMMER verarbeiten (auch bei Ignorieren) ──
+    _process_vorgeschlagene_aktionen(result, mail_data, konto_label, msg_id, absender, betreff)
+    _process_erkannte_termine(result, mail_data, msg_id, absender, betreff)
 
     # Archivieren: kein Task
     if routing == "archivieren" or kategorie in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):

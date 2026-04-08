@@ -718,18 +718,34 @@ def build_system_prompt(config=None):
     }
     stil = _stil_map.get(kira_cfg.get("persoenlichkeit", "direkt"), _stil_map["direkt"])
 
-    prompt = f"""Du bist {kira_name} \u2014 die autonome KI-Gesch\u00e4ftsassistentin von rauMKult\u00ae Sichtbeton.
-Inhaber: Kai Marienfeld. Heute: {today}.
+    # ── Profil-basierte Identität laden ──
+    try:
+        from task_manager import get_active_profile
+        _profil = get_active_profile()
+        _team = _profil.get("team", [])
+        _hauptbenutzer = _team[0] if _team else {}
+        _firma = _profil.get("firma_name", "") or "Unternehmen"
+        _inhaber_name = _hauptbenutzer.get("name", "")
+        _inhaber_rolle = _hauptbenutzer.get("rolle", "Inhaber")
+        _firma_beschr = _profil.get("firma_beschreibung", "")
+    except Exception:
+        _firma = _cfg.get("firma_name", "") or "Unternehmen"
+        _inhaber_name = ""
+        _inhaber_rolle = "Inhaber"
+        _firma_beschr = ""
+
+    prompt = f"""Du bist {kira_name} \u2014 die autonome KI-Gesch\u00e4ftsassistentin von {_firma}.
+{_inhaber_rolle}: {_inhaber_name}. Heute: {today}.{f' {_firma_beschr}' if _firma_beschr else ''}
 
 ━━━ DEINE KERNIDENTITÄT ━━━
 Du bist KEINE Chat-KI die nur antwortet wenn gefragt. Du bist eine eigenständige Geschäftsassistentin die:
 - das Unternehmen aktiv überwacht und vorantreibt
 - selbstständig Zusammenhänge erkennt und darauf reagiert
-- Kai entlastet indem du so viel wie möglich selbst erledigst
+- den {_inhaber_rolle} entlastet indem du so viel wie möglich selbst erledigst
 - niemals wartest bis etwas eskaliert — du handelst proaktiv
 
 ━━━ DEINE VOLLMACHTEN (AUTOMATISCH AUSFÜHRBAR) ━━━
-Diese Aktionen führst du nach eigenem Ermessen aus und informierst Kai danach:
+Diese Aktionen führst du nach eigenem Ermessen aus und informierst den {_inhaber_rolle} danach:
 ✓ Angebotsstatus aktualisieren (angenommen / abgelehnt / nachfassen)
 ✓ Rechnungsstatus setzen (bezahlt / offen / überfällig)
 ✓ Tasks erstellen, priorisieren, erledigen
@@ -737,7 +753,7 @@ Diese Aktionen führst du nach eigenem Ermessen aus und informierst Kai danach:
 ✓ Entwürfe für Mails, Angebote, Rechnungen erstellen
 ✓ Kunden- und Kontaktdaten pflegen
 
-Diese Aktionen führst du NUR nach Kais Bestätigung aus:
+Diese Aktionen führst du NUR nach Bestätigung des {_inhaber_rolle}s aus:
 ⚡ Mails tatsächlich versenden
 ⚡ Zahlungen oder Beträge buchen
 ⚡ Kundendaten löschen
@@ -765,19 +781,17 @@ Du kennst jederzeit:
 - Eingangsmails der letzten Tage
 - Deine eigenen Aktivitäten (runtime_log_suchen)
 
-━━━ GESCHÄFT rauMKult® ━━━
-Betonkosmetik-Fachbetrieb seit 2006. Kai ist Einzelunternehmer + 1 Mitarbeiterin (intern).
-Produkte/Leistungen: Sichtbeton-Beschichtungen, Betonretusche, Mikrozement, Betonlasuren, Treppen, Shop (sichtbeton-cire.de).
-Kunden: Privat (>80%), Architekten, Planer, Bauherren.
-Durchschnittsprojekt: €2.000–15.000. Tagessatz: €650.
+━━━ GESCHÄFT {_firma} ━━━
+{_firma_beschr or f'{_firma} — Details aus den Benutzerprofile-Einstellungen.'}
+{_inhaber_rolle}: {_inhaber_name}.
 
 ━━━ KOMMUNIKATION ━━━
-- Direkt, klar, handwerklich — kein Marketing-Sprech
+- Direkt, klar, professionell — kein Marketing-Sprech
 - Kurze Sätze, keine Füllwörter
 - Zahlen immer mit EUR und 2 Dezimalstellen
 - Datum: TT.MM.JJJJ
 - Wenn du etwas automatisch ausgeführt hast: "Habe X erledigt." — kein Ausrufezeichen-Spam
-- Wenn Kai fragt "was liegt an": Priorisierte Liste mit konkreten Handlungsoptionen
+- Wenn der {_inhaber_rolle} fragt "was liegt an": Priorisierte Liste mit konkreten Handlungsoptionen
 
 ━━━ VERTRAULICHKEIT ━━━
 Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
@@ -823,7 +837,7 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
             recent = get_recent_for_kira(limit=20)
             if recent:
                 prompt += f"\n\nDEINE LETZTEN AKTIVITÄTEN (Runtime-Log):\n{recent}\n"
-                prompt += "\nNutze diese Informationen proaktiv — z.B. wenn Kai fragt was du getan hast, welche Fehler auftraten, oder wenn du selbst Kontext zu früheren Aktionen brauchst."
+                prompt += "\nNutze diese Informationen proaktiv — z.B. wenn der Benutzer fragt was du getan hast, welche Fehler auftraten, oder wenn du selbst Kontext zu früheren Aktionen brauchst."
     except Exception:
         pass
 
@@ -865,7 +879,7 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
                 ).fetchone()
                 u_text = ((u_row["nachricht"] if u_row else "") or "")[:120].replace('\n', ' ')
                 k_text = ((k_row["nachricht"] if k_row else "") or "")[:150].replace('\n', ' ')
-                mem_lines.append(f"  [{ts}] Kai: {u_text}")
+                mem_lines.append(f"  [{ts}] Benutzer: {u_text}")
                 if k_text:
                     mem_lines.append(f"         Kira: {k_text}...")
             if mem_lines:
@@ -1140,6 +1154,27 @@ def _build_data_context(config, kira_cfg=None):
         except Exception:
             pass
 
+    # Offene Zusagen / Commitments — Kira weiß was zugesagt wurde
+    try:
+        _tbl = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mail_commitments'").fetchone()
+        if _tbl:
+            _zrows = db.execute("""
+                SELECT id, typ, text, datum_faellig, absender, betreff, erstellt_am
+                FROM mail_commitments WHERE status='offen'
+                ORDER BY CASE WHEN datum_faellig IS NULL THEN '9999' ELSE datum_faellig END ASC
+                LIMIT 15
+            """).fetchall()
+            if _zrows:
+                ctx += f"\n=== OFFENE ZUSAGEN ({len(_zrows)}) ===\n"
+                ctx += "(Vom Benutzer zugesagte oder erkannte Termine/Fristen aus E-Mails)\n"
+                for zr in _zrows:
+                    df = (zr['datum_faellig'] or 'kein Datum')[:10]
+                    abs_k = (zr['absender'] or '').split('<')[0].strip()[:30]
+                    ctx += f"  [{zr['id']}] {zr['typ']} | {df} | {abs_k} | {(zr['text'] or '')[:80]}\n"
+                ctx += "→ Wenn der Benutzer fragt 'was habe ich offen?' oder 'offene Zusagen': diese Liste verwenden.\n"
+    except Exception:
+        pass
+
     db.close()
     return ctx
 
@@ -1376,7 +1411,7 @@ def get_tools(config=None):
         "name": "tasks_loeschen",
         "description": (
             "DAUERHAFTES Löschen — Aufgaben werden unwiderruflich aus DB UND Mail-Archiv entfernt. "
-            "NUR verwenden wenn Kai EXPLIZIT 'löschen' sagt! "
+            "NUR verwenden wenn der Benutzer EXPLIZIT 'löschen' sagt! "
             "Für erledigte Rechnungen, Belege oder abgeschlossene Vorgänge stattdessen task_erledigen nutzen."
         ),
         "input_schema": {
@@ -1472,7 +1507,7 @@ def get_tools(config=None):
         "name": "vorgang_kontext_laden",
         "description": (
             "Lädt den vollständigen Vorgang-Kontext: verknüpfte Mails, Tasks, Angebote, Rechnungen + "
-            "Statushistorie. Nutze dies IMMER wenn Kai über einen Kunden oder laufenden Vorgang spricht, "
+            "Statushistorie. Nutze dies IMMER wenn der Benutzer über einen Kunden oder laufenden Vorgang spricht, "
             "um den kompletten Sachstand zu kennen. Kann auch alle offenen Vorgänge eines Kunden "
             "oder eine Gesamt-Übersicht liefern."
         ),
@@ -1514,8 +1549,8 @@ def get_tools(config=None):
         "name": "termin_erstellen",
         "description": (
             "Erstellt einen Termin im Microsoft Outlook-Kalender via Graph API. "
-            "Nutze dieses Tool wenn Kai einen Kundentermin, Baustellentermin oder Meeting eintragen moechte. "
-            "Stufe B: Kai bestaetigt den Termin-Eintrag vorher. "
+            "Nutze dieses Tool wenn der Benutzer einen Kundentermin, Baustellentermin oder Meeting eintragen moechte. "
+            "Stufe B: Der Benutzer bestaetigt den Termin-Eintrag vorher. "
             "Falls die Graph-Berechtigung fehlt, gibt das Tool eine Anleitung zur Einrichtung zurueck."
         ),
         "input_schema": {
@@ -1586,7 +1621,7 @@ def get_tools(config=None):
         "name": "konversation_suchen",
         "description": (
             "Sucht in frueheren Kira-Gespraechen nach einem Begriff, Kunden oder Thema. "
-            "Nutze dieses Tool wenn Kai fragt 'haben wir damals ueber X gesprochen?' oder "
+            "Nutze dieses Tool wenn der Benutzer fragt 'haben wir damals ueber X gesprochen?' oder "
             "wenn du Kontext aus frueheren Gespraechen brauchst. "
             "Gibt die relevantesten Gespraechs-Ausschnitte zurueck (max 5 Sessions)."
         ),
@@ -1605,7 +1640,7 @@ def get_tools(config=None):
         "name": "mail_senden",
         "description": (
             "Erstellt einen Mail-Entwurf und legt ihn zur Freigabe vor (HITL-Gate). "
-            "Die Mail wird NICHT sofort gesendet — Kai muss sie im Dashboard bestätigen. "
+            "Die Mail wird NICHT sofort gesendet — Der Benutzer muss sie im Dashboard bestätigen. "
             "Nutze dieses Tool wenn du eine Antwort, Nachfass-Mail oder Mahnung verfassen sollst. "
             "Gibt eine Vorschau des Entwurfs zurück."
         ),
@@ -1635,7 +1670,7 @@ def get_tools(config=None):
             "name": "lexware_belege_laden",
             "description": (
                 "Laedt aktuelle Belege (Rechnungen, Angebote, Eingangsrechnungen) aus Lexware Office. "
-                "Nutze dieses Tool wenn Kai nach Rechnungen, Debitoren oder Zahlungsstaenden fragt. "
+                "Nutze dieses Tool wenn der Benutzer nach Rechnungen, Debitoren oder Zahlungsstaenden fragt. "
                 "Gibt offene Posten, faellige Betraege und letzte Sync-Zeit zurueck."
             ),
             "input_schema": {
@@ -1660,7 +1695,7 @@ def get_tools(config=None):
             "description": (
                 "Klassifiziert einen Eingangsbeleg in der Buchhaltungs-Pruefqueue: "
                 "setzt Konto-Vorschlag, Steuer-Typ und Status. "
-                "Nutze dieses Tool wenn Kai einen Eingangsbeleg manuell oder automatisch einordnen moechte."
+                "Nutze dieses Tool wenn der Benutzer einen Eingangsbeleg manuell oder automatisch einordnen moechte."
             ),
             "input_schema": {
                 "type": "object",
@@ -1685,7 +1720,7 @@ def get_tools(config=None):
         "name": "capture_suchen",
         "description": (
             "Sucht in Capture-Eintraegen (Schnellerfassungen, Memos, Fotos, Baustellennotizen). "
-            "Nutze dieses Tool wenn Kai nach einem frueheren Memo sucht oder fragt ob etwas erfasst wurde."
+            "Nutze dieses Tool wenn der Benutzer nach einem frueheren Memo sucht oder fragt ob etwas erfasst wurde."
         ),
         "input_schema": {
             "type": "object",
@@ -1727,7 +1762,7 @@ def get_tools(config=None):
         "name": "dokument_suchen",
         "description": (
             "Sucht in Dokumenten (PDFs, Rechnungen, Angebote, Verträge, Briefe, Scans). "
-            "Nutze dieses Tool wenn Kai nach einem Dokument sucht oder wissen will welche Dokumente vorliegen."
+            "Nutze dieses Tool wenn der Benutzer nach einem Dokument sucht oder wissen will welche Dokumente vorliegen."
         ),
         "input_schema": {
             "type": "object",
@@ -1748,7 +1783,7 @@ def get_tools(config=None):
         "name": "dokument_erstellen",
         "description": (
             "Erstellt ein neues Dokument im Dokument-Studio. "
-            "Nutze dieses Tool wenn Kai ein Schreiben, eine Mahnung, ein Angebot oder ein anderes Dokument erstellen möchte."
+            "Nutze dieses Tool wenn der Benutzer ein Schreiben, eine Mahnung, ein Angebot oder ein anderes Dokument erstellen möchte."
         ),
         "input_schema": {
             "type": "object",
@@ -2751,7 +2786,7 @@ def _tool_konversation_suchen(p):
 def _tool_mail_senden(p):
     """
     Erstellt einen Mail-Entwurf in mail_approve_queue (HITL-Gate, Paket 2 session-oo).
-    Die Mail wird NICHT sofort gesendet — Kai muss im Dashboard bestätigen.
+    Die Mail wird NICHT sofort gesendet — der Benutzer muss im Dashboard bestätigen.
     """
     an      = (p.get("an") or "").strip()
     betreff = (p.get("betreff") or "").strip()
@@ -3764,7 +3799,13 @@ def generate_daily_briefing():
     try:
         providers = get_providers()
         if providers:
-            prompt = f"""Erstelle ein kurzes Tagesbriefing für Kai (rauMKult® Sichtbeton).
+            try:
+                from task_manager import get_active_profile as _gap_b
+                _bp = _gap_b()
+                _bn = _bp.get("firma_name", "") or "Unternehmen"
+            except Exception:
+                _bn = "Unternehmen"
+            prompt = f"""Erstelle ein kurzes Tagesbriefing für den Benutzer ({_bn}).
 Heute: {today}
 
 AKTUELLE GESCHÄFTSDATEN:
@@ -3777,7 +3818,7 @@ FORMAT (als JSON):
     {{"typ": "rechnung|angebot|aufgabe", "text": "Konkrete Handlungsaufforderung", "prio": 1}},
     ...max 5
   ],
-  "vorschlaege": ["Konkrete Vorschläge was Kai heute tun sollte"],
+  "vorschlaege": ["Konkrete Vorschläge was der Benutzer heute tun sollte"],
   "kennzahlen": {{
     "offenes_volumen": 12345.67,
     "angebote_offen": 5,
