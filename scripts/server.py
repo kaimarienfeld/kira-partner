@@ -21159,12 +21159,6 @@ function _startBgPolling() {{
   _pollBgStatus();
   _bgPollTimer = setInterval(_pollBgStatus, 5000);
 }}
-function _stopBgPolling() {{
-  if(_bgPollTimer) {{ clearInterval(_bgPollTimer); _bgPollTimer = null; }}
-}}
-document.addEventListener('visibilitychange', function() {{
-  if(document.hidden) {{ _stopBgPolling(); }} else {{ _startBgPolling(); }}
-}});
 setTimeout(_startBgPolling, 5000);
 
 // ── Server-Update-Erkennung: Banner wenn Neustart nötig ──
