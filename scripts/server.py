@@ -15428,6 +15428,7 @@ def generate_html() -> str:
       <div class="top-chip" onclick="toggleKiraQuick()" title="Kira Quick Actions">&#x26A1; Quick Actions</div>
       {'<div class="top-chip" style="background:#e84545;color:#fff;border-color:#c83030;font-weight:700" title="Urlaubsmodus aktiv — Push-Benachrichtigungen deaktiviert" onclick="esShowSec(\'benachrichtigungen\');showPanel(\'einstellungen\')">&#x1F3D6; Urlaub</div>' if ntfy_urlaub_modus else ''}
       <div class="top-chip kira-live-chip kira-live--idle" id="kiraLiveChip" onclick="kiraActivityDrawerOpen()" title="Kira-Status — klicken für Aktivitäten"><span id="kiraLiveIcon">&#x2705;</span> <span id="kiraLiveText">Kira bereit</span></div>
+      <div class="top-chip kira-bg-chip" id="kiraBgChip" style="display:none" title="Hintergrund-Prozesse"><span class="kira-bg-spinner"></span><span id="kiraBgText"></span></div>
       <div class="top-chip ok" id="monitorStatusChip"><span class="chip-dot"></span><span id="monitorStatusText">Verbunden</span></div>
       <div class="top-chip" id="llmPauseChip" style="display:none;background:#e84545;color:#fff;border-color:#c83030;font-weight:700;cursor:pointer" onclick="esShowSec('provider');showPanel('einstellungen')" title="LLM-Qualifizierung pausiert">&#x23F8; LLM pausiert</div>
       <div class="top-chip" id="mailApproveChip" onclick="pfKiraAusgangOpen()" title="Kira-Entwürfe warten auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
@@ -21128,6 +21129,44 @@ document.addEventListener('visibilitychange', function() {{
 }});
 setTimeout(_startKiraPolling, 4000);
 
+// ── Kira Background-Status Chip ──
+var _bgPollTimer = null;
+function _pollBgStatus() {{
+  fetch('/api/kira/background-status').then(r=>r.json()).then(function(d){{
+    var chip = document.getElementById('kiraBgChip');
+    var text = document.getElementById('kiraBgText');
+    if(!chip) return;
+    if(!d.active || !d.jobs || d.jobs.length === 0) {{
+      chip.style.display = 'none';
+      return;
+    }}
+    chip.style.display = 'flex';
+    var parts = [];
+    for(var i=0;i<d.jobs.length;i++) {{
+      var j = d.jobs[i];
+      if(j.pct >= 0) {{
+        parts.push(j.label+' <span class="kira-bg-pct">'+j.pct+'%</span>');
+      }} else {{
+        parts.push(j.label+': '+j.detail);
+      }}
+    }}
+    if(text) text.innerHTML = parts.join(' · ');
+    chip.title = d.jobs.map(function(j){{ return j.label+': '+j.detail; }}).join('\\n');
+  }}).catch(function(){{}});
+}}
+function _startBgPolling() {{
+  if(_bgPollTimer) clearInterval(_bgPollTimer);
+  _pollBgStatus();
+  _bgPollTimer = setInterval(_pollBgStatus, 5000);
+}}
+function _stopBgPolling() {{
+  if(_bgPollTimer) {{ clearInterval(_bgPollTimer); _bgPollTimer = null; }}
+}}
+document.addEventListener('visibilitychange', function() {{
+  if(document.hidden) {{ _stopBgPolling(); }} else {{ _startBgPolling(); }}
+}});
+setTimeout(_startBgPolling, 5000);
+
 // ── Server-Update-Erkennung: Banner wenn Neustart nötig ──
 var _updateBannerShown = false;
 function _pollServerUpdate() {{
@@ -21442,6 +21481,18 @@ a:hover{text-decoration:underline;}
 .kira-live--error{background:rgba(220,74,74,.1)!important;border-color:rgba(220,74,74,.4)!important;color:var(--danger)!important;}
 @keyframes kira-spin{to{transform:rotate(360deg)}}
 .kira-spin-icon{display:inline-block;animation:kira-spin 1s linear infinite;}
+/* ── Kira Background-Status Chip ── */
+.kira-bg-chip{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(79,125,249,.08))!important;
+  border-color:rgba(124,58,237,.35)!important;color:var(--accent)!important;
+  gap:6px;font-size:var(--fs-xs,11px);overflow:hidden;position:relative;cursor:default;}
+.kira-bg-chip::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(124,58,237,.06) 50%,transparent 100%);
+  animation:kira-bg-shimmer 2s ease-in-out infinite;}
+@keyframes kira-bg-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.kira-bg-spinner{width:12px;height:12px;border:2px solid rgba(124,58,237,.2);
+  border-top-color:rgba(124,58,237,.7);border-radius:50%;display:inline-block;
+  animation:kira-spin .8s linear infinite;flex-shrink:0;}
+.kira-bg-chip .kira-bg-pct{font-weight:700;font-variant-numeric:tabular-nums;}
 /* ── Kira Activity-Drawer ───────────────────────────────────────────────── */
 .kira-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;display:none;opacity:0;transition:opacity .2s;}
 .kira-drawer-overlay.open{display:block;opacity:1;}
@@ -23182,6 +23233,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/kira/proaktiv/status':
             self._api_kira_proaktiv_status()
+
+        elif self.path == '/api/kira/background-status':
+            self._api_kira_background_status()
 
         elif self.path == '/api/kira/circuit_breaker':
             self._api_kira_circuit_breaker_get()
@@ -25560,6 +25614,56 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "kira_proaktiv nicht verfügbar", "proaktiv_aktiv": False, "state": {}})
         except Exception as e:
             self._json({"ok": False, "error": str(e), "state": {}})
+
+    def _api_kira_background_status(self):
+        """GET /api/kira/background-status — Alle Hintergrund-Prozesse zusammengefasst."""
+        jobs = []
+        # 1. Reklassifizierung
+        try:
+            from daily_check import get_reclassify_progress
+            rc = get_reclassify_progress()
+            if rc.get("running"):
+                pct = round(100 * rc.get("geprueft", 0) / max(rc.get("gesamt", 1), 1))
+                jobs.append({"id": "reclassify", "label": "Reklassifizierung",
+                             "pct": pct, "detail": f'{rc["geprueft"]}/{rc["gesamt"]}'})
+            elif rc.get("paused"):
+                jobs.append({"id": "reclassify", "label": "Reklassifizierung",
+                             "pct": -1, "detail": "Pausiert"})
+        except Exception:
+            pass
+        # 2. Nachklassifizierung (recheck_mails)
+        try:
+            from daily_check import get_recheck_progress
+            rk = get_recheck_progress()
+            if rk.get("laeuft"):
+                pct = round(100 * rk.get("geprueft", 0) / max(rk.get("gesamt", 1), 1))
+                jobs.append({"id": "recheck", "label": "Nachklassifizierung",
+                             "pct": pct, "detail": f'{rk["geprueft"]}/{rk["gesamt"]}'})
+        except Exception:
+            pass
+        # 3. Qualifizierung
+        try:
+            from daily_check import get_qualify_progress
+            qp = get_qualify_progress()
+            if qp.get("laeuft"):
+                pct = round(100 * qp.get("geprueft", 0) / max(qp.get("gesamt", 1), 1))
+                jobs.append({"id": "qualify", "label": "Qualifizierung",
+                             "pct": pct, "detail": f'{qp["geprueft"]}/{qp["gesamt"]}'})
+            elif qp.get("pausiert"):
+                jobs.append({"id": "qualify", "label": "Qualifizierung",
+                             "pct": -1, "detail": "Pausiert"})
+        except Exception:
+            pass
+        # 4. Mail-Monitor (aktiver Abruf)
+        try:
+            from mail_monitor import get_monitor_status
+            ms = get_monitor_status()
+            if ms.get("running"):
+                jobs.append({"id": "mail_monitor", "label": "Mail-Abruf",
+                             "pct": -1, "detail": ms.get("aktuell", "läuft")})
+        except Exception:
+            pass
+        self._json({"ok": True, "jobs": jobs, "active": len(jobs) > 0})
 
     def _api_kira_circuit_breaker_get(self):
         """GET /api/kira/circuit_breaker — Circuit Breaker Status."""

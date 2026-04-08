@@ -175,3 +175,7 @@
 ### 2026-04-08 10:45 — Reklassifizierung mit Zeitfilter vorbereitet
 **Was:** (1) daily_check.py: `reclassify_low_confidence(seit="")` — optionaler `seit`-Parameter für Datum-Filter in SQL-Query. (2) server.py POST /api/mail/reclassify: liest `seit` aus Body, übergibt an Thread. (3) Einstellungen-UI: Neuer Button "Unklassifizierte mit Anhängen nachqualifizieren" mit Datum-Input (Default: 3 Monate zurück), Progress-Anzeige, Polling alle 3s. JS-Funktion `esMailReklassifizieren()`.
 **Status:** erledigt
+
+### 2026-04-08 11:00 — Kira Background-Status-Chip in Header-Leiste
+**Was:** (1) GET /api/kira/background-status — kombinierter Endpoint: prüft Reklassifizierung, Nachklassifizierung, Qualifizierung, Mail-Monitor. Gibt `jobs[]` Array zurück. (2) HTML: `kiraBgChip` im Header nach Kira-Live-Chip. Spinner + Text, nur sichtbar wenn Jobs aktiv. (3) CSS: Lila Gradient-Background, Shimmer-Animation, Mini-Spinner (12px), `kira-bg-pct` für Prozent-Anzeige. (4) JS: `_pollBgStatus()` alle 5s, Visibility-API gesteuert, zeigt alle aktiven Jobs mit Prozent oder Detail-Text.
+**Status:** erledigt
