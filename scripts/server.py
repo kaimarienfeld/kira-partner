@@ -6774,7 +6774,7 @@ def build_einstellungen():
 </style>
 <script>
 // Sektionen mit Pane-2 Sub-Navigation
-var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll', lexware:'es-p2-lexware'}};
+var _esSectionsWithPane2 = {{mail:'es-p2-mail', provider:'es-p2-provider', protokoll:'es-p2-protokoll', lexware:'es-p2-lexware', unternehmensprofile:'es-p2-unternehmen'}};
 
 function esFilterSuche(q) {{
   q = (q||'').trim().toLowerCase();
@@ -6831,6 +6831,11 @@ function esShowSec(id) {{
   if(id==='integrationen') {{ esIntegLoad(); }}
   if(id==='protokoll') {{ esShowProtoTab('runtime'); }}
   if(id==='lexware') {{ if(window.esShowLexSec) window.esShowLexSec('verbindung'); }}
+  if(id==='unternehmensprofile') {{
+    document.querySelectorAll('.up-sub').forEach(function(d){{d.style.display='none';}});
+    var def = document.getElementById('up-sub-firmendaten');
+    if(def) def.style.display='block';
+  }}
 }}
 
 function esP2Select(sec, subId, el) {{
@@ -6855,6 +6860,10 @@ function esP2Select(sec, subId, el) {{
     if(window.esShowProtoTab) window.esShowProtoTab(subId);
   }} else if(sec === 'lexware') {{
     if(window.esShowLexSec) window.esShowLexSec(subId);
+  }} else if(sec === 'unternehmensprofile') {{
+    document.querySelectorAll('.up-sub').forEach(function(d){{d.style.display='none';}});
+    var sub = document.getElementById('up-sub-' + subId);
+    if(sub) sub.style.display='block';
   }}
 }}
 function esShowProtoTab(id) {{
@@ -6926,7 +6935,7 @@ function esInfoPopup(btn, text) {{
   </div>
   <div class="es-snav-h">Konfiguration</div>
   <div class="es-sn act" data-essec="design" onclick="esShowSec('design')"><span class="es-sico">&#x25D0;</span>Design</div>
-  <div class="es-sn" data-essec="benutzerprofile" onclick="esShowSec('benutzerprofile')"><span class="es-sico">&#x1F464;</span>Benutzerprofile</div>
+  <div class="es-sn" data-essec="unternehmensprofile" onclick="esShowSec('unternehmensprofile')"><span class="es-sico">&#x1F3E2;</span>Unternehmensprofile</div>
   <div class="es-sn" data-essec="benachrichtigungen" onclick="esShowSec('benachrichtigungen')"><span class="es-sico">&#x1F514;</span>Benachrichtigungen</div>
   <div class="es-sn" data-essec="aufgaben" onclick="esShowSec('aufgaben')"><span class="es-sico">&#x2611;</span>Aufgabenlogik</div>
   <div class="es-sn" data-essec="nachfass" onclick="esShowSec('nachfass')"><span class="es-sico">&#x21BB;</span>Nachfass-Intervalle</div>
@@ -7001,6 +7010,20 @@ function esInfoPopup(btn, text) {{
     <div class="es-p2n" data-p2id="dataverse" onclick="esP2Select('lexware','dataverse',this)"><span class="es-p2n-ico">&#x1F4CA;</span>Dataverse</div>
     <div class="es-p2n" data-p2id="diagnose_es" onclick="esP2Select('lexware','diagnose_es',this)"><span class="es-p2n-ico">&#x1F50E;</span>Diagnose</div>
     <div class="es-p2n" data-p2id="freischaltung" onclick="esP2Select('lexware','freischaltung',this)"><span class="es-p2n-ico">&#x1F511;</span>Freischaltung</div>
+  </div>
+  <!-- Unternehmensprofile -->
+  <div id="es-p2-unternehmen" style="display:none">
+    <div class="es-p2grp">Unternehmen</div>
+    <div class="es-p2n act" data-p2id="firmendaten" onclick="esP2Select('unternehmensprofile','firmendaten',this)"><span class="es-p2n-ico">&#x1F3E2;</span>Firmendaten</div>
+    <div class="es-p2n" data-p2id="team" onclick="esP2Select('unternehmensprofile','team',this)"><span class="es-p2n-ico">&#x1F465;</span>Team-Mitglieder</div>
+    <div class="es-p2n" data-p2id="domains" onclick="esP2Select('unternehmensprofile','domains',this)"><span class="es-p2n-ico">&#x1F310;</span>Eigene Domains</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2grp">Leistungen &amp; Preise</div>
+    <div class="es-p2n" data-p2id="leistungskatalog" onclick="esP2Select('unternehmensprofile','leistungskatalog',this)"><span class="es-p2n-ico">&#x1F4CB;</span>Leistungskatalog</div>
+    <div class="es-p2n" data-p2id="artikel" onclick="esP2Select('unternehmensprofile','artikel',this)"><span class="es-p2n-ico">&#x1F4B0;</span>Artikel &amp; Preise</div>
+    <div class="es-p2sep"></div>
+    <div class="es-p2grp">Benutzer</div>
+    <div class="es-p2n" data-p2id="benutzerprofile" onclick="esP2Select('unternehmensprofile','benutzerprofile',this)"><span class="es-p2n-ico">&#x1F464;</span>Benutzerprofile</div>
   </div>
 </div>
 
@@ -7209,13 +7232,14 @@ function esInfoPopup(btn, text) {{
   </div>
 </div>
 
-<!-- ── SECTION: BENUTZERPROFILE ──────────────────────────────────────── -->
-<div class="es-sec-panel" id="es-sec-benutzerprofile">
-  <div class="es-sec-h">Benutzerprofile</div>
-  <div class="es-sec-sub">Firmen- und Teamdaten f&uuml;r die intelligente Mail-Klassifizierung, Kira-Chat und Aktionsvorschl&auml;ge.</div>
+<!-- ── SECTION: UNTERNEHMENSPROFILE ──────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-unternehmensprofile">
+  <div class="es-sec-h">Unternehmensprofile</div>
+  <div class="es-sec-sub">Firmen-, Team- und Leistungsdaten f&uuml;r die intelligente Mail-Klassifizierung, Kira-Chat und Aktionsvorschl&auml;ge.</div>
 
+  <div class="up-sub" id="up-sub-firmendaten">
   <div class="es-grp">
-    <div class="es-grp-h">Unternehmensprofil</div>
+    <div class="es-grp-h">Firmendaten</div>
     <div class="es-row">
       <div class="es-rl">Firmenname<div class="es-rd">Name des Unternehmens &mdash; wird in Kira-Prompts und Klassifizierung verwendet</div></div>
       <input class="es-inp" id="cfg-profil-firma" value="{_profil_firma}" placeholder="z.B. Meine Firma GmbH">
@@ -7229,7 +7253,9 @@ function esInfoPopup(btn, text) {{
       <textarea class="es-inp" id="cfg-profil-beschreibung" rows="3" style="resize:vertical" placeholder="Was macht Ihr Unternehmen? Zielgruppe, Projektgr&ouml;&szlig;en, Besonderheiten&hellip;">{_profil_beschreibung}</textarea>
     </div>
   </div>
+  </div><!-- /up-sub-firmendaten -->
 
+  <div class="up-sub" id="up-sub-team" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Team-Mitglieder</div>
     <div class="es-row" style="flex-direction:column;align-items:stretch">
@@ -7259,7 +7285,9 @@ function esInfoPopup(btn, text) {{
       <button class="es-btn" onclick="bpAddTeamMember()" style="margin-top:4px;align-self:flex-start">+ Team-Mitglied hinzuf&uuml;gen</button>
     </div>
   </div>
+  </div><!-- /up-sub-team -->
 
+  <div class="up-sub" id="up-sub-domains" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Eigene Domains</div>
     <div class="es-row" style="flex-direction:column;align-items:stretch">
@@ -7270,7 +7298,9 @@ function esInfoPopup(btn, text) {{
       <button class="es-btn" onclick="bpAddDomain()" style="margin-top:4px;align-self:flex-start">+ Domain hinzuf&uuml;gen</button>
     </div>
   </div>
+  </div><!-- /up-sub-domains -->
 
+  <div class="up-sub" id="up-sub-leistungskatalog" style="display:none">
   <div class="es-grp">
     <div class="es-grp-h">Leistungskatalog
       <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">Kira pr&uuml;ft bei jeder Anfrage ob die Leistung zu eurem Spektrum passt</span>
@@ -7292,6 +7322,25 @@ function esInfoPopup(btn, text) {{
 
     <!-- Nicht-Leistungen sind jetzt pro Gruppe im Akkordeon integriert -->
   </div>
+  </div><!-- /up-sub-leistungskatalog -->
+
+  <div class="up-sub" id="up-sub-artikel" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Artikel &amp; Preise</div>
+    <div class="es-sec-sub" style="margin-bottom:10px">Lexware-Artikel und manuell angelegte Leistungspositionen &mdash; Kira nutzt diese f&uuml;r Preisausk&uuml;nfte und Angebotsvorschl&auml;ge.</div>
+    <div id="up-artikel-content" style="padding:12px 0">
+      <div style="color:var(--muted);font-size:13px">Artikel-Verwaltung wird in Phase D implementiert &mdash; hier entsteht die vereinheitlichte Artikeltabelle mit Lexware-Import, manuellem Anlegen, CSV-Import/Export und Lexware-Transfer.</div>
+    </div>
+  </div>
+  </div><!-- /up-sub-artikel -->
+
+  <div class="up-sub" id="up-sub-benutzerprofile" style="display:none">
+  <div class="es-grp">
+    <div class="es-grp-h">Benutzerprofile</div>
+    <div class="es-sec-sub" style="margin-bottom:10px">Individuelle Benutzereinstellungen &mdash; Rollen, Benachrichtigungs-Pr&auml;ferenzen und Zugriffsrechte pro Teammitglied.</div>
+    <div style="padding:12px 0;color:var(--muted);font-size:13px">Benutzerprofile werden hier zuk&uuml;nftig individuell verwaltet. Aktuell werden Team-Mitglieder unter &laquo;Team-Mitglieder&raquo; gepflegt.</div>
+  </div>
+  </div><!-- /up-sub-benutzerprofile -->
 
   <div class="es-save-bar">
     <button class="es-btn es-btn-pri" onclick="saveSettings()">Speichern</button>
