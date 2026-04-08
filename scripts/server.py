@@ -21051,7 +21051,7 @@ function _kdResetAutoMin() {{
   }}, 60000);
 }}
 
-var _kdIcons = {{rechnung:'\u20AC',lead:'\u2605',freigabe:'\u2709',signal:'\u26A0',bg:'\u2699'}};
+var _kdIcons = {{rechnung:'\u20AC',lead:'\u2605',freigabe:'\u2709',signal:'\u26A0',bg:'\u2699',termin:'\u23F0',angebot:'\u2706',frist:'\u23F3',status:'\u2714'}};
 
 function _kiraDrawerLoad() {{
   var grid = document.getElementById('kdGrid');
@@ -21079,11 +21079,12 @@ function _kdRenderTiles(grid, items) {{
   items.forEach(function(item) {{
     var full = item.size === 'full' ? ' kd-tile-full' : '';
     var prio = ' kd-tile-' + (item.priority || 'normal');
+    var isStatus = item.type === 'status';
     html += '<div class="kd-tile' + full + prio + '" data-key="' + _esc(item.key) + '">';
     html += '<div class="kd-tile-accent"></div>';
-    html += '<button class="kd-tile-x" onclick="_kdDismiss(this)" title="Ausblenden">&times;</button>';
+    if(!isStatus) html += '<button class="kd-tile-x" onclick="_kdDismiss(this)" title="Ausblenden">&times;</button>';
     html += '<div class="kd-tile-head">';
-    html += '<span class="kd-tile-icon">' + (_kdIcons[item.type]||'\u2139\uFE0F') + '</span>';
+    html += '<span class="kd-tile-icon">' + (_kdIcons[item.type]||'\u2139') + '</span>';
     html += '<span class="kd-tile-title">' + _esc(item.title) + '</span>';
     html += '</div>';
     if(item.subtitle) html += '<div class="kd-tile-sub">' + _esc(item.subtitle) + '</div>';
@@ -21590,6 +21591,15 @@ a:hover{text-decoration:underline;}
   box-shadow:0 2px 12px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.04);}
 .kd-tile-normal::before{border-color:rgba(255,255,255,.06);}
 .kd-tile-normal:hover{box-shadow:0 6px 24px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06);}
+/* Info/Status: grün-getönt — positive Meldungen */
+.kd-tile-info{
+  background:linear-gradient(135deg,#111a14 0%,#141a16 100%);
+  box-shadow:0 2px 10px rgba(34,197,94,.06),inset 0 1px 0 rgba(255,255,255,.03);}
+.kd-tile-info::before{border-color:rgba(34,197,94,.12);}
+.kd-tile-info:hover{box-shadow:0 4px 16px rgba(34,197,94,.1);}
+.kd-tile-info .kd-tile-accent{background:linear-gradient(180deg,#22c55e,#16a34a);}
+.kd-tile-info .kd-tile-icon{color:#22c55e;}
+.kd-tile-info .kd-tile-title{color:#86efac;}
 /* Tile inner elements */
 .kd-tile-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .kd-tile-icon{font-size:18px;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));}
@@ -25787,7 +25797,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self._json({"ok": True, "jobs": jobs, "active": len(jobs) > 0})
 
     def _api_kira_activity_feed(self):
-        """GET /api/kira/activity-feed — Individuelle Activity-Items für den Drawer."""
+        """GET /api/kira/activity-feed — Individuelle Activity-Items für den Drawer (Win11 Widget-Style)."""
         try:
             # Revival-Tage aus Config (einstellbar)
             try:
@@ -25809,9 +25819,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+            def _check_revival(key, revival_days):
+                """Prüft ob ein dismissed Item revived werden soll. Gibt True zurück wenn Item angezeigt werden darf."""
+                if key not in dismissed:
+                    return True
+                try:
+                    row = db.execute("SELECT dismissed_at FROM kira_activity_dismissed WHERE item_key=?", (key,)).fetchone()
+                    if row:
+                        dism_dt = datetime.fromisoformat(row["dismissed_at"])
+                        if (now - dism_dt).days >= revival_days:
+                            db.execute("UPDATE kira_activity_dismissed SET revived_at=? WHERE item_key=?",
+                                       (now.isoformat(), key))
+                            db.commit()
+                            dismissed.discard(key)
+                            return True
+                except Exception:
+                    pass
+                return False
+
             items = []
 
-            # 1. Überfällige Rechnungen (einzeln)
+            # ── 1. Überfällige Rechnungen (einzeln) ──
+            re_count = 0
             try:
                 for r in db.execute("""
                     SELECT re_nummer, datum, kunde_name, betrag_brutto, mahnung_count
@@ -25826,55 +25855,124 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     if tage < 14:
                         continue
                     key = f"re:{r['re_nummer']}"
-                    # Revival: nach 7 Tagen dismissed und noch offen → revive
-                    if key in dismissed:
-                        try:
-                            row = db.execute(
-                                "SELECT dismissed_at FROM kira_activity_dismissed WHERE item_key=?", (key,)
-                            ).fetchone()
-                            if row:
-                                dism_dt = datetime.fromisoformat(row["dismissed_at"])
-                                if (now - dism_dt).days >= revival_tage:
-                                    db.execute("UPDATE kira_activity_dismissed SET revived_at=? WHERE item_key=?",
-                                               (now.isoformat(), key))
-                                    db.commit()
-                                    dismissed.discard(key)
-                                else:
-                                    continue
-                        except Exception:
-                            continue
+                    if not _check_revival(key, revival_tage):
+                        continue
                     betrag = r["betrag_brutto"] or 0
                     kunde = r["kunde_name"] or "Unbekannt"
                     is_urgent = tage >= 30
                     if is_urgent:
-                        kira_says = f"Diese Rechnung wartet seit {tage} Tagen. Mahnung vorbereiten?"
+                        kira_says = f"Wartet seit {tage} Tagen. Mahnung vorbereiten?"
                     else:
-                        kira_says = "Noch keine Zahlung eingegangen. Im Blick behalten."
+                        kira_says = "Noch keine Zahlung eingegangen."
+                    # Nur die schlimmste Rechnung bekommt full-width
                     items.append({
-                        "key": key,
-                        "type": "rechnung",
+                        "key": key, "type": "rechnung",
                         "priority": "urgent" if is_urgent else "high",
-                        "size": "full",
+                        "size": "full" if (is_urgent and re_count == 0) else "half",
                         "title": str(r["re_nummer"]),
                         "subtitle": kunde,
-                        "detail": f"{betrag:,.2f} EUR · {tage} Tage offen".replace(",", "X").replace(".", ",").replace("X", "."),
+                        "detail": f"{betrag:,.2f} EUR \u00b7 {tage}d".replace(",", "X").replace(".", ",").replace("X", "."),
                         "kira_says": kira_says,
                         "accent": "#ef4444" if is_urgent else "#f59e0b",
                         "action": {"type": "navigate", "target": "showPanel('geschaeft')"},
                         "ts": str(r["datum"])[:10],
                     })
+                    re_count += 1
             except Exception:
                 pass
 
-            # 2. Neue Leads (letzte 48h, einzeln)
+            # ── 2. Termine & Fristen (aus organisation-Tabelle) ──
+            termine_count = 0
+            try:
+                _ORG_TYP = {"termin": "Termin", "frist": "Frist", "rueckruf": "Rückruf"}
+                for r in db.execute("""
+                    SELECT id, typ, datum_erkannt, beschreibung, kunden_email
+                    FROM organisation
+                    WHERE datum_erkannt >= date('now', '-1 day') AND datum_erkannt <= date('now', '+14 days')
+                    ORDER BY datum_erkannt ASC LIMIT 10
+                """):
+                    key = f"termin:{r['id']}"
+                    if key in dismissed:
+                        continue
+                    dat = str(r["datum_erkannt"] or "")[:10]
+                    typ = _ORG_TYP.get(r["typ"] or "", (r["typ"] or "Termin").title())
+                    beschr = (r["beschreibung"] or "")[:60]
+                    diff = 999
+                    try:
+                        d = datetime.strptime(dat, "%Y-%m-%d").date()
+                        diff = (d - today).days
+                    except Exception:
+                        pass
+                    if diff < 0:
+                        prio = "urgent"
+                        detail = f"Überfällig seit {abs(diff)}d"
+                    elif diff == 0:
+                        prio = "high"
+                        detail = "Heute"
+                    elif diff <= 2:
+                        prio = "high"
+                        detail = f"In {diff} Tag{'en' if diff > 1 else ''}"
+                    else:
+                        prio = "normal"
+                        detail = dat
+                    items.append({
+                        "key": key, "type": "termin",
+                        "priority": prio,
+                        "size": "full" if diff <= 0 else "half",
+                        "title": f"{typ}: {beschr[:35]}" if beschr else typ,
+                        "subtitle": r["kunden_email"] or "",
+                        "detail": detail,
+                        "kira_says": "Überfällig — dringend erledigen!" if diff < 0 else ("Steht heute an." if diff == 0 else ""),
+                        "accent": "#ef4444" if diff <= 0 else ("#f59e0b" if diff <= 2 else "#3b82f6"),
+                        "action": {"type": "navigate", "target": "showPanel('organisation')"},
+                        "ts": dat,
+                    })
+                    termine_count += 1
+            except Exception:
+                pass
+
+            # ── 3. Offene Angebote ohne Rückmeldung (>14 Tage) ──
+            try:
+                for r in db.execute("""
+                    SELECT a_nummer, kunde_name, erstellt, betrag_geschaetzt
+                    FROM angebote WHERE status='offen' AND erstellt IS NOT NULL
+                    ORDER BY erstellt ASC LIMIT 5
+                """):
+                    try:
+                        d = datetime.strptime(str(r["erstellt"])[:10], "%Y-%m-%d")
+                        tage = (now - d).days
+                    except Exception:
+                        continue
+                    if tage < 14:
+                        continue
+                    key = f"angebot:{r['a_nummer']}"
+                    if not _check_revival(key, revival_tage):
+                        continue
+                    kunde = r["kunde_name"] or "?"
+                    betrag = r["betrag_geschaetzt"] or 0
+                    items.append({
+                        "key": key, "type": "angebot",
+                        "priority": "normal",
+                        "size": "half",
+                        "title": str(r["a_nummer"] or "Angebot"),
+                        "subtitle": kunde[:30],
+                        "detail": f"{tage}d ohne Rückmeldung" + (f" \u00b7 {betrag:,.0f} EUR".replace(",", ".") if betrag else ""),
+                        "kira_says": "Nachfassen?",
+                        "accent": "#6366f1",
+                        "action": {"type": "navigate", "target": "showPanel('geschaeft');setTimeout(()=>showGeschTab('angebote'),100)"},
+                        "ts": str(r["erstellt"])[:10],
+                    })
+            except Exception:
+                pass
+
+            # ── 4. Neue Leads (letzte 48h, einzeln) ──
             try:
                 seit_48h = (now - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M")
                 for r in db.execute("""
                     SELECT id, titel, kunde_name, erstellt_am, kategorie
                     FROM tasks
                     WHERE typ IN ('anfrage', 'lead', 'anfrage_lead')
-                      AND erstellt_am >= ?
-                      AND status NOT IN ('erledigt', 'archiviert', 'ignoriert')
+                      AND erstellt_am >= ? AND status NOT IN ('erledigt', 'archiviert', 'ignoriert')
                     ORDER BY erstellt_am DESC
                 """, (seit_48h,)):
                     key = f"lead:{r['id']}"
@@ -25882,14 +25980,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         continue
                     kunde = r["kunde_name"] or r["titel"] or f"Anfrage #{r['id']}"
                     items.append({
-                        "key": key,
-                        "type": "lead",
+                        "key": key, "type": "lead",
                         "priority": "normal",
                         "size": "half",
-                        "title": kunde[:40],
+                        "title": kunde[:35],
                         "subtitle": r["kategorie"] or "Neue Anfrage",
                         "detail": str(r["erstellt_am"] or "")[:16],
-                        "kira_says": f"Neue Anfrage von {kunde[:25]}. Angebot erstellen?",
+                        "kira_says": f"Angebot erstellen?",
                         "accent": "#3b82f6",
                         "action": {"type": "navigate", "target": "showPanel('kommunikation')"},
                         "ts": str(r["erstellt_am"] or "")[:10],
@@ -25897,7 +25994,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-            # 3. Pending Freigaben (einzeln)
+            # ── 5. Pending Freigaben (einzeln) ──
             try:
                 for r in db.execute("""
                     SELECT id, an, betreff, erstellt_am
@@ -25905,32 +26002,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     ORDER BY erstellt_am ASC
                 """):
                     key = f"freigabe:{r['id']}"
-                    if key in dismissed:
-                        # Freigaben nach 24h wieder zeigen
-                        try:
-                            row = db.execute(
-                                "SELECT dismissed_at FROM kira_activity_dismissed WHERE item_key=?", (key,)
-                            ).fetchone()
-                            if row:
-                                dism_dt = datetime.fromisoformat(row["dismissed_at"])
-                                if (now - dism_dt).total_seconds() >= 86400:
-                                    db.execute("UPDATE kira_activity_dismissed SET revived_at=? WHERE item_key=?",
-                                               (now.isoformat(), key))
-                                    db.commit()
-                                    dismissed.discard(key)
-                                else:
-                                    continue
-                        except Exception:
-                            continue
+                    if not _check_revival(key, 1):  # Freigaben nach 1 Tag reviven
+                        continue
                     items.append({
-                        "key": key,
-                        "type": "freigabe",
+                        "key": key, "type": "freigabe",
                         "priority": "high",
                         "size": "half",
-                        "title": (r["betreff"] or "Mail-Entwurf")[:45],
+                        "title": (r["betreff"] or "Mail-Entwurf")[:40],
                         "subtitle": f"An: {r['an'] or '?'}",
                         "detail": str(r["erstellt_am"] or "")[:16],
-                        "kira_says": "Kira hat einen Entwurf vorbereitet — wartet auf dein OK.",
+                        "kira_says": "Wartet auf dein OK.",
                         "accent": "#8b5cf6",
                         "action": {"type": "navigate", "target": "pfKiraAusgangOpen()"},
                         "ts": str(r["erstellt_am"] or "")[:10],
@@ -25938,25 +26019,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-            # 4. Case-Engine Signale (angezeigt=0, einzeln)
+            # ── 6. Case-Engine Signale (angezeigt=0) ──
             try:
                 for r in db.execute("""
                     SELECT id, stufe, titel, nachricht, erstellt_am
                     FROM vorgang_signals WHERE angezeigt=0
-                    ORDER BY stufe DESC, erstellt_am DESC LIMIT 10
+                    ORDER BY stufe DESC, erstellt_am DESC LIMIT 8
                 """):
                     key = f"signal:{r['id']}"
                     if key in dismissed:
                         continue
                     is_c = r["stufe"] == "C"
                     items.append({
-                        "key": key,
-                        "type": "signal",
+                        "key": key, "type": "signal",
                         "priority": "urgent" if is_c else "high",
                         "size": "full" if is_c else "half",
-                        "title": (r["titel"] or "Signal")[:50],
+                        "title": (r["titel"] or "Signal")[:45],
                         "subtitle": "",
-                        "detail": (r["nachricht"] or "")[:100],
+                        "detail": (r["nachricht"] or "")[:80],
                         "kira_says": "",
                         "accent": "#ef4444" if is_c else "#f59e0b",
                         "action": None,
@@ -25965,10 +26045,64 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+            # ── 7. Offene Tasks mit Frist (Tasks mit deadline in nächsten 7 Tagen) ──
+            try:
+                for r in db.execute("""
+                    SELECT id, titel, kunde_name, deadline, prioritaet
+                    FROM tasks
+                    WHERE deadline IS NOT NULL AND deadline != ''
+                      AND deadline >= date('now', '-1 day') AND deadline <= date('now', '+7 days')
+                      AND status NOT IN ('erledigt', 'archiviert', 'ignoriert')
+                    ORDER BY deadline ASC LIMIT 6
+                """):
+                    key = f"task-frist:{r['id']}"
+                    if key in dismissed:
+                        continue
+                    dl = str(r["deadline"] or "")[:10]
+                    try:
+                        diff = (datetime.strptime(dl, "%Y-%m-%d").date() - today).days
+                    except Exception:
+                        diff = 99
+                    titel = r["titel"] or r["kunde_name"] or f"Aufgabe #{r['id']}"
+                    items.append({
+                        "key": key, "type": "frist",
+                        "priority": "urgent" if diff < 0 else ("high" if diff <= 1 else "normal"),
+                        "size": "half",
+                        "title": titel[:35],
+                        "subtitle": r["kunde_name"] or "",
+                        "detail": "Überfällig!" if diff < 0 else ("Heute fällig" if diff == 0 else f"Frist in {diff}d"),
+                        "kira_says": "",
+                        "accent": "#ef4444" if diff < 0 else ("#f59e0b" if diff <= 1 else "#6366f1"),
+                        "action": {"type": "navigate", "target": "showPanel('kommunikation')"},
+                        "ts": dl,
+                    })
+            except Exception:
+                pass
+
             db.close()
 
-            # Sortieren: urgent → high → normal
-            prio_order = {"urgent": 0, "high": 1, "normal": 2}
+            # ── Status-Kacheln (positiv — wenn bestimmte Bereiche leer sind) ──
+            if termine_count == 0:
+                items.append({
+                    "key": "_status:termine", "type": "status",
+                    "priority": "info", "size": "half",
+                    "title": "Keine Termine",
+                    "subtitle": "Nächste 14 Tage frei",
+                    "detail": "", "kira_says": "",
+                    "accent": "#22c55e", "action": None, "ts": "zzz",
+                })
+            if re_count == 0:
+                items.append({
+                    "key": "_status:rechnungen", "type": "status",
+                    "priority": "info", "size": "half",
+                    "title": "Rechnungen OK",
+                    "subtitle": "Keine überfälligen Rechnungen",
+                    "detail": "", "kira_says": "",
+                    "accent": "#22c55e", "action": None, "ts": "zzz",
+                })
+
+            # Sortieren: urgent → high → normal → info (status)
+            prio_order = {"urgent": 0, "high": 1, "normal": 2, "info": 3}
             items.sort(key=lambda x: (prio_order.get(x["priority"], 9), x.get("ts", "") or ""))
 
             # Begrüßung
@@ -25979,19 +26113,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 gruss = "Hallo"
             else:
                 gruss = "Guten Abend"
+            # Zähle nur echte Action-Items (nicht Status-Kacheln)
+            n_real = len([i for i in items if i["priority"] != "info"])
             n = len(items)
-            if n == 0:
-                greeting = f"{gruss} Kai — alles im Griff."
-            elif n == 1:
+            if n_real == 0:
+                greeting = f"{gruss} Kai \u2014 alles im Griff."
+            elif n_real == 1:
                 greeting = f"{gruss} Kai, eine Sache die du wissen solltest:"
             else:
-                greeting = f"{gruss} Kai, {n} Dinge die du wissen solltest:"
+                greeting = f"{gruss} Kai, {n_real} Dinge die du wissen solltest:"
 
             self._json({
                 "ok": True,
                 "greeting": greeting,
                 "items": items,
-                "total": n,
+                "total": n_real,
                 "ts": now.isoformat(),
             })
         except Exception as e:
