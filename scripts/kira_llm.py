@@ -741,9 +741,12 @@ def _build_leistungs_prompt(leistungen: dict) -> str:
     lines.append(
         "\n→ PFLICHT bei JEDER Anfrage (Mail, Chat, WhatsApp, alle Kanäle):"
         "\n  - Prüfe ob die angefragte Leistung zum Spektrum passt"
-        "\n  - Wenn NICHT: Weise sofort darauf hin, schlage höfliche Absage vor"
-        "\n  - Bei Antwort-Entwürfen: Leistungsspektrum berücksichtigen"
-        "\n  - Bei Nicht-Leistungen: Klar kommunizieren, ggf. Weiterempfehlung anbieten"
+        "\n  - Wenn NICHT passend: Nicht einfach ablehnen! Freundlich bleiben."
+        "\n    1. Klar sagen: Diese konkrete Leistung bieten wir so nicht an"
+        "\n    2. Im Leistungskatalog nachschauen: Welche eigene Leistung könnte als Alternative passen?"
+        "\n    3. Antwort-Entwurf vorbereiten der höflich auf die passende eigene Leistung verweist"
+        "\n    4. Dem Benutzer vorschlagen: 'Soll ich eine passende Antwort mit Alternativ-Angebot vorbereiten?'"
+        "\n  - Bei Antwort-Entwürfen: Leistungsspektrum immer berücksichtigen, eigene Stärken hervorheben"
     )
     return "\n".join(lines)
 

@@ -173,11 +173,13 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
         _teile.append(
             "\n→ PFLICHT: Prüfe bei JEDER Anfrage (Mail, WhatsApp, Chat, alle Kanäle) ob die angefragte Leistung zum Spektrum passt!"
             "\n  Anfragen die NICHT zum Leistungsspektrum passen:"
-            "\n  - KEINE 'Neue Lead-Anfrage', KEINE 'Antwort erforderlich', KEINE 'Angebotsrückmeldung'"
-            "\n  - Stattdessen: 'Zur Kenntnis' oder 'VORSCHLAG: Außerhalb Leistungsspektrum'"
-            "\n  - empfohlene_aktion = 'Höfliche Absage: Leistung wird nicht angeboten. Ggf. Weiterempfehlung.'"
-            "\n  - zusammenfassung MUSS erwähnen dass die Anfrage nicht zum Leistungsspektrum passt"
-            "\n  DIY-Beratung / kostenlose Telefonhilfe ohne Auftragsbezug → kein Lead, kein Handlungsbedarf."
+            "\n  - KEINE 'Neue Lead-Anfrage', KEINE 'Angebotsrückmeldung'"
+            "\n  - Kategorie: 'Antwort erforderlich' (wir wollen freundlich antworten!)"
+            "\n  - empfohlene_aktion: Schau in den Leistungskatalog welche eigene Leistung als Alternative passt."
+            "\n    Formuliere einen konkreten Vorschlag: 'Antwort vorbereiten: Leistung X wird nicht angeboten,"
+            "\n    aber wir bieten [passende Alternative aus Katalog] an. Höfliche Weiterleitung auf eigenes Angebot.'"
+            "\n  - zusammenfassung MUSS erwähnen: (1) angefragte Leistung nicht im Spektrum, (2) welche eigene Leistung stattdessen passen könnte"
+            "\n  - antwort_noetig = true (damit der Benutzer die vorbereitete Antwort prüfen und senden kann)"
         )
         leistungs_block = "\n".join(_teile) + "\n"
 
