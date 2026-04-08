@@ -20893,11 +20893,8 @@ window.onerror = function(msg, src, line, col, err) {{
   /* Stufe-C: Activity-Drawer öffnen mit Signalen als eigener Sektion */
   function _showSignalsInDrawer(signals) {{
     if(!signals.length) return;
-    // Markiere als gesehen
     signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
-    // Drawer öffnen
     if(typeof kiraActivityDrawerOpen === 'function') kiraActivityDrawerOpen();
-    // Warte bis Drawer geladen, dann Signale-Sektion oben einfügen
     setTimeout(function() {{
       var body = document.getElementById('kiraDrawerBody');
       if(!body) return;
@@ -20909,23 +20906,48 @@ window.onerror = function(msg, src, line, col, err) {{
       sec.style.cssText = 'border-left:3px solid #ef4444;background:rgba(239,68,68,.06);border-radius:8px;margin-bottom:12px;padding:12px 14px';
       var html = '<div class="kira-drawer-section-title" style="color:#ef4444">&#9888;&#65039; Aktion erforderlich (' + signals.length + ')</div>';
       signals.forEach(function(sig) {{
-        html += '<div class="kira-drawer-item" style="margin:8px 0">';
+        html += '<div class="kira-drawer-item kira-signal-item" data-signal-id="'+sig.id+'" style="margin:8px 0;transition:all .3s ease">';
         html += '<div class="kira-drawer-item-icon">&#128308;</div>';
         html += '<div class="kira-drawer-item-body">';
         html += '<div class="kira-drawer-item-title">' + (sig.titel||'Signal') + '</div>';
         if(sig.nachricht) html += '<div class="kira-drawer-item-sub" style="white-space:pre-wrap">' + sig.nachricht + '</div>';
-        html += '<div style="display:flex;gap:8px;margin-top:6px">';
-        html += '<span class="kira-drawer-item-action" data-sid="'+sig.id+'" onclick="this.closest(\\'.kira-drawer-item\\').style.opacity=\\'0.4\\';this.textContent=\\'Bestätigt\\'">Verstanden</span>';
-        html += '<span class="kira-drawer-item-action" style="opacity:.6" data-sid="'+sig.id+'" onclick="this.closest(\\'.kira-drawer-item\\').style.opacity=\\'0.4\\';this.textContent=\\'Verschoben\\'">Später</span>';
-        html += '</div></div></div>';
+        html += '<div class="kira-signal-btns" style="display:flex;gap:8px;margin-top:8px">';
+        html += '<span class="kira-drawer-item-action kira-sig-btn-ok" data-sid="'+sig.id+'" data-action="bestaetigt">';
+        html += '&#x2705; Verstanden</span>';
+        html += '<span class="kira-drawer-item-action kira-sig-btn-later" data-sid="'+sig.id+'" data-action="snoozed" style="opacity:.7;background:transparent;border-color:var(--border)">';
+        html += '&#x23F0; Sp\u00e4ter erinnern</span>';
+        html += '</div>';
+        html += '<div class="kira-signal-done" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;font-size:12px;line-height:1.5"></div>';
+        html += '</div></div>';
       }});
       sec.innerHTML = html;
-      // Aktionsbuttons verdrahten
-      sec.querySelectorAll('[data-sid]').forEach(function(btn) {{
+      sec.querySelectorAll('.kira-sig-btn-ok, .kira-sig-btn-later').forEach(function(btn) {{
         btn.addEventListener('click', function() {{
           var sid = parseInt(btn.dataset.sid);
-          var aktion = btn.textContent.trim() === 'Verstanden' ? 'bestaetigt' : 'snoozed';
-          _markGelesen(sid, aktion);
+          var action = btn.dataset.action;
+          var item = btn.closest('.kira-signal-item');
+          var btns = item.querySelector('.kira-signal-btns');
+          var done = item.querySelector('.kira-signal-done');
+          _markGelesen(sid, action);
+          btns.style.display = 'none';
+          if(action === 'bestaetigt') {{
+            item.querySelector('.kira-drawer-item-icon').innerHTML = '&#x2705;';
+            item.style.borderColor = 'rgba(5,150,105,.3)';
+            item.style.background = 'rgba(5,150,105,.06)';
+            done.style.display = 'block';
+            done.style.background = 'rgba(5,150,105,.08)';
+            done.style.color = '#059669';
+            done.innerHTML = '<strong>&#x2705; Erledigt</strong> — Kira hat die Meldung als best\u00e4tigt markiert. Sie wird nicht erneut angezeigt.';
+          }} else {{
+            item.querySelector('.kira-drawer-item-icon').innerHTML = '&#x23F0;';
+            item.style.borderColor = 'rgba(245,158,11,.3)';
+            item.style.background = 'rgba(245,158,11,.06)';
+            done.style.display = 'block';
+            done.style.background = 'rgba(245,158,11,.08)';
+            done.style.color = '#d97706';
+            done.innerHTML = '<strong>&#x23F0; Verschoben</strong> — Kira erinnert dich in 4 Stunden erneut, falls das Thema noch offen ist.';
+          }}
+          showToast(action === 'bestaetigt' ? 'Meldung als erledigt markiert' : 'Erinnerung in 4h geplant', 'ok');
         }});
       }});
       body.insertBefore(sec, body.firstChild);

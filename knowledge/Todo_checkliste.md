@@ -594,6 +594,10 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ | KIRA Komplett-Reparatur (6 Phasen) · 2026-04-07 23:30 | session-ffff: Daten-Cleanup + UI-Buttons + Thread-Zuweisung + Auto-Cleanup + Lernsystem-Fix + Relevanz-Auswahl + Konsolidierung |
 | ⬜ | "Wie KIRA funktioniert" Dokumentation | Verständliche Erklärung der Klassifizierungspipeline, Lernsystem, Routing — geplant als Feature |
 | ⬜ | Kais weitere Urlaubs-Probleme | Kai wollte morgen noch mehr Schmerzen erzählen — nachfragen |
+| ✅ | tkinter-Popup "KIRA Aktion erforderlich" abschalten · 2026-04-08 | session-gggg: Spam-Fenster deaktiviert, Signal-Scanner im Server (5min Scan, 4h Cooldown) |
+| ✅ | Activity-Drawer Buttons: Feedback bei Klick · 2026-04-08 | session-gggg: Verstanden → grüne Bestätigung, Später → gelbe Erinnerung, Toast, Icon-Wechsel |
+| ⬜ | **Undo-Button (Header)** | Globaler Rückgängig-Button: 10s sichtbar nach Aktionen, macht Aktion rückgängig UND zeigt die Meldung erneut — nicht nur rückgängig, sondern Meldung kommt zurück zum Umentscheiden. Gilt generell für alle Aktionen, nicht nur Signale. **Größeres Projekt.** |
+| ⬜ | Activity-Drawer Optik verbessern | Abdunklung zu schwach, Design schicker machen, Kira-Branding, bessere Animationen |
 
 ---
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-ffff · 2026-04-07_
+_Erstellt: session-r · 2026-03-27 · Zuletzt: session-gggg · 2026-04-08_
