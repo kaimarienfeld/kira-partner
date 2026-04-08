@@ -7281,6 +7281,9 @@ function esInfoPopup(btn, text) {{
         <input class="es-inp" id="cfg-leistungen-url" value="" placeholder="https://beispiel.de" style="flex:1;width:auto">
         <button class="es-btn" onclick="leistungenImportieren()" id="btn-leistungen-import" style="white-space:nowrap">Website importieren</button>
       </div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--muted);cursor:pointer">
+        <input type="checkbox" id="cfg-leistungen-nur-seite"> Nur diese Seite importieren (keine Unterseiten scannen)
+      </label>
     </div>
 
     <div id="bp-leistungen-accordion" style="margin-top:8px">
@@ -17610,12 +17613,13 @@ function _bpCollectLeistungen() {{
 function leistungenImportieren() {{
   const url = (document.getElementById('cfg-leistungen-url')?.value || '').trim();
   if(!url) {{ showToast('Bitte erst Website-URL eingeben'); return; }}
+  const nurSeite = document.getElementById('cfg-leistungen-nur-seite')?.checked || false;
   const btn = document.getElementById('btn-leistungen-import');
-  if(btn) {{ btn.disabled=true; btn.textContent='Scanne Seiten\u2026'; }}
+  if(btn) {{ btn.disabled=true; btn.textContent=nurSeite?'Scanne Seite\u2026':'Scanne Seiten\u2026'; }}
   fetch('/api/leistungen/import', {{
     method:'POST',
     headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{url: url}})
+    body: JSON.stringify({{url: url, nur_diese_seite: nurSeite}})
   }}).then(r=>r.json()).then(d=>{{
     if(btn) {{ btn.disabled=false; btn.textContent='Website importieren'; }}
     if(d.ok && d.leistungen) {{
@@ -29877,24 +29881,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 links.add(clean)
                     return links
 
+                nur_diese_seite = body.get("nur_diese_seite", False)
+
                 # Hauptseite holen + Links sammeln
                 main_html = _fetch_page(url)
                 if not main_html:
                     return self._json({"ok": False, "error": f"Website {url} nicht erreichbar"})
                 all_texts = [_extract_text(main_html)]
                 crawled = {url}
-                sublinks = _extract_links(main_html, url) - crawled
                 pages_crawled = 1
 
-                # Bis zu 8 Unterseiten crawlen
-                for sub_url in list(sublinks)[:8]:
-                    sub_html = _fetch_page(sub_url)
-                    if sub_html:
-                        sub_text = _extract_text(sub_html)
-                        if len(sub_text) > 100:
-                            all_texts.append(f"--- Seite: {sub_url} ---\n{sub_text}")
-                            pages_crawled += 1
-                    crawled.add(sub_url)
+                # Bis zu 8 Unterseiten crawlen (wenn nicht deaktiviert)
+                if not nur_diese_seite:
+                    sublinks = _extract_links(main_html, url) - crawled
+                    for sub_url in list(sublinks)[:8]:
+                        sub_html = _fetch_page(sub_url)
+                        if sub_html:
+                            sub_text = _extract_text(sub_html)
+                            if len(sub_text) > 100:
+                                all_texts.append(f"--- Seite: {sub_url} ---\n{sub_text}")
+                                pages_crawled += 1
+                        crawled.add(sub_url)
 
                 combined_text = "\n\n".join(all_texts)
                 if len(combined_text) > 12000:
