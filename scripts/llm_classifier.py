@@ -93,6 +93,7 @@ WISSEN (von Kira gelernte Erkenntnisse zur Klassifizierung):
     if mail_verlauf:
         verlauf_block = f"""
 BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
+(→ = empfangen, ← = GESENDET vom Benutzer — wenn ← vorhanden, wurde BEREITS geantwortet!)
 {mail_verlauf}
 """
 
@@ -176,6 +177,14 @@ REGELN:
 - Bei Unsicherheit: lieber "Antwort erforderlich" als "Ignorieren"
 - ANHAENGE BERUECKSICHTIGEN: PDF/ZIP/Bild-Anhaenge koennen Rechnungen, Angebote, Fotos, Vertraege enthalten.
 
+KRITISCH — MAIL-VERLAUF PRÜFEN (häufigster Fehler!):
+- Wenn im Verlauf eine GESENDETE Mail (←) an denselben Absender steht → diese Anfrage wurde BEREITS BEANTWORTET!
+  → "Neue Lead-Anfrage" ist FALSCH wenn schon geantwortet wurde. Dann: "Abgeschlossen" oder "Angebotsrückmeldung" oder "Zur Kenntnis".
+  → Setze "beantwortet": true
+- Wenn der Betreff RE:/AW: enthält UND der Verlauf eine gesendete Antwort zeigt → Mail ist Teil einer laufenden Konversation, KEIN neuer Lead!
+- "Neue Lead-Anfrage" NUR wenn es die ERSTE Mail dieses Kontakts ist ODER wenn das Thema komplett neu ist (anderes Projekt, andere Frage).
+- Werbemails/Newsletter von Softwareanbietern (Lexware, shipcloud, etc.) mit Worten wie "Angebot", "Erweiterung", "Highlights" → "Newsletter / Werbung", NICHT "Rechnung" oder "Mahnung".
+
 ROUTING-ENTSCHEIDUNG (PFLICHT — vor der Klassifizierung überlegen!):
 Muss der Benutzer PERSÖNLICH handeln? Oder kann das System die Mail automatisch verarbeiten?
 - Eingangsrechnungen, Belege, Zahlungsbestätigungen → KEIN Task, sondern Buchhaltung
@@ -198,7 +207,7 @@ Antworte NUR als JSON:
   "routing": "task" | "buchhaltung" | "feed" | "kira_vorschlag" | "archivieren",
   "mit_termin": true/false,
   "manuelle_pruefung": true/false,
-  "beantwortet": true/false,
+  "beantwortet": true/false,   // TRUE wenn im Verlauf eine gesendete Antwort (←) an diesen Kontakt steht!
   "organisation": {{"termin": "...", "rueckruf": true, "frist": "..."}} oder null,
   "angebot_aktion": "angenommen" | "abgelehnt" | "rueckfrage" | null,
   "angebot_nummer": "ANF-2026-001" | null,
