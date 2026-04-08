@@ -48,6 +48,16 @@ KATEGORIEN = [
 PRIORITAETEN = ["hoch", "mittel", "niedrig"]
 
 
+def _get_alle_kategorien() -> list:
+    """Gibt alle Kategorien zurück (Standard + dynamische aus DB)."""
+    try:
+        from task_manager import get_kategorien
+        alle = get_kategorien(include_lernphase=True)
+        return [k["name"] for k in alle]
+    except Exception:
+        return list(KATEGORIEN)
+
+
 def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent,
                                   angebote_kontext: str = "", correction_beispiele: str = "",
                                   kira_wissen: str = "", kunden_profil: str = "",
@@ -129,6 +139,45 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
     firma_branche = profil.get("firma_branche", "")
     firma_beschreibung = profil.get("firma_beschreibung", "")
 
+    # ── Dynamische Kategorien laden ──
+    _dyn_kats = []
+    try:
+        alle_kats = _get_alle_kategorien()
+        _standard_namen = {k for k in KATEGORIEN}
+        _dyn_kats = [k for k in alle_kats if k not in _standard_namen]
+    except Exception:
+        pass
+    _dynamische_kat_block = ""
+    if _dyn_kats:
+        _dk_lines = [f"  + \"{k}\"" for k in _dyn_kats]
+        _dynamische_kat_block = "\nZusätzliche Kategorien (vom System gelernt):\n" + "\n".join(_dk_lines)
+
+    # ── Leistungskatalog laden ──
+    leistungen = profil.get("leistungen", {})
+    katalog = leistungen.get("katalog", [])
+    nicht_leistungen = leistungen.get("nicht_leistungen", [])
+    leistungs_block = ""
+    if katalog or nicht_leistungen:
+        _teile = ["\nLEISTUNGSSPEKTRUM DES UNTERNEHMENS:"]
+        if katalog:
+            _teile.append("Folgende Leistungen werden angeboten:")
+            for _l in katalog:
+                _kern = " [KERNLEISTUNG]" if _l.get("ist_kernleistung") else ""
+                _teile.append(f"  - {_l['name']}{_kern}: {_l.get('beschreibung', '')}")
+                if _l.get("stichworte"):
+                    _teile.append(f"    Stichworte: {', '.join(_l['stichworte'])}")
+        if nicht_leistungen:
+            _teile.append("\nFolgende Leistungen werden NICHT angeboten:")
+            for _nl in nicht_leistungen:
+                _teile.append(f"  ✗ {_nl}")
+        _teile.append(
+            "\n→ PFLICHT: Prüfe bei jeder Anfrage ob die angefragte Leistung zum Spektrum passt!"
+            "\n  Anfragen die NICHT zum Leistungsspektrum passen → KEINE 'Neue Lead-Anfrage'!"
+            "\n  Stattdessen: 'Zur Kenntnis' mit empfohlene_aktion = Höfliche Absage vorschlagen."
+            "\n  DIY-Beratung / kostenlose Telefonhilfe ohne Auftragsbezug → kein Lead."
+        )
+        leistungs_block = "\n".join(_teile) + "\n"
+
     # Team-Mitglieder-Block (alle Namen + Anreden)
     team_block = ""
     if len(team) > 1:
@@ -147,7 +196,7 @@ BENUTZER-IDENTITÄT:
 Wenn die E-Mail den Benutzer persönlich anspricht (z.B. {benutzer_anreden or benutzer_name}), ist sie an ihn gerichtet — das ist KEINE anonyme Werbung.
 Prüfe genau ob sie geschäftsrelevant ist, bevor du "Ignorieren" vergibst.
 
-{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}{projekt_block}
+{leistungs_block}{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}{projekt_block}
 MAIL-DATEN:
 - Konto: {konto}
 - Absender: {absender}
@@ -171,7 +220,7 @@ Wenn im Mail-Verlauf gesendete Mails des Benutzers stehen (←):
 
 KATEGORIEN (wähle GENAU eine):
 1. "Antwort erforderlich" — Kunde/Partner erwartet eine Antwort, offene Fragen
-2. "Neue Lead-Anfrage" — Erstanfrage von Interessenten
+2. "Neue Lead-Anfrage" — Erstanfrage von Interessenten (NUR wenn Leistung zum Spektrum passt!)
 3. "Angebotsrueckmeldung" — Reaktion auf ein gesendetes Angebot (Zusage, Absage, Rückfragen)
 4. "Rechnung / Beleg" — Rechnungen, Belege, Zahlungsbestätigungen, Mahnungen
 5. "Shop / System" — Shop-Bestellungen, Systembenachrichtigungen
@@ -179,6 +228,12 @@ KATEGORIEN (wähle GENAU eine):
 7. "Zur Kenntnis" — Informativ, kein Handlungsbedarf
 8. "Abgeschlossen" — Bereits erledigt (Danke-Mails, Bestätigungen ohne Frage)
 9. "Ignorieren" — Spam, irrelevante Systemmails
+{_dynamische_kat_block}
+
+Falls KEINE der vorhandenen Kategorien passt, darfst du eine NEUE Kategorie vorschlagen.
+Format: kategorie = "VORSCHLAG: Dein Kategoriename"
+Beispiel: "VORSCHLAG: Außerhalb Leistungsspektrum" oder "VORSCHLAG: Partneranfrage"
+Nutze das sparsam — nur wenn wirklich keine bestehende Kategorie passt.
 
 REGELN:
 - {firma_branche or 'Branche des Unternehmens beachten'}
@@ -254,14 +309,38 @@ def _parse_llm_response(text):
 
     # Validierung
     kat = data.get("kategorie", "")
-    if kat not in KATEGORIEN:
-        # Fuzzy-Match
-        for k in KATEGORIEN:
-            if k.lower() in kat.lower() or kat.lower() in k.lower():
-                data["kategorie"] = k
-                break
+    alle_bekannt = _get_alle_kategorien()
+    if kat not in alle_bekannt and kat not in KATEGORIEN:
+        # VORSCHLAG-Prefix: Neue dynamische Kategorie
+        if kat.startswith("VORSCHLAG:"):
+            neue_kat_name = kat.replace("VORSCHLAG:", "").strip()
+            if neue_kat_name:
+                try:
+                    from task_manager import add_dynamische_kategorie
+                    add_dynamische_kategorie(neue_kat_name, data.get("zusammenfassung", ""))
+                    data["kategorie"] = neue_kat_name
+                    data["_ist_neue_kategorie"] = True
+                    data["_kategorie_lernphase"] = True
+                except Exception:
+                    data["kategorie"] = "Zur Kenntnis"  # Fallback
+            else:
+                data["kategorie"] = "Zur Kenntnis"
         else:
-            return None
+            # Fuzzy-Match gegen alle bekannten Kategorien (Standard + dynamische)
+            matched = False
+            for k in alle_bekannt:
+                if k.lower() in kat.lower() or kat.lower() in k.lower():
+                    data["kategorie"] = k
+                    matched = True
+                    break
+            if not matched:
+                for k in KATEGORIEN:
+                    if k.lower() in kat.lower() or kat.lower() in k.lower():
+                        data["kategorie"] = k
+                        matched = True
+                        break
+            if not matched:
+                return None
 
     prio = data.get("prioritaet", "mittel")
     if prio not in PRIORITAETEN:

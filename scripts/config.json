@@ -224,7 +224,7 @@
     "eigene_domains_extra": [
       "invoicefetcher.email",
       "sichtbeton-cire.de",
-      "raumkult.ei"
+      "raumkult.eu"
     ]
   },
   "anhang_extraktion": {
@@ -355,7 +355,118 @@
   "cloudflare_tunnel": {
     "public_url": ""
   },
-  "firma_name": "rauMKult Sichtbeton",
-  "firma_branche": "Betonkosmetik / Sichtbeton-Fachbetrieb",
-  "firma_beschreibung": "Fachbetrieb fuer Betonkosmetik, Sichtbeton-Retusche, Betonsanierung und Oberflaechen-Beschichtung. Privatkunden >80%, Architekten, Planer. Projektvolumen 2.000-15.000 EUR."
+  "firma_name": "rauMKult",
+  "firma_branche": "Handwerkliche Oberflächenveredelung und kreative Wandgestaltung.",
+  "firma_beschreibung": "Das Unternehmen ist auf die Veredelung, Reparatur und gestalterische Aufwertung hochwertiger Oberflächen spezialisiert. Der Schwerpunkt liegt auf Sichtbeton-Kosmetik, fugenlosen Beschichtungen sowie individuellen Wand- und Designflächen für private, gewerbliche und architektonisch anspruchsvolle Projekte.",
+  "activity_feed": {
+    "revival_tage": 3
+  },
+  "benutzer_profile": {
+    "aktives_profil": "profil_1",
+    "profile": {
+      "profil_1": {
+        "firma_name": "rauMKult",
+        "firma_branche": "Handwerkliche Oberflächenveredelung und kreative Wandgestaltung.",
+        "firma_beschreibung": "Das Unternehmen ist auf die Veredelung, Reparatur und gestalterische Aufwertung hochwertiger Oberflächen spezialisiert. Der Schwerpunkt liegt auf Sichtbeton-Kosmetik, fugenlosen Beschichtungen sowie individuellen Wand- und Designflächen für private, gewerbliche und architektonisch anspruchsvolle Projekte.",
+        "team": [
+          {
+            "name": "Kai Marienfeld",
+            "rolle": "Inhaber",
+            "email_konten": [
+              "kaimrf@rauMKultSichtbeton.onmicrosoft.com",
+              "info@raumkult.eu",
+              "anfrage@raumkult.eu",
+              "shop@sichtbeton-cire.de",
+              "invoice@sichtbeton-cire.de"
+            ],
+            "anrede_varianten": [
+              "Hallo Herr Marienfeld",
+              "Sehr geehrter Herr Marienfeld",
+              "Hi Kai",
+              "Hallo Kai"
+            ],
+            "ist_admin": true
+          }
+        ],
+        "eigene_domains": [
+          "invoicefetcher.email",
+          "sichtbeton-cire.de",
+          "raumkult.eu"
+        ],
+        "social_media": {},
+        "leistungen": {
+          "website_url": "https://raumkult.eu",
+          "letzte_aktualisierung": "2026-04-08T17:00:00",
+          "katalog": [
+            {
+              "name": "Sichtbeton-Kosmetik",
+              "beschreibung": "Professionelle optische Reparatur und Angleichung von Sichtbetonflächen an Gebäuden — Kiesnester, Poren, Verfärbungen, Lunker, Abplatzungen",
+              "stichworte": [
+                "Betonkosmetik",
+                "Sichtbeton",
+                "Retusche",
+                "Spachtelung",
+                "Kiesnester",
+                "Poren",
+                "Lunker",
+                "Fehlstellen",
+                "Abplatzungen",
+                "Betonsanierung"
+              ],
+              "zielgruppe": "Bauherren, Architekten, Bauunternehmen, Generalunternehmer",
+              "ist_kernleistung": true
+            },
+            {
+              "name": "Fugenlose Beschichtungen",
+              "beschreibung": "Fugenlose Wand- und Bodenbeschichtungen in Betonoptik für Innenräume",
+              "stichworte": [
+                "fugenlos",
+                "Spachtelboden",
+                "Mikrozement",
+                "Betonoptik",
+                "Wandbeschichtung",
+                "Bodenbeschichtung"
+              ],
+              "zielgruppe": "Privatkunden, Architekten, Gewerbe, Hotels, Gastronomie",
+              "ist_kernleistung": true
+            },
+            {
+              "name": "Kreative Wandgestaltung",
+              "beschreibung": "Individuelle Design-Oberflächen und Spachteltechniken für anspruchsvolle Innenräume",
+              "stichworte": [
+                "Wandgestaltung",
+                "Designfläche",
+                "Spachteltechnik",
+                "Oberflächenveredelung"
+              ],
+              "zielgruppe": "Architekten, Innenarchitekten, gehobene Privatkunden",
+              "ist_kernleistung": true
+            },
+            {
+              "name": "Betonmöbel und Objekte",
+              "beschreibung": "Individuelle Betonmöbel, Waschtische, Küchenarbeitsplatten und Design-Objekte",
+              "stichworte": [
+                "Betonmoebel",
+                "Waschtisch",
+                "Arbeitsplatte",
+                "Betonobjekt",
+                "Sichtbeton-Moebel"
+              ],
+              "zielgruppe": "Privatkunden, Interior-Designer, Gewerbe",
+              "ist_kernleistung": false
+            }
+          ],
+          "nicht_leistungen": [
+            "Kostenlose Telefonberatung für Heimwerker und DIY-Projekte",
+            "Betreuung von Eigenbauprojekten ohne Auftragserteilung",
+            "Betonherstellung, Rohbau oder Betonbau",
+            "Statische Sanierung oder tragende Betonsanierung",
+            "Abrissarbeiten oder Rückbau",
+            "Lieferung von Baumaterialien ohne Verarbeitung"
+          ],
+          "quelle": "manuell"
+        }
+      }
+    }
+  }
 }

@@ -698,6 +698,32 @@ def init_conversations_db():
     db.close()
 
 
+def _build_leistungs_prompt(leistungen: dict) -> str:
+    """Baut den Leistungskatalog-Block für Kiras System-Prompt."""
+    if not leistungen:
+        return ""
+    katalog = leistungen.get("katalog", [])
+    nicht_l = leistungen.get("nicht_leistungen", [])
+    if not katalog and not nicht_l:
+        return ""
+    lines = ["\n━━━ LEISTUNGSSPEKTRUM ━━━"]
+    if katalog:
+        lines.append("Angebotene Leistungen:")
+        for l in katalog:
+            kern = " [KERN]" if l.get("ist_kernleistung") else ""
+            lines.append(f"  • {l['name']}{kern}: {l.get('beschreibung', '')}")
+    if nicht_l:
+        lines.append("\nNICHT angebotene Leistungen:")
+        for nl in nicht_l:
+            lines.append(f"  ✗ {nl}")
+    lines.append(
+        "\n→ Wenn eine Anfrage NICHT zum Leistungsspektrum passt: "
+        "Weise darauf hin und schlage eine höfliche Absage vor. "
+        "Berücksichtige das Leistungsspektrum bei Antwort-Entwürfen."
+    )
+    return "\n".join(lines)
+
+
 # ── System-Prompt Builder ────────────────────────────────────────────────────
 def build_system_prompt(config=None):
     config = config or get_config()
@@ -728,11 +754,13 @@ def build_system_prompt(config=None):
         _inhaber_name = _hauptbenutzer.get("name", "")
         _inhaber_rolle = _hauptbenutzer.get("rolle", "Inhaber")
         _firma_beschr = _profil.get("firma_beschreibung", "")
+        _leistungen = _profil.get("leistungen", {})
     except Exception:
         _firma = _cfg.get("firma_name", "") or "Unternehmen"
         _inhaber_name = ""
         _inhaber_rolle = "Inhaber"
         _firma_beschr = ""
+        _leistungen = {}
 
     prompt = f"""Du bist {kira_name} \u2014 die autonome KI-Gesch\u00e4ftsassistentin von {_firma}.
 {_inhaber_rolle}: {_inhaber_name}. Heute: {today}.{f' {_firma_beschr}' if _firma_beschr else ''}
@@ -799,6 +827,7 @@ Du kennst jederzeit:
 ━━━ GESCHÄFT {_firma} ━━━
 {_firma_beschr or f'{_firma} — Details aus den Benutzerprofile-Einstellungen.'}
 {_inhaber_rolle}: {_inhaber_name}.
+{_build_leistungs_prompt(_leistungen)}
 
 ━━━ KOMMUNIKATION ━━━
 - Direkt, klar, professionell — kein Marketing-Sprech

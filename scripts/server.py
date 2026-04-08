@@ -4672,10 +4672,9 @@ window.pfKiraMailContext = async function() {
   if(taskKat) lines.push('', 'Aktuelle Kategorie: **' + taskKat + '**' + (taskId ? ' (Task #' + taskId + ')' : ''));
 
   lines.push('', '---');
-  lines.push('Ich habe dir diese Mail geladen. Bitte lies sie und frag mich direkt:');
-  lines.push('1. Ist die Kategorie \"' + (taskKat || 'unbekannt') + '\" korrekt? Wenn nicht, sag mir die richtige — ich korrigiere das sofort (mit korrektur-Tool) und es wird als Lernbeispiel gespeichert.');
-  lines.push('2. Was m\u00f6chtest du damit tun? (Antworten, Erledigen, Ignorieren, Weiterleiten, Erinnerung setzen?)');
-  lines.push('3. Falls du Informationen brauchst die ich nachschlagen kann — frag einfach.');
+  lines.push('Analysiere diese Mail und schlage mir konkret vor, was wir damit tun sollen.');
+  lines.push('Pr\u00fcfe: Ist die Kategorie \"' + (taskKat || 'unbekannt') + '\" korrekt? Ist eine Antwort n\u00f6tig? Wenn ja, erstelle direkt einen Entwurf.');
+  lines.push('Ber\u00fccksichtige den Absender-Verlauf und offene Aufgaben bei deiner Empfehlung.');
 
   const msg = lines.join('\\n');
 
@@ -6187,6 +6186,24 @@ def build_einstellungen():
     _profil_beschreibung = esc(_profil.get("firma_beschreibung", ""))
     _profil_domains = _profil.get("eigene_domains", [])
     _alle_konten = config.get("combined_postfach", {}).get("konten", [])
+    # Dynamische Kategorien für Korrektur-Modal
+    try:
+        from task_manager import get_kategorien as _gk
+        _alle_kats = _gk(include_lernphase=True)
+        _korr_kat_options = "\n".join(
+            f'<option value="{esc(k["name"])}">{esc(k["name"])}{" (Lernphase)" if k.get("lernphase") else ""}</option>'
+            for k in _alle_kats
+        )
+    except Exception:
+        _korr_kat_options = (
+            '<option value="Antwort erforderlich">Antwort erforderlich</option>'
+            '<option value="Neue Lead-Anfrage">Neue Lead-Anfrage</option>'
+            '<option value="Angebotsrückmeldung">Angebotsrückmeldung</option>'
+            '<option value="Rechnung / Beleg">Rechnung / Beleg</option>'
+            '<option value="Shop / System">Shop / System</option>'
+            '<option value="Zur Kenntnis">Zur Kenntnis</option>'
+            '<option value="Ignorieren">Ignorieren</option>'
+        )
     _konto_labels = config.get("mail_konto_labels", {})
     # Circuit Breaker Status laden
     circuit_state = {}
@@ -16018,14 +16035,12 @@ def generate_html() -> str:
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Kategorie ändern auf:</label>
     <select id="korr-neu">
       <option value="">– unverändert –</option>
-      <option value="Antwort erforderlich">Antwort erforderlich</option>
-      <option value="Neue Lead-Anfrage">Neue Lead-Anfrage</option>
-      <option value="Angebotsrückmeldung">Angebotsrückmeldung</option>
-      <option value="Rechnung / Beleg">Rechnung / Beleg</option>
-      <option value="Shop / System">Shop / System</option>
-      <option value="Zur Kenntnis">Zur Kenntnis</option>
-      <option value="Ignorieren">Ignorieren</option>
+      {_korr_kat_options}
     </select>
+    <div style="margin-top:6px">
+      <input type="text" id="korr-neu-custom" placeholder="Oder neue Kategorie vorschlagen..." style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px">
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Neue Kategorien starten in der Lernphase und werden nach 5 Zuweisungen permanent.</div>
+    </div>
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px;">Notiz (optional):</label>
     <textarea id="korr-notiz" placeholder="z.B. war kein Lead, war Lieferant..."></textarea>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
@@ -20020,6 +20035,8 @@ function closeKira(){{ closeKiraWorkspace(); closeKiraQuick(); }}
 async function kiraOpenWithContext(modul, typ, id, extra) {{
   openKiraNaked();
   showKTab('chat');
+  // Neue Session für neuen Kontext
+  kiraSessionId = null;
   const qaMap = {{
     'postfach':'mail','kommunikation':'aufgabe',
     'geschaeft': typ==='re'||typ==='eingang'?'rechnung':typ==='ang'?'angebot':'frage',
@@ -20038,7 +20055,8 @@ async function kiraOpenWithContext(modul, typ, id, extra) {{
       input.value = ctx.prompt_vorschlag;
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-      input.focus();
+      // Automatisch absenden — Kira analysiert proaktiv
+      setTimeout(()=>{{ sendKiraMsg(); }}, 200);
     }}
   }} catch(e) {{ console.warn('kiraOpenWithContext fetch error:', e); }}
 }}
@@ -20866,24 +20884,28 @@ function kiraProaktivCheck() {{
   }}).catch(()=>{{}});
 }}
 
-// Mit Kira besprechen – Chat öffnen mit Kontext
+// Mit Kira besprechen – Chat öffnen mit Kontext + Auto-Send
 function openKira(taskId){{
   const ctx = KIRA_CTX[taskId];
   if(!ctx){{ showToast('Kein Kontext'); return; }}
   openKiraNaked();
   showKTab('chat');
-  kiraSetQuickActions('frage');
-  // Pre-fill chat with task context
+  kiraSessionId = null;  // Neue Session für neuen Kontext
+  kiraSetQuickActions('aufgabe');
+  setKiraContextBar('Kommunikation', ctx.titel||'Aufgabe', ctx.name||ctx.email ? [ctx.name||ctx.email] : []);
+  // Chat mit Kontext füllen + automatisch senden
   const input = document.getElementById('kiraInput');
   if(input) {{
     const msg = 'Aufgabe: ' + (ctx.titel||'') + '\\nVon: ' + (ctx.name||ctx.email||'') +
       '\\nKategorie: ' + (ctx.kategorie||'') +
+      '\\nStatus: ' + (ctx.status||'') +
       '\\nZusammenfassung: ' + (ctx.zusammenfassung||'') +
-      '\\n\\nWas schlägst du vor?';
+      '\\n\\nAnalysiere diese Aufgabe und schlage mir konkret vor, was wir als nächstes tun sollen. ' +
+      'Berücksichtige den Kontext — gibt es einen Mail-Verlauf? Ist eine Antwort fällig? Soll ich einen Entwurf erstellen?';
     input.value = msg;
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-    input.focus();
+    setTimeout(()=>{{ sendKiraMsg(); }}, 300);
   }}
 }}
 
@@ -20928,6 +20950,8 @@ function openKorrektur(taskId, alterKat){{
   document.getElementById('korr-alt').value=alterKat;
   document.getElementById('korr-neu').value='';
   document.getElementById('korr-notiz').value='';
+  const customEl = document.getElementById('korr-neu-custom');
+  if(customEl) customEl.value='';
   document.getElementById('korrModal').classList.add('open');
 }}
 function closeKorrModal(){{ document.getElementById('korrModal').classList.remove('open'); }}
@@ -20978,8 +21002,11 @@ function closeLhModal(){{
 function saveKorrektur(){{
   const tid  = document.getElementById('korr-tid').value;
   const alt  = document.getElementById('korr-alt').value;
-  const neu  = document.getElementById('korr-neu').value;
+  let neu  = document.getElementById('korr-neu').value;
+  const custom = (document.getElementById('korr-neu-custom')?.value||'').trim();
   const notiz= document.getElementById('korr-notiz').value;
+  // Custom-Kategorie hat Vorrang wenn ausgefüllt
+  if(custom) neu = custom;
   if(!neu&&!notiz){{ showToast('Bitte Kategorie oder Notiz angeben'); return; }}
   fetch('/api/task/'+tid+'/korrektur',{{
     method:'POST',headers:{{'Content-Type':'application/json'}},
@@ -23655,6 +23682,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/kira/termine'):
             self._api_kira_termine()
 
+        elif self.path == '/api/leistungen':
+            try:
+                from task_manager import get_active_profile
+                profil = get_active_profile()
+                self._json(profil.get("leistungen", {"katalog": [], "nicht_leistungen": []}))
+            except Exception as e:
+                self._json({"error": str(e)})
+
         elif self.path == '/api/config/export':
             try:
                 cfg  = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
@@ -24484,7 +24519,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     except Exception: pass
                     result["kontext"] = f"Mail von {row['absender'] or '?'}: {row['betreff'] or '?'} ({row['kategorie'] or '?'})"
                 conn.close()
-                result["prompt_vorschlag"] = f"Ich sehe mir diese Mail an.\nKategorie: {result['daten'].get('kategorie','?')}\n\n1. Ist die Kategorie korrekt? Wenn nicht, sag mir die richtige.\n2. Was möchtest du damit tun?\n3. Falls du Informationen brauchst — frag einfach."
+                result["prompt_vorschlag"] = (
+                    f"Mail von: {result['daten'].get('absender','?')}\n"
+                    f"Betreff: {result['daten'].get('betreff','?')}\n"
+                    f"Kategorie: {result['daten'].get('kategorie','?')}\n"
+                    f"Datum: {result['daten'].get('datum','?')}\n"
+                    "\nAnalysiere diese Mail und schlage mir konkret vor, was wir damit tun sollen. "
+                    "Prüfe die Kategorie, ob eine Antwort nötig ist, und erstelle ggf. direkt einen Entwurf."
+                )
                 result["verfuegbare_aktionen"] = ["korrektur", "task_erstellen", "task_erledigen", "mail_senden"]
 
             elif modul == "kommunikation" and eid:
@@ -24498,7 +24540,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }
                     result["kontext"] = f"Aufgabe #{row['id']}: {row['betreff'] or '?'} ({row['kategorie'] or '?'}, {row['status'] or '?'})"
                 db.close()
-                result["prompt_vorschlag"] = f"Aufgabe: {result['daten'].get('betreff','?')}\nKategorie: {result['daten'].get('kategorie','?')}\nStatus: {result['daten'].get('status','?')}\n\nWas möchtest du mit dieser Aufgabe tun?"
+                _zf = result['daten'].get('zusammenfassung', '')
+                _ke = result['daten'].get('kunden_email', '')
+                result["prompt_vorschlag"] = (
+                    f"Aufgabe: {result['daten'].get('betreff','?')}\n"
+                    f"Von: {_ke}\n"
+                    f"Kategorie: {result['daten'].get('kategorie','?')}\n"
+                    f"Status: {result['daten'].get('status','?')}\n"
+                    + (f"Zusammenfassung: {_zf}\n" if _zf else "")
+                    + "\nAnalysiere diese Aufgabe und schlage mir konkret vor, was wir als nächstes tun sollen. "
+                    "Berücksichtige den Kontext (gibt es einen Mail-Verlauf? Ist eine Antwort fällig? Soll ich einen Entwurf erstellen?)."
+                )
                 result["verfuegbare_aktionen"] = ["korrektur", "task_bearbeiten", "task_erledigen", "nachfass_email_entwerfen"]
 
             elif modul == "geschaeft":
@@ -24510,7 +24562,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     if row:
                         result["daten"] = dict(row)
                         result["kontext"] = f"{'Rechnung' if typ=='re' else 'Eingangsrechnung'}: {eid}"
-                    result["prompt_vorschlag"] = f"Ich prüfe diese {'Rechnung' if typ=='re' else 'Eingangsrechnung'}: {eid}\n\nSoll ich Fälligkeiten checken oder den Status ändern?"
+                    result["prompt_vorschlag"] = f"{'Rechnung' if typ=='re' else 'Eingangsrechnung'}: {eid}\n\nAnalysiere diese Rechnung — prüfe Fälligkeiten, Zahlungsstatus und schlage vor, was als nächstes zu tun ist."
                     result["verfuegbare_aktionen"] = ["rechnung_bezahlt", "eingangsrechnung_erledigt", "rechnungsdetails_abrufen"]
 
                 elif typ == "ang" and eid:
@@ -24518,7 +24570,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     if row:
                         result["daten"] = dict(row)
                         result["kontext"] = f"Angebot: {eid}"
-                    result["prompt_vorschlag"] = f"Ich schaue mir Angebot {eid} an.\n\nSoll ich nachfassen oder den Status aktualisieren?"
+                    result["prompt_vorschlag"] = f"Angebot: {eid}\n\nAnalysiere dieses Angebot — prüfe Status, ob Nachfassen sinnvoll ist, und schlage konkret vor, was wir tun sollen."
                     result["verfuegbare_aktionen"] = ["angebot_status", "angebot_pruefen", "nachfass_email_entwerfen"]
 
                 elif typ == "vorgang" and eid:
@@ -24526,20 +24578,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     if row:
                         result["daten"] = dict(row)
                         result["kontext"] = f"Vorgang: {row.get('vorgang_nr', eid)}"
-                    result["prompt_vorschlag"] = f"Vorgang {eid} — Was möchtest du damit tun?"
+                    result["prompt_vorschlag"] = f"Vorgang: {eid}\n\nAnalysiere diesen Vorgang — zeige mir den aktuellen Stand und schlage vor, was als nächstes ansteht."
                     result["verfuegbare_aktionen"] = ["vorgang_kontext_laden", "vorgang_status_setzen", "korrektur"]
                 db.close()
 
             elif modul == "lexware" and typ and eid:
                 result["kontext"] = f"Lexware {typ}: {eid}"
                 if typ == "beleg":
-                    result["prompt_vorschlag"] = f"Ich prüfe Lexware-Beleg #{eid}.\n\nStimmt die Klassifizierung? Soll ich etwas ändern?"
+                    result["prompt_vorschlag"] = f"Lexware-Beleg #{eid}\n\nPrüfe die Klassifizierung dieses Belegs und schlage vor, ob etwas korrigiert werden muss."
                     result["verfuegbare_aktionen"] = ["korrektur", "lexware_eingangsbeleg_klassifizieren"]
                 elif typ == "zahlung":
-                    result["prompt_vorschlag"] = f"Lexware-Zahlung #{eid} — Was möchtest du prüfen?"
+                    result["prompt_vorschlag"] = f"Lexware-Zahlung #{eid}\n\nAnalysiere diese Zahlung — prüfe Status und zeige mir, was damit zusammenhängt."
                     result["verfuegbare_aktionen"] = ["lexware_belege_laden", "rechnung_bezahlt"]
                 else:
-                    result["prompt_vorschlag"] = f"Lexware {typ} #{eid} — Wie kann ich helfen?"
+                    result["prompt_vorschlag"] = f"Lexware {typ} #{eid}\n\nAnalysiere diesen Eintrag und schlage vor, was zu tun ist."
                     result["verfuegbare_aktionen"] = ["lexware_belege_laden"]
 
             elif modul == "capture" and eid:
@@ -24552,7 +24604,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }
                     result["kontext"] = f"Capture #{row['id']}: {(row['raw_text'] or '')[:60]}"
                 db.close()
-                result["prompt_vorschlag"] = "Ich analysiere diesen Capture-Eintrag.\n\nSoll ich ihn zuordnen oder eine Aufgabe daraus erstellen?"
+                result["prompt_vorschlag"] = f"Capture-Eintrag #{eid}\n\nAnalysiere diesen Capture — schlage vor, ob er einem Projekt zugeordnet oder eine Aufgabe daraus erstellt werden soll."
                 result["verfuegbare_aktionen"] = ["korrektur", "task_erstellen", "capture_zuordnen"]
 
             elif modul == "dashboard" and eid:
@@ -24565,7 +24617,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }
                     result["kontext"] = f"Dashboard-Aufgabe #{row['id']}: {row['betreff'] or '?'}"
                 db.close()
-                result["prompt_vorschlag"] = f"Aufgabe: {result['daten'].get('betreff','?')}\n\nWas möchtest du damit tun?"
+                result["prompt_vorschlag"] = f"Aufgabe: {result['daten'].get('betreff','?')}\nKategorie: {result['daten'].get('kategorie','?')}\nStatus: {result['daten'].get('status','?')}\n\nAnalysiere diese Aufgabe und schlage mir vor, was als nächstes zu tun ist."
                 result["verfuegbare_aktionen"] = ["task_bearbeiten", "task_erledigen", "korrektur"]
 
             elif modul == "wissen" and eid:
@@ -24575,7 +24627,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     result["daten"] = dict(row)
                     result["kontext"] = f"Wissensregel #{row['id']}: {row['titel'] or '?'}"
                 db.close()
-                result["prompt_vorschlag"] = f"Wissensregel: {result['daten'].get('titel','?')}\n\nSoll ich sie bearbeiten oder deaktivieren?"
+                result["prompt_vorschlag"] = f"Wissensregel: {result['daten'].get('titel','?')}\n\nAnalysiere diese Regel — ist sie noch aktuell? Schlage vor, ob sie angepasst werden sollte."
                 result["verfuegbare_aktionen"] = ["wissen_verwalten"]
 
             else:
@@ -29390,6 +29442,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # Leistungskatalog verwalten
+        if self.path == '/api/leistungen':
+            try:
+                config = load_config()
+                bp = config.setdefault("benutzer_profile", {})
+                aktiv = bp.get("aktives_profil", "profil_1")
+                profil = bp.setdefault("profile", {}).setdefault(aktiv, {})
+                leistungen = body.get("leistungen", {})
+                profil["leistungen"] = leistungen
+                save_config(config)
+                rlog('settings', 'leistungen_updated', f'Leistungskatalog aktualisiert: {len(leistungen.get("katalog", []))} Leistungen',
+                     source='server', modul='einstellungen', actor_type='user', status='ok')
+                return self._json({"ok": True, "message": f"Leistungskatalog gespeichert: {len(leistungen.get('katalog', []))} Leistungen, {len(leistungen.get('nicht_leistungen', []))} Ausschlüsse"})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)})
+
         # Config zurücksetzen auf Werkseinstellungen
         if self.path == '/api/config/reset':
             try:
@@ -29754,6 +29822,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                            (task_id, alter, neu, notiz))
                 if neu and neu != alter:
                     db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neu, task_id))
+                    # Dynamische Kategorie registrieren wenn unbekannt
+                    try:
+                        from task_manager import add_dynamische_kategorie, STANDARD_KATEGORIEN
+                        _std_namen = {k["name"] for k in STANDARD_KATEGORIEN}
+                        if neu not in _std_namen:
+                            add_dynamische_kategorie(neu, notiz or "")
+                    except Exception:
+                        pass
                 db.commit()
 
                 # Sofort-Konsolidierung: >= 3 gleiche Korrekturen → permanente Regel
