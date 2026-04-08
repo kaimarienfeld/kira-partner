@@ -194,10 +194,6 @@ def _scan_ueberfaellige_rechnungen() -> dict | None:
         if not ueberfaellige:
             return None
 
-        key = f"re-ueberf-{len(ueberfaellige)}"
-        if not _cooldown_ok(key):
-            return None
-
         # Höchste zuerst
         ueberfaellige.sort(key=lambda x: x["tage"], reverse=True)
         top = ueberfaellige[0]
@@ -241,11 +237,6 @@ def _scan_neue_leads() -> dict | None:
         if not rows:
             return None
 
-        # Nur anzeigen wenn mindestens 1 neuer Lead im Cooldown-Fenster
-        key = f"neue-leads-{rows[0]['id']}"
-        if not _cooldown_ok(key):
-            return None
-
         n = len(rows)
         top = rows[0]
         titel = f"{n} neue{'r' if n == 1 else ''} Lead{'s' if n > 1 else ''}"
@@ -283,10 +274,6 @@ def _scan_kira_freigaben() -> dict | None:
         db.close()
 
         if not rows:
-            return None
-
-        key = f"freigaben-{len(rows)}"
-        if not _cooldown_ok(key):
             return None
 
         n = len(rows)

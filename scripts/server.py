@@ -30823,13 +30823,44 @@ def run_server(open_browser=True):
     if open_browser and auto_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
 
-    # Signal-Watcher für Desktop-Overlays starten (Paket 9, session-nn)
-    try:
-        from activity_window import start_signal_watcher
-        start_signal_watcher()
-        print("[Signal-Watcher] Desktop-Overlay aktiv (15s Intervall)")
-    except Exception as _sw_err:
-        print(f"[Signal-Watcher] Nicht verfügbar: {_sw_err}")
+    # Signal-Scanner: prüft periodisch auf überfällige Rechnungen, Leads, Freigaben
+    # und schreibt Signale in die Case-Engine-DB → Browser Activity-Drawer zeigt sie an.
+    # tkinter Desktop-Overlay DEAKTIVIERT seit session-gggg.
+    def _signal_scanner_loop():
+        import time as _t
+        _t.sleep(30)  # Warte bis Server hochgefahren
+        _scan_cooldowns = {}
+        _SCAN_COOLDOWN = 14400  # 4 Stunden — gleiche Meldung frühestens nach 4h
+        while True:
+            try:
+                from activity_window import (
+                    _scan_ueberfaellige_rechnungen,
+                    _scan_kira_freigaben,
+                    _scan_neue_leads,
+                )
+                for scan_fn in [_scan_ueberfaellige_rechnungen, _scan_kira_freigaben, _scan_neue_leads]:
+                    try:
+                        sig = scan_fn()
+                        if sig:
+                            sig_key = sig.get("id", sig.get("titel", ""))
+                            now = _t.time()
+                            if now - _scan_cooldowns.get(sig_key, 0) < _SCAN_COOLDOWN:
+                                continue
+                            _scan_cooldowns[sig_key] = now
+                            from case_engine import create_signal
+                            create_signal(
+                                stufe=sig.get("stufe", "B"),
+                                titel=sig.get("titel", ""),
+                                nachricht=sig.get("nachricht", ""),
+                                typ=sig.get("typ", "activity_trigger"),
+                            )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            _t.sleep(300)  # Alle 5 Minuten scannen
+    threading.Thread(target=_signal_scanner_loop, name="signal-scanner", daemon=True).start()
+    print("[Signal-Scanner] Hintergrund-Scan aktiv (5min Intervall, 4h Cooldown)")
 
     # Task-Cleanup: beantwortete Tasks automatisch als erledigt markieren
     try:

@@ -177,5 +177,9 @@
 **Status:** erledigt
 
 ### 2026-04-08 11:00 — Kira Background-Status-Chip in Header-Leiste
-**Was:** (1) GET /api/kira/background-status — kombinierter Endpoint: prüft Reklassifizierung, Nachklassifizierung, Qualifizierung, Mail-Monitor. Gibt `jobs[]` Array zurück. (2) HTML: `kiraBgChip` im Header nach Kira-Live-Chip. Spinner + Text, nur sichtbar wenn Jobs aktiv. (3) CSS: Lila Gradient-Background, Shimmer-Animation, Mini-Spinner (12px), `kira-bg-pct` für Prozent-Anzeige. (4) JS: `_pollBgStatus()` alle 5s, Visibility-API gesteuert, zeigt alle aktiven Jobs mit Prozent oder Detail-Text.
+**Was:** (1) GET /api/kira/background-status — kombinierter Endpoint: prüft Reklassifizierung, Nachklassifizierung, Qualifizierung, Mail-Monitor. Gibt `jobs[]` Array zurück. (2) HTML: `kiraBgChip` im Header nach Kira-Live-Chip. Spinner + Text, nur sichtbar wenn Jobs aktiv. (3) CSS: Lila Gradient-Background, Shimmer-Animation, Mini-Spinner (12px), `kira-bg-pct` für Prozent-Anzeige. (4) JS: `_pollBgStatus()` alle 5s, läuft durchgehend (auch bei minimiertem Tab).
+**Status:** erledigt
+
+### 2026-04-08 11:30 — tkinter Popup deaktiviert + Signal-Scanner im Server
+**Was:** (1) `start_signal_watcher()` (tkinter Desktop-Overlay) deaktiviert — das war die Ursache für das hässliche "KIRA — Aktion erforderlich"-Fenster das alle ~1h mit gleichen Daten kam. (2) Neuer `_signal_scanner_loop` Thread im Server: nutzt die bestehenden Scan-Funktionen (Rechnungen, Leads, Freigaben) aus activity_window.py, schreibt Signale in Case-Engine-DB → Browser Activity-Drawer zeigt sie. (3) **4h Cooldown** statt 1h, im Server-Thread-RAM (überlebt Scan-Zyklen, reset bei Server-Neustart — was OK ist da neue Infos kommen könnten). (4) Scan-Funktionen in activity_window.py: eigener _cooldown_ok()-Check entfernt (Server-Thread macht das jetzt zentral). (5) Scan alle 5 Minuten, aber dank Cooldown maximal 1 Signal pro Thema alle 4h.
 **Status:** erledigt
