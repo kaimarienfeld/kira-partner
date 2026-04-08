@@ -30614,6 +30614,29 @@ Regeln:
                 self._json({'ok': False, 'error': str(e)})
             return
 
+        # POST /api/config/patch — Einzelnen Config-Wert setzen (path + value)
+        if self.path == '/api/config/patch':
+            try:
+                cfg_path_str = body.get("path", "")
+                value = body.get("value")
+                if not cfg_path_str:
+                    self._json({"ok": False, "error": "path fehlt"})
+                    return
+                cfg_file = SCRIPTS_DIR / "config.json"
+                cfg_data = json.loads(cfg_file.read_text("utf-8"))
+                keys = cfg_path_str.split(".")
+                obj = cfg_data
+                for k in keys[:-1]:
+                    if k not in obj or not isinstance(obj[k], dict):
+                        obj[k] = {}
+                    obj = obj[k]
+                obj[keys[-1]] = value
+                cfg_file.write_text(json.dumps(cfg_data, indent=2, ensure_ascii=False), encoding="utf-8")
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+            return
+
         # DB VACUUM — Komprimierung aller SQLite-Datenbanken
         if self.path == '/api/db/vacuum':
             try:
@@ -32558,30 +32581,6 @@ def _handle_lexware_post(handler, path, body):
             db.commit()
             db.close()
             handler._json({"ok": True, "message": f"Artikel synchronisiert: {stats.get('updated', 0)} aktualisiert, {stats.get('inserted', 0)} neu", "stats": stats, "ts": ts})
-        except Exception as e:
-            handler._json({"ok": False, "error": str(e)})
-        return True
-
-    # POST /api/config/patch — Einzelnen Config-Wert setzen (path + value)
-    if path == '/api/config/patch':
-        try:
-            cfg_path_str = body.get("path", "")
-            value = body.get("value")
-            if not cfg_path_str:
-                handler._json({"ok": False, "error": "path fehlt"})
-                return True
-            cfg_file = SCRIPTS_DIR / "config.json"
-            cfg_data = json.loads(cfg_file.read_text("utf-8"))
-            # Verschachtelten Pfad setzen (z.B. "artikel_sync.intervall")
-            keys = cfg_path_str.split(".")
-            obj = cfg_data
-            for k in keys[:-1]:
-                if k not in obj or not isinstance(obj[k], dict):
-                    obj[k] = {}
-                obj = obj[k]
-            obj[keys[-1]] = value
-            cfg_file.write_text(json.dumps(cfg_data, indent=2, ensure_ascii=False), encoding="utf-8")
-            handler._json({"ok": True})
         except Exception as e:
             handler._json({"ok": False, "error": str(e)})
         return True
