@@ -462,6 +462,18 @@ def _ensure_lexware_tables():
                 erstellt_ts  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS artikel_preishistorie (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                artikel_id     INTEGER NOT NULL,
+                artikel_quelle TEXT DEFAULT 'lexware',
+                name           TEXT,
+                netto_preis    REAL,
+                einheit        TEXT,
+                snapshot_ts    TEXT NOT NULL DEFAULT (datetime('now')),
+                sync_event     TEXT,
+                diff_pct       REAL
+            );
+
             CREATE TABLE IF NOT EXISTS manuelle_artikel (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 lexware_id    TEXT,
@@ -24294,6 +24306,44 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
                 self._json({"ok": True, "artikel": result, "count": len(result)})
+            finally:
+                db.close()
+
+        elif self.path.startswith('/api/artikel/') and '/preishistorie' in self.path:
+            # GET /api/artikel/{id}/preishistorie
+            try:
+                art_id = int(self.path.split('/api/artikel/')[1].split('/')[0])
+                db = get_db()
+                try:
+                    rows = db.execute(
+                        "SELECT name, netto_preis, einheit, snapshot_ts, sync_event, diff_pct, artikel_quelle "
+                        "FROM artikel_preishistorie WHERE artikel_id=? ORDER BY snapshot_ts DESC LIMIT 100",
+                        (art_id,)
+                    ).fetchall()
+                    self._json({"ok": True, "historie": [dict(r) for r in rows], "count": len(rows)})
+                finally:
+                    db.close()
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+
+        elif self.path == '/api/artikel/statistik':
+            # Aggregierte Preis-Statistiken
+            db = get_db()
+            try:
+                stats = {}
+                try:
+                    stats["aenderungen_30d"] = db.execute(
+                        "SELECT COUNT(*) FROM artikel_preishistorie WHERE snapshot_ts >= datetime('now', '-30 days')"
+                    ).fetchone()[0]
+                    stats["artikel_lexware"] = db.execute("SELECT COUNT(*) FROM lexware_artikel").fetchone()[0]
+                except Exception:
+                    stats["artikel_lexware"] = 0
+                    stats["aenderungen_30d"] = 0
+                try:
+                    stats["artikel_manuell"] = db.execute("SELECT COUNT(*) FROM manuelle_artikel WHERE aktiv=1").fetchone()[0]
+                except Exception:
+                    stats["artikel_manuell"] = 0
+                self._json({"ok": True, **stats})
             finally:
                 db.close()
 

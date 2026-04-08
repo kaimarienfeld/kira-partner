@@ -2006,6 +2006,23 @@ def get_tools(config=None):
         }
     })
 
+    tools.append({
+        "name": "preisentwicklung_abfragen",
+        "description": (
+            "Zeigt die Preisentwicklung eines Artikels ueber die Zeit. "
+            "Nutze dieses Tool wenn der Benutzer fragt 'Wie hat sich der Preis von X entwickelt?' "
+            "oder 'Gab es Preisaenderungen bei Y?'. Gibt chronologische Preis-Snapshots zurueck."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "artikel_name": {"type": "string", "description": "Name des Artikels (Freitext-Suche)"},
+                "zeitraum_tage": {"type": "integer", "description": "Nur Eintraege der letzten N Tage (Standard: 365)"}
+            },
+            "required": ["artikel_name"]
+        }
+    })
+
     # ── Dokument-Tools (session-eeee) ──
     tools.append({
         "name": "dokument_suchen",
@@ -2221,6 +2238,7 @@ def execute_tool(name, params):
             "projekt_kontext_laden": _tool_projekt_kontext_laden,
             "artikel_preise_abfragen": _tool_artikel_preise_abfragen,
             "angebot_positionen_vorschlagen": _tool_angebot_positionen_vorschlagen,
+            "preisentwicklung_abfragen": _tool_preisentwicklung_abfragen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -5088,6 +5106,46 @@ Nur vorhandene Artikel verwenden. Maximal 10 Positionen."""
             return {"ok": True, "message": llm_resp}
     except Exception as e:
         return {"ok": False, "error": f"Fehler bei Positionsvorschlag: {e}"}
+
+
+def _tool_preisentwicklung_abfragen(p):
+    """Zeigt Preisentwicklung eines Artikels."""
+    artikel_name = p.get("artikel_name", "").strip()
+    if not artikel_name:
+        return {"ok": False, "error": "Artikelname erforderlich"}
+    zeitraum = int(p.get("zeitraum_tage", 365))
+    like = f"%{artikel_name}%"
+
+    import sqlite3
+    try:
+        db = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "tasks.db"))
+        db.row_factory = sqlite3.Row
+        rows = db.execute(
+            "SELECT name, netto_preis, einheit, snapshot_ts, sync_event, diff_pct, artikel_quelle "
+            "FROM artikel_preishistorie "
+            "WHERE name LIKE ? AND snapshot_ts >= datetime('now', ? || ' days') "
+            "ORDER BY snapshot_ts ASC",
+            (like, f"-{zeitraum}")
+        ).fetchall()
+        db.close()
+    except Exception as e:
+        return {"ok": False, "error": f"DB-Fehler: {e}"}
+
+    if not rows:
+        return {"ok": True, "message": f"Keine Preishistorie gefunden fuer '{artikel_name}' in den letzten {zeitraum} Tagen."}
+
+    preise = [r["netto_preis"] for r in rows if r["netto_preis"] is not None]
+    lines = [f"Preisentwicklung fuer '{rows[0]['name']}' ({len(rows)} Eintraege, letzte {zeitraum} Tage):\n"]
+    for r in rows:
+        diff = f" ({r['diff_pct']:+.1f}%)" if r["diff_pct"] else ""
+        lines.append(f"  {r['snapshot_ts'][:10]} — {r['netto_preis']:.2f} EUR/{r['einheit'] or 'Stk'}{diff} [{r['artikel_quelle']}]")
+
+    if preise:
+        _min, _max, _avg = min(preise), max(preise), sum(preise) / len(preise)
+        trend = "steigend" if preise[-1] > preise[0] else ("fallend" if preise[-1] < preise[0] else "stabil")
+        lines.append(f"\nStatistik: Min {_min:.2f} | Max {_max:.2f} | Durchschnitt {_avg:.2f} EUR | Trend: {trend}")
+
+    return {"ok": True, "message": "\n".join(lines), "eintraege": len(rows)}
 
 
 # Init DB bei Import

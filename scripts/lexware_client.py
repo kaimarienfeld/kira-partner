@@ -716,6 +716,23 @@ class LexwareClient:
                     "payload_json": json.dumps(a, ensure_ascii=False),
                 }
                 if existing:
+                    # Preis-Snapshot bei Änderung
+                    try:
+                        old = db.execute(
+                            "SELECT netto_preis FROM lexware_artikel WHERE lexware_id=?", (lex_id,)
+                        ).fetchone()
+                        old_preis = old[0] if old else None
+                        new_preis = row["netto_preis"]
+                        if old_preis is not None and old_preis != new_preis:
+                            diff_pct = ((new_preis - old_preis) / old_preis * 100) if old_preis else 0
+                            db.execute(
+                                "INSERT INTO artikel_preishistorie "
+                                "(artikel_id, artikel_quelle, name, netto_preis, einheit, sync_event, diff_pct) "
+                                "VALUES (?, 'lexware', ?, ?, ?, 'lexware_sync', ?)",
+                                (existing[0], row["name"], new_preis, row["einheit"], round(diff_pct, 2))
+                            )
+                    except Exception:
+                        pass  # Preishistorie-Tabelle existiert ggf. noch nicht
                     db.execute("""
                         UPDATE lexware_artikel SET
                             name=:name, beschreibung=:beschreibung, einheit=:einheit,
@@ -733,6 +750,17 @@ class LexwareClient:
                             (:lexware_id, :name, :beschreibung, :einheit, :netto_preis,
                              :steuer_satz, :typ, :last_sync, :payload_json)
                     """, row)
+                    # Initialer Preis-Snapshot für neuen Artikel
+                    try:
+                        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                        db.execute(
+                            "INSERT INTO artikel_preishistorie "
+                            "(artikel_id, artikel_quelle, name, netto_preis, einheit, sync_event, diff_pct) "
+                            "VALUES (?, 'lexware', ?, ?, ?, 'lexware_sync_neu', 0)",
+                            (new_id, row["name"], row["netto_preis"], row["einheit"])
+                        )
+                    except Exception:
+                        pass
                     stats["neu"] += 1
             db.commit()
         except Exception as e:
