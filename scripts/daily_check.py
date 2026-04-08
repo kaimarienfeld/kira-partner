@@ -379,7 +379,10 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
             pass
 
         # Klassifizieren (mit Anhang-Text-Extraktion)
-        _att_pfad = m.get("anhaenge_pfad") or ""
+        try:
+            _att_pfad = m["anhaenge_pfad"] or ""
+        except (KeyError, IndexError):
+            _att_pfad = ""
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
@@ -738,7 +741,10 @@ def qualify_mails(seit_datum: str, bis_datum: str = None,
             pass
 
         # Klassifizieren — bei totalem LLM-Ausfall: PAUSE statt Fallback
-        _att_pfad2 = m.get("anhaenge_pfad") or ""
+        try:
+            _att_pfad2 = m["anhaenge_pfad"] or ""
+        except (KeyError, IndexError):
+            _att_pfad2 = ""
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
