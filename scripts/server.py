@@ -223,6 +223,27 @@ def _ensure_mail_columns():
     _ensure_mail_signaturen_table()
     # Vorlagen-Tabelle sicherstellen
     _ensure_mail_vorlagen_table()
+    # Activity-Feed Dismissed-Tabelle sicherstellen
+    _ensure_activity_dismissed_table()
+
+def _ensure_activity_dismissed_table():
+    """Erstellt kira_activity_dismissed-Tabelle in tasks.db (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kira_activity_dismissed (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_key    TEXT UNIQUE NOT NULL,
+                dismissed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                revived_at   TEXT
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kad_key ON kira_activity_dismissed(item_key)")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
 
 def _ensure_mail_signaturen_table():
     """Erstellt mail_signaturen-Tabelle in tasks.db (idempotent)."""
@@ -15434,6 +15455,9 @@ def generate_html() -> str:
       <div class="top-chip" id="mailApproveChip" onclick="pfKiraAusgangOpen()" title="Kira-Entwürfe warten auf Freigabe" style="display:none;background:#f59e0b;color:#fff;border-color:#d97706;cursor:pointer;font-weight:700">&#x2709; <span id="mailApproveCount">0</span> Freigabe</div>
       <div class="top-chip" onclick="showPanel('kommunikation')" title="Offene Aufgaben">&#x1F514; <span id="headerBadgeCount">{n_ges}</span> offen</div>
       <div class="header-avatar" title="Einstellungen" onclick="showPanel('einstellungen')">K</div>
+      <div class="kd-header-btn" id="kdHeaderBtn" onclick="kiraActivityDrawerOpen()" title="Kira Aktivit&auml;ten">
+        <span class="kd-header-btn-icon">&#x2728;</span><span class="kd-header-btn-badge" id="kdBadge" style="display:none">0</span>
+      </div>
       <button class="btn btn-muted btn-xs" id="updateBtn" onclick="serverNeustart()" title="Server komplett neu starten (alle Instanzen beenden)" style="border-radius:6px">&#x21BB; Neustart</button>
     </div>
   </div>
@@ -15698,16 +15722,24 @@ def generate_html() -> str:
   </div>
 </div>
 
-<!-- ── Kira Activity-Drawer (Slide-In von rechts) ─────────────────────── -->
-<div class="kira-drawer-overlay" id="kiraDrawerOverlay" onclick="kiraActivityDrawerClose()"></div>
-<div class="kira-drawer" id="kiraActivityDrawer">
-  <div class="kira-drawer-header">
-    <span class="kira-drawer-icon">&#x1F916;</span>
-    <span class="kira-drawer-title">Kira — Was l&auml;uft gerade?</span>
-    <button class="kira-drawer-close" onclick="kiraActivityDrawerClose()">&times;</button>
+<!-- ── Kira Activity-Drawer (Slide-In, Widget-Style) ──────────────────── -->
+<div class="kd-overlay" id="kiraDrawerOverlay" onclick="kiraActivityDrawerClose()"></div>
+<div class="kd-drawer" id="kiraActivityDrawer">
+  <div class="kd-header">
+    <div class="kd-header-left">
+      <div class="kd-avatar">K</div>
+      <div>
+        <div class="kd-header-name">Kira</div>
+        <div class="kd-header-sub" id="kdHeaderSub">Aktivit&auml;ten</div>
+      </div>
+    </div>
+    <button class="kd-close" onclick="kiraActivityDrawerClose()" title="Minimieren">&times;</button>
   </div>
-  <div class="kira-drawer-body" id="kiraDrawerBody">
-    <div class="kira-drawer-loading">Lade Aktivit&auml;ten&hellip;</div>
+  <div class="kd-greeting" id="kdGreeting"></div>
+  <div class="kd-body" id="kiraDrawerBody">
+    <div class="kd-grid" id="kdGrid">
+      <div class="kd-loading"><span></span><span></span><span></span></div>
+    </div>
   </div>
 </div>
 
@@ -20895,63 +20927,6 @@ window.onerror = function(msg, src, line, col, err) {{
     if(!signals.length) return;
     signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
     if(typeof kiraActivityDrawerOpen === 'function') kiraActivityDrawerOpen();
-    setTimeout(function() {{
-      var body = document.getElementById('kiraDrawerBody');
-      if(!body) return;
-      var existing = document.getElementById('_vg-signal-section');
-      if(existing) existing.remove();
-      var sec = document.createElement('div');
-      sec.id = '_vg-signal-section';
-      sec.className = 'kira-drawer-section';
-      sec.style.cssText = 'border-left:3px solid #ef4444;background:rgba(239,68,68,.06);border-radius:8px;margin-bottom:12px;padding:12px 14px';
-      var html = '<div class="kira-drawer-section-title" style="color:#ef4444">&#9888;&#65039; Aktion erforderlich (' + signals.length + ')</div>';
-      signals.forEach(function(sig) {{
-        html += '<div class="kira-drawer-item kira-signal-item" data-signal-id="'+sig.id+'" style="margin:8px 0;transition:all .3s ease">';
-        html += '<div class="kira-drawer-item-icon">&#128308;</div>';
-        html += '<div class="kira-drawer-item-body">';
-        html += '<div class="kira-drawer-item-title">' + (sig.titel||'Signal') + '</div>';
-        if(sig.nachricht) html += '<div class="kira-drawer-item-sub" style="white-space:pre-wrap">' + sig.nachricht + '</div>';
-        html += '<div class="kira-signal-btns" style="display:flex;gap:8px;margin-top:8px">';
-        html += '<span class="kira-drawer-item-action kira-sig-btn-ok" data-sid="'+sig.id+'" data-action="bestaetigt">';
-        html += '&#x2705; Verstanden</span>';
-        html += '<span class="kira-drawer-item-action kira-sig-btn-later" data-sid="'+sig.id+'" data-action="snoozed" style="opacity:.7;background:transparent;border-color:var(--border)">';
-        html += '&#x23F0; Sp\u00e4ter erinnern</span>';
-        html += '</div>';
-        html += '<div class="kira-signal-done" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;font-size:12px;line-height:1.5"></div>';
-        html += '</div></div>';
-      }});
-      sec.innerHTML = html;
-      sec.querySelectorAll('.kira-sig-btn-ok, .kira-sig-btn-later').forEach(function(btn) {{
-        btn.addEventListener('click', function() {{
-          var sid = parseInt(btn.dataset.sid);
-          var action = btn.dataset.action;
-          var item = btn.closest('.kira-signal-item');
-          var btns = item.querySelector('.kira-signal-btns');
-          var done = item.querySelector('.kira-signal-done');
-          _markGelesen(sid, action);
-          btns.style.display = 'none';
-          if(action === 'bestaetigt') {{
-            item.querySelector('.kira-drawer-item-icon').innerHTML = '&#x2705;';
-            item.style.borderColor = 'rgba(5,150,105,.3)';
-            item.style.background = 'rgba(5,150,105,.06)';
-            done.style.display = 'block';
-            done.style.background = 'rgba(5,150,105,.08)';
-            done.style.color = '#059669';
-            done.innerHTML = '<strong>&#x2705; Erledigt</strong> — Kira hat die Meldung als best\u00e4tigt markiert. Sie wird nicht erneut angezeigt.';
-          }} else {{
-            item.querySelector('.kira-drawer-item-icon').innerHTML = '&#x23F0;';
-            item.style.borderColor = 'rgba(245,158,11,.3)';
-            item.style.background = 'rgba(245,158,11,.06)';
-            done.style.display = 'block';
-            done.style.background = 'rgba(245,158,11,.08)';
-            done.style.color = '#d97706';
-            done.innerHTML = '<strong>&#x23F0; Verschoben</strong> — Kira erinnert dich in 4 Stunden erneut, falls das Thema noch offen ist.';
-          }}
-          showToast(action === 'bestaetigt' ? 'Meldung als erledigt markiert' : 'Erinnerung in 4h geplant', 'ok');
-        }});
-      }});
-      body.insertBefore(sec, body.firstChild);
-    }}, 400);
   }}
 
   function _pollSignals() {{
@@ -21016,100 +20991,135 @@ function _pollMailApprove() {{
 
 setTimeout(function(){{ _pollMailApprove(); setInterval(_pollMailApprove, 15000); }}, 3000);
 
-// ── Kira Live-Chip + Activity-Drawer (Phase 4, session-oo) ──────────────
+// ── Kira Activity-Drawer (Widget-Style, session-gggg) ──────────────
 var _kiraDrawerOpen = false;
+var _kdAutoMinTimer = null;
 
 window.kiraActivityDrawerOpen = function() {{
   var overlay = document.getElementById('kiraDrawerOverlay');
   var drawer  = document.getElementById('kiraActivityDrawer');
   if(!overlay || !drawer) return;
-  // Force reflow for transition
+  drawer.classList.remove('kd-sucking');
   overlay.style.display = 'block';
+  // Force reflow
+  void drawer.offsetHeight;
   requestAnimationFrame(function() {{
     overlay.classList.add('open');
     drawer.classList.add('open');
   }});
   _kiraDrawerOpen = true;
   _kiraDrawerLoad();
+  // Auto-minimize nach 60s Inaktivität
+  _kdResetAutoMin();
+  drawer.addEventListener('click', _kdResetAutoMin);
 }};
 
 window.kiraActivityDrawerClose = function() {{
   var overlay = document.getElementById('kiraDrawerOverlay');
   var drawer  = document.getElementById('kiraActivityDrawer');
-  if(!overlay || !drawer) return;
-  overlay.classList.remove('open');
+  if(!overlay || !drawer || !_kiraDrawerOpen) return;
+  // Einsaug-Animation
   drawer.classList.remove('open');
+  drawer.classList.add('kd-sucking');
+  overlay.classList.remove('open');
   _kiraDrawerOpen = false;
-  setTimeout(function(){{ overlay.style.display='none'; }}, 250);
+  if(_kdAutoMinTimer) {{ clearTimeout(_kdAutoMinTimer); _kdAutoMinTimer = null; }}
+  drawer.removeEventListener('click', _kdResetAutoMin);
+  // Pulse auf Header-Button
+  var hbtn = document.getElementById('kdHeaderBtn');
+  if(hbtn) {{ hbtn.classList.add('kd-btn-pulse'); setTimeout(function(){{ hbtn.classList.remove('kd-btn-pulse'); }}, 700); }}
+  setTimeout(function(){{ overlay.style.display='none'; drawer.classList.remove('kd-sucking'); }}, 450);
 }};
 
+function _kdResetAutoMin() {{
+  if(_kdAutoMinTimer) clearTimeout(_kdAutoMinTimer);
+  _kdAutoMinTimer = setTimeout(function() {{
+    if(_kiraDrawerOpen) kiraActivityDrawerClose();
+  }}, 60000);
+}}
+
+var _kdIcons = {{rechnung:'\uD83D\uDCC4',lead:'\u2728',freigabe:'\u2709\uFE0F',signal:'\u26A0\uFE0F',bg:'\u2699\uFE0F'}};
+
 function _kiraDrawerLoad() {{
-  var body = document.getElementById('kiraDrawerBody');
-  if(!body) return;
-  body.innerHTML = '<div class="kira-drawer-loading">Lade Aktivit\u00e4ten\u2026</div>';
-  Promise.all([
-    fetch('/api/mail/approve/pending').then(function(r){{return r.json();}}).catch(function(){{return {{pending:[]}}}}),
-    fetch('/api/kira/proaktiv/status').then(function(r){{return r.json();}}).catch(function(){{return {{state:{{}}}}}})
-  ]).then(function(res) {{
-    var approveData = res[0];
-    var proaktivData = res[1];
-    _kiraDrawerRender(body, approveData, proaktivData);
+  var grid = document.getElementById('kdGrid');
+  var greeting = document.getElementById('kdGreeting');
+  if(!grid) return;
+  grid.innerHTML = '<div class="kd-loading"><span></span><span></span><span></span></div>';
+  fetch('/api/kira/activity-feed').then(function(r){{return r.json();}}).then(function(d){{
+    if(!d.ok) {{ grid.innerHTML = '<div class="kd-empty"><div class="kd-empty-text">Fehler beim Laden</div></div>'; return; }}
+    if(greeting) greeting.textContent = d.greeting || '';
+    var sub = document.getElementById('kdHeaderSub');
+    if(sub) sub.textContent = d.total > 0 ? d.total+' offen' : 'Alles ruhig';
+    _kdRenderTiles(grid, d.items || []);
+    _kdUpdateBadge(d.total || 0);
+  }}).catch(function(){{
+    grid.innerHTML = '<div class="kd-empty"><div class="kd-empty-text">Verbindung fehlgeschlagen</div></div>';
   }});
 }}
 
-function _kiraDrawerRender(body, approveData, proaktivData) {{
-  var html = '';
-  var pending = approveData.pending || [];
-
-  // Section 1: "Braucht dich" (pending approvals)
-  html += '<div class="kira-drawer-section">';
-  html += '<div class="kira-drawer-section-title">&#x1F4EC; Braucht deine Freigabe</div>';
-  if(pending.length === 0) {{
-    html += '<div class="kira-drawer-empty">Nichts offen &#x2705;</div>';
-  }} else {{
-    pending.slice(0,5).forEach(function(item) {{
-      var grund = item.grund || item.vorgang_id ? ('Vorgang #'+item.vorgang_id) : '';
-      html += '<div class="kira-drawer-item">';
-      html += '<div class="kira-drawer-item-icon">&#x2709;&#xFE0F;</div>';
-      html += '<div class="kira-drawer-item-body">';
-      html += '<div class="kira-drawer-item-title">'+_esc(item.betreff||'Mail-Entwurf')+'</div>';
-      html += '<div class="kira-drawer-item-sub">An: '+_esc(item.an||'')+(grund?(' \u00b7 '+_esc(grund)):'')+'</div>';
-      html += '<span class="kira-drawer-item-action" onclick="kiraActivityDrawerClose();pfKiraAusgangOpen()">Ansehen &rarr;</span>';
-      html += '</div></div>';
-    }});
-    if(pending.length > 5) html += '<div style="text-align:center;font-size:12px;color:var(--muted);padding:4px 0">+ '+(pending.length-5)+' weitere</div>';
+function _kdRenderTiles(grid, items) {{
+  if(!items.length) {{
+    grid.innerHTML = '<div class="kd-empty"><div class="kd-empty-icon">\u2728</div><div class="kd-empty-text">Alles im Griff. Ich melde mich,<br>wenn es etwas Neues gibt.</div></div>';
+    return;
   }}
-  html += '</div>';
-
-  // Section 2: Scan-Status
-  var state = (proaktivData.state) || {{}};
-  var scanNames = {{
-    'angebot_followup':'Angebot-Nachfass','mahnung_eskalation':'Mahnungs-Pr\u00fcfung',
-    'autonomy_decision':'Vorgang-Entscheidung','tages_summary':'Tages-Zusammenfassung',
-    'termin_erkennung':'Termin-Erkennung'
-  }};
-  html += '<div class="kira-drawer-section">';
-  html += '<div class="kira-drawer-section-title">&#x1F504; Automatisierungen</div>';
-  var scanEntries = Object.keys(scanNames);
-  var hasScans = false;
-  scanEntries.forEach(function(key) {{
-    var ts = state['last_'+key] || state[key+'_last'];
-    if(!ts) return;
-    hasScans = true;
-    var d = new Date(ts);
-    var tsStr = isNaN(d)?ts:(d.toLocaleDateString('de-DE',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('de-DE',{{hour:'2-digit',minute:'2-digit'}}));
-    html += '<div class="kira-drawer-item">';
-    html += '<div class="kira-drawer-item-icon">&#x2705;</div>';
-    html += '<div class="kira-drawer-item-body">';
-    html += '<div class="kira-drawer-item-title">'+scanNames[key]+'</div>';
-    html += '<div class="kira-drawer-item-sub">Zuletzt: '+tsStr+'</div>';
-    html += '</div></div>';
+  var html = '';
+  items.forEach(function(item) {{
+    var full = item.size === 'full' ? ' kd-tile-full' : '';
+    var prio = ' kd-tile-' + (item.priority || 'normal');
+    html += '<div class="kd-tile' + full + prio + '" data-key="' + _esc(item.key) + '">';
+    html += '<button class="kd-tile-x" onclick="_kdDismiss(this)" title="Ausblenden">&times;</button>';
+    html += '<div class="kd-tile-head">';
+    html += '<span class="kd-tile-icon">' + (_kdIcons[item.type]||'\u2139\uFE0F') + '</span>';
+    html += '<span class="kd-tile-title">' + _esc(item.title) + '</span>';
+    html += '</div>';
+    if(item.subtitle) html += '<div class="kd-tile-sub">' + _esc(item.subtitle) + '</div>';
+    if(item.detail) html += '<div class="kd-tile-detail">' + _esc(item.detail) + '</div>';
+    if(item.kira_says) html += '<div class="kd-tile-kira"><span class="kd-kira-label">Kira:</span> ' + _esc(item.kira_says) + '</div>';
+    if(item.action && item.action.target) html += '<div class="kd-tile-action" onclick="kiraActivityDrawerClose();' + item.action.target + '">Ansehen \u2192</div>';
+    html += '</div>';
   }});
-  if(!hasScans) html += '<div class="kira-drawer-empty">Noch keine Scans gelaufen</div>';
-  html += '</div>';
-
-  body.innerHTML = html;
+  grid.innerHTML = html;
 }}
+
+function _kdDismiss(btn) {{
+  var tile = btn.closest('.kd-tile');
+  if(!tile) return;
+  var key = tile.dataset.key;
+  tile.classList.add('kd-tile-dismissing');
+  fetch('/api/kira/activity-feed/dismiss', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{key:key}})
+  }}).catch(function(){{}});
+  setTimeout(function() {{
+    tile.remove();
+    var grid = document.getElementById('kdGrid');
+    if(grid && !grid.querySelector('.kd-tile')) {{
+      grid.innerHTML = '<div class="kd-empty"><div class="kd-empty-icon">\u2728</div><div class="kd-empty-text">Alles im Griff.</div></div>';
+    }}
+    // Badge aktualisieren
+    var remaining = grid ? grid.querySelectorAll('.kd-tile').length : 0;
+    _kdUpdateBadge(remaining);
+  }}, 350);
+}}
+
+function _kdUpdateBadge(n) {{
+  var badge = document.getElementById('kdBadge');
+  if(!badge) return;
+  if(n > 0) {{
+    badge.style.display = 'flex';
+    badge.textContent = n;
+  }} else {{
+    badge.style.display = 'none';
+  }}
+}}
+
+// Badge beim Laden aktualisieren (Hintergrund-Polling)
+function _kdPollBadge() {{
+  fetch('/api/kira/activity-feed').then(function(r){{return r.json();}}).then(function(d){{
+    if(d.ok) _kdUpdateBadge(d.total || 0);
+  }}).catch(function(){{}});
+}}
+setTimeout(function(){{ _kdPollBadge(); setInterval(_kdPollBadge, 30000); }}, 8000);
 
 function _pollKiraStatus() {{
   fetch('/api/kira/proaktiv/status').then(function(r){{return r.json();}}).then(function(d){{
@@ -21509,32 +21519,83 @@ a:hover{text-decoration:underline;}
   border-top-color:rgba(124,58,237,.7);border-radius:50%;display:inline-block;
   animation:kira-spin .8s linear infinite;flex-shrink:0;}
 .kira-bg-chip .kira-bg-pct{font-weight:700;font-variant-numeric:tabular-nums;}
-/* ── Kira Activity-Drawer ───────────────────────────────────────────────── */
-.kira-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;display:none;opacity:0;transition:opacity .2s;}
-.kira-drawer-overlay.open{display:block;opacity:1;}
-.kira-drawer{position:fixed;top:0;right:0;height:100vh;width:400px;max-width:calc(100vw - 32px);
-  background:var(--bg-overlay);border-left:1px solid var(--border-strong);
+/* ── Kira Activity-Drawer (Widget-Style, session-gggg) ─────────────────── */
+.kd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:9100;display:none;opacity:0;transition:opacity .25s;}
+.kd-overlay.open{display:block;opacity:1;}
+.kd-drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:calc(100vw - 24px);
+  background:rgba(var(--bg-rgb,255,255,255),.88);backdrop-filter:blur(24px) saturate(1.4);
+  border-left:1px solid rgba(var(--border-rgb,200,200,200),.3);
+  box-shadow:-8px 0 40px rgba(0,0,0,.08);
   z-index:9101;display:flex;flex-direction:column;
-  transform:translateX(100%);transition:transform .25s cubic-bezier(.32,.72,0,1);}
-.kira-drawer.open{transform:translateX(0);}
-.kira-drawer-header{display:flex;align-items:center;gap:10px;padding:18px 20px 16px;
-  border-bottom:1px solid var(--border);flex-shrink:0;}
-.kira-drawer-icon{font-size:20px;}
-.kira-drawer-title{flex:1;font-size:15px;font-weight:700;color:var(--text);}
-.kira-drawer-close{background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;}
-.kira-drawer-close:hover{background:var(--bg-raised);color:var(--text);}
-.kira-drawer-body{flex:1;overflow-y:auto;padding:16px;}
-.kira-drawer-section{margin-bottom:18px;}
-.kira-drawer-section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
-.kira-drawer-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg-raised);margin-bottom:6px;border:1px solid var(--border);}
-.kira-drawer-item-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
-.kira-drawer-item-body{flex:1;min-width:0;}
-.kira-drawer-item-title{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.kira-drawer-item-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  transform-origin:top right;transform:scale(.4) translateX(60%);opacity:0;border-radius:16px 0 0 16px;
+  transition:transform .35s cubic-bezier(.32,.72,0,1),opacity .3s,border-radius .35s;}
+.kd-drawer.open{transform:scale(1) translateX(0);opacity:1;border-radius:0;}
+.kd-drawer.kd-sucking{transform:scale(.2) translateX(80%) translateY(-40vh);opacity:0;border-radius:50%;transition:all .4s ease-in;}
+[data-theme='dark'] .kd-drawer{background:rgba(22,22,26,.88);}
+.kd-header{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 8px;flex-shrink:0;}
+.kd-header-left{display:flex;align-items:center;gap:12px;}
+.kd-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6366f1);
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
+.kd-header-name{font-size:15px;font-weight:700;color:var(--text);}
+.kd-header-sub{font-size:11px;color:var(--muted);}
+.kd-close{background:none;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;
+  padding:4px 8px;border-radius:8px;transition:background .15s;}
+.kd-close:hover{background:var(--bg-raised);color:var(--text);}
+.kd-greeting{padding:4px 20px 14px;font-size:14px;color:var(--text);line-height:1.5;font-weight:400;}
+.kd-body{flex:1;overflow-y:auto;padding:0 16px 20px;}
+.kd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+/* Tiles */
+.kd-tile{position:relative;background:var(--bg-raised);border:0.5px solid var(--border);
+  border-radius:14px;padding:14px 16px 12px;transition:transform .2s,opacity .3s,box-shadow .2s;cursor:default;}
+.kd-tile:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.06);}
+.kd-tile-full{grid-column:1/-1;}
+.kd-tile-urgent{border-left:3px solid #ef4444;}
+.kd-tile-high{border-left:3px solid #f59e0b;}
+.kd-tile-normal{border-left:3px solid var(--border-strong);}
+.kd-tile-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.kd-tile-icon{font-size:16px;flex-shrink:0;}
+.kd-tile-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.kd-tile-sub{font-size:12px;color:var(--muted);margin-bottom:2px;}
+.kd-tile-detail{font-size:12px;color:var(--text-secondary);font-weight:500;font-variant-numeric:tabular-nums;}
+.kd-tile-kira{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;line-height:1.4;}
+.kd-tile-kira .kd-kira-label{font-style:normal;font-weight:600;color:var(--accent);}
+.kd-tile-action{display:inline-block;margin-top:8px;font-size:11px;font-weight:600;color:var(--accent);
+  cursor:pointer;padding:3px 10px;border-radius:6px;background:var(--accent-bg);border:1px solid var(--accent-border);transition:background .15s;}
+.kd-tile-action:hover{background:rgba(79,125,249,.18);}
+/* X dismiss */
+.kd-tile-x{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+  background:transparent;border:none;color:var(--muted);font-size:14px;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:all .15s;}
+.kd-tile:hover .kd-tile-x{opacity:.6;}
+.kd-tile-x:hover{opacity:1!important;background:var(--bg);transform:scale(1.1);}
+/* Dismiss animation */
+@keyframes kd-dismiss{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.92) translateX(24px)}}
+.kd-tile-dismissing{animation:kd-dismiss .3s ease-out forwards;pointer-events:none;}
+/* Empty state */
+.kd-empty{grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);}
+.kd-empty-icon{font-size:32px;margin-bottom:10px;opacity:.5;}
+.kd-empty-text{font-size:13px;line-height:1.6;}
+/* Loading */
+.kd-loading{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px;padding:40px 0;}
+.kd-loading span{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.3;
+  animation:kd-dot .6s ease-in-out infinite alternate;}
+.kd-loading span:nth-child(2){animation-delay:.2s;}
+.kd-loading span:nth-child(3){animation-delay:.4s;}
+@keyframes kd-dot{to{opacity:1;transform:translateY(-4px)}}
+/* Header-Button */
+.kd-header-btn{position:relative;width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(99,102,241,.08));
+  border:0.5px solid rgba(124,58,237,.25);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;flex-shrink:0;}
+.kd-header-btn:hover{background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(99,102,241,.15));transform:scale(1.08);}
+.kd-header-btn-icon{font-size:15px;}
+.kd-header-btn-badge{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;
+  border-radius:8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;}
+@keyframes kd-btn-pulse{0%{box-shadow:0 0 0 0 rgba(124,58,237,.4)}70%{box-shadow:0 0 0 8px rgba(124,58,237,0)}100%{box-shadow:0 0 0 0 rgba(124,58,237,0)}}
+.kd-btn-pulse{animation:kd-btn-pulse .6s ease-out;}
+/* Compat: alte Klassen für Code der noch .kira-drawer-item-action nutzt */
 .kira-drawer-item-action{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:5px;padding:2px 10px;}
-.kira-drawer-item-action:hover{background:rgba(79,125,249,.18);}
-.kira-drawer-empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
-.kira-drawer-loading{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
 .header-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent-bg);
   display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
   color:var(--accent);cursor:pointer;flex-shrink:0;border:0.5px solid var(--accent-border);}
@@ -23252,6 +23313,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/api/kira/background-status':
             self._api_kira_background_status()
+
+        elif self.path.startswith('/api/kira/activity-feed'):
+            self._api_kira_activity_feed()
 
         elif self.path == '/api/kira/circuit_breaker':
             self._api_kira_circuit_breaker_get()
@@ -25681,6 +25745,242 @@ class DashboardHandler(BaseHTTPRequestHandler):
             pass
         self._json({"ok": True, "jobs": jobs, "active": len(jobs) > 0})
 
+    def _api_kira_activity_feed(self):
+        """GET /api/kira/activity-feed — Individuelle Activity-Items für den Drawer."""
+        try:
+            # Revival-Tage aus Config (einstellbar)
+            try:
+                cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                revival_tage = int(cfg.get('activity_feed', {}).get('revival_tage', 7))
+            except Exception:
+                revival_tage = 7
+
+            db = sqlite3.connect(str(TASKS_DB))
+            db.row_factory = sqlite3.Row
+            today = datetime.now().date()
+            now = datetime.now()
+
+            # Dismissed Keys laden (nur nicht-revived)
+            dismissed = set()
+            try:
+                for r in db.execute("SELECT item_key, dismissed_at FROM kira_activity_dismissed WHERE revived_at IS NULL"):
+                    dismissed.add(r["item_key"])
+            except Exception:
+                pass
+
+            items = []
+
+            # 1. Überfällige Rechnungen (einzeln)
+            try:
+                for r in db.execute("""
+                    SELECT re_nummer, datum, kunde_name, betrag_brutto, mahnung_count
+                    FROM ausgangsrechnungen WHERE status='offen' AND datum IS NOT NULL
+                    ORDER BY datum ASC
+                """):
+                    try:
+                        re_datum = datetime.strptime(str(r["datum"])[:10], "%Y-%m-%d").date()
+                        tage = (today - re_datum).days
+                    except Exception:
+                        continue
+                    if tage < 14:
+                        continue
+                    key = f"re:{r['re_nummer']}"
+                    # Revival: nach 7 Tagen dismissed und noch offen → revive
+                    if key in dismissed:
+                        try:
+                            row = db.execute(
+                                "SELECT dismissed_at FROM kira_activity_dismissed WHERE item_key=?", (key,)
+                            ).fetchone()
+                            if row:
+                                dism_dt = datetime.fromisoformat(row["dismissed_at"])
+                                if (now - dism_dt).days >= revival_tage:
+                                    db.execute("UPDATE kira_activity_dismissed SET revived_at=? WHERE item_key=?",
+                                               (now.isoformat(), key))
+                                    db.commit()
+                                    dismissed.discard(key)
+                                else:
+                                    continue
+                        except Exception:
+                            continue
+                    betrag = r["betrag_brutto"] or 0
+                    kunde = r["kunde_name"] or "Unbekannt"
+                    is_urgent = tage >= 30
+                    if is_urgent:
+                        kira_says = f"Diese Rechnung wartet seit {tage} Tagen. Mahnung vorbereiten?"
+                    else:
+                        kira_says = "Noch keine Zahlung eingegangen. Im Blick behalten."
+                    items.append({
+                        "key": key,
+                        "type": "rechnung",
+                        "priority": "urgent" if is_urgent else "high",
+                        "size": "full",
+                        "title": str(r["re_nummer"]),
+                        "subtitle": kunde,
+                        "detail": f"{betrag:,.2f} EUR · {tage} Tage offen".replace(",", "X").replace(".", ",").replace("X", "."),
+                        "kira_says": kira_says,
+                        "accent": "#ef4444" if is_urgent else "#f59e0b",
+                        "action": {"type": "navigate", "target": "showPanel('geschaeft')"},
+                        "ts": str(r["datum"])[:10],
+                    })
+            except Exception:
+                pass
+
+            # 2. Neue Leads (letzte 48h, einzeln)
+            try:
+                seit_48h = (now - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M")
+                for r in db.execute("""
+                    SELECT id, titel, kunde_name, erstellt_am, kategorie
+                    FROM tasks
+                    WHERE typ IN ('anfrage', 'lead', 'anfrage_lead')
+                      AND erstellt_am >= ?
+                      AND status NOT IN ('erledigt', 'archiviert', 'ignoriert')
+                    ORDER BY erstellt_am DESC
+                """, (seit_48h,)):
+                    key = f"lead:{r['id']}"
+                    if key in dismissed:
+                        continue
+                    kunde = r["kunde_name"] or r["titel"] or f"Anfrage #{r['id']}"
+                    items.append({
+                        "key": key,
+                        "type": "lead",
+                        "priority": "normal",
+                        "size": "half",
+                        "title": kunde[:40],
+                        "subtitle": r["kategorie"] or "Neue Anfrage",
+                        "detail": str(r["erstellt_am"] or "")[:16],
+                        "kira_says": f"Neue Anfrage von {kunde[:25]}. Angebot erstellen?",
+                        "accent": "#3b82f6",
+                        "action": {"type": "navigate", "target": "showPanel('kommunikation')"},
+                        "ts": str(r["erstellt_am"] or "")[:10],
+                    })
+            except Exception:
+                pass
+
+            # 3. Pending Freigaben (einzeln)
+            try:
+                for r in db.execute("""
+                    SELECT id, an, betreff, erstellt_am
+                    FROM mail_approve_queue WHERE status='pending'
+                    ORDER BY erstellt_am ASC
+                """):
+                    key = f"freigabe:{r['id']}"
+                    if key in dismissed:
+                        # Freigaben nach 24h wieder zeigen
+                        try:
+                            row = db.execute(
+                                "SELECT dismissed_at FROM kira_activity_dismissed WHERE item_key=?", (key,)
+                            ).fetchone()
+                            if row:
+                                dism_dt = datetime.fromisoformat(row["dismissed_at"])
+                                if (now - dism_dt).total_seconds() >= 86400:
+                                    db.execute("UPDATE kira_activity_dismissed SET revived_at=? WHERE item_key=?",
+                                               (now.isoformat(), key))
+                                    db.commit()
+                                    dismissed.discard(key)
+                                else:
+                                    continue
+                        except Exception:
+                            continue
+                    items.append({
+                        "key": key,
+                        "type": "freigabe",
+                        "priority": "high",
+                        "size": "half",
+                        "title": (r["betreff"] or "Mail-Entwurf")[:45],
+                        "subtitle": f"An: {r['an'] or '?'}",
+                        "detail": str(r["erstellt_am"] or "")[:16],
+                        "kira_says": "Kira hat einen Entwurf vorbereitet — wartet auf dein OK.",
+                        "accent": "#8b5cf6",
+                        "action": {"type": "navigate", "target": "pfKiraAusgangOpen()"},
+                        "ts": str(r["erstellt_am"] or "")[:10],
+                    })
+            except Exception:
+                pass
+
+            # 4. Case-Engine Signale (angezeigt=0, einzeln)
+            try:
+                for r in db.execute("""
+                    SELECT id, stufe, titel, nachricht, erstellt_am
+                    FROM vorgang_signals WHERE angezeigt=0
+                    ORDER BY stufe DESC, erstellt_am DESC LIMIT 10
+                """):
+                    key = f"signal:{r['id']}"
+                    if key in dismissed:
+                        continue
+                    is_c = r["stufe"] == "C"
+                    items.append({
+                        "key": key,
+                        "type": "signal",
+                        "priority": "urgent" if is_c else "high",
+                        "size": "full" if is_c else "half",
+                        "title": (r["titel"] or "Signal")[:50],
+                        "subtitle": "",
+                        "detail": (r["nachricht"] or "")[:100],
+                        "kira_says": "",
+                        "accent": "#ef4444" if is_c else "#f59e0b",
+                        "action": None,
+                        "ts": str(r["erstellt_am"] or "")[:10],
+                    })
+            except Exception:
+                pass
+
+            db.close()
+
+            # Sortieren: urgent → high → normal
+            prio_order = {"urgent": 0, "high": 1, "normal": 2}
+            items.sort(key=lambda x: (prio_order.get(x["priority"], 9), x.get("ts", "") or ""))
+
+            # Begrüßung
+            h = now.hour
+            if h < 12:
+                gruss = "Guten Morgen"
+            elif h < 17:
+                gruss = "Hallo"
+            else:
+                gruss = "Guten Abend"
+            n = len(items)
+            if n == 0:
+                greeting = f"{gruss} Kai — alles im Griff."
+            elif n == 1:
+                greeting = f"{gruss} Kai, eine Sache die du wissen solltest:"
+            else:
+                greeting = f"{gruss} Kai, {n} Dinge die du wissen solltest:"
+
+            self._json({
+                "ok": True,
+                "greeting": greeting,
+                "items": items,
+                "total": n,
+                "ts": now.isoformat(),
+            })
+        except Exception as e:
+            self._json({"ok": False, "error": str(e), "items": [], "total": 0})
+
+    def _api_kira_activity_dismiss(self, body: dict):
+        """POST /api/kira/activity-feed/dismiss — Item im Drawer ausblenden."""
+        item_key = (body or {}).get("key", "").strip()
+        if not item_key:
+            self._json({"ok": False, "error": "key fehlt"})
+            return
+        try:
+            db = sqlite3.connect(str(TASKS_DB))
+            db.execute("""
+                INSERT OR REPLACE INTO kira_activity_dismissed (item_key, dismissed_at, revived_at)
+                VALUES (?, ?, NULL)
+            """, (item_key, datetime.now().isoformat()))
+            db.commit()
+            db.close()
+            if item_key.startswith("signal:"):
+                try:
+                    sid = int(item_key.split(":")[1])
+                    from case_engine import mark_signal_shown
+                    mark_signal_shown(sid, "dismissed_drawer")
+                except Exception:
+                    pass
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _api_kira_circuit_breaker_get(self):
         """GET /api/kira/circuit_breaker — Circuit Breaker Status."""
         try:
@@ -27425,6 +27725,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/qualifizieren/fortsetzen':
             self._api_mail_qualifizieren_fortsetzen()
+            return
+
+        if self.path == '/api/kira/activity-feed/dismiss':
+            self._api_kira_activity_dismiss(body)
             return
 
         if self.path == '/api/mail/reclassify':

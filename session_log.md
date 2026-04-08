@@ -183,3 +183,13 @@
 ### 2026-04-08 11:30 — tkinter Popup deaktiviert + Signal-Scanner im Server
 **Was:** (1) `start_signal_watcher()` (tkinter Desktop-Overlay) deaktiviert — das war die Ursache für das hässliche "KIRA — Aktion erforderlich"-Fenster das alle ~1h mit gleichen Daten kam. (2) Neuer `_signal_scanner_loop` Thread im Server: nutzt die bestehenden Scan-Funktionen (Rechnungen, Leads, Freigaben) aus activity_window.py, schreibt Signale in Case-Engine-DB → Browser Activity-Drawer zeigt sie. (3) **4h Cooldown** statt 1h, im Server-Thread-RAM (überlebt Scan-Zyklen, reset bei Server-Neustart — was OK ist da neue Infos kommen könnten). (4) Scan-Funktionen in activity_window.py: eigener _cooldown_ok()-Check entfernt (Server-Thread macht das jetzt zentral). (5) Scan alle 5 Minuten, aber dank Cooldown maximal 1 Signal pro Thema alle 4h.
 **Status:** erledigt
+
+### 2026-04-08 12:30 — Activity-Drawer Komplett-Redesign (Windows 11 Widget-Style)
+**Was:** Kompletter Umbau des Activity-Drawers:
+- **Backend:** `_ensure_activity_dismissed_table()` in tasks.db (item_key UNIQUE, dismissed_at, revived_at). GET /api/kira/activity-feed — sammelt individuelle Items aus 4 Quellen (Rechnungen, Leads, Freigaben, Signale), filtert dismissed, Begrüßung nach Tageszeit. POST /api/kira/activity-feed/dismiss — markiert Items als dismissed.
+- **HTML:** Neuer Drawer mit Kira-Avatar, Begrüßungszeile, Grid-Container. Header-Button `#kdHeaderBtn` mit Badge neben Neustart.
+- **CSS:** Glass-Effekt (backdrop-blur 24px, semi-transparent BG), 14px border-radius Kacheln in 2-Spalten-Grid, Priority-Farben (rot/gelb/neutral), Hover-Lift, Dismiss-Animation (scale+translateX+opacity), Einsaug-Animation (kd-sucking: scale(.2)+translateX(80%)+border-radius:50%), Loading-Dots, Header-Button mit Pulse.
+- **JS:** `kiraActivityDrawerOpen()` mit Ausblas-Effekt, `kiraActivityDrawerClose()` mit Einsaug-in-Header-Button + Pulse. `_kiraDrawerLoad()` fetcht activity-feed API. `_kdRenderTiles()` baut individuelle Kacheln mit X-Dismiss, Kira-says, Action-Links. `_kdDismiss()` animiert + POST. Auto-Minimize nach 60s. Badge-Polling alle 30s.
+- **Kira-says:** Template-basiert pro Item-Typ (kein LLM nötig).
+- **Revival:** Rechnungen kommen nach config.activity_feed.revival_tage (Default 7) wieder wenn noch offen. Einstellbar.
+**Status:** erledigt
