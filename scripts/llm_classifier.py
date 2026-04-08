@@ -169,7 +169,9 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
         if nicht_leistungen:
             _teile.append("\nFolgende Leistungen werden NICHT angeboten:")
             for _nl in nicht_leistungen:
-                _teile.append(f"  ✗ {_nl}")
+                _nl_text = _nl.get("text", "") if isinstance(_nl, dict) else str(_nl)
+                if _nl_text:
+                    _teile.append(f"  ✗ {_nl_text}")
         _teile.append(
             "\n→ PFLICHT: Prüfe bei JEDER Anfrage (Mail, WhatsApp, Chat, alle Kanäle) ob die angefragte Leistung zum Spektrum passt!"
             "\n  Anfragen die NICHT zum Leistungsspektrum passen:"

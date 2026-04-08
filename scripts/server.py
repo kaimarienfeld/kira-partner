@@ -6225,11 +6225,21 @@ def build_einstellungen():
     _profil_katalog = _profil_leistungen.get("katalog", [])
     _profil_nicht_leistungen = _profil_leistungen.get("nicht_leistungen", [])
     _profil_website_url = _profil_leistungen.get("website_url", "")
-    # Leistungen nach Quelle gruppieren (für Akkordeon)
-    _lk_gruppen = {}  # quelle -> [leistungen]
+    # Leistungen + Nicht-Leistungen nach Quelle gruppieren (für Akkordeon)
+    _lk_gruppen = {}  # quelle -> {"katalog": [...], "nicht": [...]}
     for _lk_item in _profil_katalog:
         _lk_q = _lk_item.get("quelle", "manuell") or "manuell"
-        _lk_gruppen.setdefault(_lk_q, []).append(_lk_item)
+        _lk_gruppen.setdefault(_lk_q, {"katalog": [], "nicht": []})["katalog"].append(_lk_item)
+    # Nicht-Leistungen: können dict mit quelle sein oder plain string (→ manuell)
+    for _nl_item in _profil_nicht_leistungen:
+        if isinstance(_nl_item, dict):
+            _nl_q = _nl_item.get("quelle", "manuell") or "manuell"
+            _nl_text = _nl_item.get("text", "")
+        else:
+            _nl_q = "manuell"
+            _nl_text = str(_nl_item)
+        if _nl_text:
+            _lk_gruppen.setdefault(_nl_q, {"katalog": [], "nicht": []})["nicht"].append(_nl_text)
     # Sortierung: "manuell" zuerst, dann Websites alphabetisch
     _lk_gruppen_sorted = []
     if "manuell" in _lk_gruppen:
@@ -6261,13 +6271,30 @@ def build_einstellungen():
             f'</div></div>'
         )
 
-    def _build_lk_group(quelle, items):
+    def _build_nl_rows(nicht_list, quelle):
+        """Baut die Nicht-Leistungen-Zeilen für eine Gruppe."""
+        rows = ""
+        for nl in nicht_list:
+            rows += (
+                f'<div class="bp-nl-row" data-quelle="{esc(quelle)}" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">'
+                f'<input class="es-inp bp-nl-val" value="{esc(nl)}" placeholder="z.B. Kostenlose Beratung f&uuml;r Heimwerker" style="flex:1">'
+                f'<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button>'
+                f'</div>'
+            )
+        return rows
+
+    def _build_lk_group(quelle, grp_data):
         _q = esc(quelle)
         _icon = "&#x270D;" if quelle == "manuell" else "&#x1F310;"
         _title = "Manuell angelegt" if quelle == "manuell" else _q
-        _count = len(items)
+        _items = grp_data.get("katalog", [])
+        _nicht = grp_data.get("nicht", [])
+        _count = len(_items)
         _count_txt = f'{_count} Leistung{"en" if _count != 1 else ""}'
-        _cards = "".join(_build_lk_card(l, quelle) for l in items)
+        if _nicht:
+            _count_txt += f', {len(_nicht)} Ausschl.'
+        _cards = "".join(_build_lk_card(l, quelle) for l in _items)
+        _nl_html = _build_nl_rows(_nicht, quelle)
         _del_btn = "" if quelle == "manuell" else (
             '<button class="es-btn bp-lk-del-grp" style="color:#e84545;border-color:#e84545;padding:1px 8px;font-size:11px;margin-left:auto" '
             'onclick="event.stopPropagation();bpDeleteGroup(this)" title="Alle Leistungen dieser Website entfernen">&times; Entfernen</button>'
@@ -6285,11 +6312,21 @@ def build_einstellungen():
             f'<span class="bp-lk-count">{_count_txt}</span>'
             f'{_del_btn}{_add_btn}'
             f'</div>'
-            f'<div class="bp-lk-body" style="display:none">{_cards}</div>'
+            f'<div class="bp-lk-body" style="display:none">'
+            f'{_cards}'
+            f'<div class="bp-lk-nicht-section" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">'
+            f'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px">'
+            f'<span style="color:var(--muted)">&#x2718;</span> Nicht angebotene Leistungen'
+            f'<span style="font-size:10px;font-weight:400;color:var(--muted)">Kira erkennt unpassende Anfragen automatisch</span>'
             f'</div>'
+            f'<div class="bp-nl-list">{_nl_html}</div>'
+            f'<button class="es-btn" style="font-size:11px;padding:2px 8px;margin-top:4px" '
+            f"onclick=\"bpAddNichtLeistung('{_q}')\">+ Ausschluss</button>"
+            f'</div>'
+            f'</div></div>'
         )
 
-    _lk_accordion_html = "".join(_build_lk_group(q, items) for q, items in _lk_gruppen_sorted)
+    _lk_accordion_html = "".join(_build_lk_group(q, data) for q, data in _lk_gruppen_sorted)
     _alle_konten = config.get("combined_postfach", {}).get("konten", [])
     # Dynamische Kategorien für Korrektur-Modal
     try:
@@ -7250,13 +7287,7 @@ function esInfoPopup(btn, text) {{
       {_lk_accordion_html}
     </div>
 
-    <div class="es-row" style="flex-direction:column;align-items:stretch;margin-top:8px">
-      <div class="es-rl" style="margin-bottom:4px">Nicht angebotene Leistungen<div class="es-rd">Kira ber&uuml;cksichtigt diese &uuml;berall: Klassifizierung, Antwort-Entw&uuml;rfe, Chat, WhatsApp &mdash; unpassende Anfragen werden erkannt</div></div>
-      <div id="bp-nicht-leistungen-list">
-        {"".join(f'<div class="bp-nl-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-nl-val" value="{esc(nl)}" placeholder="z.B. Kostenlose Beratung f&uuml;r Heimwerker" style="flex:1"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for nl in _profil_nicht_leistungen)}
-      </div>
-      <button class="es-btn" onclick="bpAddNichtLeistung()" style="margin-top:4px;align-self:flex-start">+ Ausschluss hinzuf&uuml;gen</button>
-    </div>
+    <!-- Nicht-Leistungen sind jetzt pro Gruppe im Akkordeon integriert -->
   </div>
 
   <div class="es-save-bar">
@@ -17520,15 +17551,32 @@ function bpAddLeistung(quelle) {{
   cards[cards.length - 1].querySelector('.bp-l-name').focus();
   bpUpdateGroupCount();
 }}
-function bpAddNichtLeistung() {{
-  const list = document.getElementById('bp-nicht-leistungen-list');
-  if(!list) return;
+function bpAddNichtLeistung(quelle) {{
+  quelle = quelle || 'manuell';
+  const acc = document.getElementById('bp-leistungen-accordion');
+  if(!acc) return;
+  // Gruppe finden
+  let grp = acc.querySelector(`.bp-lk-group[data-quelle="${{quelle}}"]`);
+  if(!grp) {{ grp = acc.querySelector('.bp-lk-group[data-quelle="manuell"]'); }}
+  if(!grp) return;
+  const nlList = grp.querySelector('.bp-nl-list');
+  if(!nlList) return;
+  // Gruppe \u00f6ffnen
+  if(!grp.classList.contains('open')) {{
+    document.querySelectorAll('#bp-leistungen-accordion .bp-lk-group.open').forEach(g => {{
+      g.classList.remove('open');
+      g.querySelector('.bp-lk-body').style.display = 'none';
+    }});
+    grp.classList.add('open');
+    grp.querySelector('.bp-lk-body').style.display = '';
+  }}
   const row = document.createElement('div');
   row.className = 'bp-nl-row';
+  row.dataset.quelle = quelle;
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
   row.innerHTML = `<input class="es-inp bp-nl-val" value="" placeholder="z.B. Kostenlose Beratung f\u00fcr Heimwerker" style="flex:1">`
     +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button>`;
-  list.appendChild(row);
+  nlList.appendChild(row);
   row.querySelector('input').focus();
 }}
 function _bpCollectLeistungen() {{
@@ -17545,10 +17593,13 @@ function _bpCollectLeistungen() {{
       quelle: card.dataset.quelle || card.closest('.bp-lk-group')?.dataset.quelle || 'manuell'
     }});
   }});
+  // Nicht-Leistungen pro Gruppe sammeln (mit Quelle als Objekt)
   const nicht = [];
-  document.querySelectorAll('#bp-nicht-leistungen-list .bp-nl-val').forEach(inp => {{
-    const v = inp.value.trim();
-    if(v) nicht.push(v);
+  document.querySelectorAll('#bp-leistungen-accordion .bp-nl-row').forEach(row => {{
+    const v = (row.querySelector('.bp-nl-val')?.value || '').trim();
+    if(!v) return;
+    const q = row.dataset.quelle || row.closest('.bp-lk-group')?.dataset.quelle || 'manuell';
+    nicht.push({{ text: v, quelle: q }});
   }});
   return {{
     letzte_aktualisierung: new Date().toISOString().slice(0,10),
@@ -17584,14 +17635,14 @@ function leistungenImportieren() {{
         last.querySelector('.bp-l-zielgruppe').value = l.zielgruppe || '';
         if(l.ist_kernleistung) last.querySelector('.bp-l-kern').checked = true;
       }});
-      // Nicht-Leistungen
-      const nlList = document.getElementById('bp-nicht-leistungen-list');
-      const existingNl = Array.from(nlList.querySelectorAll('.bp-nl-val')).map(i=>i.value.trim().toLowerCase());
+      // Nicht-Leistungen in die Website-Gruppe einf\u00fcgen
       (d.leistungen.nicht_leistungen || []).forEach(nl => {{
-        if(existingNl.includes(nl.toLowerCase())) return;
-        bpAddNichtLeistung();
-        const rows = nlList.querySelectorAll('.bp-nl-val');
-        rows[rows.length-1].value = nl;
+        bpAddNichtLeistung(url);
+        const acc = document.getElementById('bp-leistungen-accordion');
+        const grp = acc.querySelector(`.bp-lk-group[data-quelle="${{CSS.escape(url)}}"]`);
+        if(!grp) return;
+        const rows = grp.querySelectorAll('.bp-nl-val');
+        if(rows.length) rows[rows.length-1].value = nl;
       }});
       bpUpdateGroupCount();
       const pages = d.leistungen.pages_crawled || 1;

@@ -737,7 +737,9 @@ def _build_leistungs_prompt(leistungen: dict) -> str:
     if nicht_l:
         lines.append("\nNICHT angebotene Leistungen:")
         for nl in nicht_l:
-            lines.append(f"  ✗ {nl}")
+            nl_text = nl.get("text", "") if isinstance(nl, dict) else str(nl)
+            if nl_text:
+                lines.append(f"  ✗ {nl_text}")
     lines.append(
         "\n→ PFLICHT bei JEDER Anfrage (Mail, Chat, WhatsApp, alle Kanäle):"
         "\n  - Prüfe ob die angefragte Leistung zum Spektrum passt"
