@@ -6178,6 +6178,8 @@ def build_einstellungen():
     _profil_branche = esc(_profil.get("firma_branche", ""))
     _profil_beschreibung = esc(_profil.get("firma_beschreibung", ""))
     _profil_domains = _profil.get("eigene_domains", [])
+    _alle_konten = config.get("combined_postfach", {}).get("konten", [])
+    _konto_labels = config.get("mail_konto_labels", {})
     # Circuit Breaker Status laden
     circuit_state = {}
     try:
@@ -7041,11 +7043,11 @@ function esInfoPopup(btn, text) {{
       <input class="es-inp" id="cfg-profil-firma" value="{_profil_firma}" placeholder="z.B. Meine Firma GmbH">
     </div>
     <div class="es-row">
-      <div class="es-rl">Branche<div class="es-rd">Gesch&auml;ftsfeld &mdash; hilft Kira beim Einordnen von Mails</div></div>
-      <input class="es-inp" id="cfg-profil-branche" value="{_profil_branche}" placeholder="z.B. IT-Dienstleistungen">
+      <div class="es-rl">Branche<div class="es-rd">Gesch&auml;ftsfeld &mdash; Kira nutzt Branche <strong>und</strong> Beschreibung f&uuml;r Klassifizierung &amp; Chat</div></div>
+      <textarea class="es-inp" id="cfg-profil-branche" rows="2" style="resize:vertical;min-height:48px" placeholder="z.B. Betonkosmetik / Sichtbeton-Fachbetrieb&#10;oder: IT-Dienstleistungen / Cloud-Hosting">{_profil_branche}</textarea>
     </div>
     <div class="es-row">
-      <div class="es-rl">Beschreibung<div class="es-rd">Kurzbeschreibung des Unternehmens f&uuml;r Kontext</div></div>
+      <div class="es-rl">Beschreibung<div class="es-rd">Ausf&uuml;hrliche Beschreibung &mdash; gibt Kira tieferen Kontext &uuml;ber Zielgruppe, Leistungen und Besonderheiten</div></div>
       <textarea class="es-inp" id="cfg-profil-beschreibung" rows="3" style="resize:vertical" placeholder="Was macht Ihr Unternehmen? Zielgruppe, Projektgr&ouml;&szlig;en, Besonderheiten&hellip;">{_profil_beschreibung}</textarea>
     </div>
   </div>
@@ -7063,9 +7065,11 @@ function esInfoPopup(btn, text) {{
             <button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="bpRemoveTeamMember({i})" title="Entfernen">&times;</button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-            <div style="flex:1;min-width:200px">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:2px">E-Mail-Konten (kommagetrennt)</div>
-              <input class="es-inp bp-tm-emails" value="{esc(", ".join(m.get("email_konten",[])))}" placeholder="info@firma.de, shop@firma.de" style="width:100%">
+            <div style="flex:1;min-width:220px">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">E-Mail-Konten zuweisen</div>
+              <div class="bp-tm-email-checks" style="display:flex;flex-direction:column;gap:3px">
+                {"".join(f'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:2px 0"><input type="checkbox" class="bp-email-cb" value="{esc(k)}" {"checked" if k in m.get("email_konten",[]) else ""}><span style="color:var(--text)">{esc(k)}</span><span style="color:var(--muted);font-size:10px">{esc(_konto_labels.get(k,""))}</span></label>' for k in _alle_konten) if _alle_konten else '<span style="font-size:11px;color:var(--muted)">Keine Konten konfiguriert &mdash; zuerst unter Mail &amp; Konten anlegen</span>'}
+              </div>
             </div>
             <div style="flex:1;min-width:200px">
               <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Anrede-Varianten (kommagetrennt)</div>
@@ -7080,9 +7084,12 @@ function esInfoPopup(btn, text) {{
 
   <div class="es-grp">
     <div class="es-grp-h">Eigene Domains</div>
-    <div class="es-row">
-      <div class="es-rl">Domains<div class="es-rd">Domains die zum Unternehmen geh&ouml;ren &mdash; Mails von diesen Domains werden als eigene erkannt</div></div>
-      <input class="es-inp" id="cfg-profil-domains" value="{esc(", ".join(_profil_domains))}" placeholder="firma.de, shop.firma.de">
+    <div class="es-row" style="flex-direction:column;align-items:stretch">
+      <div class="es-rd" style="margin-bottom:6px">Domains die zum Unternehmen geh&ouml;ren &mdash; Mails von diesen Domains werden als eigene erkannt</div>
+      <div id="bp-domain-list">
+        {"".join(f'<div class="bp-domain-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-domain-val" value="{esc(d)}" placeholder="beispiel.de" style="flex:1;max-width:320px"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for d in _profil_domains)}
+      </div>
+      <button class="es-btn" onclick="bpAddDomain()" style="margin-top:4px;align-self:flex-start">+ Domain hinzuf&uuml;gen</button>
     </div>
   </div>
 
@@ -17207,6 +17214,16 @@ function resetAccent() {{
   applyAccent(def);
 }}
 // ── Benutzerprofile: Team-Mitglieder verwalten ──
+const _bpKonten = {json.dumps(_alle_konten, ensure_ascii=False)};
+const _bpKontoLabels = {json.dumps(_konto_labels, ensure_ascii=False)};
+function _bpEmailCheckboxes(selected) {{
+  if(!_bpKonten.length) return '<span style="font-size:11px;color:var(--muted)">Keine Konten konfiguriert</span>';
+  return _bpKonten.map(k => {{
+    const lbl = _bpKontoLabels[k] ? ` <span style="color:var(--muted);font-size:10px">${{_bpKontoLabels[k]}}</span>` : '';
+    const chk = selected.includes(k) ? ' checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:2px 0"><input type="checkbox" class="bp-email-cb" value="${{k}}"${{chk}}><span style="color:var(--text)">${{k}}</span>${{lbl}}</label>`;
+  }}).join('');
+}}
 function bpAddTeamMember() {{
   const list = document.getElementById('bp-team-list');
   if(!list) return;
@@ -17222,8 +17239,8 @@ function bpAddTeamMember() {{
     +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="bpRemoveTeamMember(${{idx}})" title="Entfernen">&times;</button>`
     +`</div>`
     +`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">`
-    +`<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">E-Mail-Konten (kommagetrennt)</div>`
-    +`<input class="es-inp bp-tm-emails" value="" placeholder="info@firma.de, shop@firma.de" style="width:100%"></div>`
+    +`<div style="flex:1;min-width:220px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">E-Mail-Konten zuweisen</div>`
+    +`<div class="bp-tm-email-checks" style="display:flex;flex-direction:column;gap:3px">${{_bpEmailCheckboxes([])}}</div></div>`
     +`<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Anrede-Varianten (kommagetrennt)</div>`
     +`<input class="es-inp bp-tm-anreden" value="" placeholder="Herr M\\u00fcller, Max" style="width:100%"></div>`
     +`</div>`;
@@ -17234,7 +17251,6 @@ function bpRemoveTeamMember(idx) {{
   if(!list) return;
   const cards = list.querySelectorAll('.bp-team-card');
   if(cards[idx]) cards[idx].remove();
-  // Re-index
   list.querySelectorAll('.bp-team-card').forEach((c,i) => {{
     c.dataset.idx = i;
     const btn = c.querySelector('button[onclick*="bpRemoveTeamMember"]');
@@ -17247,15 +17263,33 @@ function _bpCollectTeam() {{
   cards.forEach(c => {{
     const name = (c.querySelector('.bp-tm-name')?.value || '').trim();
     if(!name) return;
+    const emailCbs = c.querySelectorAll('.bp-email-cb:checked');
+    const konten = Array.from(emailCbs).map(cb => cb.value);
     team.push({{
       name: name,
       rolle: (c.querySelector('.bp-tm-rolle')?.value || '').trim(),
-      email_konten: (c.querySelector('.bp-tm-emails')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      email_konten: konten,
       anrede_varianten: (c.querySelector('.bp-tm-anreden')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
       ist_admin: c.querySelector('.bp-tm-admin')?.checked ?? false
     }});
   }});
   return team;
+}}
+// ── Benutzerprofile: Domains verwalten ──
+function bpAddDomain() {{
+  const list = document.getElementById('bp-domain-list');
+  if(!list) return;
+  const row = document.createElement('div');
+  row.className = 'bp-domain-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  row.innerHTML = `<input class="es-inp bp-domain-val" value="" placeholder="beispiel.de" style="flex:1;max-width:320px">`
+    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}}
+function _bpCollectDomains() {{
+  const rows = document.querySelectorAll('#bp-domain-list .bp-domain-val');
+  return Array.from(rows).map(inp => inp.value.trim()).filter(Boolean);
 }}
 function _bpCollectProfile() {{
   return {{
@@ -17266,7 +17300,7 @@ function _bpCollectProfile() {{
         firma_branche: (document.getElementById('cfg-profil-branche')?.value || '').trim(),
         firma_beschreibung: (document.getElementById('cfg-profil-beschreibung')?.value || '').trim(),
         team: _bpCollectTeam(),
-        eigene_domains: (document.getElementById('cfg-profil-domains')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+        eigene_domains: _bpCollectDomains(),
         social_media: {{}}
       }}
     }}
