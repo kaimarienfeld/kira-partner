@@ -24065,6 +24065,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             lex_id = urllib.parse.unquote(self.path.split('/api/lexware/beleg/')[1])
             self._api_lexware_beleg(lex_id)
 
+        elif self.path.startswith('/api/lexware/artikel/'):
+            lex_id = urllib.parse.unquote(self.path.split('/api/lexware/artikel/')[1])
+            self._api_lexware_artikel(lex_id)
+
         elif self.path.startswith('/api/lexware/kontakt/') and not self.path.endswith('/update'):
             lex_id = urllib.parse.unquote(self.path.split('/api/lexware/kontakt/')[1])
             self._api_lexware_kontakt(lex_id)
@@ -28514,6 +28518,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
             self._json(d)
+        finally:
+            db.close()
+
+    def _api_lexware_artikel(self, lex_id):
+        """GET /api/lexware/artikel/{id}"""
+        db = get_db()
+        try:
+            row = db.execute("SELECT * FROM lexware_artikel WHERE lexware_id=?", (lex_id,)).fetchone()
+            if row:
+                d = dict(row)
+                if d.get("payload_json"):
+                    try: d["payload"] = json.loads(d["payload_json"])
+                    except Exception: pass
+                self._json(d)
+            else:
+                self._json({"error": "Artikel nicht gefunden"}, 404)
         finally:
             db.close()
 

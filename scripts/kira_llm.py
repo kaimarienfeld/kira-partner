@@ -1234,6 +1234,24 @@ def _build_data_context(config, kira_cfg=None):
     except Exception:
         pass
 
+    # Artikel-/Leistungskatalog mit Preisen (session-pp-cont2)
+    try:
+        _art_rows = []
+        for _tbl, _herk in [("lexware_artikel", "Lexware"), ("manuelle_artikel", "Manuell")]:
+            try:
+                for _ar in db.execute(f"SELECT name, netto_preis, einheit, typ FROM {_tbl}{' WHERE aktiv=1' if _tbl == 'manuelle_artikel' else ''} ORDER BY name LIMIT 20").fetchall():
+                    _art_rows.append((_ar[0], _ar[1], _ar[2] or "Stk", _ar[3] or "SERVICE", _herk))
+            except Exception:
+                pass
+        if _art_rows:
+            ctx += f"\n=== ARTIKEL-/LEISTUNGSKATALOG MIT PREISEN ({len(_art_rows)}) ===\n"
+            for _an, _ap, _ae, _at, _ah in _art_rows:
+                _preis_str = f"{_ap:.2f} EUR netto" if _ap else "kein Preis"
+                ctx += f"  • {_an} — {_preis_str}/{_ae} [{_ah}]\n"
+            ctx += "  → Nutze Tool 'artikel_preise_abfragen' fuer detaillierte Suche\n"
+    except Exception:
+        pass
+
     # Dokumente — letzte Eingänge und offene Dokumente (session-eeee)
     _k_dokumente = kira_cfg.get("kontext_dokumente", "immer")
     if _k_dokumente != "nie":
@@ -1947,6 +1965,47 @@ def get_tools(config=None):
         }
     })
 
+    # ── Artikel-/Preis-Tools (session-pp-cont2, universell: Lexware + Manuell) ──
+    tools.append({
+        "name": "artikel_preise_abfragen",
+        "description": (
+            "Durchsucht die Artikel-/Leistungsdatenbank nach Preisen. "
+            "Nutze dieses Tool wenn der Benutzer oder ein Kunde nach Preisen, Kosten oder "
+            "Leistungspositionen fragt. Gibt Artikelname, Netto-Preis, Einheit und Beschreibung zurueck. "
+            "Funktioniert mit Lexware-Artikeln UND manuell angelegten Leistungspositionen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "suchbegriff": {"type": "string", "description": "Suchbegriff (Artikelname, Beschreibung)"},
+                "kategorie": {
+                    "type": "string",
+                    "enum": ["SERVICE", "PRODUCT", "alle"],
+                    "description": "Typ-Filter (Standard: alle)"
+                },
+                "limit": {"type": "integer", "description": "Max. Ergebnisse (Standard: 10)"}
+            },
+            "required": ["suchbegriff"]
+        }
+    })
+    tools.append({
+        "name": "angebot_positionen_vorschlagen",
+        "description": (
+            "Stellt passende Leistungspositionen fuer ein Angebot zusammen. "
+            "Basierend auf einer Beschreibung der Kundenanfrage werden passende Artikel "
+            "mit Preisen aus der Datenbank zurueckgegeben. WICHTIG: Preise nur intern "
+            "fuer den Benutzer, niemals direkt an Kunden kommunizieren."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "beschreibung": {"type": "string", "description": "Was will der Kunde? (Freitext-Beschreibung der Anfrage)"},
+                "budget": {"type": "number", "description": "Optional: Budget-Obergrenze in EUR netto"}
+            },
+            "required": ["beschreibung"]
+        }
+    })
+
     # ── Dokument-Tools (session-eeee) ──
     tools.append({
         "name": "dokument_suchen",
@@ -2160,6 +2219,8 @@ def execute_tool(name, params):
             "projekt_suchen": _tool_projekt_suchen,
             "projekt_zuordnen": _tool_projekt_zuordnen,
             "projekt_kontext_laden": _tool_projekt_kontext_laden,
+            "artikel_preise_abfragen": _tool_artikel_preise_abfragen,
+            "angebot_positionen_vorschlagen": _tool_angebot_positionen_vorschlagen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -4894,6 +4955,139 @@ def _tool_projekt_kontext_laden(p):
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── Artikel-/Preis-Tool-Handler ──────────────────────────────────────────────
+
+def _tool_artikel_preise_abfragen(p):
+    """Durchsucht Lexware-Artikel + manuelle Artikel nach Preisen."""
+    suchbegriff = p.get("suchbegriff", "").strip()
+    if not suchbegriff:
+        return {"ok": False, "error": "Suchbegriff erforderlich"}
+    kategorie = p.get("kategorie", "alle")
+    limit = min(int(p.get("limit", 10)), 50)
+    like = f"%{suchbegriff}%"
+
+    results = []
+    try:
+        import sqlite3
+        cfg = get_config()
+        # Lexware-Artikel
+        _lex_db_path = Path(cfg.get("lexware", {}).get("db_path", "")) if cfg.get("lexware", {}).get("db_path") else SCRIPTS_DIR.parent / "knowledge" / "tasks.db"
+        if not _lex_db_path.exists():
+            _lex_db_path = SCRIPTS_DIR.parent / "knowledge" / "tasks.db"
+        db = sqlite3.connect(str(_lex_db_path))
+        db.row_factory = sqlite3.Row
+        typ_filter = "" if kategorie == "alle" else f" AND typ='{kategorie}'"
+        # Lexware
+        try:
+            for row in db.execute(
+                f"SELECT name, beschreibung, einheit, netto_preis, steuer_satz, typ FROM lexware_artikel WHERE (name LIKE ? OR beschreibung LIKE ?){typ_filter} LIMIT ?",
+                (like, like, limit)
+            ).fetchall():
+                results.append({
+                    "name": row["name"], "beschreibung": row["beschreibung"] or "",
+                    "netto_preis": row["netto_preis"], "einheit": row["einheit"] or "",
+                    "steuer_satz": row["steuer_satz"] or "19%", "typ": row["typ"] or "SERVICE",
+                    "herkunft": "Lexware",
+                })
+        except Exception:
+            pass
+        # Manuelle Artikel
+        try:
+            for row in db.execute(
+                f"SELECT name, beschreibung, einheit, netto_preis, steuer_satz, typ FROM manuelle_artikel WHERE aktiv=1 AND (name LIKE ? OR beschreibung LIKE ?){typ_filter} LIMIT ?",
+                (like, like, limit)
+            ).fetchall():
+                results.append({
+                    "name": row["name"], "beschreibung": row["beschreibung"] or "",
+                    "netto_preis": row["netto_preis"], "einheit": row["einheit"] or "",
+                    "steuer_satz": row["steuer_satz"] or "19%", "typ": row["typ"] or "SERVICE",
+                    "herkunft": "Manuell",
+                })
+        except Exception:
+            pass
+        db.close()
+    except Exception as e:
+        return {"ok": False, "error": f"DB-Fehler: {e}"}
+
+    if not results:
+        return {"ok": True, "message": f"Keine Artikel gefunden fuer '{suchbegriff}'.", "artikel": []}
+
+    lines = [f"Gefunden: {len(results)} Artikel fuer '{suchbegriff}':\n"]
+    for a in results:
+        preis = f"{a['netto_preis']:.2f} EUR netto" if a['netto_preis'] else "kein Preis"
+        lines.append(f"  • {a['name']} — {preis}/{a['einheit'] or 'Stk'} ({a['steuer_satz']}) [{a['herkunft']}]")
+        if a['beschreibung']:
+            lines.append(f"    {a['beschreibung'][:120]}")
+    return {"ok": True, "message": "\n".join(lines), "artikel": results}
+
+
+def _tool_angebot_positionen_vorschlagen(p):
+    """Schlaegt passende Artikelpositionen fuer ein Angebot vor."""
+    beschreibung = p.get("beschreibung", "").strip()
+    if not beschreibung:
+        return {"ok": False, "error": "Beschreibung der Kundenanfrage erforderlich"}
+    budget = p.get("budget")
+
+    # Alle aktiven Artikel laden
+    import sqlite3
+    try:
+        cfg = get_config()
+        _db_path = SCRIPTS_DIR.parent / "knowledge" / "tasks.db"
+        db = sqlite3.connect(str(_db_path))
+        db.row_factory = sqlite3.Row
+        alle_artikel = []
+        for tbl, herkunft in [("lexware_artikel", "Lexware"), ("manuelle_artikel", "Manuell")]:
+            try:
+                for row in db.execute(f"SELECT name, beschreibung, einheit, netto_preis, steuer_satz, typ FROM {tbl} WHERE {'1=1' if tbl == 'lexware_artikel' else 'aktiv=1'}"):
+                    alle_artikel.append({
+                        "name": row["name"], "beschreibung": row["beschreibung"] or "",
+                        "einheit": row["einheit"] or "", "netto_preis": row["netto_preis"] or 0,
+                        "steuer_satz": row["steuer_satz"] or "19%", "herkunft": herkunft,
+                    })
+            except Exception:
+                pass
+        db.close()
+    except Exception as e:
+        return {"ok": False, "error": f"DB-Fehler: {e}"}
+
+    if not alle_artikel:
+        return {"ok": True, "message": "Keine Artikel in der Datenbank vorhanden. Bitte zuerst Artikel anlegen (Einstellungen > Unternehmensprofile > Artikel & Preise)."}
+
+    # Artikel-Katalog als Kontext fuer eine schnelle LLM-Auswahl
+    artikel_text = "\n".join(f"- {a['name']}: {a['netto_preis']:.2f} EUR/{a['einheit'] or 'Stk'} — {a['beschreibung'][:80]}" for a in alle_artikel)
+    budget_hint = f"\nBudget-Obergrenze: {budget:.2f} EUR netto" if budget else ""
+
+    prompt = f"""Kundenanfrage: {beschreibung}{budget_hint}
+
+Verfuegbare Artikel:
+{artikel_text}
+
+Waehle die passenden Artikel fuer ein Angebot aus. Antworte als JSON-Array:
+[{{"name": "Artikelname", "menge": 1, "einheit": "h", "netto_preis": 95.00, "gesamt_netto": 95.00, "begruendung": "Warum dieser Artikel passt"}}]
+Nur vorhandene Artikel verwenden. Maximal 10 Positionen."""
+
+    try:
+        llm_resp = _call_llm_simple(prompt, max_tokens=1500)
+        import re
+        json_match = re.search(r'\[[\s\S]*\]', llm_resp)
+        if json_match:
+            positionen = json.loads(json_match.group())
+            gesamt = sum(pos.get("gesamt_netto", 0) for pos in positionen)
+            lines = ["Vorgeschlagene Angebotspositionen:\n"]
+            for i, pos in enumerate(positionen, 1):
+                lines.append(f"  {i}. {pos['name']} — {pos.get('menge', 1)}x {pos.get('netto_preis', 0):.2f} EUR/{pos.get('einheit', 'Stk')} = {pos.get('gesamt_netto', 0):.2f} EUR")
+                if pos.get("begruendung"):
+                    lines.append(f"     → {pos['begruendung']}")
+            lines.append(f"\nGesamt netto: {gesamt:.2f} EUR")
+            if budget and gesamt > budget:
+                lines.append(f"⚠️ Ueberschreitet Budget ({budget:.2f} EUR) um {gesamt - budget:.2f} EUR")
+            return {"ok": True, "message": "\n".join(lines), "positionen": positionen, "gesamt_netto": gesamt}
+        else:
+            return {"ok": True, "message": llm_resp}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler bei Positionsvorschlag: {e}"}
 
 
 # Init DB bei Import
