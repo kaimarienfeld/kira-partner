@@ -17965,6 +17965,7 @@ function upShowHistorie() {{
   if(!panel||!body) return;
   panel.style.display = '';
   body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted)">Lade Historie\\u2026</div>';
+  setTimeout(()=>panel.scrollIntoView({{behavior:'smooth',block:'start'}}), 100);
   fetch('/api/artikel/historie').then(r=>r.json()).then(d=>{{
     if(!d.ok || !d.historie || d.historie.length===0) {{
       body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted)">Keine \\u00c4nderungen aufgezeichnet.</div>';
