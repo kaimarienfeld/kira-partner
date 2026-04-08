@@ -1217,6 +1217,108 @@ def _scan_eingangsbeleg_lexware(mail_data: dict, konto_label: str, kategorie: st
               status='fehler', context_id=msg_id)
 
 
+# ── Zahlungseingangs-Verarbeitung ────────────────────────────────────────────
+_ZAHLUNG_PATTERNS = [
+    r'zahlung\s+eingegangen', r'zahlung\s+erhalten', r'zahlung\s+best[aä]tigt',
+    r'payment\s+received', r'geld\s+eingegangen', r'betrag\s+gutgeschrieben',
+    r'R[uü]ckzahlung\s+von', r'[Dd]anke\s+f[uü]r\s+(?:die\s+|Ihre\s+)?(?:Zahlung|R[uü]ckzahlung)',
+    r'Neue\s+Zahlung\s+von', r'Zahlung\s+[uü]berwiesen',
+]
+
+def _process_zahlungseingang(mail_data: dict, konto_label: str, kategorie: str,
+                              msg_id: str, absender: str, betreff: str, text: str):
+    """
+    Erkennt Zahlungsbestätigungen und markiert die zugehörige Ausgangsrechnung als bezahlt.
+    Sucht nach RE-Nummern (RE-SB*) und Beträgen im Betreff+Body.
+    """
+    combined = (betreff + '\n' + (text or '')[:5000])
+    # Prüfen ob es eine Zahlungs-Mail ist
+    is_zahlung = any(re.search(pat, combined, re.IGNORECASE) for pat in _ZAHLUNG_PATTERNS)
+    if not is_zahlung:
+        return
+
+    try:
+        # RE-Nummer extrahieren
+        re_match = re.search(r'(RE-SB\d{6})', combined, re.IGNORECASE)
+        re_nummer = re_match.group(1).upper() if re_match else None
+
+        # Betrag extrahieren
+        betrag = 0.0
+        betrag_patterns = [
+            r'(?:H[oö]he\s+von|Betrag|Zahlung)\s*(?:von\s+)?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€)',
+            r'(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*€\s*€?',  # "2.973,94 € €" (Doppel-€ aus Templates)
+            r'(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€)',
+        ]
+        for pat in betrag_patterns:
+            m = re.search(pat, combined, re.IGNORECASE)
+            if m:
+                betrag = _parse_amount(m.group(1))
+                if betrag > 0:
+                    break
+
+        if not re_nummer and betrag <= 0:
+            return  # Keine identifizierbare Rechnung
+
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        matched_re = None
+
+        # Versuch 1: Per RE-Nummer
+        if re_nummer:
+            row = db.execute(
+                "SELECT id, re_nummer, status, betrag_brutto FROM ausgangsrechnungen WHERE UPPER(re_nummer)=? LIMIT 1",
+                (re_nummer,)
+            ).fetchone()
+            if row and row['status'] != 'bezahlt':
+                matched_re = dict(row)
+
+        # Versuch 2: Per Betrag (wenn keine RE-Nummer oder nicht gefunden)
+        if not matched_re and betrag > 0:
+            rows = db.execute(
+                "SELECT id, re_nummer, status, betrag_brutto, kunde_name FROM ausgangsrechnungen WHERE status='offen' AND ABS(betrag_brutto - ?) < 0.02",
+                (betrag,)
+            ).fetchall()
+            if len(rows) == 1:
+                matched_re = dict(rows[0])
+
+        if matched_re:
+            from datetime import datetime as _dt
+            now_str = _dt.now().strftime('%Y-%m-%d %H:%M:%S')
+            db.execute(
+                "UPDATE ausgangsrechnungen SET status='bezahlt', bezahlt_am=? WHERE id=?",
+                (now_str, matched_re['id'])
+            )
+            db.commit()
+            _alog("Zahlung", f"Bezahlt: {matched_re['re_nummer']}",
+                  f"Rechnung {matched_re['re_nummer']} als bezahlt markiert (Betrag: {betrag:.2f} EUR)",
+                  "ok")
+            _elog('system', 'zahlung_eingegangen',
+                  f"Rechnung {matched_re['re_nummer']} bezahlt ({betrag:.2f} EUR)",
+                  source='mail_monitor', modul='buchhaltung', actor_type='system',
+                  status='ok', context_type='rechnung', context_id=matched_re['re_nummer'])
+            # Signal für Activity-Drawer
+            try:
+                from case_engine import kira_notify
+                kira_notify(
+                    titel=f"Zahlung eingegangen: {matched_re['re_nummer']}",
+                    nachricht=f"Rechnung {matched_re['re_nummer']} — {betrag:.2f} EUR bezahlt",
+                    stufe="B", typ="zahlung_eingegangen", modul="mail_monitor",
+                    cooldown_key=f"zahlung_{matched_re['re_nummer']}"
+                )
+            except Exception:
+                pass
+            log.info(f"Zahlungseingang: {matched_re['re_nummer']} als bezahlt markiert")
+        else:
+            log.info(f"Zahlungs-Mail erkannt, aber keine offene Rechnung gefunden (RE={re_nummer}, Betrag={betrag})")
+
+        db.close()
+    except Exception as e:
+        log.error(f"Zahlungseingangs-Verarbeitung fehlgeschlagen: {e}")
+        _elog('system', 'zahlung_fehler', f'Zahlungsverarbeitung fehlgeschlagen: {e}',
+              source='mail_monitor', modul='buchhaltung', actor_type='system',
+              status='fehler', context_id=msg_id)
+
+
 # ── Routing-Helfer ───────────────────────────────────────────────────────────
 def _load_firma_signatur():
     """Lädt Firmenname + Inhaber für Signatur aus config.json."""
@@ -1451,6 +1553,11 @@ def _process_mail(mail_data, konto_label, folder_name):
     except Exception:
         pass
 
+    # ── Buchhaltungs-Scans IMMER ausführen (auch bei Ignorieren/Abgeschlossen) ──
+    _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+    _scan_eingangsbeleg_lexware(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+    _process_zahlungseingang(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+
     # Archivieren: kein Task
     if routing == "archivieren" or kategorie in ("Ignorieren", "Newsletter / Werbung", "Abgeschlossen"):
         db.close()
@@ -1598,11 +1705,7 @@ def _process_mail(mail_data, konto_label, folder_name):
         _elog('system', 'vorgang_router_fehler', f"Router-Fehler: {_ve}",
               source='mail_monitor', modul='vorgang_router', actor_type='system', status='fehler')
 
-    # ── Eingangsrechnungs-Auto-Scan ───────────────────────────────────────────
-    _auto_scan_eingangsrechnung(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
-
-    # ── Lexware Buchhaltungs-Pruefqueue (session-eee) ─────────────────────────
-    _scan_eingangsbeleg_lexware(mail_data, konto_label, kategorie, msg_id, absender, betreff, text)
+    # (Buchhaltungs-Scans jetzt VOR Early-Returns, siehe oben — hier nicht mehr nötig)
 
     # ── Anthropic Billing Push ────────────────────────────────────────────────
     _check_anthropic_billing(absender, betreff, text)

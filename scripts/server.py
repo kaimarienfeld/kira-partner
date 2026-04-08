@@ -4995,7 +4995,7 @@ window.pfAlleKontenAbrufen = function(btn) {
     .then(r=>r.json()).then(d=>{
       if(btn) { btn.disabled=false; btn.textContent='\u21BB'; }
       showToast(d.ok ? 'Alle Konten werden abgerufen\u2026' : 'Fehler: '+(d.error||'?'), d.ok?'ok':'fehler');
-      if(d.ok) setTimeout(()=>{ pfLoadFolderTree(); pfRefreshBadge(); }, 4000);
+      if(d.ok) setTimeout(()=>{ fetch('/api/mail/folders').then(r=>r.json()).then(data=>{if(typeof pfRenderFolders==='function')pfRenderFolders(data);}).catch(()=>{}); if(typeof pfRefreshBadge==='function')pfRefreshBadge(); }, 4000);
     }).catch(()=>{ if(btn){btn.disabled=false;btn.textContent='\u21BB';} showToast('Netzwerkfehler','fehler'); });
 };
 })();
