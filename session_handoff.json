@@ -1,6 +1,6 @@
 {
-  "last_session": "session-ffff-anhang-extraktion",
-  "date": "2026-04-08 01:30",
+  "last_session": "session-gggg-aktives-aktivfenster",
+  "date": "2026-04-08 12:00",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -257,7 +257,19 @@
     "feed-widgets-api-endpoint-dashboard-widgets",
     "feed-widgets-einstellungen-ui-config",
     "feed-widgets-race-condition-fix",
-    "session-eeee-dokumente (2026-04-03): Dokumente-Modul komplett implementiert (Phase A-D). (1) dokument_storage.py NEU (~350 Zeilen): SQLite-Tabellen dokumente (26 Spalten), dokument_vorlagen (13), dokument_briefkoepfe (13). Vollständige CRUD-API: store_file(), create_dokument(), list/get/update/delete, Vorlagen+Briefköpfe, Hash-Deduplizierung. (2) dokument_pipeline.py NEU (~400 Zeilen): Text-Extraktion (PDF/DOCX/Bilder), OCR via pytesseract, LLM-Klassifizierung + Rule-Based-Fallback, Routing-Layer (6 Ziele), 8-Schritt-Pipeline process_file(), Folder-Watcher (watchdog), Export PDF (weasyprint) + DOCX (docxtpl/python-docx). (3) kira_llm.py: 3 neue Tools (dokument_suchen/erstellen/zuordnen), DOKUMENTE-Kontext-Sektion. (4) server.py: Sidebar-Eintrag mit Badge, Dokumente-Panel (3-Spalten, Status-Cards, Drop-Zone), Studio-Overlay (Quill-Editor, Vorlagen-Variablen), Preview-Overlay, ~350 Zeilen JS (dokLoadList/dokFilter/dokUpload/dokReclassify/dokArchive/dokDelete/Studio/Export), 20 API-Endpoints (10 GET + 10 POST), Einstellungen-Sektion (Modul-Status/OCR/Klassifizierung/Kira-Regeln), saveSettings() dokumente-Block, CSS-Klassen. (5) config.json: dokumente-Sektion (16 Einstellungen). (6) 7 Plan-Dateien: Masterplan, Gap-Analyse, Stack-Recherche, Checkliste, UI-Plan, Vorlagen-Plan, Runtime-Log-Plan. Commit 49fa685."
+    "kira-notify-zentraler-event-bus",
+    "kira-proaktiv-3-broken-signals-fixed",
+    "mail-monitor-kira-notify-3-events",
+    "daily-check-reklassifizierung-signal",
+    "capture-zuordnung-signal",
+    "presence-endpoint-vorgang-signals",
+    "drawer-auto-open-stufe-b-c-presence",
+    "drawer-close-debounce-30s",
+    "drawer-presence-return-auto-open",
+    "no-sandbox-browser-fix-subprocess",
+    "neustart-kira-vbs-expliziter-browser",
+    "session-eeee-dokumente (2026-04-03): Dokumente-Modul komplett implementiert (Phase A-D). (1) dokument_storage.py NEU (~350 Zeilen): SQLite-Tabellen dokumente (26 Spalten), dokument_vorlagen (13), dokument_briefkoepfe (13). Vollständige CRUD-API: store_file(), create_dokument(), list/get/update/delete, Vorlagen+Briefköpfe, Hash-Deduplizierung. (2) dokument_pipeline.py NEU (~400 Zeilen): Text-Extraktion (PDF/DOCX/Bilder), OCR via pytesseract, LLM-Klassifizierung + Rule-Based-Fallback, Routing-Layer (6 Ziele), 8-Schritt-Pipeline process_file(), Folder-Watcher (watchdog), Export PDF (weasyprint) + DOCX (docxtpl/python-docx). (3) kira_llm.py: 3 neue Tools (dokument_suchen/erstellen/zuordnen), DOKUMENTE-Kontext-Sektion. (4) server.py: Sidebar-Eintrag mit Badge, Dokumente-Panel (3-Spalten, Status-Cards, Drop-Zone), Studio-Overlay (Quill-Editor, Vorlagen-Variablen), Preview-Overlay, ~350 Zeilen JS (dokLoadList/dokFilter/dokUpload/dokReclassify/dokArchive/dokDelete/Studio/Export), 20 API-Endpoints (10 GET + 10 POST), Einstellungen-Sektion (Modul-Status/OCR/Klassifizierung/Kira-Regeln), saveSettings() dokumente-Block, CSS-Klassen. (5) config.json: dokumente-Sektion (16 Einstellungen). (6) 7 Plan-Dateien: Masterplan, Gap-Analyse, Stack-Recherche, Checkliste, UI-Plan, Vorlagen-Plan, Runtime-Log-Plan. Commit 49fa685.",
+    "session-gggg-aktives-aktivfenster (2026-04-08): Aktives Aktivfenster — Alle Module verbunden + Präsenz-Erkennung. (1) case_engine.py: kira_notify() zentraler Event-Bus mit Cooldown + Thread-Safety + elog. (2) kira_proaktiv.py: 3 kaputte create_signal()-Aufrufe (quelle=/meta= statt gültige Params → TypeError von except:pass geschluckt) durch kira_notify() ersetzt + WhatsApp-Signal. (3) mail_monitor.py: 3 kira_notify()-Aufrufe — neue Mail (Stufe B), Angebot angenommen (Stufe C!), Angebot abgelehnt (Stufe B). (4) daily_check.py: kira_notify() bei Reklassifizierung (Stufe B, 12h Cooldown). (5) server.py: Capture-Zuordnung → kira_notify (Stufe A). /api/vorgang/signals?presence=1 liefert idle_seconds+present aus presence_detector.py. JS _pollSignals() komplett neu: Auto-Open bei Stufe-B (mit 30s Debounce), IMMER bei Stufe-C, Präsenz-Rückkehr → Drawer nach 2s. _kdRecordClose() in kiraActivityDrawerClose() verdrahtet. (6) --no-sandbox Browser-Fix: webbrowser.open() → expliziter subprocess.Popen für Chrome/Edge. neustart_kira.vbs: expliziter Browser-Start statt sh.Run URL."
   ],
   "open_tasks": [
     "Neue (falsch benannte) Archiv-Ordner anfrage/ info/ invoice/ kaimrf/ shop/ koennen vom User manuell geloescht werden (aus session-cc)",
@@ -280,9 +292,10 @@
     "D-11 Partner-View Tour (partner_view.html: Tour-Engine mit Kai/Leni-Schritte, Overlay, Dots)",
     "session-vvv (2026-04-02): Mail-Klassifizierung komplett repariert — 8 kaskadierende Fehler behoben. Formular-Mails (noreply@) als Leads erkennen (Step 1b). Textfenster 1200→3000 Zeichen. Domain-Level schon-beantwortet→E-Mail-Level. Universelle Geschäfts-Keywords (30+). Smarter Fallback anfrage@/info@. LLM-Fehler sichtbar (Logging+Marker). System-Prompt universell aus config.json. Klassifizierung in mail_index.db. Thread-ID in Tasks. Thread-basierte Task-Zusammenführung. Pflegbare Keywords in config.json. Trockenlauf: 4,5× mehr Tasks (2→9). Commits: 27acc81, 5133857, b68f66c, 9cc770a.",
     "session-vvv-cont: Lexware-Kontext in LLM-Klassifizierung eingebaut (_get_lexware_kontext() in llm_classifier.py). Commit bdc4552.",
-    "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren."
+    "session-www (2026-04-02): Historisches Mail-Qualifizierungs-Tool gebaut. qualify_mails() in daily_check.py (2 Modi: nur_klassifizieren/mit_tasks). POST /api/mail/qualifizieren + GET /api/mail/qualifizieren/status. Einstellungen-UI: Zeitraum, Modus-Dropdown, Task-ab-Datum, Progress-Bar. Commit cbf5401. Nachtlauf gestartet: 12.071 INBOX-Mails 2021-2025 nur_klassifizieren.",
+    "session-gggg (2026-04-08): Activity-Drawer Komplett-Redesign (Windows 11 Widget-Style). (1) DB: kira_activity_dismissed Tabelle mit Revival-Logik. (2) GET /api/kira/activity-feed — individuelle Items aus 4 Quellen (Rechnungen/Leads/Freigaben/Signale), dismissed-Filter, kira_says Templates. (3) POST /api/kira/activity-feed/dismiss. (4) Drawer HTML: kd-* Klassen, Kira-Avatar, Begrüßung, 2-Spalten Grid, X-zum-Wegklicken. (5) Header-Button #kdHeaderBtn mit Badge + Einsaug/Ausblas-Animation. (6) CSS: Glass-Effekt, Tile-Varianten (urgent/high/normal), Dismiss-Animation. (7) JS: kiraActivityDrawerOpen/Close mit Animationen, _kiraDrawerLoad, _kdRenderTiles, _kdDismiss, Auto-Minimize 60s, Badge-Polling 30s. (8) Signal-Scanner als Server-Thread (5min, 4h Cooldown) statt tkinter. (9) Background-Status-Endpoint + Header-Indikator. (10) Revival-Tage in Einstellungen-UI (Automationen > Activity Feed, cfg-af-revival-tage). Commits: b093465, 935e046, 01623f2, 0acb585, 0fc79c7, e65e5dc, a46269e."
   ],
-  "next_step": "Anhang-Text-Extraktion implementiert (fc74427). Nächste Schritte: (1) Nachklassifizierung mit Anhängen nochmal laufen lassen — bestehende Mails profitieren jetzt von Anhang-Kontext. (2) Kundenmonitor als eigenes großes Projekt planen. (3) Kai nach RE-SB240038 Status, Tasks #10/#50 Relevanz fragen.",
+  "next_step": "Activity-Drawer live testen nach Server-Neustart. Weitere offene Punkte: (1) Undo-Button im Header (größeres Projekt, auf Todo-Liste). (2) Activity-Drawer Optik-Feinschliff. (3) Nachklassifizierung mit Anhang-Kontext nochmal laufen lassen.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",

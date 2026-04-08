@@ -1044,6 +1044,18 @@ def reclassify_low_confidence(seit: str = "") -> dict:
     _elog('system', 'reclassify_done',
           f'{stats["reklassifiziert"]} Mails reklassifiziert, {stats["unveraendert"]} unverändert, {stats["fehler"]} Fehler',
           modul='daily_check', source='daily_check', actor_type='system', status='ok')
+    # Signal: Reklassifizierung abgeschlossen
+    if stats["reklassifiziert"] > 0:
+        try:
+            from case_engine import kira_notify
+            kira_notify(
+                titel="Reklassifizierung abgeschlossen",
+                nachricht=f'{stats["reklassifiziert"]} Mails reklassifiziert, {stats["fehler"]} Fehler',
+                stufe="B", typ="reklassifizierung", modul="daily_check",
+                cooldown_key="reclass_done", cooldown_hours=12.0
+            )
+        except Exception:
+            pass
     return stats
 
 

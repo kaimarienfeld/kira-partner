@@ -1552,6 +1552,17 @@ def _process_mail(mail_data, konto_label, folder_name):
               source='mail_monitor', modul='mail_monitor', submodul='task_erstellung',
               actor_type='system', status='ok', context_type='mail', context_id=msg_id,
               result=str(task_id_new))
+        # Signal für Activity-Drawer: Neue wichtige Mail
+        try:
+            from case_engine import kira_notify
+            kira_notify(
+                titel=f"Neue Mail: {kategorie}",
+                nachricht=f"{betreff[:120]}",
+                stufe="B", typ="neue_mail", modul="mail_monitor",
+                cooldown_key=f"mail_{msg_id}", cooldown_hours=24.0
+            )
+        except Exception:
+            pass
     except Exception as e:
         log.error(f"Task-Erstellung fehlgeschlagen: {e}")
         _alog("Mail", "Task-Erstellung fehlgeschlagen", f"{betreff[:80]}", "fehler", fehler=str(e)[:300])
@@ -1890,6 +1901,17 @@ def _auto_angebot_aktion(result: dict, kunden_email: str, betreff: str, msg_id: 
             _elog('system', 'angebot_angenommen', f"Angebot {ang_nr} angenommen von {kunde}",
                   source='mail_monitor', modul='mail_monitor', submodul='auto_aktion',
                   actor_type='system', status='ok', context_type='angebot', context_id=ang_nr)
+            # Signal: Angebot angenommen — Stufe C (dringend)
+            try:
+                from case_engine import kira_notify
+                kira_notify(
+                    titel=f"Angebot angenommen: {ang_nr}",
+                    nachricht=f"{kunde} hat Angebot {ang_nr} angenommen!",
+                    stufe="C", typ="angebot_angenommen", modul="mail_monitor",
+                    cooldown_key=f"ang_angenommen_{ang_nr}"
+                )
+            except Exception:
+                pass
 
         elif angebot_aktion == "abgelehnt":
             db.execute(
@@ -1901,6 +1923,17 @@ def _auto_angebot_aktion(result: dict, kunden_email: str, betreff: str, msg_id: 
             _elog('system', 'angebot_abgelehnt', f"Angebot {ang_nr} abgelehnt von {kunde}",
                   source='mail_monitor', modul='mail_monitor', submodul='auto_aktion',
                   actor_type='system', status='warnung', context_type='angebot', context_id=ang_nr)
+            # Signal: Angebot abgelehnt
+            try:
+                from case_engine import kira_notify
+                kira_notify(
+                    titel=f"Angebot abgelehnt: {ang_nr}",
+                    nachricht=f"{kunde} hat Angebot {ang_nr} abgelehnt.",
+                    stufe="B", typ="angebot_abgelehnt", modul="mail_monitor",
+                    cooldown_key=f"ang_abgelehnt_{ang_nr}"
+                )
+            except Exception:
+                pass
 
         elif angebot_aktion == "rueckfrage":
             # Nur loggen, kein Status-Update — Rückfrage = Angebot bleibt offen

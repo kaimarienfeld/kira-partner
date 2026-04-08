@@ -454,7 +454,7 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 |--------|---------|-----------|
 | ✅ | Kira-Live-Chip im Header | idle/scanning/pending/error-States, session-oo |
 | ✅ | 15s Polling via _pollKiraStatus() | fetcht /api/kira/proaktiv/status + /api/mail/approve/pending |
-| ✅ | Activity-Drawer (Slide-In rechts 400px) | kiraActivityDrawerOpen/Close(), nicht-modal, session-oo |
+| ✅ | Activity-Drawer (Win11 Widget-Style) | session-gggg: Dunkler Glass-Hintergrund, 2-Spalten-Grid, 7 Datenquellen (Rechnungen/Termine/Fristen/Angebote/Leads/Freigaben/Signale), Status-Kacheln, X-Dismiss mit Revival, Einsaug/Ausblas-Animation, Header-Button mit Badge |
 | ✅ | Drawer: Freigabe-Queue Sektion | zeigt pending Kira-Mails mit Freigabe/Ablehnen-Buttons |
 | ✅ | Drawer: Proaktiv-Status Sektion | zeigt aktive Scan-Infos |
 | ✅ | CSS: .kira-live-chip alle 4 States | @keyframes kira-spin, session-oo |
@@ -597,7 +597,8 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ✅ | tkinter-Popup "KIRA Aktion erforderlich" abschalten · 2026-04-08 | session-gggg: Spam-Fenster deaktiviert, Signal-Scanner im Server (5min Scan, 4h Cooldown) |
 | ✅ | Activity-Drawer Buttons: Feedback bei Klick · 2026-04-08 | session-gggg: Verstanden → grüne Bestätigung, Später → gelbe Erinnerung, Toast, Icon-Wechsel |
 | ⬜ | **Undo-Button (Header)** | Globaler Rückgängig-Button: 10s sichtbar nach Aktionen, macht Aktion rückgängig UND zeigt die Meldung erneut — nicht nur rückgängig, sondern Meldung kommt zurück zum Umentscheiden. Gilt generell für alle Aktionen, nicht nur Signale. **Größeres Projekt.** |
-| ⬜ | Activity-Drawer Optik verbessern | Abdunklung zu schwach, Design schicker machen, Kira-Branding, bessere Animationen |
+| ⬜ | **Activity-Drawer Optik nachbessern** | Win11-Widget-Style v2: Mehr visuelle Abwechslung zwischen Kachel-Typen, Kacheln weniger uniform, ggf. kleine Vorschaubilder/Icons, Farben feiner abstimmen, Greeting-Bereich kompakter. Referenz: Windows 11 Widget-Feed. |
+| ⬜ | Activity-Drawer: Auto-Open bei Events | Drawer soll sich automatisch öffnen bei bestimmten Ereignissen: neue Leads, Memo-Zuordnung (Capture), neue Signale Stufe C. Nicht bei jedem Polling — nur bei echten neuen Items. |
 
 ---
 _Erstellt: session-r · 2026-03-27 · Zuletzt: session-gggg · 2026-04-08_

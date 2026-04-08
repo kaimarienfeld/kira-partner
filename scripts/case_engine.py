@@ -486,6 +486,67 @@ def mark_signal_shown(signal_id: int, aktion: str = "") -> None:
         db.close()
 
 
+# ── Zentraler Event-Bus (session-gggg) ────────────────────────────────────────
+import threading as _threading
+import time as _time
+
+_notify_cooldowns: dict[str, float] = {}
+_notify_lock = _threading.Lock()
+
+
+def kira_notify(
+    titel: str,
+    nachricht: str = "",
+    stufe: str = "B",
+    typ: str = "",
+    modul: str = "",
+    vorgang_id: int = None,
+    payload: dict = None,
+    cooldown_key: str = "",
+    cooldown_hours: float = 4.0,
+) -> int:
+    """
+    Zentraler Event-Bus — alle Module rufen diese Funktion auf.
+    Wraps create_signal() mit Cooldown + Runtime-Logging.
+    Gibt signal_id zurück (0 wenn übersprungen oder Stufe A).
+    """
+    # Cooldown-Check
+    if cooldown_key:
+        with _notify_lock:
+            now = _time.time()
+            last = _notify_cooldowns.get(cooldown_key, 0)
+            if now - last < cooldown_hours * 3600:
+                return 0
+            _notify_cooldowns[cooldown_key] = now
+
+    # Payload mit Modul anreichern
+    p = dict(payload or {})
+    if modul:
+        p["modul"] = modul
+
+    # Signal erstellen
+    sig_id = create_signal(
+        stufe=stufe,
+        titel=titel,
+        nachricht=nachricht,
+        vorgang_id=vorgang_id,
+        typ=typ or modul,
+        payload=p,
+    )
+
+    # Runtime-Log
+    try:
+        from runtime_log import elog
+        elog("system", "kira_notify", titel,
+             source=modul or "case_engine", modul=modul or "case_engine",
+             context_type="signal", context_id=str(sig_id),
+             status="ok" if sig_id else "skipped")
+    except Exception:
+        pass
+
+    return sig_id
+
+
 def get_open_vorgaenge(
     typ: str = None,
     kunden_email: str = None,

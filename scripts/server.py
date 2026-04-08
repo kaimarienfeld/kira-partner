@@ -20914,17 +20914,20 @@ window.onerror = function(msg, src, line, col, err) {{
   document.title = document.title.replace(' \u2013 ', ' \u2713 \u2013 ');
 }})();
 
-/* ── Vorgang-Signal-Polling (Paket 8, session-nn / Redesign session-dddd) ── */
+/* ── Vorgang-Signal-Polling + Auto-Open (session-nn/dddd/gggg) ──────────── */
 (function() {{
   'use strict';
 
   var _shownSignals = {{}};
+  var _kdLastClosedAt = 0;
+  var _kdCloseDebounceMs = 30000;  // 30s nach Schliessen nicht auto-oeffnen
+  var _wasPresent = true;
 
   function _markGelesen(sid, aktion) {{
     fetch('/api/vorgang/signal/gelesen', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{signal_id:sid,aktion:aktion}})}}).catch(function(){{}});
   }}
 
-  /* Gruppierter Toast für Stufe-B Signale */
+  /* Gruppierter Toast fuer Stufe-B Signale (Fallback wenn Drawer unterdrueckt) */
   function _showGroupedToast(signals) {{
     if(!signals.length) return;
     var n = signals.length;
@@ -20935,27 +20938,64 @@ window.onerror = function(msg, src, line, col, err) {{
     signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
   }}
 
-  /* Stufe-C: Activity-Drawer öffnen mit Signalen als eigener Sektion */
-  function _showSignalsInDrawer(signals) {{
+  /* Drawer oeffnen + Feed laden */
+  function _autoOpenDrawer(signals) {{
     if(!signals.length) return;
-    signals.forEach(function(s){{ _markGelesen(s.id, 'gesehen'); }});
+    signals.forEach(function(s){{ _markGelesen(s.id, 'auto_drawer'); }});
+    if(typeof _kiraDrawerLoad === 'function') _kiraDrawerLoad();
     if(typeof kiraActivityDrawerOpen === 'function') kiraActivityDrawerOpen();
   }}
 
+  /* Close-Timestamp tracken — wird von kiraActivityDrawerClose gesetzt */
+  window._kdRecordClose = function() {{ _kdLastClosedAt = Date.now(); }};
+
   function _pollSignals() {{
-    fetch('/api/vorgang/signals?limit=10').then(function(r) {{
+    fetch('/api/vorgang/signals?limit=10&presence=1').then(function(r) {{
       return r.ok ? r.json() : null;
     }}).then(function(d) {{
       if(!d) return;
+
+      var present = d.presence ? d.presence.present : true;
       var newB = [], newC = [];
       (d.signals||[]).forEach(function(sig) {{
         if(_shownSignals[sig.id]) return;
         _shownSignals[sig.id] = true;
         if(sig.stufe === 'C') newC.push(sig); else newB.push(sig);
       }});
-      // Gruppiert anzeigen
-      if(newC.length) _showSignalsInDrawer(newC);
-      if(newB.length) _showGroupedToast(newB);
+
+      // Praesenz-Rueckkehr: Nutzer war weg und ist jetzt zurueck
+      if(present && !_wasPresent) {{
+        setTimeout(function() {{
+          if(typeof _kiraDrawerLoad === 'function') _kiraDrawerLoad();
+          if(typeof kiraActivityDrawerOpen === 'function') kiraActivityDrawerOpen();
+        }}, 2000);
+      }}
+      _wasPresent = present;
+
+      // Stufe-C: IMMER Drawer oeffnen (kritisch)
+      if(newC.length) {{
+        _autoOpenDrawer(newC);
+        return;
+      }}
+
+      // Stufe-B: Drawer oeffnen wenn sinnvoll
+      if(newB.length) {{
+        var drawerOpen = typeof _kiraDrawerOpen !== 'undefined' && _kiraDrawerOpen;
+        var sinceClose = Date.now() - _kdLastClosedAt;
+        var debounced = sinceClose < _kdCloseDebounceMs;
+
+        if(drawerOpen) {{
+          // Drawer schon offen — nur Feed refreshen
+          if(typeof _kiraDrawerLoad === 'function') _kiraDrawerLoad();
+          newB.forEach(function(s){{ _markGelesen(s.id, 'auto_refresh'); }});
+        }} else if(!debounced && present) {{
+          // Drawer zu + kein Debounce + Nutzer da → oeffnen
+          _autoOpenDrawer(newB);
+        }} else {{
+          // Debounce aktiv oder Nutzer weg → nur Toast
+          _showGroupedToast(newB);
+        }}
+      }}
     }}).catch(function(){{}});
   }}
 
@@ -21036,6 +21076,7 @@ window.kiraActivityDrawerClose = function() {{
   drawer.classList.add('kd-sucking');
   overlay.classList.remove('open');
   _kiraDrawerOpen = false;
+  if(typeof window._kdRecordClose === 'function') window._kdRecordClose();
   if(_kdAutoMinTimer) {{ clearTimeout(_kdAutoMinTimer); _kdAutoMinTimer = null; }}
   drawer.removeEventListener('click', _kdResetAutoMin);
   // Pulse auf Header-Button
@@ -29903,11 +29944,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _api_vorgang_signals(self):
         """GET /api/vorgang/signals — B/C-Signale.
-           ?alle=1 -> auch bereits angezeigte (letzte 7 Tage), fuer Geschaeft-Panel."""
+           ?alle=1 -> auch bereits angezeigte (letzte 7 Tage), fuer Geschaeft-Panel.
+           ?presence=1 -> Präsenz-Info mitliefern (idle_seconds, present)."""
         try:
             qs    = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             limit = int(qs.get('limit', ['20'])[0])
             alle  = qs.get('alle', ['0'])[0] == '1'
+            want_presence = qs.get('presence', ['0'])[0] == '1'
             if alle:
                 from case_engine import _get_db
                 db = _get_db()
@@ -29926,7 +29969,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             else:
                 from case_engine import get_pending_signals
                 signals = get_pending_signals(max_count=limit)
-            self._json({"ok": True, "signals": signals})
+            result = {"ok": True, "signals": signals}
+            if want_presence:
+                try:
+                    from presence_detector import get_idle_seconds, is_user_present
+                    idle = get_idle_seconds()
+                    result["presence"] = {"idle_seconds": idle, "present": is_user_present()}
+                except Exception:
+                    result["presence"] = {"idle_seconds": 0, "present": True}
+            self._json(result)
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 
@@ -30457,6 +30508,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 db.close()
                 rlog('capture', 'item_assigned', f"Capture #{cap_id} manuell zugeordnet",
                      source='capture', modul='capture', status='ok')
+                # Signal: Capture zugeordnet (Stufe A = nur Logging)
+                try:
+                    from case_engine import kira_notify
+                    kira_notify(
+                        titel=f"Capture #{cap_id} zugeordnet",
+                        stufe="A", typ="capture_zugeordnet", modul="capture",
+                    )
+                except Exception:
+                    pass
                 self._json({"ok": True})
             except Exception as e:
                 self._json({"ok": False, "error": str(e)})
@@ -31324,7 +31384,27 @@ def run_server(open_browser=True):
     print(f"[Kira Dashboard v4] {url}")
 
     if open_browser and auto_open:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        def _open_browser_clean():
+            """Browser ohne --no-sandbox starten (expliziter Pfad statt Registry)."""
+            import subprocess as _sp, shutil
+            chrome_paths = [
+                os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+            ]
+            edge_paths = [
+                os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+                os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+            ]
+            for p in chrome_paths + edge_paths:
+                if os.path.isfile(p):
+                    try:
+                        _sp.Popen([p, url])
+                        return
+                    except Exception:
+                        continue
+            webbrowser.open(url)  # Fallback
+        threading.Timer(0.8, _open_browser_clean).start()
 
     # Signal-Scanner: prüft periodisch auf überfällige Rechnungen, Leads, Freigaben
     # und schreibt Signale in die Case-Engine-DB → Browser Activity-Drawer zeigt sie an.

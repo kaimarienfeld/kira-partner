@@ -515,12 +515,13 @@ def scan_angebot_followup_vorgang(db, state: dict) -> list:
 
         # Stufe-B-Signal
         try:
-            from case_engine import create_signal
-            create_signal(
+            from case_engine import kira_notify
+            kira_notify(
                 titel=f"Angebot-Nachfass: {name}",
                 nachricht=f"{vorgang_nr} seit {tage_alt} Tagen ohne Antwort",
-                stufe="B", quelle="kira_proaktiv",
-                meta={"vorgang_id": v["id"]},
+                stufe="B", modul="kira_proaktiv", typ="angebot_followup",
+                vorgang_id=v["id"],
+                cooldown_key=f"ang-nachfass-{v['id']}", cooldown_hours=48,
             )
         except Exception:
             pass
@@ -567,12 +568,13 @@ def scan_mahnung_eskalation(db, state: dict) -> list:
         vorgang_nr = v.get("vorgang_nr", "")
 
         try:
-            from case_engine import create_signal
-            create_signal(
+            from case_engine import kira_notify
+            kira_notify(
                 titel=f"Mahnung eskalieren: {name}",
-                nachricht=f"{vorgang_nr} seit {tage_alt} Tagen ohne Reaktion. Naechste Stufe?",
-                stufe="B", quelle="kira_proaktiv",
-                meta={"vorgang_id": v["id"]},
+                nachricht=f"{vorgang_nr} seit {tage_alt} Tagen ohne Reaktion. Nächste Stufe?",
+                stufe="B", modul="kira_proaktiv", typ="mahnung_eskalation",
+                vorgang_id=v["id"],
+                cooldown_key=f"mahnung-{v['id']}", cooldown_hours=72,
             )
         except Exception:
             pass
@@ -666,12 +668,13 @@ def scan_autonomy_decision(db, state: dict) -> list:
         else:
             # Signal erstellen
             try:
-                from case_engine import create_signal
-                create_signal(
+                from case_engine import kira_notify
+                kira_notify(
                     titel=f"Kira-Vorschlag: {aktion}",
                     nachricht=f"Vorgang {vid} | Konfidenz: {konfidenz:.0%}",
-                    stufe=stufe, quelle="autonomy_decision",
-                    meta={"vorgang_id": vid, "konfidenz": konfidenz},
+                    stufe=stufe, modul="kira_proaktiv", typ="autonomy_decision",
+                    vorgang_id=vid,
+                    cooldown_key=f"autonomy-{vid}", cooldown_hours=24,
                 )
             except Exception:
                 pass
@@ -1107,6 +1110,18 @@ def verarbeite_kanal_eingang(
               status='ok', context_type='kanal', context_id=kanal,
               result=json.dumps({"kategorie": kategorie, "task_id": task_id,
                                   "angebot_aktion": auto_aktion}, ensure_ascii=False)[:500])
+
+        # Signal für Activity-Drawer
+        try:
+            from case_engine import kira_notify
+            kira_notify(
+                titel=f"{kanal.title()}: {kategorie}",
+                nachricht=f"Von {absender[:30]} — {betreff[:60]}",
+                stufe="B", modul="kira_proaktiv", typ=f"kanal_{kanal}",
+                cooldown_key=f"kanal-{kanal}-{meta.get('id','')}", cooldown_hours=24,
+            )
+        except Exception:
+            pass
 
         return {
             "ok": True,

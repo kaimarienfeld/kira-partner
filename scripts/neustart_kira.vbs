@@ -20,6 +20,17 @@ WScript.Sleep 3000
 ' 4. Server neu starten
 sh.Run """" & pythonw & """ """ & script & """", 0, False
 
-' 5. Warten bis Server hochgefahren, dann Browser oeffnen
+' 5. Warten bis Server hochgefahren, dann Browser oeffnen (ohne --no-sandbox)
 WScript.Sleep 4000
-sh.Run "http://localhost:8765", 1, False
+Dim fso, chromePath, edgePath, url
+Set fso = CreateObject("Scripting.FileSystemObject")
+url = "http://localhost:8765"
+chromePath = sh.ExpandEnvironmentStrings("%ProgramFiles%") & "\Google\Chrome\Application\chrome.exe"
+edgePath = sh.ExpandEnvironmentStrings("%ProgramFiles(x86)%") & "\Microsoft\Edge\Application\msedge.exe"
+If fso.FileExists(chromePath) Then
+    sh.Run """" & chromePath & """ " & url, 1, False
+ElseIf fso.FileExists(edgePath) Then
+    sh.Run """" & edgePath & """ " & url, 1, False
+Else
+    sh.Run url, 1, False
+End If
