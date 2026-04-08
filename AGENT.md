@@ -324,6 +324,26 @@ memory/                     ← Dieses Verzeichnis (Git-Repo)
 
 ---
 
+## 5b. Kira-Integration bei neuen Modulen (PFLICHT)
+
+Jedes neue Modul oder jede neue Funktion die Daten verwaltet MUSS folgendes mitbringen:
+
+1. **"Kira fragen"-Button** → `kiraOpenWithContext(modul, typ, id)` aufrufen
+2. **Kontext-Handler** in `POST /api/kira/kontext` (server.py `_api_kira_kontext()`) für das Modul
+3. **CRUD-Fähigkeit** → Kira muss Einträge des Moduls erstellen, bearbeiten, korrigieren und löschen können
+4. **Lernfähigkeit** → Korrekturen fließen über corrections-Tabelle (mit `entitaet_typ` + `kanal`) in den Classifier zurück
+5. **Quick Actions** → Modul-spezifische Schnellaktionen in `kiraSetQuickActions()`
+
+**Keine Ausnahmen.** Kira ist die zentrale Assistentin — jedes Modul muss ihr volles CRUD ermöglichen.
+
+**Relevante Tools in kira_llm.py:**
+- `korrektur` — universelle Kategorie-Korrektur (task/capture/vorgang/beleg)
+- `task_erstellen` / `task_bearbeiten` — Aufgaben-CRUD
+- `wissen_verwalten` — Wissensregeln erstellen/bearbeiten/deaktivieren
+- `task_erledigen` / `tasks_loeschen` — Status/Löschung
+
+---
+
 ## 6. Offene Feature-Wünsche (Future List)
 
 Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.

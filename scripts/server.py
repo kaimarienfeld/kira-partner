@@ -1220,7 +1220,7 @@ function actionsCard(actions){{
     const next=a.empfohlene_aktion?`<span class="dlive-prio-next">${{esc(a.empfohlene_aktion)}}</span>`:"";
     return `<div class="dlive-prio-item ${{pClass}}">
       <div class="dlive-prio-body"><div class="dlive-prio-title">${{esc(a.titel)}}</div><div class="dlive-prio-meta">${{esc(meta)}}</div><div class="dlive-prio-tags">${{tag}}${{next}}</div></div>
-      <div class="dlive-prio-menu"><button class="dlive-prio-dots" onclick="togglePrioMenu(this)">&#x22EE;</button><div class="dlive-prio-dropdown"><button class="dlive-pdd-btn" onclick="filterKomm('${{esc(kat)}}')">&#x2192; Öffnen</button><div class="dlive-pdd-sep"></div><button class="dlive-pdd-btn dlive-pdd-kira" onclick="openKiraWorkspace('aufgabe')">&#x2728; Mit Kira</button></div></div>
+      <div class="dlive-prio-menu"><button class="dlive-prio-dots" onclick="togglePrioMenu(this)">&#x22EE;</button><div class="dlive-prio-dropdown"><button class="dlive-pdd-btn" onclick="filterKomm('${{esc(kat)}}')">&#x2192; Öffnen</button><div class="dlive-pdd-sep"></div><button class="dlive-pdd-btn dlive-pdd-kira" onclick="kiraOpenWithContext('kommunikation','task',${{a.id||'null'}})">&#x2728; Mit Kira</button></div></div>
     </div>`;
   }}).join("");
   return `<div class="dlive-panel dlive-card"><div class="dlive-panel-title" style="cursor:pointer" onclick="showPanel('kommunikation')">Heute priorisiert</div><div class="dlive-panel-sub">Top ${{actions.length}} &mdash; modulübergreifend kuratiert</div>${{items}}</div>`;
@@ -4673,7 +4673,7 @@ window.pfKiraMailContext = async function() {
 
   lines.push('', '---');
   lines.push('Ich habe dir diese Mail geladen. Bitte lies sie und frag mich direkt:');
-  lines.push('1. Ist die Kategorie \"' + (taskKat || 'unbekannt') + '\" korrekt? Wenn nicht, sag mir die richtige — ich korrigiere das sofort (mit mail_korrektur Tool) und es wird als Lernbeispiel gespeichert.');
+  lines.push('1. Ist die Kategorie \"' + (taskKat || 'unbekannt') + '\" korrekt? Wenn nicht, sag mir die richtige — ich korrigiere das sofort (mit korrektur-Tool) und es wird als Lernbeispiel gespeichert.');
   lines.push('2. Was m\u00f6chtest du damit tun? (Antworten, Erledigen, Ignorieren, Weiterleiten, Erinnerung setzen?)');
   lines.push('3. Falls du Informationen brauchst die ich nachschlagen kann — frag einfach.');
 
@@ -5271,7 +5271,7 @@ def build_geschaeft(db):
       </div>
       <div class="gh-mod-acts">
         <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_GESCHAEFT,{{erklaermodus:true}})" title="Gefuehrte Tour durch das Geschaeft-Modul">Tour</button>
-        <button class="btn btn-sm btn-muted" onclick="openKiraWorkspace('chat')">Kira fragen</button>
+        <button class="btn btn-sm btn-muted" onclick="kiraOpenWithContext('geschaeft','uebersicht',null)">Kira fragen</button>
         <button class="btn btn-sm btn-muted" onclick="location.reload()">Sync</button>
       </div>
     </div>
@@ -5727,7 +5727,7 @@ def _build_gesch_uebersicht(ar_offen, ar_gemahnt, ang_offen, s_ar_offen, n_nf, e
       <div class="gh-zone">
         <div class="gh-zone-hdr">
           <span>Signale &amp; Warnungen</span>
-          <button class="btn btn-xs btn-muted" onclick="openKiraWorkspace('chat')" style="font-size:10px">Kira</button>
+          <button class="btn btn-xs btn-muted" onclick="kiraOpenWithContext('geschaeft','signale',null)" style="font-size:10px">Kira</button>
         </div>
         <div class="gh-zone-body">
           <div id="gesch-kira-signals"></div>
@@ -15006,12 +15006,7 @@ function capArchivieren(id) {{
 }}
 
 function capKiraOpen(id) {{
-  fetch('/api/capture/item/'+id).then(r=>r.json()).then(d=>{{
-    const text='[Capture #'+id+']\\n'+(d.raw_text||'');
-    const match=d.matches&&d.matches.length>0?'\\nBeste Zuordnung: '+d.matches[0].candidate_type+' #'+d.matches[0].candidate_id:'';
-    openKiraWorkspace('capture','Capture #'+id+': '+(d.raw_text||'').substring(0,60));
-    setTimeout(()=>{{const inp=document.getElementById('kwInput');if(inp){{inp.value=text+match;inp.focus();}}}},600);
-  }}).catch(()=>{{}});
+  kiraOpenWithContext('capture','eintrag',id);
 }}
 </script>"""
 
@@ -15788,32 +15783,32 @@ def generate_html() -> str:
     <div class="kq-close" onclick="closeKiraQuick()">&#x2715;</div>
   </div>
   <div class="kq-actions">
-    <div class="kq-item" onclick="openKiraWorkspace('chat')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','frage',null)">
       <div class="kq-icon purple">?</div>
       <div class="kq-body"><div class="kq-title">Frage stellen</div><div class="kq-sub">Freie Frage an Kira &mdash; zu allem im System</div></div>
       <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kq-item" onclick="openKiraWorkspace('aufgabe')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','aufgabe',null)">
       <div class="kq-icon amber">&#x2610;</div>
       <div class="kq-body"><div class="kq-title">Aufgabe besprechen</div><div class="kq-sub">Aktuelle Aufgabe mit Kontext &ouml;ffnen</div></div>
       <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kq-item" onclick="openKiraWorkspace('rechnung')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','rechnung',null)">
       <div class="kq-icon green">&#x20AC;</div>
       <div class="kq-body"><div class="kq-title">Rechnung pr&uuml;fen</div><div class="kq-sub">Eingangs- oder Ausgangsrechnung analysieren</div></div>
       <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kq-item" onclick="openKiraWorkspace('angebot')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','angebot',null)">
       <div class="kq-icon blue">&#x270E;</div>
       <div class="kq-body"><div class="kq-title">Angebot pr&uuml;fen</div><div class="kq-sub">Angebotsstatus, Nachfass oder Entwurf</div></div>
       <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kq-item" onclick="openKiraWorkspace('kunde')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','kunde',null)">
       <div class="kq-icon coral">&#x265F;</div>
       <div class="kq-body"><div class="kq-title">Kunde &ouml;ffnen</div><div class="kq-sub">Kundendaten, Historie, offene Themen</div></div>
       <span class="kq-arrow">&#x203A;</span>
     </div>
-    <div class="kq-item" onclick="openKiraWorkspace('suche')">
+    <div class="kq-item" onclick="kiraOpenWithContext('quickpanel','suche',null)">
       <div class="kq-icon teal">&#x2315;</div>
       <div class="kq-body"><div class="kq-title">Suche</div><div class="kq-sub">In Mails, Aufgaben, Wissen, Gesch&auml;ft suchen</div></div>
       <span class="kq-arrow">&#x203A;</span>
@@ -16403,7 +16398,7 @@ function lexPruefDetail(id) {{
         '<br><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
         `<button class="btn btn-primary" onclick="lexPruefSetStatus(${{id}},'klassifiziert')">Klassifizieren</button>` +
         `<button class="btn btn-sec" onclick="lexPruefSetStatus(${{id}},'abgelegt')">Ablegen</button>` +
-        `<button class="btn btn-sec" onclick="openKiraWorkspace('buchhaltung',${{id}})">Mit Kira besprechen</button>` +
+        `<button class="btn btn-sec" onclick="kiraOpenWithContext('lexware','buchhaltung',${{id}})">Mit Kira besprechen</button>` +
         '</div></div>';
       showSimpleModal('Eingangsbeleg pr\\u00fcfen', html);
     }}).catch(e => showToast('Fehler: ' + e, true));
@@ -16796,8 +16791,7 @@ function lxBelegDetail(lexId) {{
 }}
 
 function lxBelegKira(lexId, nummer, kontakt) {{
-  const prompt = 'Lexware Beleg prüfen\\\\n\\\\nBeleg: ' + (nummer||lexId) + '\\\\nKontakt: ' + (kontakt||'') + '\\\\n\\\\nBitte analysiere diesen Beleg und gib mir eine Einschätzung.';
-  openKiraWorkspace('lexware_beleg', prompt);
+  kiraOpenWithContext('lexware','beleg',lexId,{{partner:kontakt||'',nummer:nummer||''}});
 }}
 
 // Kontakte Detail-Panel (A-06 session-ooo)
@@ -16956,8 +16950,7 @@ function lxKontaktKiraById() {{
 }}
 
 function lxKontaktKira(lexId, name) {{
-  const prompt = 'Lexware Kontakt: ' + (name||lexId) + '\\\\n\\\\nBitte gib mir eine Uebersicht zu diesem Kontakt und oeffne relevante Vorgaenge.';
-  openKiraWorkspace('lexware_kontakt', prompt);
+  kiraOpenWithContext('lexware','kontakt',lexId,{{partner:name||''}});
 }}
 
 function lxArtikelDetail(lexId) {{
@@ -17009,18 +17002,7 @@ function lxBuchDetailFull(id) {{
 }}
 
 function lxBuchKira(id, absender) {{
-  fetch('/api/lexware/eingangsbeleg/' + id).then(r => r.json()).then(d => {{
-    const p = d.beleg || {{}};
-    const prompt = 'Eingangsbeleg klassifizieren\\\\n\\\\n' +
-      'Absender: ' + (p.absender||'-') + '\\\\n' +
-      'Betreff: ' + (p.betreff||'-') + '\\\\n' +
-      'Betrag: ' + (p.betrag||0) + ' ' + (p.waehrung||'EUR') + '\\\\n' +
-      'Datum: ' + (p.datum_beleg||'-') + '\\\\n' +
-      (p.konto_vorschlag ? ('Bisheriger Vorschlag: ' + p.konto_vorschlag + '\\\\n') : '') +
-      (p.body_excerpt ? ('\\\\nInhalt:\\\\n' + p.body_excerpt.substring(0,400)) : '') +
-      '\\\\n\\\\nBitte klassifiziere diesen Eingangsbeleg: Welche Lexware-Kategorie? Gibt es ein passendes Konto? Muss ich das selbst pruefen?';
-    openKiraWorkspace('lexware_buchaltung', prompt);
-  }}).catch(() => openKiraWorkspace('lexware_buchaltung', 'Eingangsbeleg ID ' + id + ' pruefen'));
+  kiraOpenWithContext('lexware','buchhaltung',id,{{partner:absender||''}});
 }}
 
 function lxBuchBestaetigen(id, status) {{
@@ -17061,28 +17043,11 @@ function lxBuchManuellSpeichern() {{
 }}
 
 function lxOpenKiraWithContext(typ, id) {{
-  let prompt = '';
-  if(typ === 'cockpit') {{
-    prompt = 'Lexware Office Cockpit-Uebersicht\\\\n\\\\nBitte gib mir eine kurze Zusammenfassung des aktuellen Lexware-Status: offene Rechnungen, Eingangsbelege in Pruefung, und was heute zu tun ist.';
-  }} else if(typ === 'zahlung') {{
-    prompt = 'Zahlung (Eingangsbeleg ID ' + id + ') pruefen\\\\nBitte analysiere diesen Zahlungseingang.';
-  }} else if(typ === 'artikel') {{
-    prompt = 'Artikel / Preisposition analysieren (ID: ' + id + ').';
-  }} else if(typ === 'regel') {{
-    prompt = 'Buchungsregel fuer Domain ' + id + ' pruefen und Empfehlung geben.';
-  }} else if(typ === 'diagnose') {{
-    prompt = 'Lexware Verbindungsprobleme diagnostizieren. Modul-Status und API-Verbindung pruefen.';
-  }} else if(typ === 'datei') {{
-    prompt = 'Belegdatei (Eingangsbeleg ID ' + id + ') klassifizieren und Konto vorschlagen.';
-  }} else {{
-    prompt = 'Lexware Office: ' + typ + '\\\\n\\\\nBitte hilf mir bei diesem Thema.';
-  }}
-  openKiraWorkspace('lexware_' + typ, prompt);
+  kiraOpenWithContext('lexware', typ, id||'');
 }}
 
 function lxRegelDetail(domain) {{
-  const prompt = 'Lexware Buchungsregel fuer Domain: ' + domain + '\\\\n\\\\nBitte analysiere das bisherige Muster und empfehle eine Buchungskategorie.';
-  showSimpleModal('Regel fuer ' + domain, `<div style="font-size:var(--fs-sm)">Domain: <b>${{domain}}</b><br><br><button class="btn btn-primary btn-xs" onclick="openKiraWorkspace('lexware_regel','${{prompt}}')">&#x1F916; Mit Kira besprechen</button></div>`);
+  showSimpleModal('Regel für ' + domain, `<div style="font-size:var(--fs-sm)">Domain: <b>${{domain}}</b><br><br><button class="btn btn-primary btn-xs" onclick="kiraOpenWithContext('lexware','regel','${{domain}}')">&#x1F916; Mit Kira besprechen</button></div>`);
 }}
 
 function lxFilterRegeln() {{
@@ -18487,24 +18452,7 @@ function kalKiraAngebot() {{
 
 function geschKira(typ, nr, partner, betrag) {{
   _rtlog('ui','gesch_kira_opened',typ+' '+nr+' via Kira',{{submodul:'geschaeft',context_type:typ,context_id:String(nr)}});
-  openKiraNaked();
-  showKTab('chat');
-  const labels = {{re:'Rechnung',ang:'Angebot',eingang:'Eingangsrechnung',mah:'Mahnung'}};
-  const label = labels[typ]||typ;
-  setKiraContextBar(label, nr, partner ? [partner] : []);
-  kiraSetQuickActions(typ==='re'||typ==='eingang'?'rechnung':typ==='ang'?'angebot':'frage');
-  const input = document.getElementById('kiraInput');
-  if(input) {{
-    const lines = [label + ': ' + nr];
-    if(partner) lines.push('Kunde/Partner: ' + partner);
-    if(betrag)  lines.push('Betrag: ' + betrag);
-    lines.push('');
-    lines.push('Was schlägst du vor?');
-    input.value = lines.join('\\n');
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-    input.focus();
-  }}
+  kiraOpenWithContext('geschaeft', typ, nr, {{partner: partner||'', betrag: betrag||''}});
 }}
 
 // Eingangsrechnungen: Filter-Tabs
@@ -20067,6 +20015,33 @@ function closeKiraWorkspace() {{
 function toggleKira(){{ toggleKiraQuick(); }}
 function openKiraNaked(){{ openKiraWorkspace('chat'); }}
 function closeKira(){{ closeKiraWorkspace(); closeKiraQuick(); }}
+
+// ── Universeller Kira-Kontext-Einstieg ──────────────────────────────────
+async function kiraOpenWithContext(modul, typ, id, extra) {{
+  openKiraNaked();
+  showKTab('chat');
+  const qaMap = {{
+    'postfach':'mail','kommunikation':'aufgabe',
+    'geschaeft': typ==='re'||typ==='eingang'?'rechnung':typ==='ang'?'angebot':'frage',
+    'lexware':'rechnung','capture':'dokument','dashboard':'frage','wissen':'frage'
+  }};
+  kiraSetQuickActions(qaMap[modul]||'frage');
+  setKiraContextBar(modul+' — '+typ, String(id||''), extra&&extra.partner?[extra.partner]:[]);
+  try {{
+    const resp = await fetch('/api/kira/kontext', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{modul, typ, id, extra: extra||{{}}}})
+    }});
+    const ctx = await resp.json();
+    const input = document.getElementById('kiraInput');
+    if(input && ctx.prompt_vorschlag) {{
+      input.value = ctx.prompt_vorschlag;
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      input.focus();
+    }}
+  }} catch(e) {{ console.warn('kiraOpenWithContext fetch error:', e); }}
+}}
 
 // Kira tabs / context switching
 function showKTab(name){{
@@ -24475,6 +24450,144 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         self._json(result)
 
+    # ── Universeller Kira-Kontext ──────────────────────────────────────────
+
+    def _api_kira_kontext(self, body):
+        """POST /api/kira/kontext — Universeller Kontext-Endpoint für Kira aus jedem Modul."""
+        modul = body.get("modul", "")
+        typ = body.get("typ", "")
+        eid = body.get("id")
+        extra = body.get("extra", {})
+
+        result = {"kontext": "", "prompt_vorschlag": "", "verfuegbare_aktionen": [], "daten": {}}
+
+        try:
+            if modul == "postfach" and eid:
+                # Bestehende Mail-Kontext-Logik wiederverwenden
+                conn = sqlite3.connect(str(MAIL_INDEX_DB))
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    "SELECT betreff,absender,an,datum,text_plain,kategorie FROM mails WHERE message_id=?", (str(eid),)
+                ).fetchone()
+                if row:
+                    result["daten"] = {
+                        "betreff": row["betreff"] or "", "absender": row["absender"] or "",
+                        "datum": row["datum"] or "", "text": (row["text_plain"] or "")[:5000],
+                        "kategorie": row["kategorie"] or ""
+                    }
+                    # Task-ID suchen
+                    try:
+                        _tdb = get_db()
+                        _tr = _tdb.execute("SELECT id FROM tasks WHERE message_id=? LIMIT 1", (str(eid),)).fetchone()
+                        if _tr: result["daten"]["task_id"] = _tr["id"]
+                        _tdb.close()
+                    except Exception: pass
+                    result["kontext"] = f"Mail von {row['absender'] or '?'}: {row['betreff'] or '?'} ({row['kategorie'] or '?'})"
+                conn.close()
+                result["prompt_vorschlag"] = f"Ich sehe mir diese Mail an.\nKategorie: {result['daten'].get('kategorie','?')}\n\n1. Ist die Kategorie korrekt? Wenn nicht, sag mir die richtige.\n2. Was möchtest du damit tun?\n3. Falls du Informationen brauchst — frag einfach."
+                result["verfuegbare_aktionen"] = ["korrektur", "task_erstellen", "task_erledigen", "mail_senden"]
+
+            elif modul == "kommunikation" and eid:
+                db = get_db()
+                row = db.execute("SELECT id,betreff,kategorie,status,zusammenfassung,kunden_email,message_id FROM tasks WHERE id=?", (int(eid),)).fetchone()
+                if row:
+                    result["daten"] = {
+                        "task_id": row["id"], "betreff": row["betreff"] or "", "kategorie": row["kategorie"] or "",
+                        "status": row["status"] or "", "zusammenfassung": (row["zusammenfassung"] or "")[:500],
+                        "kunden_email": row["kunden_email"] or ""
+                    }
+                    result["kontext"] = f"Aufgabe #{row['id']}: {row['betreff'] or '?'} ({row['kategorie'] or '?'}, {row['status'] or '?'})"
+                db.close()
+                result["prompt_vorschlag"] = f"Aufgabe: {result['daten'].get('betreff','?')}\nKategorie: {result['daten'].get('kategorie','?')}\nStatus: {result['daten'].get('status','?')}\n\nWas möchtest du mit dieser Aufgabe tun?"
+                result["verfuegbare_aktionen"] = ["korrektur", "task_bearbeiten", "task_erledigen", "nachfass_email_entwerfen"]
+
+            elif modul == "geschaeft":
+                db = get_db()
+                if typ in ("re", "eingang") and eid:
+                    tbl = "ausgangsrechnungen" if typ == "re" else "eingangsrechnungen"
+                    id_col = "re_nummer" if typ == "re" else "id"
+                    row = db.execute(f"SELECT * FROM {tbl} WHERE {id_col}=? LIMIT 1", (str(eid),)).fetchone()
+                    if row:
+                        result["daten"] = dict(row)
+                        result["kontext"] = f"{'Rechnung' if typ=='re' else 'Eingangsrechnung'}: {eid}"
+                    result["prompt_vorschlag"] = f"Ich prüfe diese {'Rechnung' if typ=='re' else 'Eingangsrechnung'}: {eid}\n\nSoll ich Fälligkeiten checken oder den Status ändern?"
+                    result["verfuegbare_aktionen"] = ["rechnung_bezahlt", "eingangsrechnung_erledigt", "rechnungsdetails_abrufen"]
+
+                elif typ == "ang" and eid:
+                    row = db.execute("SELECT * FROM angebote WHERE a_nummer=? LIMIT 1", (str(eid),)).fetchone()
+                    if row:
+                        result["daten"] = dict(row)
+                        result["kontext"] = f"Angebot: {eid}"
+                    result["prompt_vorschlag"] = f"Ich schaue mir Angebot {eid} an.\n\nSoll ich nachfassen oder den Status aktualisieren?"
+                    result["verfuegbare_aktionen"] = ["angebot_status", "angebot_pruefen", "nachfass_email_entwerfen"]
+
+                elif typ == "vorgang" and eid:
+                    row = db.execute("SELECT * FROM vorgaenge WHERE vorgang_nr=? OR id=? LIMIT 1", (str(eid), str(eid))).fetchone()
+                    if row:
+                        result["daten"] = dict(row)
+                        result["kontext"] = f"Vorgang: {row.get('vorgang_nr', eid)}"
+                    result["prompt_vorschlag"] = f"Vorgang {eid} — Was möchtest du damit tun?"
+                    result["verfuegbare_aktionen"] = ["vorgang_kontext_laden", "vorgang_status_setzen", "korrektur"]
+                db.close()
+
+            elif modul == "lexware" and typ and eid:
+                result["kontext"] = f"Lexware {typ}: {eid}"
+                if typ == "beleg":
+                    result["prompt_vorschlag"] = f"Ich prüfe Lexware-Beleg #{eid}.\n\nStimmt die Klassifizierung? Soll ich etwas ändern?"
+                    result["verfuegbare_aktionen"] = ["korrektur", "lexware_eingangsbeleg_klassifizieren"]
+                elif typ == "zahlung":
+                    result["prompt_vorschlag"] = f"Lexware-Zahlung #{eid} — Was möchtest du prüfen?"
+                    result["verfuegbare_aktionen"] = ["lexware_belege_laden", "rechnung_bezahlt"]
+                else:
+                    result["prompt_vorschlag"] = f"Lexware {typ} #{eid} — Wie kann ich helfen?"
+                    result["verfuegbare_aktionen"] = ["lexware_belege_laden"]
+
+            elif modul == "capture" and eid:
+                db = get_db()
+                row = db.execute("SELECT id,raw_text,kategorie,status FROM captures WHERE id=?", (int(eid),)).fetchone()
+                if row:
+                    result["daten"] = {
+                        "capture_id": row["id"], "text": (row["raw_text"] or "")[:2000],
+                        "kategorie": row["kategorie"] or "", "status": row["status"] or ""
+                    }
+                    result["kontext"] = f"Capture #{row['id']}: {(row['raw_text'] or '')[:60]}"
+                db.close()
+                result["prompt_vorschlag"] = "Ich analysiere diesen Capture-Eintrag.\n\nSoll ich ihn zuordnen oder eine Aufgabe daraus erstellen?"
+                result["verfuegbare_aktionen"] = ["korrektur", "task_erstellen", "capture_zuordnen"]
+
+            elif modul == "dashboard" and eid:
+                db = get_db()
+                row = db.execute("SELECT id,betreff,kategorie,status,zusammenfassung FROM tasks WHERE id=?", (int(eid),)).fetchone()
+                if row:
+                    result["daten"] = {
+                        "task_id": row["id"], "betreff": row["betreff"] or "",
+                        "kategorie": row["kategorie"] or "", "status": row["status"] or ""
+                    }
+                    result["kontext"] = f"Dashboard-Aufgabe #{row['id']}: {row['betreff'] or '?'}"
+                db.close()
+                result["prompt_vorschlag"] = f"Aufgabe: {result['daten'].get('betreff','?')}\n\nWas möchtest du damit tun?"
+                result["verfuegbare_aktionen"] = ["task_bearbeiten", "task_erledigen", "korrektur"]
+
+            elif modul == "wissen" and eid:
+                db = get_db()
+                row = db.execute("SELECT id,titel,inhalt,kategorie,status FROM wissen_regeln WHERE id=?", (int(eid),)).fetchone()
+                if row:
+                    result["daten"] = dict(row)
+                    result["kontext"] = f"Wissensregel #{row['id']}: {row['titel'] or '?'}"
+                db.close()
+                result["prompt_vorschlag"] = f"Wissensregel: {result['daten'].get('titel','?')}\n\nSoll ich sie bearbeiten oder deaktivieren?"
+                result["verfuegbare_aktionen"] = ["wissen_verwalten"]
+
+            else:
+                # Quickpanel oder generischer Aufruf ohne spezifische ID
+                result["prompt_vorschlag"] = "Wie kann ich helfen?"
+                result["verfuegbare_aktionen"] = ["task_erstellen", "wissen_verwalten", "mail_suchen", "kunde_nachschlagen"]
+
+        except Exception as e:
+            result["error"] = str(e)
+
+        self._json(result)
+
     # ── MAIL KONTEN / OAuth ────────────────────────────────────────────────
 
     def _api_mail_konten(self):
@@ -28438,6 +28551,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'ok': ok})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
+            return
+
+        # Universeller Kira-Kontext-Endpoint
+        if self.path == '/api/kira/kontext':
+            self._api_kira_kontext(body)
             return
 
         # Kira Chat (LLM)

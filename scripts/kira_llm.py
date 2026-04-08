@@ -759,6 +759,17 @@ Diese Aktionen führst du NUR nach Bestätigung des {_inhaber_rolle}s aus:
 ⚡ Kundendaten löschen
 ⚡ Externe Dienste (ntfy, GitHub, APIs) nutzen
 
+━━━ STRUKTURELLE FÄHIGKEITEN ━━━
+Du kannst die Datenstruktur aktiv verändern:
+✓ Aufgaben erstellen, bearbeiten, erledigen, löschen (task_erstellen, task_bearbeiten, task_erledigen, tasks_loeschen)
+✓ Kategorien korrigieren — für Tasks, Captures, Vorgänge, Belege (korrektur)
+✓ Wissensregeln erstellen, bearbeiten, deaktivieren (wissen_verwalten)
+✓ Korrekturen werden automatisch als Lernbeispiele für den Classifier gespeichert
+
+Wenn der Benutzer sagt "das ist falsch eingeordnet" → korrektur-Tool nutzen
+Wenn der Benutzer sagt "merk dir das" / "das ist wichtig" → wissen_verwalten
+Wenn aus dem Gespräch eine Aufgabe entsteht → task_erstellen anbieten
+
 ━━━ SO ARBEITEST DU ━━━
 1. KONTEXT ZUERST: Bevor du antwortest oder handelst, nutze IMMER die Tools um den vollständigen Kontext zu holen.
    - Bei Kundenanfragen: mail_suchen + kunde_nachschlagen
@@ -767,7 +778,7 @@ Diese Aktionen führst du NUR nach Bestätigung des {_inhaber_rolle}s aus:
 2. VOLLSTÄNDIGE ANALYSE: Schaue immer in ALLE relevanten Datenquellen:
    - Mails (12.000+ Archiv), Tasks, Angebote, Rechnungen, Kunden, Wissen
 3. PROAKTIVE EMPFEHLUNGEN: Gib immer konkrete nächste Schritte an, nicht nur Beobachtungen
-4. LERNE: Wenn etwas gut oder schlecht läuft → wissen_speichern
+4. LERNE: Wenn etwas gut oder schlecht läuft → wissen_verwalten
 5. KANÄLE: Du verarbeitest Eingaben aus allen Quellen:
    - E-Mail (5 Postfächer) | WhatsApp | Instagram | Manuell | Shop-Bestellungen | Dokumente
 
@@ -1036,6 +1047,20 @@ def _build_data_context(config, kira_cfg=None):
                 elif r['quelle'] and 'feedback' in r['quelle']:
                     _src = " [Chat-Feedback]"
                 ctx += f"  • {r['titel']}: {r['inhalt'][:150]}{_src}\n"
+    except: pass
+
+    # Klassifizierungs-Korrekturen (aus Kira-Chat gelernt)
+    try:
+        klass_rows = db.execute(
+            "SELECT titel, inhalt FROM wissen_regeln "
+            "WHERE kategorie='klassifizierung' AND status='aktiv' "
+            "ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+        if klass_rows:
+            ctx += f"\n=== KLASSIFIZIERUNGS-KORREKTUREN ({len(klass_rows)}) ===\n"
+            ctx += "(Aus Kira-Chat-Korrekturen gelernt — beachte bei Kategorisierungen!)\n"
+            for r in klass_rows:
+                ctx += f"  • {r['titel']}: {r['inhalt'][:120]}\n"
     except: pass
 
     try:
@@ -1320,16 +1345,24 @@ def get_tools(config=None):
             }
         },
         {
-            "name": "wissen_speichern",
-            "description": "Speichert eine Erkenntnis oder Information im Wissenspeicher für zukünftige Nutzung.",
+            "name": "wissen_verwalten",
+            "description": (
+                "Erstellt, bearbeitet oder deaktiviert Wissensregeln. "
+                "Nutze 'erstellen' für neue Erkenntnisse. "
+                "'bearbeiten' um bestehende Regeln zu aktualisieren. "
+                "'deaktivieren' um veraltete Regeln zu entfernen."
+            ),
             "input_schema": {
                 "type": "object",
                 "properties": {
+                    "aktion": {"type": "string", "enum": ["erstellen", "bearbeiten", "deaktivieren"], "description": "Was soll getan werden?"},
+                    "regel_id": {"type": "integer", "description": "ID der Regel (nur bei bearbeiten/deaktivieren)"},
                     "titel": {"type": "string", "description": "Kurzer Titel der Erkenntnis"},
                     "inhalt": {"type": "string", "description": "Ausführlicher Inhalt"},
-                    "kategorie": {"type": "string", "enum": ["gelernt", "kunde", "prozess", "markt"]}
+                    "kategorie": {"type": "string", "enum": ["gelernt", "kunde", "prozess", "markt", "klassifizierung", "stil", "kira", "fest", "preis", "technik"]},
+                    "status": {"type": "string", "enum": ["aktiv", "inaktiv", "entwurf"]}
                 },
-                "required": ["titel", "inhalt", "kategorie"]
+                "required": ["aktion"]
             }
         },
         {
@@ -1378,34 +1411,83 @@ def get_tools(config=None):
         }
     })
     tools.append({
-        "name": "mail_korrektur",
+        "name": "korrektur",
         "description": (
-            "Korrigiert die Kategorie einer falsch klassifizierten Mail/Aufgabe. "
-            "Speichert die Korrektur als Lernbeispiel — zukünftige Mails werden dadurch besser klassifiziert. "
-            "Nutze dieses Tool wenn der Benutzer sagt, dass eine Mail falsch eingeordnet ist. "
-            "Die Korrektur wird in der corrections-DB und optional als Wissensregel gespeichert."
+            "Korrigiert die Kategorie oder Zuordnung eines beliebigen Eintrags — Mail, Task, Capture, Vorgang oder Beleg. "
+            "Speichert die Korrektur als Lernbeispiel für den Classifier. "
+            "Nutze dieses Tool wenn der Benutzer sagt, dass etwas falsch eingeordnet ist — egal welcher Kanal."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "task_id": {"type": "integer", "description": "ID der Aufgabe/Mail die korrigiert werden soll"},
+                "entitaet_typ": {
+                    "type": "string",
+                    "enum": ["task", "capture", "vorgang", "beleg"],
+                    "description": "Was wird korrigiert? task = Mail-/Aufgabenklassifizierung, capture = Capture-Eintrag, vorgang = Geschäftsvorgang, beleg = Lexware-Beleg"
+                },
+                "entitaet_id": {"type": "integer", "description": "ID des Eintrags"},
                 "neue_kategorie": {
                     "type": "string",
-                    "description": "Die korrekte Kategorie",
-                    "enum": [
-                        "Antwort erforderlich", "Neue Lead-Anfrage", "Angebotsrueckmeldung",
-                        "Rechnung / Beleg", "Zur Kenntnis", "Newsletter / Werbung",
-                        "Shop / System", "Ignorieren", "Abgeschlossen"
-                    ]
+                    "description": "Die korrekte Kategorie (abhängig vom Entitätstyp)"
                 },
                 "grund": {"type": "string", "description": "Warum die alte Kategorie falsch war — wird als Lernregel gespeichert"},
-                "auch_task_status": {
+                "auch_status": {
                     "type": "string",
-                    "enum": ["offen", "erledigt", ""],
-                    "description": "Optional: Task-Status gleich mitändern (leer = nicht ändern)"
+                    "description": "Optional: Status gleich mitändern (z.B. 'offen', 'erledigt', 'ignorieren')"
+                },
+                "kanal": {
+                    "type": "string",
+                    "description": "Ursprungskanal der Korrektur (email, whatsapp, instagram, capture, lexware, manuell, chat)"
                 }
             },
-            "required": ["task_id", "neue_kategorie", "grund"]
+            "required": ["entitaet_typ", "entitaet_id", "neue_kategorie", "grund"]
+        }
+    })
+    tools.append({
+        "name": "task_erstellen",
+        "description": (
+            "Erstellt eine neue Aufgabe. Nutze dies wenn aus einer Konversation heraus eine Aufgabe entsteht — "
+            "z.B. 'Kunde anrufen', 'Angebot nachfassen', 'Dokument prüfen'. "
+            "Die Aufgabe erscheint sofort im Dashboard."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "betreff": {"type": "string", "description": "Kurzer Titel der Aufgabe"},
+                "zusammenfassung": {"type": "string", "description": "Ausführlichere Beschreibung"},
+                "kategorie": {
+                    "type": "string",
+                    "enum": [
+                        "Antwort erforderlich", "Neue Lead-Anfrage", "Angebotsrückmeldung",
+                        "Rechnung / Beleg", "Zur Kenntnis", "Shop / System", "Sonstiger Vorgang"
+                    ],
+                    "description": "Aufgabenkategorie"
+                },
+                "prioritaet": {"type": "string", "enum": ["hoch", "mittel", "niedrig"]},
+                "deadline": {"type": "string", "description": "Fälligkeitsdatum YYYY-MM-DD (optional)"},
+                "kanal": {"type": "string", "description": "Ursprungskanal (email, whatsapp, instagram, capture, manuell, chat)"}
+            },
+            "required": ["betreff", "kategorie"]
+        }
+    })
+    tools.append({
+        "name": "task_bearbeiten",
+        "description": (
+            "Ändert Felder einer bestehenden Aufgabe — Betreff, Kategorie, Priorität, Deadline, Zusammenfassung. "
+            "Nutze dies statt korrektur wenn es keine Fehlklassifizierung ist sondern eine inhaltliche Änderung."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "ID der Aufgabe"},
+                "betreff": {"type": "string", "description": "Neuer Titel"},
+                "zusammenfassung": {"type": "string", "description": "Neue Beschreibung"},
+                "kategorie": {"type": "string", "description": "Neue Kategorie"},
+                "prioritaet": {"type": "string", "enum": ["hoch", "mittel", "niedrig"]},
+                "deadline": {"type": "string", "description": "Neues Fälligkeitsdatum YYYY-MM-DD"},
+                "notiz": {"type": "string", "description": "Warum die Änderung"}
+            },
+            "required": ["task_id"]
         }
     })
     tools.append({
@@ -1883,8 +1965,12 @@ def execute_tool(name, params):
             "eingangsrechnung_erledigt": _tool_eingangsrechnung_erledigt,
             "kunde_nachschlagen": _tool_kunde_nachschlagen,
             "nachfass_email_entwerfen": _tool_nachfass_email,
-            "wissen_speichern": _tool_wissen_speichern,
-            "mail_korrektur": _tool_mail_korrektur,
+            "wissen_verwalten": _tool_wissen_verwalten,
+            "wissen_speichern": _tool_wissen_verwalten,  # Legacy-Alias
+            "korrektur": _tool_korrektur,
+            "mail_korrektur": _tool_korrektur,  # Legacy-Alias
+            "task_erstellen": _tool_task_erstellen,
+            "task_bearbeiten": _tool_task_bearbeiten,
             "rechnungsdetails_abrufen": _tool_rechnungsdetails,
             "angebot_pruefen": _tool_angebot_pruefen,
             "web_recherche": _tool_web_recherche,
@@ -2106,14 +2192,63 @@ def _tool_nachfass_email(p):
         return {"error": f"Nachfass-Generierung fehlgeschlagen: {e}"}
 
 
-def _tool_wissen_speichern(p):
+def _tool_wissen_verwalten(p):
+    """Erstellt, bearbeitet oder deaktiviert Wissensregeln."""
+    aktion = p.get("aktion", "erstellen")  # Legacy-Kompatibilität: ohne aktion = erstellen
     db = sqlite3.connect(str(TASKS_DB))
+    db.row_factory = sqlite3.Row
     now = datetime.now().isoformat()
-    db.execute("INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am) VALUES (?,?,?,?,?)",
-               (p["kategorie"], p["titel"], p["inhalt"], 'Kira-Chat', now))
-    db.commit()
-    db.close()
-    return {"ok": True, "message": f"Erkenntnis gespeichert: {p['titel']}"}
+    try:
+        if aktion == "erstellen":
+            titel = p.get("titel", "")
+            inhalt = p.get("inhalt", "")
+            kategorie = p.get("kategorie", "gelernt")
+            if not titel or not inhalt:
+                return {"ok": False, "error": "titel und inhalt sind Pflicht bei erstellen"}
+            status = p.get("status", "aktiv")
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie,titel,inhalt,quelle,erstellt_am,status) VALUES (?,?,?,?,?,?)",
+                (kategorie, titel, inhalt, 'Kira-Chat', now, status))
+            db.commit()
+            return {"ok": True, "message": f"Erkenntnis gespeichert: {titel}"}
+
+        elif aktion == "bearbeiten":
+            regel_id = p.get("regel_id")
+            if not regel_id:
+                return {"ok": False, "error": "regel_id ist Pflicht bei bearbeiten"}
+            row = db.execute("SELECT * FROM wissen_regeln WHERE id=?", (regel_id,)).fetchone()
+            if not row:
+                return {"ok": False, "error": f"Regel {regel_id} nicht gefunden"}
+            updates = []
+            vals = []
+            for feld in ("titel", "inhalt", "kategorie", "status"):
+                if p.get(feld):
+                    updates.append(f"{feld}=?")
+                    vals.append(p[feld])
+            if not updates:
+                return {"ok": False, "error": "Keine Felder zum Aktualisieren angegeben"}
+            vals.append(regel_id)
+            db.execute(f"UPDATE wissen_regeln SET {','.join(updates)} WHERE id=?", vals)
+            db.commit()
+            return {"ok": True, "message": f"Regel #{regel_id} aktualisiert: {', '.join(updates)}"}
+
+        elif aktion == "deaktivieren":
+            regel_id = p.get("regel_id")
+            if not regel_id:
+                return {"ok": False, "error": "regel_id ist Pflicht bei deaktivieren"}
+            row = db.execute("SELECT id, titel FROM wissen_regeln WHERE id=?", (regel_id,)).fetchone()
+            if not row:
+                return {"ok": False, "error": f"Regel {regel_id} nicht gefunden"}
+            db.execute("UPDATE wissen_regeln SET status='inaktiv' WHERE id=?", (regel_id,))
+            db.commit()
+            return {"ok": True, "message": f"Regel #{regel_id} deaktiviert: {row['titel']}"}
+
+        else:
+            return {"ok": False, "error": f"Unbekannte Aktion: {aktion}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
 
 
 def _tool_rechnungsdetails(p):
@@ -2280,61 +2415,186 @@ def _tool_duplikate_suchen(p):
     return {"cluster": clusters, "gesamt_cluster": len(clusters)}
 
 
-def _tool_mail_korrektur(p):
-    """Korrigiert Kategorie einer Mail/Aufgabe und speichert als Lernbeispiel."""
-    task_id = p.get("task_id")
-    neue_kat = p.get("neue_kategorie", "")
-    grund = p.get("grund", "")
-    auch_status = p.get("auch_task_status", "")
-    if not task_id or not neue_kat:
-        return {"ok": False, "error": "task_id und neue_kategorie sind Pflicht"}
+def _tool_task_erstellen(p):
+    """Erstellt eine neue Aufgabe in der tasks-Tabelle."""
+    betreff = p.get("betreff", "")
+    if not betreff:
+        return {"ok": False, "error": "betreff ist Pflicht"}
+    kategorie = p.get("kategorie", "Sonstiger Vorgang")
+    zusammenfassung = p.get("zusammenfassung", "")
+    prioritaet = p.get("prioritaet", "mittel")
+    deadline = p.get("deadline", "")
+    kanal = p.get("kanal", "chat")
+    now = datetime.now().isoformat()
     try:
         db = sqlite3.connect(str(TASKS_DB))
-        db.row_factory = sqlite3.Row
-        task = db.execute("SELECT id, kategorie, betreff, message_id, zusammenfassung, absender_rolle FROM tasks WHERE id=?", (task_id,)).fetchone()
-        if not task:
-            db.close()
-            return {"ok": False, "error": f"Task {task_id} nicht gefunden"}
-        alter_typ = task["kategorie"] or "unbekannt"
-        now = datetime.now().isoformat()
-        # 1. Korrektur in corrections-Tabelle speichern (= Lernbeispiel für Classifier)
-        try:
-            db.execute(
-                "INSERT INTO corrections (task_id, alter_typ, neuer_typ, notiz, erstellt_am) VALUES (?,?,?,?,?)",
-                (task_id, alter_typ, neue_kat, grund, now))
-        except Exception:
-            pass
-        # 2. Task-Kategorie aktualisieren
-        db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neue_kat, task_id))
-        # 3. Optional: Task-Status ändern
-        if auch_status and auch_status in ("offen", "erledigt"):
-            db.execute("UPDATE tasks SET status=? WHERE id=?", (auch_status, task_id))
-        # 4. Wissensregel speichern wenn Grund gegeben
-        if grund:
-            titel = f"Korrektur: {alter_typ} → {neue_kat}"
-            inhalt = f"Mail \"{(task['betreff'] or '')[:80]}\" war als '{alter_typ}' klassifiziert, korrekt ist '{neue_kat}'. Grund: {grund}"
-            db.execute(
-                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, quelle, status, erstellt_am) VALUES (?,?,?,?,?,?)",
-                ("klassifizierung", titel, inhalt, "Kira-Chat Korrektur", "aktiv", now))
-        # 5. mail_index.db auch aktualisieren
-        msgid = task["message_id"] or ""
-        if msgid:
-            try:
-                mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
-                mi_db.execute("UPDATE mails SET kategorie=?, klassifiziert_am=? WHERE message_id=?",
-                              (neue_kat, now, msgid))
-                mi_db.commit()
-                mi_db.close()
-            except Exception:
-                pass
+        cur = db.execute(
+            "INSERT INTO tasks (betreff, zusammenfassung, kategorie, prioritaet, deadline, kanal, erstellt_am, status) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (betreff, zusammenfassung, kategorie, prioritaet, deadline or None, kanal, now, "offen"))
+        task_id = cur.lastrowid
         db.commit()
         db.close()
         return {
             "ok": True,
-            "message": f"Korrektur gespeichert: '{alter_typ}' → '{neue_kat}'. "
+            "task_id": task_id,
+            "message": f"Aufgabe #{task_id} erstellt: {betreff}"
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_task_bearbeiten(p):
+    """Ändert Felder einer bestehenden Aufgabe."""
+    task_id = p.get("task_id")
+    if not task_id:
+        return {"ok": False, "error": "task_id ist Pflicht"}
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        row = db.execute("SELECT id, betreff FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not row:
+            db.close()
+            return {"ok": False, "error": f"Task {task_id} nicht gefunden"}
+        updates = []
+        vals = []
+        for feld in ("betreff", "zusammenfassung", "kategorie", "prioritaet", "deadline"):
+            if p.get(feld):
+                updates.append(f"{feld}=?")
+                vals.append(p[feld])
+        if not updates:
+            db.close()
+            return {"ok": False, "error": "Keine Felder zum Aktualisieren angegeben"}
+        vals.append(task_id)
+        db.execute(f"UPDATE tasks SET {','.join(updates)} WHERE id=?", vals)
+        db.commit()
+        db.close()
+        return {"ok": True, "message": f"Task #{task_id} aktualisiert: {', '.join(f.split('=')[0] for f in updates)}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _ensure_corrections_columns():
+    """Stellt sicher, dass corrections-Tabelle die neuen Spalten hat."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        cols = [r[1] for r in db.execute("PRAGMA table_info(corrections)").fetchall()]
+        if "entitaet_typ" not in cols:
+            db.execute("ALTER TABLE corrections ADD COLUMN entitaet_typ TEXT DEFAULT 'task'")
+        if "kanal" not in cols:
+            db.execute("ALTER TABLE corrections ADD COLUMN kanal TEXT DEFAULT 'email'")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+_corrections_cols_ensured = False
+
+def _tool_korrektur(p):
+    """Universelle Korrektur — Task, Capture, Vorgang oder Beleg."""
+    global _corrections_cols_ensured
+    if not _corrections_cols_ensured:
+        _ensure_corrections_columns()
+        _corrections_cols_ensured = True
+
+    ent_typ = p.get("entitaet_typ", "task")
+    ent_id = p.get("entitaet_id") or p.get("task_id")  # Legacy-Kompatibilität
+    neue_kat = p.get("neue_kategorie", "")
+    grund = p.get("grund", "")
+    auch_status = p.get("auch_status", "") or p.get("auch_task_status", "")  # Legacy
+    kanal = p.get("kanal", "chat")
+
+    if not ent_id or not neue_kat:
+        return {"ok": False, "error": "entitaet_id und neue_kategorie sind Pflicht"}
+
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        now = datetime.now().isoformat()
+        alter_typ = "unbekannt"
+        label = ""
+
+        if ent_typ == "task":
+            row = db.execute("SELECT id, kategorie, betreff, message_id, zusammenfassung, absender_rolle FROM tasks WHERE id=?", (ent_id,)).fetchone()
+            if not row:
+                db.close()
+                return {"ok": False, "error": f"Task {ent_id} nicht gefunden"}
+            alter_typ = row["kategorie"] or "unbekannt"
+            label = (row["betreff"] or "")[:80]
+            db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neue_kat, ent_id))
+            if auch_status and auch_status in ("offen", "erledigt", "ignorieren"):
+                db.execute("UPDATE tasks SET status=? WHERE id=?", (auch_status, ent_id))
+            # mail_index.db synchronisieren
+            msgid = row["message_id"] or ""
+            if msgid:
+                try:
+                    mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
+                    mi_db.execute("UPDATE mails SET kategorie=?, klassifiziert_am=? WHERE message_id=?",
+                                  (neue_kat, now, msgid))
+                    mi_db.commit()
+                    mi_db.close()
+                except Exception:
+                    pass
+
+        elif ent_typ == "capture":
+            row = db.execute("SELECT id, kategorie, raw_text FROM captures WHERE id=?", (ent_id,)).fetchone()
+            if not row:
+                db.close()
+                return {"ok": False, "error": f"Capture {ent_id} nicht gefunden"}
+            alter_typ = row["kategorie"] or "unbekannt"
+            label = (row["raw_text"] or "")[:80]
+            db.execute("UPDATE captures SET kategorie=? WHERE id=?", (neue_kat, ent_id))
+            if auch_status:
+                db.execute("UPDATE captures SET status=? WHERE id=?", (auch_status, ent_id))
+
+        elif ent_typ == "vorgang":
+            row = db.execute("SELECT id, typ, vorgang_nr FROM vorgaenge WHERE id=?", (ent_id,)).fetchone()
+            if not row:
+                db.close()
+                return {"ok": False, "error": f"Vorgang {ent_id} nicht gefunden"}
+            alter_typ = row["typ"] or "unbekannt"
+            label = row["vorgang_nr"] or f"Vorgang #{ent_id}"
+            db.execute("UPDATE vorgaenge SET typ=? WHERE id=?", (neue_kat, ent_id))
+
+        elif ent_typ == "beleg":
+            row = db.execute("SELECT id, kategorie, dateiname FROM lexware_eingangsbelege WHERE id=?", (ent_id,)).fetchone()
+            if not row:
+                db.close()
+                return {"ok": False, "error": f"Beleg {ent_id} nicht gefunden"}
+            alter_typ = row["kategorie"] or "unbekannt"
+            label = (row["dateiname"] or "")[:80]
+            db.execute("UPDATE lexware_eingangsbelege SET kategorie=? WHERE id=?", (neue_kat, ent_id))
+
+        else:
+            db.close()
+            return {"ok": False, "error": f"Unbekannter Entitätstyp: {ent_typ}"}
+
+        # Korrektur in corrections-Tabelle (Lernbeispiel für Classifier)
+        try:
+            db.execute(
+                "INSERT INTO corrections (task_id, alter_typ, neuer_typ, notiz, erstellt_am, entitaet_typ, kanal) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (ent_id, alter_typ, neue_kat, grund, now, ent_typ, kanal))
+        except Exception:
+            pass
+
+        # Wissensregel speichern
+        if grund:
+            titel = f"Korrektur: {alter_typ} → {neue_kat}"
+            inhalt = f"{ent_typ.capitalize()} \"{label}\" war als '{alter_typ}' klassifiziert, korrekt ist '{neue_kat}'. Grund: {grund}"
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, quelle, status, erstellt_am) VALUES (?,?,?,?,?,?)",
+                ("klassifizierung", titel, inhalt, f"Kira-Chat Korrektur ({kanal})", "aktiv", now))
+
+        db.commit()
+        db.close()
+        return {
+            "ok": True,
+            "message": f"Korrektur gespeichert: '{alter_typ}' → '{neue_kat}' ({ent_typ}). "
                        f"Wird als Lernbeispiel für zukünftige Klassifizierungen verwendet.",
             "alter_typ": alter_typ,
-            "neuer_typ": neue_kat
+            "neuer_typ": neue_kat,
+            "entitaet_typ": ent_typ
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}

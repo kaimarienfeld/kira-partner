@@ -1,5 +1,30 @@
 # Session Log
 
+## 2026-04-08 17:30 — Session-Start (session-ffff-universal)
+**Auftrag:** Universelle Kira-Handlungsfähigkeit — mail_korrektur → korrektur (universal), neue CRUD-Tools, kiraOpenWithContext() für alle Module, Architektur-Regel.
+**Status:** erledigt
+
+### 2026-04-08 17:35 — Schritt 1: mail_korrektur → korrektur (universell)
+**Was:** Tool umbenannt, Handler universell für task/capture/vorgang/beleg, corrections-Tabelle +entitaet_typ +kanal, Legacy-Alias
+**Status:** erledigt
+
+### 2026-04-08 17:40 — Schritt 2: Neue CRUD-Tools
+**Was:** task_erstellen, task_bearbeiten, wissen_verwalten (ersetzt wissen_speichern mit erstellen/bearbeiten/deaktivieren)
+**Status:** erledigt
+
+### 2026-04-08 17:45 — Schritt 3: kiraOpenWithContext() + alle Buttons
+**Was:** Neue universelle JS-Funktion, POST /api/kira/kontext Python-Endpoint (7 Module), 25+ Kira-Buttons migriert (geschKira, lxOpenKiraWithContext, capKiraOpen, lxBelegKira, lxKontaktKira, lxBuchKira, Quick Panel 6×, Geschäft 2×)
+**Status:** erledigt
+
+### 2026-04-08 17:50 — Schritt 4: System-Prompt + Klassifizierungs-Regeln
+**Was:** STRUKTURELLE FÄHIGKEITEN Sektion im Prompt, Klassifizierungs-Korrekturen in _build_data_context()
+**Status:** erledigt
+
+### 2026-04-08 17:55 — Schritt 5: Architektur-Regel
+**Was:** AGENT.md §5b Kira-CRUD-Pflicht, wissen_regeln DB-Eintrag (fest/aktiv)
+**Status:** erledigt
+
+---
 ## 2026-04-08 14:00 — Session-Start (session-ffff-intelligenz)
 **Auftrag:** Kira Intelligenz-Upgrade — Plan "gleaming-sauteeing-sun" (6 Schritte). Mails wirklich lesen, Aktionen vorschlagen, Follow-ups tracken. Universelle Benutzerprofile statt hardcoded.
 **Status:** erledigt
