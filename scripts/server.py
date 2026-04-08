@@ -462,6 +462,24 @@ def _ensure_lexware_tables():
                 erstellt_ts  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS manuelle_artikel (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                lexware_id    TEXT,
+                profil_id     TEXT DEFAULT 'profil_1',
+                name          TEXT NOT NULL,
+                beschreibung  TEXT,
+                einheit       TEXT,
+                netto_preis   REAL DEFAULT 0,
+                steuer_satz   TEXT DEFAULT '19%%',
+                typ           TEXT DEFAULT 'SERVICE',
+                payload_json  TEXT,
+                kategorie     TEXT,
+                aktiv         INTEGER DEFAULT 1,
+                erstellt_ts   TEXT NOT NULL DEFAULT (datetime('now')),
+                geaendert_ts  TEXT,
+                last_sync     TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS eingangsbelege_pruefqueue (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 mail_id         TEXT,
@@ -7328,8 +7346,36 @@ function esInfoPopup(btn, text) {{
   <div class="es-grp">
     <div class="es-grp-h">Artikel &amp; Preise</div>
     <div class="es-sec-sub" style="margin-bottom:10px">Lexware-Artikel und manuell angelegte Leistungspositionen &mdash; Kira nutzt diese f&uuml;r Preisausk&uuml;nfte und Angebotsvorschl&auml;ge.</div>
-    <div id="up-artikel-content" style="padding:12px 0">
-      <div style="color:var(--muted);font-size:13px">Artikel-Verwaltung wird in Phase D implementiert &mdash; hier entsteht die vereinheitlichte Artikeltabelle mit Lexware-Import, manuellem Anlegen, CSV-Import/Export und Lexware-Transfer.</div>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="es-btn es-btn-pri" onclick="upArtikelNeu()">+ Artikel anlegen</button>
+      <button class="es-btn" onclick="upArtikelCsvImport()">CSV importieren</button>
+      <button class="es-btn" onclick="location.href='/api/artikel/export?format=csv'">CSV exportieren</button>
+      <button class="es-btn" onclick="location.href='/api/artikel/export?format=json'">JSON exportieren</button>
+      <button class="es-btn" id="btn-transfer-lx" onclick="upArtikelTransferLexware()" style="display:none">Zu Lexware &uuml;bertragen</button>
+    </div>
+
+    <div id="up-artikel-info" style="display:none;background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--muted)">
+      Lexware nicht verbunden &mdash; Artikel k&ouml;nnen manuell angelegt oder per CSV importiert werden. Bei sp&auml;terem Lexware-Anschluss lassen sich alle Artikel dorthin &uuml;bertragen.
+    </div>
+
+    <div id="up-artikel-tabelle" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px" id="tbl-artikel">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);text-align:left">
+            <th style="padding:6px 8px">Name</th>
+            <th style="padding:6px 8px">Typ</th>
+            <th style="padding:6px 8px;text-align:right">Netto-Preis</th>
+            <th style="padding:6px 8px">Einheit</th>
+            <th style="padding:6px 8px">Steuer</th>
+            <th style="padding:6px 8px">Herkunft</th>
+            <th style="padding:6px 8px;width:60px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-artikel-body">
+          <tr><td colspan="7" style="padding:12px;color:var(--muted);text-align:center">Lade Artikel&hellip;</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
   </div><!-- /up-sub-artikel -->
@@ -17726,6 +17772,110 @@ function _bpCollectProfile() {{
   }};
 }}
 
+// ── Artikel & Preise (session-pp-cont2, Phase D) ──
+function upArtikelLaden() {{
+  fetch('/api/artikel').then(r=>r.json()).then(d=>{{
+    const tb = document.getElementById('tbl-artikel-body');
+    if(!tb) return;
+    if(!d.ok || !d.artikel || d.artikel.length===0) {{
+      tb.innerHTML='<tr><td colspan="7" style="padding:12px;color:var(--muted);text-align:center">Keine Artikel vorhanden &mdash; lege den ersten manuell an oder importiere per CSV.</td></tr>';
+      return;
+    }}
+    tb.innerHTML = d.artikel.map(a => {{
+      const preis = a.netto_preis ? (parseFloat(a.netto_preis).toFixed(2).replace('.',',')+' &euro;') : '&mdash;';
+      const herk = a.herkunft==='lexware' ? '<span style="color:#2563eb">Lexware</span>' : '<span style="color:#16a34a">Manuell</span>';
+      const btns = a.editierbar
+        ? `<button class="es-btn" style="padding:2px 6px;font-size:11px" onclick="upArtikelEdit(${{a.id}})">&#x270E;</button><button class="es-btn" style="padding:2px 6px;font-size:11px;color:#e84545;border-color:#e84545" onclick="upArtikelDel(${{a.id}},'${{(a.name||'').replace(/'/g,"\\\\'")}}')">&times;</button>`
+        : '';
+      return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px">${{a.name||''}}</td><td style="padding:6px 8px">${{a.typ||''}}</td><td style="padding:6px 8px;text-align:right">${{preis}}</td><td style="padding:6px 8px">${{a.einheit||''}}</td><td style="padding:6px 8px">${{a.steuer_satz||''}}</td><td style="padding:6px 8px">${{herk}}</td><td style="padding:6px 8px;display:flex;gap:4px">${{btns}}</td></tr>`;
+    }}).join('');
+    // Lexware-Transfer-Button zeigen wenn manuelle Artikel existieren
+    const hasManual = d.artikel.some(a=>a.herkunft==='manuell');
+    const btnLx = document.getElementById('btn-transfer-lx');
+    if(btnLx) btnLx.style.display = hasManual ? '' : 'none';
+  }});
+}}
+function upArtikelNeu() {{
+  const name = prompt('Artikelname:');
+  if(!name) return;
+  const einheit = prompt('Einheit (z.B. h, m², Stk, pauschal):', 'h') || 'h';
+  const preis = prompt('Netto-Preis in EUR:', '0');
+  const typ = prompt('Typ (SERVICE oder PRODUCT):', 'SERVICE') || 'SERVICE';
+  fetch('/api/artikel', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{name:name, einheit:einheit, netto_preis:parseFloat(preis)||0, typ:typ, steuer_satz:'19%'}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast(d.message); upArtikelLaden(); }}
+    else showToast('Fehler: '+(d.error||'Unbekannt'));
+  }});
+}}
+function upArtikelEdit(id) {{
+  const row = document.querySelector(`#tbl-artikel-body tr:has(button[onclick*="upArtikelEdit(${{id}}"])`) || null;
+  const name = prompt('Neuer Name:', row?.cells[0]?.textContent || '');
+  if(!name) return;
+  const preis = prompt('Neuer Netto-Preis:', row?.cells[2]?.textContent?.replace(/[^0-9.,]/g,'').replace(',','.') || '0');
+  const einheit = prompt('Neue Einheit:', row?.cells[3]?.textContent || '');
+  fetch('/api/artikel/update', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{id:id, name:name, netto_preis:parseFloat(preis)||0, einheit:einheit}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Artikel aktualisiert'); upArtikelLaden(); }}
+    else showToast('Fehler: '+(d.error||'Unbekannt'));
+  }});
+}}
+function upArtikelDel(id, name) {{
+  if(!confirm('Artikel "'+name+'" wirklich l\\u00f6schen?')) return;
+  fetch('/api/artikel/delete', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{id:id}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Artikel gel\\u00f6scht'); upArtikelLaden(); }}
+    else showToast('Fehler: '+(d.error||'Unbekannt'));
+  }});
+}}
+function upArtikelCsvImport() {{
+  const input = document.createElement('input');
+  input.type='file'; input.accept='.csv,.txt';
+  input.onchange = function() {{
+    const file = input.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {{
+      fetch('/api/artikel/import', {{
+        method:'POST', headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{csv: e.target.result}})
+      }}).then(r=>r.json()).then(d=>{{
+        if(d.ok) {{ showToast(d.message); upArtikelLaden(); }}
+        else showToast('Import-Fehler: '+(d.error||'Unbekannt'));
+      }});
+    }};
+    reader.readAsText(file, 'utf-8');
+  }};
+  input.click();
+}}
+function upArtikelTransferLexware() {{
+  if(!confirm('Alle manuellen Artikel (ohne Lexware-ID) zu Lexware \\u00fcbertragen?')) return;
+  const btn = document.getElementById('btn-transfer-lx');
+  if(btn) {{ btn.disabled=true; btn.textContent='\\u00dcbertrage\\u2026'; }}
+  fetch('/api/artikel/transfer-lexware', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'
+  }}).then(r=>r.json()).then(d=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Zu Lexware \\u00fcbertragen'; }}
+    if(d.ok) {{ showToast(d.message); upArtikelLaden(); }}
+    else showToast('Transfer-Fehler: '+(d.error||'Unbekannt'));
+  }}).catch(()=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Zu Lexware \\u00fcbertragen'; }}
+  }});
+}}
+// Artikel laden wenn Unternehmensprofile/Artikel geöffnet
+(function() {{
+  var _origP2 = window.esP2Select;
+  window.esP2Select = function(sec, subId, el) {{
+    if(_origP2) _origP2(sec, subId, el);
+    if(sec==='unternehmensprofile' && subId==='artikel') upArtikelLaden();
+  }};
+}})();
+
 function applyFontSize(size) {{
   if(size) document.documentElement.dataset.fontsize = size;
   else delete document.documentElement.dataset.fontsize;
@@ -24128,6 +24278,62 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({"error": str(e)})
 
+        elif self.path == '/api/artikel':
+            # Vereinheitlichte Artikelliste (Lexware + Manuell)
+            db = get_db()
+            try:
+                result = []
+                try:
+                    for r in db.execute("SELECT id, lexware_id, name, beschreibung, einheit, netto_preis, steuer_satz, typ, last_sync FROM lexware_artikel ORDER BY name").fetchall():
+                        result.append({**dict(r), "herkunft": "lexware", "editierbar": False})
+                except Exception:
+                    pass
+                try:
+                    for r in db.execute("SELECT id, lexware_id, name, beschreibung, einheit, netto_preis, steuer_satz, typ, kategorie, erstellt_ts, geaendert_ts FROM manuelle_artikel WHERE aktiv=1 ORDER BY name").fetchall():
+                        result.append({**dict(r), "herkunft": "manuell", "editierbar": True})
+                except Exception:
+                    pass
+                self._json({"ok": True, "artikel": result, "count": len(result)})
+            finally:
+                db.close()
+
+        elif self.path.startswith('/api/artikel/export'):
+            # CSV/JSON-Export aller Artikel
+            fmt = "csv"
+            if "?" in self.path:
+                qs = urllib.parse.parse_qs(self.path.split("?")[1])
+                fmt = qs.get("format", ["csv"])[0]
+            db = get_db()
+            try:
+                rows = []
+                for tbl, herk in [("lexware_artikel", "lexware"), ("manuelle_artikel", "manuell")]:
+                    try:
+                        for r in db.execute(f"SELECT name, beschreibung, einheit, netto_preis, steuer_satz, typ FROM {tbl}{' WHERE aktiv=1' if tbl == 'manuelle_artikel' else ''} ORDER BY name").fetchall():
+                            rows.append({**dict(r), "herkunft": herk})
+                    except Exception:
+                        pass
+                if fmt == "json":
+                    data = json.dumps(rows, ensure_ascii=False, indent=2).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="artikel_export.json"')
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    lines = ["name;beschreibung;einheit;netto_preis;steuer_satz;typ;herkunft"]
+                    for r in rows:
+                        lines.append(";".join(str(r.get(k, "")) for k in ["name", "beschreibung", "einheit", "netto_preis", "steuer_satz", "typ", "herkunft"]))
+                    data = "\n".join(lines).encode("utf-8-sig")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="artikel_export.csv"')
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+            finally:
+                db.close()
+
         elif self.path == '/api/config/export':
             try:
                 cfg  = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
@@ -30032,6 +30238,140 @@ Regeln:
                 return self._json({"ok": False, "error": "LLM-Antwort war kein gültiges JSON"})
             except Exception as e:
                 return self._json({"ok": False, "error": f"Import-Fehler: {str(e)}"})
+
+        # ── Artikel CRUD (session-pp-cont2, Phase D) ──
+        if self.path == '/api/artikel':
+            # Manuellen Artikel anlegen
+            try:
+                name = body.get("name", "").strip()
+                if not name:
+                    return self._json({"ok": False, "error": "Artikelname erforderlich"})
+                db = get_db()
+                try:
+                    db.execute(
+                        "INSERT INTO manuelle_artikel (profil_id, name, beschreibung, einheit, netto_preis, steuer_satz, typ, kategorie) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (body.get("profil_id", "profil_1"), name, body.get("beschreibung", ""),
+                         body.get("einheit", ""), float(body.get("netto_preis", 0)),
+                         body.get("steuer_satz", "19%"), body.get("typ", "SERVICE"),
+                         body.get("kategorie", ""))
+                    )
+                    db.commit()
+                    art_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                    return self._json({"ok": True, "id": art_id, "message": f"Artikel '{name}' angelegt"})
+                finally:
+                    db.close()
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)})
+
+        if self.path == '/api/artikel/update':
+            # Manuellen Artikel bearbeiten
+            try:
+                art_id = body.get("id")
+                if not art_id:
+                    return self._json({"ok": False, "error": "Artikel-ID erforderlich"})
+                db = get_db()
+                try:
+                    fields = []
+                    vals = []
+                    for k in ["name", "beschreibung", "einheit", "netto_preis", "steuer_satz", "typ", "kategorie"]:
+                        if k in body:
+                            fields.append(f"{k}=?")
+                            vals.append(float(body[k]) if k == "netto_preis" else body[k])
+                    if not fields:
+                        return self._json({"ok": False, "error": "Keine Felder zum Aktualisieren"})
+                    fields.append("geaendert_ts=datetime('now')")
+                    vals.append(int(art_id))
+                    db.execute(f"UPDATE manuelle_artikel SET {', '.join(fields)} WHERE id=? AND aktiv=1", vals)
+                    db.commit()
+                    return self._json({"ok": True, "message": "Artikel aktualisiert"})
+                finally:
+                    db.close()
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)})
+
+        if self.path == '/api/artikel/delete':
+            # Manuellen Artikel soft-delete
+            try:
+                art_id = body.get("id")
+                if not art_id:
+                    return self._json({"ok": False, "error": "Artikel-ID erforderlich"})
+                db = get_db()
+                try:
+                    db.execute("UPDATE manuelle_artikel SET aktiv=0, geaendert_ts=datetime('now') WHERE id=?", (int(art_id),))
+                    db.commit()
+                    return self._json({"ok": True, "message": "Artikel gelöscht"})
+                finally:
+                    db.close()
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)})
+
+        if self.path == '/api/artikel/import':
+            # CSV-Import → manuelle Artikel anlegen
+            try:
+                csv_text = body.get("csv", "").strip()
+                if not csv_text:
+                    return self._json({"ok": False, "error": "Kein CSV-Inhalt"})
+                import csv, io
+                reader = csv.DictReader(io.StringIO(csv_text), delimiter=";")
+                db = get_db()
+                count = 0
+                try:
+                    for row in reader:
+                        name = (row.get("name") or "").strip()
+                        if not name:
+                            continue
+                        db.execute(
+                            "INSERT INTO manuelle_artikel (name, beschreibung, einheit, netto_preis, steuer_satz, typ, kategorie) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (name, row.get("beschreibung", ""), row.get("einheit", ""),
+                             float(row.get("netto_preis", 0) or 0), row.get("steuer_satz", "19%"),
+                             row.get("typ", "SERVICE"), row.get("kategorie", ""))
+                        )
+                        count += 1
+                    db.commit()
+                    return self._json({"ok": True, "imported": count, "message": f"{count} Artikel importiert"})
+                finally:
+                    db.close()
+            except Exception as e:
+                return self._json({"ok": False, "error": f"CSV-Import-Fehler: {e}"})
+
+        if self.path == '/api/artikel/transfer-lexware':
+            # Manuelle Artikel zu Lexware übertragen
+            try:
+                cfg = json.loads((SCRIPTS_DIR / "config.json").read_text("utf-8"))
+                from lexware_client import LexwareClient, is_lexware_configured
+                if not is_lexware_configured(cfg):
+                    return self._json({"ok": False, "error": "Lexware nicht konfiguriert"})
+                client = LexwareClient(cfg["lexware"]["api_key"], cfg["lexware"].get("api_base_url", "https://api.lexware.io/v1"))
+                db = get_db()
+                try:
+                    rows = db.execute("SELECT id, name, beschreibung, einheit, netto_preis, steuer_satz, typ FROM manuelle_artikel WHERE aktiv=1 AND (lexware_id IS NULL OR lexware_id='')").fetchall()
+                    transferred = 0
+                    errors = []
+                    for r in rows:
+                        try:
+                            result = client.create_article({
+                                "title": r["name"],
+                                "description": r["beschreibung"] or "",
+                                "type": r["typ"] or "SERVICE",
+                                "unitName": r["einheit"] or "Stück",
+                                "unitPrice": {"currency": "EUR", "netAmount": r["netto_preis"] or 0, "taxRatePercentage": int(float((r["steuer_satz"] or "19%").replace("%", "")))}
+                            })
+                            if result and result.get("id"):
+                                db.execute("UPDATE manuelle_artikel SET lexware_id=?, last_sync=datetime('now') WHERE id=?", (result["id"], r["id"]))
+                                transferred += 1
+                        except Exception as te:
+                            errors.append(f"{r['name']}: {te}")
+                    db.commit()
+                    msg = f"{transferred} Artikel zu Lexware übertragen"
+                    if errors:
+                        msg += f", {len(errors)} Fehler"
+                    return self._json({"ok": True, "transferred": transferred, "errors": errors, "message": msg})
+                finally:
+                    db.close()
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)})
 
         # Config zurücksetzen auf Werkseinstellungen
         if self.path == '/api/config/reset':
