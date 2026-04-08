@@ -34,6 +34,23 @@
 \### Organisation-Tab (Termine/Fristen/Rückrufe) — im Überblick beschrieben, aber kein eigenständiger UI-Rebuild dokumentiert
 
 
+### Im Postfach Empfänger Auto vervollständigung
+Wenn man Im Postfach eine neue E-Mail schreibt Oder auch bei Weiterleitungen Sollte wenn man schon einmal eine E-Mail Adresse eingegeben hat Diese dann beim nächsten Mal durch Autovervollständigung Vorgeschlagen werden Punkt bitte die dafür nötigen Funktionen Einbauen 
+ 
+
+### Postfach Favorit Ungelesen Gefiltert
+Im Postfach Habe ich Bei dem Favoriten Mehrere Konten Angelegt mit den Posteingänge der ungelesenen Nachrichten. Aber Es werden Trotzdem Alle E-Mails angezeigt. Selbst wenn Eine E-Mail alles gelesen markiere Bleibt die Gelesene Nachricht trotzdem In diesen Eigentlich vorgefilterten Ordner stehen. Du siehst es am Screenshot Ausgewählt ist der Ordner ungelesenen Info Raumkult Mit 4 ungelesenen Nachrichten Aber es werden Alle Schon gelesenen angezeigt Punkt bitte das beheben
+
+### Postfach Ungelesene Nachrichten Batches
+In allen Postfächern Dauert es extrem lange Bis die Zahl der Patches Mit Ungelesene Nachrichten Sich verändert. Habe ich nun mehrere Nachrichten gelesen Verändert sich die Zahl nicht Komma oder Manchmal erst nach Aktualisierung. Das dauert Zu lange. Sobald ich eine Nachricht gelesen habe Muss sofort Die Zahl sich Um eine reduzieren, ansonsten ist das Verwirrend. Nur soll es nicht so sein dass ständig die Seite Aktualisiert wird Punkt durch das Aktualisieren Der Postfächer Verschwinden Immer für 2-3 Sekunden Alle E-Mails. Das ist kein Gutes Arbeiten Keine Gute User Experience Punkt dafür muss es eine andere Lösung geben Vielleicht Durch Anlegen einer Datenquelle die dann aktualisiert wird ohne dass jedes Mal das Postfach Die E-Mails Kurz für 2-3 Sekunden weg sind.
+
+### Aktualierung Der Postfäch Immer Mit Kurzem verschwinden Der E-Mails
+Es muss Lösung gefunden werden Dass man nicht bemerkt wenn sich das Postfach aktualisiert Man hat immer eine Lücke Von 2 Sekunden Wo dann auch das Krollbalken Im Posteingang wieder nach oben springt Komma wenn man gerade eine E Mail weiter unten bearbeitet hat Springt bei Aktualisierung Die Der Scrollbal Ganz nach oben Und man muss wieder nach unten scrollen zu der E-Mail wo man war. Keine gute Lösung bitte das beheben dass man nicht mitbekommen wenn aktualisiert wird Das muss irgendwie im Hintergrund laufen Ohne eine Veränderung in der UI.
+
+### Postfach Inhaltsfenster Bleibt von der Mail Die Entfernt wurde
+Das Inhaltsfenster von der E-Mail Die entfernt wurde Bleibt Offen Im Inhaltsfenster Es wird dann Kein Fenster angezeigt zulesen des Element auswählen wie das im Standortmodus sein sollte. beziehungsweise anpassbar Über das Einstellungsmenü Im Postfach, Ob das nächste Element angezeigt werden soll Oder keins In dem Vorschaufenster beziehungsweise in dem Inhaltsfenster der E-mail
+
+
 
 
 
@@ -65,63 +82,6 @@
 
 
 
-
-##### \### DATVERSE Tabellen per API einbinden  (neues Einstellungsmenü oder an vorhandenes sinvoll hinzufügen)
-
-* Rechnungstabellen in Kira einbinden
-* Kira sendet an zwei verschiedenen Tabellen nach DATEVERSE jeweils die .json Datei die über eine Mail eingegangen ist.
-
-&#x09;und oder - im Betreff steht: Neue Bestellung!!  (anpassbar)1
-
-&#x09;und oder - im Body der Mail steht ausschlieslich der .json inhalt. dieser kommt nicht per anhang (ist aber im Menü einstellbar)
-
-&#x09;und oder - Nachricht kommt von noreply@billbee.io (in den Einstellungen anpassbar)
-
-* Optional, manuell per Mail einen json inhalt an eine mailadresse oder API senden
-* alles was dafür benötigt wird das es funktioniert in die einstellungen aufnehmen und einrichtungsassitent dafür bauen und zu verfügung stellen. mit test und allen schnick schnack.. zusätzlich dokumentation, einrichtung und wo bekomme ich was her im aktuellen stand (internet recherche verwenden) optional mit llm chatten, problem direkt reinkopieren und lösung über chat finden.
-
-
-
-* alternativ abrufbar, manueller abruf oder automatischer Abruf über (ehem.Admin Panel) Funktion abrufen der neuen rechnungen aus Lexoffice wie in folgenden Dateien voll funktionsfähig. Funktion wie sie ist, vollständig in die App intigrieren/übernehmen, auch mit Daten, aber alles dann optional durch eintellungsmenü einstellbar. api, mail, schutz, mailvorlage (anpassen einzelner Einstellungen, die aber die grundfunktion nicht zerschießen)
-* darauf achten, dass die funktion und formate so bleiben wie jetzt orginal in den dateien, ohne diese festgesetzten vorganen von lexoffice und Billbee funktioniert am ende der export oder import sonst nicht. kritsche einstellunegn die das zerstören können nicht zulassen.
-
-
-
-der derzeitige start wird über den btn <button onclick="startProcess()">🔄 Prozess Starten</button> in der datei "C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\admin\_lex\_billb.php"
-
-&#x20;ausgelöst.
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\02\_lex\_billb\_fetch\_invoice\_details.php"
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\03\_lex\_billb\_fetch\_contact.php"
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\04\_lex\_billb\_convert\_to\_billbee.php"
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\admin\_lex\_billb.php"
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\00\_lex\_billb\_master.php"
-
-"C:\\Users\\kaimr\\OneDrive - rauMKult Sichtbeton\\07\_Webseiten\\VS\\sonstige Webseiten\\Sichtbeton-cire.de\\01\_lex\_billb\_fetch\_invoices.php"
-
-
-
-Bitte alle codes prüfen und ggfls. reparieren. die funktionen 00 -04 funktionieren auf jedenfall, diese nicht verändern in der struktur wenn es nicht nötig ist. Die Dataverse funktion darin habe ich nie zum laufen bekommen, ist aber im prinzip nicht nötig wenn die funktion DATVERSE Tabellen per API einbinden dann funktioniert. Logs und fehlermeldung sowie status etc und job einstellungen zeit intervall etc mit übernehmen oder in den einstellunegn ergänzen.
-
-
-
-
-
-##### **### Lexware Office Anbindung.**
-
-
-
-* In diesem zuge die Lexware Anbindung einrichten. API steht in einer der oben genannten Dateien lex\_billb.
-* Dokumentation dazu https://developers.lexware.io/docs/#lexware-api-documentation bitte browser öffnen und nötige informationen holen.
-* Ziel ist es, Alle möglichen Daten für KIRA bereitzustellen in vorhandenen oder neu angelegten Datenbanken, dass dann auch Module wie Kunden / Aufträge / Kalkulationen / Preispositionen / Cashflow etc. aktiviert werden könenn und insgesamt das Modul Geschäft besser und realistischer läuft. KIRA llm soll auch hier dann voll zugriff erhalten.
-* Vorschläge für extra Module und Funktionen was Lexoffice mit zusammenarbneit mit dieserapp deutlich verbessert vorschlagen.
-
-
-
 \################## als extra Regel anlegen: immer wenn neue funktionen oder module gebaut werden, ganze app durchschauen, ob diese neuen funktionen oder module in vorhandene eingebunden werden können oder müssen wie auch z.b. bei einstellungen, sei es llm, backup, sync, abfragen, kommunikation, marketing... etc. immer alles schlau und vorbereitend vorbereiten und in eine vorhandene arbeitsliste - bestandsliste - checkliste - feature liste packen und stetig aktualisieren. bitte bestätige mir in worten so, dass ich sehe, wie du es verstanden hast ################
 
 
@@ -134,23 +94,13 @@ Bitte alle codes prüfen und ggfls. reparieren. die funktionen 00 -04 funktionie
 
 
 
-### ✅ ERLEDIGT (session-vv) — Logo Sidebar: K-Placeholder ersetzt durch Kira-Launcher SVG (lila Orb mit Augen, passend zu Variante B). applyLogo() restauriert SVG bei Reset/leer. applyLogoSize() skaliert auch SVG. Wenn eigenes Logo gesetzt: Logo erscheint, SVG verschwindet.
+\### Logo upload ist da, aber keine sinnvollen einstellungen dazu. z.b logo größe. ich habe jetzt eins hinzugefügt, der blaue hintergrund vom K symbohl ist noch zu sehen. das nur anzeigen wenn kein logo gesetzt. bzw. nicht das blaue k logo, sondern eine version von kira launcher.
 
-### 🔍 Muss Kai Live prüfen — App-Icon/Verknuepfung als Kira-Launcher: erfordert .ico-Datei oder Electron-Aenderung — kein direkter Eingriff moeglich ohne App-Build-System.
+### bitte als bild von der kira verknüfung auch ein bild von kiralauncher in grösst möglicher form als bild setzen
 
 
 
 \### Wie sieht es mit dem derzeitigen Schutz aus der app, ist diese durch angriffe von aussen wenn das programm auf meinem windows Rechner installiert ist geschützt? Was gibt es für optionen (beste) um meine sensiblen Daten zu schützen? Kann das LLM modell damit unfug machen? oder teilt das llm meine informationen zum lernen der eigenen ki bei verwendung von api? wenn ja oder nein, kann man das als menüpunkt hinzufügen und einstellen? aber nicht nur optisch, sondern tatsächlich mit der gewünschten
-
-
-
-
-
-\###  Einstellungen Toast-Position ist noch bei Design, kann aber zum menü Benachrichtigungen.
-
-sinnvolle  einstellungsmöglichleiten hinzufügen, z.b. anzeigedauer - größe - aussehen
-
-
 
 
 
@@ -199,17 +149,6 @@ sinnvolle  einstellungsmöglichleiten hinzufügen, z.b. anzeigedauer - größe -
 
 
 
-
-\### Urlaubsmodus Auto-Aktivierung (Backend-Check getestet, läuft zumindest in UI alles) - prüfe aktiv ob dann tatsächlich keine meldungen mehr kommen. Kira soll aber trotzdem im urlaubsmodus weiter arbeiten wenn programm offen, damit die sortierung dann nicht nach urlaub chaos erzeugt. es sollte dann nur schlau markiert werden was in der urlaubszeit gekommen ist, automatisch an Kunden, die eine antwort erwarten, oder wenn neuer lead, nicht newsletter systemmails etc. schlau halt eine abwesenheit angepasst an den inhalt der mail senden, (persönlichkeit) durch llm. das dann dokumentieren, z.b. durch breif nach urlaub was passiert ist, oder und komplette liste. was kira llm gemacht hat, was für mails an welche kunden gesendet wurden, welche rechnungen eingegangen sind und so sachen --- hier weitere vorschläge passend zum thema suchen und in planung aufnehmen!Was jetzt schon durch aktuelle app aktivierbar ist, aktivieren!
-
-
-
-\###  Benachrichtigungsmöglichkeit Benachrichtigung via
-
-Wie wird der Nachfass gemeldet -  ist Aufgabe erstellen.. KIRA LLM tatsächlich aktiv?
-
-
-
 \### Mail-Klassifizierung (Budget-Modell) sehr gut! aber, je nachdem welches model gerade aktiv ist, sollte man sehen wie es gerade dort eingestellt ist. option --> Kira wählt -- Admin wählt (generell krittische einstellungen (Admin vorbereiten) noch nicht aktivieren bis wir die rollen und login haben (todo)
 
 
@@ -230,9 +169,7 @@ Wie wird der Nachfass gemeldet -  ist Aufgabe erstellen.. KIRA LLM tatsächlich 
 
 
 
-### ✅ ERLEDIGT (session-vv) — Spaeter-Klick Lernfrage + Datum-Picker: spaeterModal hat datetime-local Picker + 4 Schnell-Buttons (+2h/Morgen/Uebermorgen/Nae.Woche) + Lernfrage Warum mit 4 Preset-Gruenden + Wissensregel wird via /api/wissen/neu gespeichert. Aufgabe bleibt offen mit naechste_erinnerung gesetzt (task_manager.py prueft und erinnert).
-
-### ⚠️ Kalender-Eintrag: Erinnerung als Outlook-Termin — noch nicht implementiert (wartet auf Paket 8 Microsoft Graph Calendar)
+\-- bei später klick auf mail bearbeiten -- hier auch lernede frage von kira ki aktive, warum? damit sie weiss warum und bei Zuordnung und Wiedervorlagen anderer ähnlicher mail, aufgaben, etc muster erkennt und die Benachrichtigung oder todos beser einordnen kann. ausserdem wäre hier die angabe von Datum und Uhrzeit gut, wann soll ich dich erneut erinnern oder die mail vorlegen? Das dann aber auch machen und in einen Kalender eintragen. wichtig, nicht das sie dann weg ist, weil die funkt noch nicht da ist und ich dann nicht mehr erinnert werde
 
 
 
@@ -282,43 +219,14 @@ Funktioniert?
 
 
 
-###### **Kira und KIRA LLM**
 
-\-Komplette Struktur und Architektur verbessern
-
-
-
-
-
-### ✅ ERLEDIGT (session-vv) — Ungelesene Badge Postfach: _pfGlobalBadgeUpdate() laeuft sofort beim Seitenload + alle 2 Minuten — zeigt Ungelesen-Count aus allen Posteingang-Ordnern auf jedem Panel. Playwright-Test: Badge zeigte "3" auf Start-Panel.
-
-
-
-### ✅ ERLEDIGT (session-vv verifiziert) — Fenster-Split Position: localStorage pf_pane_w speichert left+mid, pfInitResize() restauriert beim naechsten Oeffnen. Funktioniert bereits.
-
-&#x20;
-
-
-
-
-
-\### Postfach Mail: 
+&#x20;### Die Anzahl der Ungelesene Nachrichten im Batch Symbol Der Haupt Sidebar Vom Postfach Stimmt nicht. bitte Alle Posteingänge Von allen Postfächern Einbeziehen "D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-30 050052.png"
 
 
 
 
 
 
-
-\### HTML Code für senden mail + Editor in einstellungen für typogr. der ausgangs mails
-
-
-
-
-
-
-
-##### \###  Vorher Kontext eng mit CHAT
 
 
 
@@ -516,16 +424,6 @@ lies bitte folgende Datei und führe nach Anweisungen aus "C:\\Users\\kaimr\\.cl
 bitte recherchiere geeignete lösungen auch im Internet die passend und für unser projekt umsetzbar sind, dann plan erstellen und bestätigen lassen
 
 
-
-
-
-&#x20;1. State Machine: Dict-basiert aber transitions-Library in betracht ziehen bzw. vorbereiten für besseren umbau für den fall doch später
-
-&#x20; 2. Aktivfenster:  Desktop-Overlay auch jetzt
-
-&#x20; 3. Scope: Pakete 1–10 jetzt (kein Dashboard-Umbau in dieser Session) — ok!
-
-&#x20; 4. Backfill: Direkt in dieser Session, oder als separater Schritt danach? ja
 
 
 

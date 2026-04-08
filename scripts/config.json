@@ -393,13 +393,11 @@
           "sichtbeton-cire.de",
           "raumkult.eu"
         ],
-        "social_media": {},
         "leistungen": {
-          "website_url": "https://raumkult.eu",
-          "letzte_aktualisierung": "2026-04-08T17:00:00",
+          "letzte_aktualisierung": "2026-04-08",
           "katalog": [
             {
-              "name": "Sichtbeton-Kosmetik",
+              "name": "Sichtbeton-Betonkosmetik",
               "beschreibung": "Professionelle optische Reparatur und Angleichung von Sichtbetonflächen an Gebäuden — Kiesnester, Poren, Verfärbungen, Lunker, Abplatzungen",
               "stichworte": [
                 "Betonkosmetik",
@@ -414,10 +412,11 @@
                 "Betonsanierung"
               ],
               "zielgruppe": "Bauherren, Architekten, Bauunternehmen, Generalunternehmer",
-              "ist_kernleistung": true
+              "ist_kernleistung": true,
+              "quelle": "manuell"
             },
             {
-              "name": "Fugenlose Beschichtungen",
+              "name": "Fugenlose Mikrozement Wand und Bodengestaltung",
               "beschreibung": "Fugenlose Wand- und Bodenbeschichtungen in Betonoptik für Innenräume",
               "stichworte": [
                 "fugenlos",
@@ -428,7 +427,8 @@
                 "Bodenbeschichtung"
               ],
               "zielgruppe": "Privatkunden, Architekten, Gewerbe, Hotels, Gastronomie",
-              "ist_kernleistung": true
+              "ist_kernleistung": true,
+              "quelle": "manuell"
             },
             {
               "name": "Kreative Wandgestaltung",
@@ -440,7 +440,8 @@
                 "Oberflächenveredelung"
               ],
               "zielgruppe": "Architekten, Innenarchitekten, gehobene Privatkunden",
-              "ist_kernleistung": true
+              "ist_kernleistung": true,
+              "quelle": "manuell"
             },
             {
               "name": "Betonmöbel und Objekte",
@@ -453,19 +454,150 @@
                 "Sichtbeton-Moebel"
               ],
               "zielgruppe": "Privatkunden, Interior-Designer, Gewerbe",
-              "ist_kernleistung": false
+              "ist_kernleistung": false,
+              "quelle": "manuell"
+            },
+            {
+              "name": "Betonkosmetik für Sichtbetonoberflächen",
+              "beschreibung": "Überarbeitung und Reparatur von Sichtbetonoberflächen, um Mängel zu beseitigen und die Ästhetik zu verbessern.",
+              "stichworte": [
+                "Sichtbeton",
+                "Reparatur",
+                "Ästhetik"
+              ],
+              "zielgruppe": "Bauherren, Architekten, Objektbetreiber",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/"
+            },
+            {
+              "name": "Kreative Wandgestaltung",
+              "beschreibung": "Individuelle Gestaltung von Wandflächen mit verschiedenen Techniken und Materialien für einen einzigartigen Raumlook. z.B. Felsenwände, Stencil Art, Kalk Designputz",
+              "stichworte": [
+                "Wandgestaltung",
+                "Akzentwände",
+                "Individuell"
+              ],
+              "zielgruppe": "Privatkunden, Architekten, Innenarchitekten",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/"
+            },
+            {
+              "name": "Fugenlose Mikrozement Oberflächen",
+              "beschreibung": "Gestaltung von fugenlosen Wänden und Böden in Bädern, Wohnräumen und Geschäftsräumen, die den Raum größer und hochwertiger wirken lassen.",
+              "stichworte": [
+                "Mikrozement",
+                "fugenlos",
+                "Bodenbeläge"
+              ],
+              "zielgruppe": "Privatkunden, Sanierer, Architekten",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/"
+            },
+            {
+              "name": "Schutz und Erhalt von Sichtbeton Oberflächen",
+              "beschreibung": "Imprägnierung und Versiegelung von Sichtbetonoberflächen zum Schutz vor Umwelteinflüssen und Graffiti.",
+              "stichworte": [
+                "Imprägnierung",
+                "Versiegelung",
+                "Graffitischutz",
+                "Betonschutz"
+              ],
+              "zielgruppe": "Bauherren, Objektbetreiber",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/"
+            },
+            {
+              "name": "Online-Beratung für Betonkosmetik",
+              "beschreibung": "Beratung zur Verschönerung und Instandsetzung von Betonflächen.",
+              "stichworte": [
+                "Betonkosmetik",
+                "Oberflächenveredelung"
+              ],
+              "zielgruppe": "Privatpersonen, Handwerker, Bauunternehmen",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/beratung---schulung-fur-betonkosmetik---fugenlose-oberflachen---kreative-wandgestaltung"
+            },
+            {
+              "name": "Kostenpflichtige Telefonische Beratung oder Video-Calls",
+              "beschreibung": "Schnelle Antworten und Hilfestellungen bei Fragen.  -Live-Anleitungen und direkte Unterstützung durch Experten. Projekt-Check-In - Auffrischungstermin für erfahrene gewerbliche Anwender. Intensive Beratung für Einsteiger in die Betonkosmetik. Umfassende Unterstützung für Fortgeschrittene bei Projekten. Rundum-sorglos-Paket für größere Vorhaben.",
+              "stichworte": [
+                "telefonische Beratung",
+                "Hilfestellung",
+                "Video-Call Beratung"
+              ],
+              "zielgruppe": "Privatpersonen, Handwerker, Bauunternehmen",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/beratung---schulung-fur-betonkosmetik---fugenlose-oberflachen---kreative-wandgestaltung"
+            },
+            {
+              "name": "Onlinekurse",
+              "beschreibung": "Schritt-für-Schritt Videokurse zu verschiedenen Themen der Oberflächenveredelung. Vorerst - Betonkosmetik für Sichtbeton",
+              "stichworte": [
+                "Videos",
+                "Step-by-Step",
+                "Materialkunde"
+              ],
+              "zielgruppe": "Heimwerker, Profis",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/raumkult-academy"
+            },
+            {
+              "name": "Projektcoaching vor Ort",
+              "beschreibung": "Praxisbegleitung und Workshops direkt auf der Baustelle mit Material und Anleitung für Sichtbeton Betonkosmetik",
+              "stichworte": [
+                "Vor-Ort",
+                "Praxisbegleitung",
+                "Fehlervermeidung"
+              ],
+              "zielgruppe": "Heimwerker, Profis",
+              "ist_kernleistung": true,
+              "quelle": "https://www.sichtbeton-cire.de/raumkult-academy"
+            },
+            {
+              "name": "Präsenz-Workshop",
+              "beschreibung": "Intensiv-Workshops in der rauMKult Academy für praktische Erfahrungen.",
+              "stichworte": [
+                "Präsenz",
+                "Workshop",
+                "Praxistag"
+              ],
+              "zielgruppe": "Heimwerker, Profis",
+              "ist_kernleistung": false,
+              "quelle": "https://www.sichtbeton-cire.de/raumkult-academy"
             }
           ],
           "nicht_leistungen": [
-            "Kostenlose Telefonberatung für Heimwerker und DIY-Projekte",
-            "Betreuung von Eigenbauprojekten ohne Auftragserteilung",
-            "Betonherstellung, Rohbau oder Betonbau",
-            "Statische Sanierung oder tragende Betonsanierung",
-            "Abrissarbeiten oder Rückbau",
-            "Lieferung von Baumaterialien ohne Verarbeitung"
-          ],
-          "quelle": "manuell"
-        }
+            {
+              "text": "Kostenlose Telefonberatung für Heimwerker und DIY-Projekte",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Betreuung von Eigenbauprojekten ohne Auftragserteilung",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Betonherstellung, Rohbau oder Betonbau",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Statische Sanierung oder tragende Betonsanierung",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Abrissarbeiten oder Rückbau",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Lieferung von Betonwaren oder Frischbeton",
+              "quelle": "manuell"
+            },
+            {
+              "text": "Kostenlose Telefon oder E-Mail Beratung oder Begleitung für DIY Kunden.",
+              "quelle": "https://www.sichtbeton-cire.de/"
+            }
+          ]
+        },
+        "social_media": {}
       }
     }
   }

@@ -467,11 +467,13 @@ def _ensure_lexware_tables():
                 artikel_id     INTEGER NOT NULL,
                 artikel_quelle TEXT DEFAULT 'lexware',
                 name           TEXT,
+                beschreibung   TEXT,
                 netto_preis    REAL,
                 einheit        TEXT,
                 snapshot_ts    TEXT NOT NULL DEFAULT (datetime('now')),
                 sync_event     TEXT,
-                diff_pct       REAL
+                diff_pct       REAL,
+                aenderung_typ  TEXT DEFAULT 'preis'
             );
 
             CREATE TABLE IF NOT EXISTS manuelle_artikel (
@@ -7359,6 +7361,23 @@ function esInfoPopup(btn, text) {{
     <div class="es-grp-h">Artikel &amp; Preise</div>
     <div class="es-sec-sub" style="margin-bottom:10px">Lexware-Artikel und manuell angelegte Leistungspositionen &mdash; Kira nutzt diese f&uuml;r Preisausk&uuml;nfte und Angebotsvorschl&auml;ge.</div>
 
+    <!-- Sync-Einstellungen -->
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;background:var(--bg-raised);border:1px solid var(--border);border-radius:8px">
+      <div style="font-size:12px">
+        <strong>Automatische Aktualisierung:</strong>
+        <select id="cfg-artikel-sync-intervall" class="es-inp" style="width:140px;margin-left:6px" onchange="upSaveArtikelSync()">
+          <option value="manuell">Nur manuell</option>
+          <option value="taeglich">T&auml;glich</option>
+          <option value="woechentlich">W&ouml;chentlich</option>
+          <option value="monatlich">Monatlich</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">
+        Letzte Aktualisierung: <strong id="up-artikel-last-sync">&mdash;</strong>
+      </div>
+      <button class="es-btn" onclick="upArtikelSyncJetzt()" id="btn-artikel-sync" style="font-size:11px">Jetzt synchronisieren</button>
+    </div>
+
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <button class="es-btn es-btn-pri" onclick="upArtikelNeu()">+ Artikel anlegen</button>
       <button class="es-btn" onclick="upArtikelCsvImport()">CSV importieren</button>
@@ -7371,11 +7390,18 @@ function esInfoPopup(btn, text) {{
       Lexware nicht verbunden &mdash; Artikel k&ouml;nnen manuell angelegt oder per CSV importiert werden. Bei sp&auml;terem Lexware-Anschluss lassen sich alle Artikel dorthin &uuml;bertragen.
     </div>
 
+    <!-- &Auml;nderungshistorie-Link -->
+    <div style="margin-bottom:8px;font-size:12px">
+      <a href="#" onclick="upShowHistorie();return false" style="color:var(--accent);text-decoration:underline">&#x1F4CA; &Auml;nderungshistorie anzeigen</a>
+      <span style="color:var(--muted);margin-left:8px" id="up-historie-count"></span>
+    </div>
+
     <div id="up-artikel-tabelle" style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px" id="tbl-artikel">
         <thead>
           <tr style="border-bottom:2px solid var(--border);text-align:left">
             <th style="padding:6px 8px">Name</th>
+            <th style="padding:6px 8px">Beschreibung</th>
             <th style="padding:6px 8px">Typ</th>
             <th style="padding:6px 8px;text-align:right">Netto-Preis</th>
             <th style="padding:6px 8px">Einheit</th>
@@ -7385,9 +7411,21 @@ function esInfoPopup(btn, text) {{
           </tr>
         </thead>
         <tbody id="tbl-artikel-body">
-          <tr><td colspan="7" style="padding:12px;color:var(--muted);text-align:center">Lade Artikel&hellip;</td></tr>
+          <tr><td colspan="8" style="padding:12px;color:var(--muted);text-align:center">Lade Artikel&hellip;</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- &Auml;nderungshistorie (versteckt, wird per JS eingeblendet) -->
+    <div id="up-historie-panel" style="display:none;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:13px">&#x1F4CA; &Auml;nderungshistorie</strong>
+        <div style="display:flex;gap:6px">
+          <button class="es-btn" style="font-size:11px" onclick="upExportHistorie()">Exportieren (CSV)</button>
+          <button class="es-btn" style="font-size:11px" onclick="document.getElementById('up-historie-panel').style.display='none'">Schlie&szlig;en</button>
+        </div>
+      </div>
+      <div id="up-historie-body" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;font-size:11px"></div>
     </div>
   </div>
   </div><!-- /up-sub-artikel -->
@@ -17790,21 +17828,35 @@ function upArtikelLaden() {{
     const tb = document.getElementById('tbl-artikel-body');
     if(!tb) return;
     if(!d.ok || !d.artikel || d.artikel.length===0) {{
-      tb.innerHTML='<tr><td colspan="7" style="padding:12px;color:var(--muted);text-align:center">Keine Artikel vorhanden &mdash; lege den ersten manuell an oder importiere per CSV.</td></tr>';
+      tb.innerHTML='<tr><td colspan="8" style="padding:12px;color:var(--muted);text-align:center">Keine Artikel vorhanden &mdash; lege den ersten manuell an oder importiere per CSV.</td></tr>';
       return;
     }}
     tb.innerHTML = d.artikel.map(a => {{
-      const preis = a.netto_preis ? (parseFloat(a.netto_preis).toFixed(2).replace('.',',')+' &euro;') : '&mdash;';
+      const preis = a.netto_preis ? (parseFloat(a.netto_preis).toFixed(2).replace('.',',')+' \\u20ac') : '\\u2014';
+      const desc = (a.beschreibung||'').length > 60 ? (a.beschreibung||'').substring(0,57)+'\\u2026' : (a.beschreibung||'');
       const herk = a.herkunft==='lexware' ? '<span style="color:#2563eb">Lexware</span>' : '<span style="color:#16a34a">Manuell</span>';
       const btns = a.editierbar
         ? `<button class="es-btn" style="padding:2px 6px;font-size:11px" onclick="upArtikelEdit(${{a.id}})">&#x270E;</button><button class="es-btn" style="padding:2px 6px;font-size:11px;color:#e84545;border-color:#e84545" onclick="upArtikelDel(${{a.id}},'${{(a.name||'').replace(/'/g,"\\\\'")}}')">&times;</button>`
         : '';
-      return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px">${{a.name||''}}</td><td style="padding:6px 8px">${{a.typ||''}}</td><td style="padding:6px 8px;text-align:right">${{preis}}</td><td style="padding:6px 8px">${{a.einheit||''}}</td><td style="padding:6px 8px">${{a.steuer_satz||''}}</td><td style="padding:6px 8px">${{herk}}</td><td style="padding:6px 8px;display:flex;gap:4px">${{btns}}</td></tr>`;
+      return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px">${{a.name||''}}</td><td style="padding:6px 8px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{(a.beschreibung||'').replace(/"/g,'&quot;')}}">${{desc}}</td><td style="padding:6px 8px">${{a.typ||''}}</td><td style="padding:6px 8px;text-align:right">${{preis}}</td><td style="padding:6px 8px">${{a.einheit||''}}</td><td style="padding:6px 8px">${{a.steuer_satz||''}}</td><td style="padding:6px 8px">${{herk}}</td><td style="padding:6px 8px;display:flex;gap:4px">${{btns}}</td></tr>`;
     }}).join('');
     // Lexware-Transfer-Button zeigen wenn manuelle Artikel existieren
     const hasManual = d.artikel.some(a=>a.herkunft==='manuell');
     const btnLx = document.getElementById('btn-transfer-lx');
     if(btnLx) btnLx.style.display = hasManual ? '' : 'none';
+    // Letzte Sync-Anzeige aktualisieren
+    if(d.artikel.length>0) {{
+      const lxArts = d.artikel.filter(a=>a.herkunft==='lexware' && a.last_sync);
+      if(lxArts.length>0) {{
+        const latest = lxArts.sort((a,b)=>(b.last_sync||'').localeCompare(a.last_sync||''))[0];
+        const el = document.getElementById('up-artikel-last-sync');
+        if(el) el.textContent = latest.last_sync || '\\u2014';
+      }}
+    }}
+    // Lexware-Info-Banner anzeigen wenn keine Lexware-Artikel
+    const hasLx = d.artikel.some(a=>a.herkunft==='lexware');
+    const info = document.getElementById('up-artikel-info');
+    if(info) info.style.display = hasLx ? 'none' : '';
   }});
 }}
 function upArtikelNeu() {{
@@ -17878,6 +17930,68 @@ function upArtikelTransferLexware() {{
   }}).catch(()=>{{
     if(btn) {{ btn.disabled=false; btn.textContent='Zu Lexware \\u00fcbertragen'; }}
   }});
+}}
+// ── Sync-Einstellungen speichern ──
+function upSaveArtikelSync() {{
+  const sel = document.getElementById('cfg-artikel-sync-intervall');
+  if(!sel) return;
+  fetch('/api/config/patch', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{path:'artikel_sync.intervall', value:sel.value}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) showToast('Sync-Intervall gespeichert: '+sel.options[sel.selectedIndex].text);
+    else showToast('Fehler: '+(d.error||''));
+  }});
+}}
+// ── Jetzt synchronisieren ──
+function upArtikelSyncJetzt() {{
+  const btn = document.getElementById('btn-artikel-sync');
+  if(btn) {{ btn.disabled=true; btn.textContent='Synchronisiere\\u2026'; }}
+  fetch('/api/lexware/sync-artikel', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{}}'
+  }}).then(r=>r.json()).then(d=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Jetzt synchronisieren'; }}
+    if(d.ok) {{ showToast(d.message || 'Artikel synchronisiert'); upArtikelLaden(); }}
+    else showToast('Sync-Fehler: '+(d.error||'Unbekannt'));
+  }}).catch(()=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Jetzt synchronisieren'; }}
+    showToast('Sync-Fehler: Verbindung fehlgeschlagen');
+  }});
+}}
+// ── \\u00c4nderungshistorie anzeigen ──
+function upShowHistorie() {{
+  const panel = document.getElementById('up-historie-panel');
+  const body = document.getElementById('up-historie-body');
+  if(!panel||!body) return;
+  panel.style.display = '';
+  body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted)">Lade Historie\\u2026</div>';
+  fetch('/api/artikel/historie').then(r=>r.json()).then(d=>{{
+    if(!d.ok || !d.historie || d.historie.length===0) {{
+      body.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted)">Keine \\u00c4nderungen aufgezeichnet.</div>';
+      return;
+    }}
+    const typLabel = {{'preis':'Preis','name':'Name','beschreibung':'Beschreibung'}};
+    let html = '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border);text-align:left">';
+    html += '<th style="padding:4px 6px">Datum</th><th style="padding:4px 6px">Artikel</th><th style="padding:4px 6px">\\u00c4nderungstyp</th><th style="padding:4px 6px">Preis</th><th style="padding:4px 6px">\\u00c4nderung</th><th style="padding:4px 6px">Quelle</th></tr></thead><tbody>';
+    d.historie.forEach(h=>{{
+      const ts = (h.snapshot_ts||'').replace('T',' ').substring(0,16);
+      const preis = h.netto_preis!=null ? parseFloat(h.netto_preis).toFixed(2).replace('.',',')+' \\u20ac' : '\\u2014';
+      const diff = h.diff_pct!=null ? (h.diff_pct>0?'+':'')+h.diff_pct.toFixed(1)+'%' : '';
+      const diffColor = h.diff_pct>0 ? '#e84545' : h.diff_pct<0 ? '#16a34a' : '';
+      const typ = typLabel[h.aenderung_typ] || h.aenderung_typ || 'Preis';
+      html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 6px">${{ts}}</td><td style="padding:4px 6px">${{h.name||''}}</td><td style="padding:4px 6px">${{typ}}</td><td style="padding:4px 6px;text-align:right">${{preis}}</td><td style="padding:4px 6px;color:${{diffColor}}">${{diff}}</td><td style="padding:4px 6px">${{h.artikel_quelle||''}}</td></tr>`;
+    }});
+    html += '</tbody></table>';
+    body.innerHTML = html;
+    const cnt = document.getElementById('up-historie-count');
+    if(cnt) cnt.textContent = d.historie.length+' Eintr\\u00e4ge';
+  }}).catch(()=>{{
+    body.innerHTML = '<div style="padding:12px;text-align:center;color:#e84545">Fehler beim Laden der Historie.</div>';
+  }});
+}}
+// ── Historie exportieren (CSV) ──
+function upExportHistorie() {{
+  window.location.href = '/api/artikel/historie/export?format=csv';
 }}
 // Artikel laden wenn Unternehmensprofile/Artikel geöffnet
 (function() {{
@@ -24316,7 +24430,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 db = get_db()
                 try:
                     rows = db.execute(
-                        "SELECT name, netto_preis, einheit, snapshot_ts, sync_event, diff_pct, artikel_quelle "
+                        "SELECT name, beschreibung, netto_preis, einheit, snapshot_ts, sync_event, diff_pct, artikel_quelle, aenderung_typ "
                         "FROM artikel_preishistorie WHERE artikel_id=? ORDER BY snapshot_ts DESC LIMIT 100",
                         (art_id,)
                     ).fetchall()
@@ -24344,6 +24458,49 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except Exception:
                     stats["artikel_manuell"] = 0
                 self._json({"ok": True, **stats})
+            finally:
+                db.close()
+
+        elif self.path == '/api/artikel/historie' or self.path.startswith('/api/artikel/historie?'):
+            # GET /api/artikel/historie — Gesamte Änderungshistorie
+            db = get_db()
+            try:
+                rows = db.execute(
+                    "SELECT artikel_id, name, beschreibung, netto_preis, einheit, snapshot_ts, "
+                    "sync_event, diff_pct, artikel_quelle, aenderung_typ "
+                    "FROM artikel_preishistorie ORDER BY snapshot_ts DESC LIMIT 500"
+                ).fetchall()
+                self._json({"ok": True, "historie": [dict(r) for r in rows], "count": len(rows)})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+            finally:
+                db.close()
+
+        elif self.path.startswith('/api/artikel/historie/export'):
+            # GET /api/artikel/historie/export?format=csv — CSV-Export der Änderungshistorie
+            db = get_db()
+            try:
+                rows = db.execute(
+                    "SELECT snapshot_ts, name, beschreibung, netto_preis, einheit, aenderung_typ, "
+                    "diff_pct, artikel_quelle, sync_event "
+                    "FROM artikel_preishistorie ORDER BY snapshot_ts DESC"
+                ).fetchall()
+                lines = ["Datum;Artikel;Beschreibung;Netto-Preis;Einheit;Änderungstyp;Änderung %;Quelle;Event"]
+                for r in rows:
+                    rd = dict(r)
+                    lines.append(";".join(str(rd.get(k, "")) for k in [
+                        "snapshot_ts", "name", "beschreibung", "netto_preis", "einheit",
+                        "aenderung_typ", "diff_pct", "artikel_quelle", "sync_event"
+                    ]))
+                data = "\n".join(lines).encode("utf-8-sig")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="artikel_historie.csv"')
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
             finally:
                 db.close()
 
@@ -32386,6 +32543,45 @@ def _handle_lexware_post(handler, path, body):
             rlog('system', 'lexware_sync', f"Sync abgeschlossen: {stats}",
                  source='server', modul='lexware', actor_type='system', status='ok')
             handler._json({"ok": True, "stats": stats, "ts": ts})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/lexware/sync-artikel — Nur Artikel synchronisieren
+    if path == '/api/lexware/sync-artikel':
+        try:
+            from lexware_client import get_client
+            client = get_client(cfg)
+            db = get_db()
+            stats = client.sync_artikel_to_db(db)
+            ts = datetime.now().isoformat(timespec="seconds")
+            db.commit()
+            db.close()
+            handler._json({"ok": True, "message": f"Artikel synchronisiert: {stats.get('updated', 0)} aktualisiert, {stats.get('inserted', 0)} neu", "stats": stats, "ts": ts})
+        except Exception as e:
+            handler._json({"ok": False, "error": str(e)})
+        return True
+
+    # POST /api/config/patch — Einzelnen Config-Wert setzen (path + value)
+    if path == '/api/config/patch':
+        try:
+            cfg_path_str = body.get("path", "")
+            value = body.get("value")
+            if not cfg_path_str:
+                handler._json({"ok": False, "error": "path fehlt"})
+                return True
+            cfg_file = SCRIPTS_DIR / "config.json"
+            cfg_data = json.loads(cfg_file.read_text("utf-8"))
+            # Verschachtelten Pfad setzen (z.B. "artikel_sync.intervall")
+            keys = cfg_path_str.split(".")
+            obj = cfg_data
+            for k in keys[:-1]:
+                if k not in obj or not isinstance(obj[k], dict):
+                    obj[k] = {}
+                obj = obj[k]
+            obj[keys[-1]] = value
+            cfg_file.write_text(json.dumps(cfg_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            handler._json({"ok": True})
         except Exception as e:
             handler._json({"ok": False, "error": str(e)})
         return True

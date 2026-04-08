@@ -709,27 +709,46 @@ class LexwareClient:
                     "name":        a.get("title", ""),
                     "beschreibung": a.get("description", ""),
                     "einheit":     a.get("unitName", ""),
-                    "netto_preis": a.get("netPrice", 0),
-                    "steuer_satz": a.get("taxRateType", ""),
+                    "netto_preis": a.get("price", {}).get("netPrice", 0) if isinstance(a.get("price"), dict) else a.get("netPrice", 0),
+                    "steuer_satz": str(a.get("price", {}).get("taxRate", "")) + "%" if isinstance(a.get("price"), dict) and a.get("price", {}).get("taxRate") else a.get("taxRateType", ""),
                     "typ":         a.get("type", ""),
                     "last_sync":   datetime.now().isoformat(timespec="seconds"),
                     "payload_json": json.dumps(a, ensure_ascii=False),
                 }
                 if existing:
-                    # Preis-Snapshot bei Änderung
+                    # Änderungs-Tracking: Preis, Name, Beschreibung
                     try:
                         old = db.execute(
-                            "SELECT netto_preis FROM lexware_artikel WHERE lexware_id=?", (lex_id,)
+                            "SELECT netto_preis, name, beschreibung FROM lexware_artikel WHERE lexware_id=?", (lex_id,)
                         ).fetchone()
                         old_preis = old[0] if old else None
+                        old_name = old[1] if old else None
+                        old_beschr = old[2] if old else None
                         new_preis = row["netto_preis"]
+                        # Preis-Änderung
                         if old_preis is not None and old_preis != new_preis:
                             diff_pct = ((new_preis - old_preis) / old_preis * 100) if old_preis else 0
                             db.execute(
                                 "INSERT INTO artikel_preishistorie "
-                                "(artikel_id, artikel_quelle, name, netto_preis, einheit, sync_event, diff_pct) "
-                                "VALUES (?, 'lexware', ?, ?, ?, 'lexware_sync', ?)",
-                                (existing[0], row["name"], new_preis, row["einheit"], round(diff_pct, 2))
+                                "(artikel_id, artikel_quelle, name, beschreibung, netto_preis, einheit, sync_event, diff_pct, aenderung_typ) "
+                                "VALUES (?, 'lexware', ?, ?, ?, ?, 'lexware_sync', ?, 'preis')",
+                                (existing[0], row["name"], row["beschreibung"], new_preis, row["einheit"], round(diff_pct, 2))
+                            )
+                        # Name-Änderung
+                        if old_name and old_name != row["name"]:
+                            db.execute(
+                                "INSERT INTO artikel_preishistorie "
+                                "(artikel_id, artikel_quelle, name, beschreibung, netto_preis, einheit, sync_event, aenderung_typ) "
+                                "VALUES (?, 'lexware', ?, ?, ?, ?, 'lexware_sync', 'name')",
+                                (existing[0], row["name"], row["beschreibung"], new_preis, row["einheit"])
+                            )
+                        # Beschreibung-Änderung
+                        if old_beschr is not None and old_beschr != row["beschreibung"]:
+                            db.execute(
+                                "INSERT INTO artikel_preishistorie "
+                                "(artikel_id, artikel_quelle, name, beschreibung, netto_preis, einheit, sync_event, aenderung_typ) "
+                                "VALUES (?, 'lexware', ?, ?, ?, ?, 'lexware_sync', 'beschreibung')",
+                                (existing[0], row["name"], row["beschreibung"], new_preis, row["einheit"])
                             )
                     except Exception:
                         pass  # Preishistorie-Tabelle existiert ggf. noch nicht
