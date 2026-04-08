@@ -1,5 +1,26 @@
 # Session Log
 
+## 2026-04-08 23:15 — Session-Ende (session-pp-cont4)
+**Auftrag:** Artikel-UI fertigstellen: Beschreibungs-Spalte, Sync-UI, Änderungshistorie, Netto-Preis-Fix, Playwright reparieren.
+**Status:** erledigt
+
+### Änderungen:
+- `upArtikelLaden()` von 7 auf 8 Spalten erweitert (Beschreibung sichtbar, Last-Sync-Anzeige, Info-Banner)
+- 4 neue JS-Funktionen: `upSaveArtikelSync()`, `upArtikelSyncJetzt()`, `upShowHistorie()`, `upExportHistorie()`
+- 3 neue API-Endpoints: `GET /api/artikel/historie`, `GET /api/artikel/historie/export`, `POST /api/lexware/sync-artikel`
+- `POST /api/config/patch` — universeller Config-Patch-Endpoint (dot-notation Pfade)
+- Routing-Bug: `/api/config/patch` aus `_handle_lexware_post()` in `do_POST()` verschoben
+- Lexware `netto_preis`-Extraktion gefixt (`price.netPrice` statt `netPrice`)
+- `artikel_preishistorie` API liefert jetzt `beschreibung` + `aenderung_typ`
+- Playwright repariert (browser_close + navigate)
+- Alle Tests bestanden: 0 JS-Fehler, alle Endpoints funktional
+
+### Commits:
+- `79db99b` — fix(artikel): Beschreibungs-Spalte + Sync-UI + Änderungshistorie + Netto-Preis-Fix
+- `98f7a19` — fix(routing): /api/config/patch aus _handle_lexware_post in do_POST verschoben
+
+---
+
 ## 2026-04-08 22:15 — Session-Start (session-oo)
 **Auftrag:** Universelle Verknüpfung + Projekt-System — Thread-Awareness im Classifier, Projekt-Vorgänge (typ='projekt'), automatische Zuordnung, 4 Kira Projekt-Tools, CRM-Vorbereitung.
 **Status:** erledigt

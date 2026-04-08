@@ -13,7 +13,12 @@
 
 
 ### ✅ ERLEDIGT (session-uu verifiziert) — Wissensregeln Zeitstempel: erstellt_am + geaendert_am vorhanden, UI zeigt beide. Ignorieren-Lernmodal schreibt automatisch neue Regeln.
-\--   wird hiese Datenbank durch kira tatsächlich erweitert und gepflegt? das soll automatisch geschehen durch ihr gelerntes.. nicht nur die starren sachen die wir am anfang eingtragen haben. auch soll sie nachschauen ob ähnliche bestehen und anpassen wenn es Änderungen gibt. ansonsten wiedersprechen sich irgendwann die Ereignisse. kira llm soll diese Datenbanken und das log immer mit nutzen und aktualisieren und muster erkennen. smart haltmir nützt das nichts wenn sich preise ändern, und die werden nie automatisch gepflegt, deshalb sollte jede abfrage, jedes Angebot, jede Rechnung , jede antwort etc. zusammenarbeiten und auf muster suchen die zusammengehören , analysieren, auswerten, und anpassen, dass dann dokumentieren, vorher nachher ist, etc..
+### ✅ TEILWEISE ERLEDIGT (session-pp, 2026-04-08) — Wissensregeln Datenbank automatisch pflegen + Preise:
+- Kira hat jetzt 3 Artikel-Preis-Tools (artikel_preise_abfragen, angebot_positionen_vorschlagen, preisentwicklung_abfragen)
+- artikel_preishistorie Tabelle zeichnet Preis-, Name- und Beschreibungsänderungen automatisch auf
+- Lexware-Artikel werden bei jedem Sync geprüft und Änderungen dokumentiert
+- Top-20 Artikel mit Preisen automatisch im Kira-System-Prompt
+- ⚠️ OFFEN: Muster-Erkennung über Angebote/Rechnungen/Antworten hinweg + automatische Wissensregel-Aktualisierung bei Widersprüchen
 
 
 

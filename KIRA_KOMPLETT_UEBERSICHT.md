@@ -565,4 +565,63 @@ Der Assistent sollte idealerweise in einer gesicherten Unternehmensumgebung betr
 
 ---
 
-*Erstellt am 25.03.2026. Letzte Aktualisierung: 25.03.2026 (Phase 0 fertig).*
+---
+
+## ERGÄNZUNGEN SEIT 25.03.2026 (session-r bis session-pp-cont4)
+
+_Stand: 2026-04-08 · Kurzform — vollständige Details in feature_registry.json_
+
+### Neue DB-Tabellen
+
+| Tabelle | DB | Zweck |
+|---------|-----|-------|
+| `artikel_preishistorie` | kunden.db | Preis-/Name-/Beschreibungsänderungen mit diff_pct + aenderung_typ |
+| `manuelle_artikel` | kunden.db | Lexware-kompatibles Schema für Artikel ohne Lexware-Anbindung |
+| `vorgaenge` | tasks.db | Case Engine Vorgänge (10 Typen, Status-Maschinen) |
+| `vorgang_links` | tasks.db | Verknüpfungen zwischen Vorgängen und Tasks/Angeboten/Rechnungen |
+| `vorgang_status_history` | tasks.db | Statusübergänge mit Timestamps |
+| `vorgang_signals` | tasks.db | Signal-Queue für Activity-Drawer (Stufe A/B/C) |
+| `geloeschte_protokoll` | tasks.db | Protokoll gelöschter Mails |
+| `dokumente` | kunden.db | Dokumente-Modul (Eingang, Studio, Vorlagen) |
+
+### Neue Kira-Tools (15+ seit session-r)
+
+| Tool | Modul | Zweck |
+|------|-------|-------|
+| `artikel_preise_abfragen` | kira_llm.py | LIKE-Suche in lexware_artikel + manuelle_artikel |
+| `angebot_positionen_vorschlagen` | kira_llm.py | LLM wählt passende Artikel + Mengen |
+| `preisentwicklung_abfragen` | kira_llm.py | Chronologische Preis-Snapshots + Trend |
+| `vorgang_kontext_laden` | kira_llm.py | Vorgang-Details mit Status-History |
+| `vorgang_status_setzen` | kira_llm.py | Statusübergang in Case Engine |
+| `projekt_erstellen` | kira_llm.py | Neues Projekt als Vorgang anlegen |
+| `projekt_mails_zuordnen` | kira_llm.py | Mails zu Projekt verknüpfen |
+| `mail_korrektur` | kira_llm.py | Klassifizierung korrigieren + neu zuordnen |
+
+### Neue API-Endpoints (Auswahl der wichtigsten)
+
+| Method | Pfad | Zweck |
+|--------|------|-------|
+| GET | /api/artikel | Vereinheitlichte Artikelliste (Lexware + Manuell) |
+| GET | /api/artikel/historie | Gesamt-Änderungshistorie |
+| GET | /api/artikel/historie/export | CSV-Export der Historie |
+| GET | /api/artikel/statistik | Aggregierte Preis-Statistiken |
+| POST | /api/artikel | Manuellen Artikel anlegen |
+| POST | /api/artikel/import | CSV-Import |
+| POST | /api/artikel/transfer-lexware | Manuelle Artikel zu Lexware übertragen |
+| POST | /api/lexware/sync-artikel | Nur Artikel synchronisieren |
+| POST | /api/config/patch | Einzelnen Config-Wert setzen (dot-notation) |
+| GET | /api/vorgang/* | 8 Vorgang-API-Endpoints |
+| GET | /api/presence | Präsenz-Erkennung (idle detection) |
+| POST | /api/dokumente/* | Dokumente CRUD + Export |
+
+### Architektur-Änderungen
+
+- **5-Stufen Routing**: Vorfilter → Klassifizierung → Routing → Vorgang → Task
+- **Case Engine**: dict-basierte Statusmaschinen für 10 Vorgangstypen
+- **Thread-Awareness**: Mails im Kontext des Verlaufs klassifizieren
+- **Unternehmensprofile**: Neue Pane-2 Sub-Navigation mit 6 Tabs
+- **Universelle Handlungsfähigkeit**: Kira kann in allen Modulen CRUD ausführen
+- **Activity-Drawer**: Windows 11 Widget-Style mit Signal-System
+- **Anhang-Extraktion**: PDF/DOCX/ZIP/OCR + Vision-Fallback bei Klassifizierung
+
+*Erstellt am 25.03.2026. Letzte Aktualisierung: 2026-04-08 (session-pp-cont4).*

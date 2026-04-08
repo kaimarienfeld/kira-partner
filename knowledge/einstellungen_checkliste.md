@@ -1,5 +1,6 @@
 # Einstellungen – Vollständige Checkliste & Erweiterungsvorschläge
 _Stand: 2026-03-28 · session-t · Analyse-Basis: config.json, server.py (~8700 Z.), kira_llm.py, mail_monitor.py, llm_classifier.py_
+_⚠️ HINWEIS: Aktuelle Version ist `knowledge/Todo_checkliste.md` — diese Datei ist seit session-t nicht mehr aktualisiert._
 
 ---
 

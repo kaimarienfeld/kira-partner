@@ -601,4 +601,41 @@ _Diese Punkte betreffen die direkte Kopplung zwischen Einstellungen und Kira's V
 | ⬜ | Activity-Drawer: Auto-Open bei Events | Drawer soll sich automatisch öffnen bei bestimmten Ereignissen: neue Leads, Memo-Zuordnung (Capture), neue Signale Stufe C. Nicht bei jedem Polling — nur bei echten neuen Items. |
 
 ---
-_Erstellt: session-r · 2026-03-27 · Zuletzt: session-gggg · 2026-04-08_
+
+## UNTERNEHMENSPROFILE (session-pp, 2026-04-08)
+
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | Pane-2 Sub-Navigation (6 Tabs) | Firmendaten, Team, Domains, Leistungskatalog, Artikel & Preise, Benutzerprofile |
+| ✅ | "Benutzerprofile" → "Unternehmensprofile" Rename | 🏢 Icon, esP2Select() angepasst |
+| ✅ | Leistungskatalog Akkordeon-UI | Gruppen-Akkordeon, Nicht-Leistungen pro Gruppe integriert |
+| ✅ | Website-Import mit Subpage-Crawler | LLM-Analyse, Checkbox "Nur diese Seite" |
+| ✅ | Website-URLs in Kira-Antworten | quelle-URL pro Leistung, "Mehr erfahren"-Link Instruktion |
+| ✅ | Artikel & Preise Tabelle (8 Spalten) | Name, Beschreibung, Typ, Netto-Preis, Einheit, Steuer, Herkunft, Aktionen |
+| ✅ | Artikel CRUD (Manuell) | POST /api/artikel, /update, /delete |
+| ✅ | CSV Import/Export | POST /api/artikel/import, GET /api/artikel/export?format=csv/json |
+| ✅ | Lexware-Transfer | POST /api/artikel/transfer-lexware via create_article() |
+| ✅ | Sync-Einstellungen | Dropdown (manuell/täglich/wöchentlich/monatlich), /api/config/patch |
+| ✅ | "Jetzt synchronisieren" Button | POST /api/lexware/sync-artikel |
+| ✅ | Letzte Aktualisierung Anzeige | Aus last_sync der Lexware-Artikel |
+| ✅ | Änderungshistorie Panel | GET /api/artikel/historie + scrollIntoView |
+| ✅ | Historie CSV-Export | GET /api/artikel/historie/export?format=csv |
+| ✅ | Preisentwicklungs-Statistik | artikel_preishistorie Tabelle (preis/name/beschreibung Änderungstypen) |
+| ✅ | 3 Kira-Artikel-Tools | artikel_preise_abfragen, angebot_positionen_vorschlagen, preisentwicklung_abfragen |
+| ✅ | Lexware-Info-Banner | Zeigt "Lexware nicht verbunden" wenn keine Lexware-Artikel |
+| ⬜ | Sync-Intervall Timer | Config-Wert wird gespeichert, aber kein Background-Thread prüft/triggert automatisch |
+
+## ROUTING & KLASSIFIZIERUNG (session-oo..pp, 2026-04-08)
+
+| Status | Element | Anmerkung |
+|--------|---------|-----------|
+| ✅ | 5-Stufen Routing-System | Tasks nur bei echtem Handlungsbedarf |
+| ✅ | Eigene Domains konfigurierbar | Statt hardcoded |
+| ✅ | Thread-Awareness | thread_id Tracking, 60-Tage + Betreff-Fallback |
+| ✅ | Projekt-Vorgänge | typ='projekt' in Case Engine, 4 Kira-Tools |
+| ✅ | Bereits beantwortete Mails erkennen | Keine doppelten "Neue Lead" |
+| ✅ | Universelle Handlungsfähigkeit | Korrektur-CRUD-Kontext für alle Module |
+| ✅ | Anhang-Text-Extraktion | PDF/DOCX/ZIP/OCR + Vision-Fallback |
+
+---
+_Erstellt: session-r · 2026-03-27 · Zuletzt: session-pp-cont4 · 2026-04-08_

@@ -1,5 +1,5 @@
 {
-  "_updated": "2026-04-08 00:15 session-ffff — Bereinigung + Nachklassifizierung + LLM-Ausfall-Schutz",
+  "_updated": "2026-04-08 23:45 session-pp-cont4 — Artikel-Preise, Routing, Klassifizierung",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
@@ -489,6 +489,57 @@
       "fixed": "2026-04-08 00:15 MEZ",
       "session": "session-ffff",
       "fix_summary": "_all_providers_failed Check: Mail nur indexieren, keinen Task erstellen. reclassify_low_confidence() holt nach wenn Budget wieder da."
+    },
+    {
+      "id": "ISS-036",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/lexware_client.py",
+      "area": "lexware, artikel",
+      "title": "Lexware Netto-Preise alle 0.00 — falscher API-Pfad",
+      "description": "sync_artikel_to_db() las a.get('netPrice', 0) — aber Lexware API liefert Preise unter price.netPrice (verschachteltes Dict). 51/52 Artikel hatten netto_preis=0.",
+      "discovered": "2026-04-08 22:00 MEZ",
+      "fixed": "2026-04-08 22:30 MEZ",
+      "session": "session-pp-cont3",
+      "fix_summary": "a.get('price',{}).get('netPrice',0) + Einmal-DB-Repair für 51 betroffene Artikel. Gleiches für steuer_satz (price.taxRate)."
+    },
+    {
+      "id": "ISS-037",
+      "status": "fixed",
+      "priority": "important",
+      "module": "scripts/server.py",
+      "area": "routing, api",
+      "title": "/api/config/patch nie erreichbar — in falscher Handler-Funktion",
+      "description": "POST /api/config/patch wurde in _handle_lexware_post() implementiert, die nur für /api/lexware/* aufgerufen wird. Endpoint antwortete immer mit 404.",
+      "discovered": "2026-04-08 23:00 MEZ",
+      "fixed": "2026-04-08 23:10 MEZ",
+      "session": "session-pp-cont4",
+      "fix_summary": "Handler aus _handle_lexware_post() in die direkte do_POST()-Kette verschoben."
+    },
+    {
+      "id": "ISS-038",
+      "status": "fixed",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "lexware, api",
+      "title": "/api/lexware/artikel/{id} Endpoint fehlte",
+      "description": "Frontend (Zeile 17165) rief /api/lexware/artikel/{id} auf, aber der Backend-Endpoint war nie implementiert → 404.",
+      "discovered": "2026-04-08 20:00 MEZ",
+      "fixed": "2026-04-08 21:00 MEZ",
+      "session": "session-pp",
+      "fix_summary": "_api_lexware_artikel() Handler implementiert."
+    },
+    {
+      "id": "ISS-039",
+      "status": "open",
+      "priority": "cosmetic",
+      "module": "chrome",
+      "area": "browser",
+      "title": "Chrome --no-sandbox Warnung im Browser",
+      "description": "Gelbes Banner 'Du verwendest ein nicht unterstütztes Befehlszeilen-Flag: --no-sandbox'. Nicht durch KIRA-Code verursacht — Chrome wurde extern mit diesem Flag gestartet. Registry + aktuelle Kommandozeile enthalten das Flag nicht.",
+      "discovered": "2026-04-08 23:30 MEZ",
+      "session": "session-pp-cont4",
+      "workaround": "Chrome komplett schließen und über Startmenü (ohne --no-sandbox) neu öffnen. Taskbar-Pin ggf. prüfen."
     }
   ]
 }
