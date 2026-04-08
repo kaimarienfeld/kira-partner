@@ -764,11 +764,15 @@ Du kannst die Datenstruktur aktiv verändern:
 ✓ Aufgaben erstellen, bearbeiten, erledigen, löschen (task_erstellen, task_bearbeiten, task_erledigen, tasks_loeschen)
 ✓ Kategorien korrigieren — für Tasks, Captures, Vorgänge, Belege (korrektur)
 ✓ Wissensregeln erstellen, bearbeiten, deaktivieren (wissen_verwalten)
+✓ Projekte anlegen, suchen, zuordnen und Kontext laden (projekt_anlegen, projekt_suchen, projekt_zuordnen, projekt_kontext_laden)
 ✓ Korrekturen werden automatisch als Lernbeispiele für den Classifier gespeichert
 
 Wenn der Benutzer sagt "das ist falsch eingeordnet" → korrektur-Tool nutzen
 Wenn der Benutzer sagt "merk dir das" / "das ist wichtig" → wissen_verwalten
 Wenn aus dem Gespräch eine Aufgabe entsteht → task_erstellen anbieten
+Wenn ein neuer Auftrag/Kunde/Vorhaben entsteht → projekt_anlegen anbieten
+Wenn der Benutzer nach einem Kunden/Projekt fragt → projekt_suchen + projekt_kontext_laden
+Wenn etwas einem Projekt zugeordnet werden soll → projekt_zuordnen
 
 ━━━ SO ARBEITEST DU ━━━
 1. KONTEXT ZUERST: Bevor du antwortest oder handelst, nutze IMMER die Tools um den vollständigen Kontext zu holen.
@@ -859,6 +863,17 @@ Alle Geschäftsdaten sind streng vertraulich. Nie erfinden — immer aus Daten.
         if vs and vs.strip():
             prompt += f"\n\nOFFENE VORGAENGE (Case Engine):\n{vs}\n"
             prompt += "\nNutze vorgang_kontext_laden fuer den vollstaendigen Kontext eines Vorgangs.\n"
+    except Exception:
+        pass
+
+    # Aktive Projekte (session-oo: Universelle Verknüpfung)
+    try:
+        from case_engine import get_projekt_summary_for_kira
+        ps = get_projekt_summary_for_kira(limit=8)
+        if ps and ps.strip():
+            prompt += f"\n\n{ps}\n"
+            prompt += "\nNutze projekt_kontext_laden für Details zu einem Projekt. "
+            prompt += "Nutze projekt_zuordnen um Mails/Tasks/Dokumente einem Projekt zuzuweisen.\n"
     except Exception:
         pass
 
@@ -1929,6 +1944,90 @@ def get_tools(config=None):
         }
     })
 
+    # ── Projekt-Tools (session-oo: Universelle Verknüpfung) ──
+    tools.append({
+        "name": "projekt_anlegen",
+        "description": (
+            "Legt ein neues Projekt an (als Vorgang vom Typ 'projekt'). "
+            "Nutze dies wenn ein neuer Auftrag, eine neue Anfrage oder ein neues Vorhaben eines Kunden entsteht. "
+            "Jedes Projekt bekommt automatisch eine Projektnummer (P-YYYY-NNN)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunde_name": {"type": "string", "description": "Name des Kunden/der Firma"},
+                "titel": {"type": "string", "description": "Kurzer Projekttitel, z.B. 'Betondecke Sanierung EG'"},
+                "kunde_email": {"type": "string", "description": "E-Mail-Adresse des Kunden (optional)"},
+                "typ_detail": {
+                    "type": "string",
+                    "enum": ["neubau", "sanierung", "beratung", "reklamation", "sonstiges"],
+                    "description": "Detaillierter Projekttyp"
+                },
+                "adresse": {"type": "string", "description": "Baustellenadresse (optional)"},
+                "notiz": {"type": "string", "description": "Zusätzliche Notizen (optional)"}
+            },
+            "required": ["kunde_name", "titel"]
+        }
+    })
+
+    tools.append({
+        "name": "projekt_suchen",
+        "description": (
+            "Sucht nach bestehenden Projekten — nach Kundenname, E-Mail oder Stichwörtern im Titel. "
+            "Gibt eine Liste passender Projekte mit Projektnummer, Status und verknüpften Entitäten zurück."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunde_name": {"type": "string", "description": "Kundenname (Teilsuche)"},
+                "kunde_email": {"type": "string", "description": "E-Mail-Adresse"},
+                "stichwort": {"type": "string", "description": "Stichwörter im Projekttitel"},
+                "status": {
+                    "type": "string",
+                    "enum": ["aktiv", "abgeschlossen", "alle"],
+                    "description": "Statusfilter (Standard: aktiv)"
+                }
+            }
+        }
+    })
+
+    tools.append({
+        "name": "projekt_zuordnen",
+        "description": (
+            "Ordnet eine Mail, Aufgabe, ein Dokument oder Capture einem bestehenden Projekt zu. "
+            "Die Verknüpfung erfolgt über die universelle vorgang_links-Tabelle."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "projekt_vorgang_id": {"type": "integer", "description": "vorgang_id des Projekts"},
+                "entitaet_typ": {
+                    "type": "string",
+                    "enum": ["task", "mail", "dokument", "capture", "angebot", "rechnung"],
+                    "description": "Typ der zu verknüpfenden Entität"
+                },
+                "entitaet_id": {"type": "integer", "description": "ID der Entität"},
+                "kanal": {"type": "string", "description": "Herkunftskanal (email, capture, manuell, chat)"}
+            },
+            "required": ["projekt_vorgang_id", "entitaet_typ", "entitaet_id"]
+        }
+    })
+
+    tools.append({
+        "name": "projekt_kontext_laden",
+        "description": (
+            "Lädt den vollständigen Kontext eines Projekts — alle verknüpften Mails, Aufgaben, "
+            "Dokumente und Vorgänge. Suche nach vorgang_id oder Projektnummer."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "projekt_vorgang_id": {"type": "integer", "description": "vorgang_id des Projekts"},
+                "projekt_nr": {"type": "string", "description": "Projektnummer (z.B. P-2025-001) — Alternative zu vorgang_id"}
+            }
+        }
+    })
+
     return tools
 
 
@@ -1995,6 +2094,10 @@ def execute_tool(name, params):
             "dokument_suchen": _tool_dokument_suchen,
             "dokument_erstellen": _tool_dokument_erstellen,
             "dokument_zuordnen": _tool_dokument_zuordnen,
+            "projekt_anlegen": _tool_projekt_anlegen,
+            "projekt_suchen": _tool_projekt_suchen,
+            "projekt_zuordnen": _tool_projekt_zuordnen,
+            "projekt_kontext_laden": _tool_projekt_kontext_laden,
         }
         handler = handlers.get(name)
         if not handler:
@@ -4566,6 +4669,149 @@ def _tool_dokument_zuordnen(p):
         except Exception:
             pass
         return {"ok": True, "message": f"Dokument #{dok_id} wurde Vorgang #{vorgang_id} zugeordnet."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Projekt-Tool-Handler (session-oo: Universelle Verknüpfung) ───────────────
+
+def _tool_projekt_anlegen(p):
+    """Legt ein neues Projekt als Vorgang (typ='projekt') an."""
+    kunde_name = p.get("kunde_name", "").strip()
+    titel = p.get("titel", "").strip()
+    if not kunde_name or not titel:
+        return {"ok": False, "error": "kunde_name und titel sind erforderlich"}
+    try:
+        from case_engine import create_projekt
+        result = create_projekt(
+            kunde_name=kunde_name,
+            titel=titel,
+            kunde_email=p.get("kunde_email", ""),
+            typ_detail=p.get("typ_detail"),
+            adresse=p.get("adresse"),
+            quelle="kira",
+            notiz=p.get("notiz"),
+        )
+        pnr = result.get("projekt_nr", "?")
+        vid = result.get("vorgang_id", "?")
+        try:
+            _elog("kira", "projekt_erstellt", f"Neues Projekt {pnr}: {titel} ({kunde_name})",
+                  source="kira_llm", modul="projekt", status="ok")
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "message": f"Projekt {pnr} wurde angelegt: '{titel}' für {kunde_name}.",
+            "projekt_nr": pnr,
+            "vorgang_id": vid,
+            "kontakt_id": result.get("kontakt_id"),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_projekt_suchen(p):
+    """Sucht nach bestehenden Projekten."""
+    try:
+        from case_engine import find_projekt
+        projekte = find_projekt(
+            kunde_name=p.get("kunde_name"),
+            kunde_email=p.get("kunde_email"),
+            titel_keywords=p.get("stichwort"),
+            status=p.get("status", "aktiv"),
+        )
+        if not projekte:
+            return {"ok": True, "message": "Keine Projekte gefunden.", "projekte": []}
+        ergebnisse = []
+        for pr in projekte:
+            ergebnisse.append({
+                "vorgang_id": pr.get("id"),
+                "projekt_nr": pr.get("projekt_nr") or pr.get("vorgang_nr"),
+                "titel": pr.get("titel"),
+                "kunde": pr.get("kunden_name") or pr.get("kunden_email"),
+                "status": pr.get("status"),
+                "datum": (pr.get("aktualisiert_am") or "")[:10],
+            })
+        return {
+            "ok": True,
+            "message": f"{len(ergebnisse)} Projekt(e) gefunden.",
+            "projekte": ergebnisse,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_projekt_zuordnen(p):
+    """Ordnet eine Entität einem Projekt-Vorgang zu."""
+    vorgang_id = int(p.get("projekt_vorgang_id", 0))
+    entitaet_typ = p.get("entitaet_typ", "")
+    entitaet_id = p.get("entitaet_id", 0)
+    kanal = p.get("kanal", "chat")
+    if not vorgang_id or not entitaet_typ or not entitaet_id:
+        return {"ok": False, "error": "projekt_vorgang_id, entitaet_typ und entitaet_id erforderlich"}
+    try:
+        from case_engine import assign_to_projekt
+        link_id = assign_to_projekt(vorgang_id, entitaet_typ, str(entitaet_id), kanal=kanal)
+        try:
+            _elog("kira", "projekt_zuordnung",
+                  f"Kira: {entitaet_typ} #{entitaet_id} → Projekt-Vorgang #{vorgang_id}",
+                  source="kira_llm", modul="projekt", status="ok")
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "message": f"{entitaet_typ.capitalize()} #{entitaet_id} wurde dem Projekt zugeordnet.",
+            "link_id": link_id,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_projekt_kontext_laden(p):
+    """Lädt vollständigen Projekt-Kontext."""
+    vorgang_id = p.get("projekt_vorgang_id")
+    projekt_nr = p.get("projekt_nr")
+    if not vorgang_id and not projekt_nr:
+        return {"ok": False, "error": "projekt_vorgang_id oder projekt_nr erforderlich"}
+    try:
+        from case_engine import get_projekt_kontext
+        kontext = get_projekt_kontext(
+            vorgang_id=int(vorgang_id) if vorgang_id else None,
+            projekt_nr=projekt_nr,
+        )
+        if kontext.get("fehler"):
+            return {"ok": False, "error": kontext["fehler"]}
+
+        projekt = kontext.get("projekt", {})
+        tasks = kontext.get("tasks", [])
+        mails = kontext.get("mails", [])
+        dokumente = kontext.get("dokumente", [])
+
+        # Formatierten Überblick bauen
+        lines = [
+            f"Projekt: {projekt.get('projekt_nr', '?')} — {projekt.get('titel', '?')}",
+            f"Kunde: {projekt.get('kunden_name', '?')} ({projekt.get('kunden_email', '?')})",
+            f"Status: {projekt.get('status', '?')} | Erstellt: {(projekt.get('erstellt_am') or '')[:10]}",
+            f"Verknüpfungen: {kontext.get('anzahl_links', 0)} gesamt",
+        ]
+        if tasks:
+            lines.append(f"\nAufgaben ({len(tasks)}):")
+            for t in tasks[:10]:
+                lines.append(f"  • #{t.get('id','')} {t.get('titel','')} [{t.get('status','')}]")
+        if mails:
+            lines.append(f"\nMails ({len(mails)}):")
+            for m in mails[:10]:
+                lines.append(f"  • {m.get('betreff','')} von {m.get('absender','?')} ({(m.get('datum_mail',''))[:10]})")
+        if dokumente:
+            lines.append(f"\nDokumente ({len(dokumente)}):")
+            for d in dokumente[:10]:
+                lines.append(f"  • #{d.get('id','')}")
+
+        return {
+            "ok": True,
+            "message": "\n".join(lines),
+            "kontext": kontext,
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

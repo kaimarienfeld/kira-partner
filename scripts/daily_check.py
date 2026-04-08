@@ -251,7 +251,7 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
     kandidaten = mail_db.execute("""
         SELECT id, konto, konto_label, betreff, absender, an, datum,
                message_id, folder, hat_anhaenge, anhaenge,
-               anhaenge_pfad, mail_folder_pfad, text_plain
+               anhaenge_pfad, mail_folder_pfad, text_plain, thread_id
         FROM mails
         WHERE folder NOT LIKE '%Gesendete%'
           AND folder NOT LIKE '%Sent%'
@@ -383,12 +383,19 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
             _att_pfad = m["anhaenge_pfad"] or ""
         except (KeyError, IndexError):
             _att_pfad = ""
+        # Thread-ID für Kontext-Anreicherung
+        _thread_id = ""
+        try:
+            _thread_id = m["thread_id"] or ""
+        except (KeyError, IndexError):
+            pass
         try:
             cl = classify_mail(
                 konto=konto, absender=absnd, betreff=betr, text=text,
                 anhaenge=anhaenge_list, folder=folder, is_sent=False,
                 mail_datum=datum, kanal="email",
                 anhaenge_pfad=_att_pfad,
+                thread_id=_thread_id,
             )
         except Exception as e:
             stats["fehler"] += 1

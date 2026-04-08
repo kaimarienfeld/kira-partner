@@ -608,3 +608,361 @@ def get_vorgang_summary_for_kira(limit: int = 5) -> str:
         return "\n".join(lines)
     finally:
         db.close()
+
+
+# ── Projekt-System (Vorgänge typ='projekt') ──────────────────────────────────
+
+KUNDEN_DB = KNOWLEDGE_DIR / "kunden.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
+
+_projekt_columns_ensured = False
+
+def _ensure_projekt_columns():
+    """Erweitert vorgaenge + vorgang_links um projekt-spezifische Felder (einmalig)."""
+    global _projekt_columns_ensured
+    if _projekt_columns_ensured:
+        return
+    db = _get_db()
+    try:
+        migrations = [
+            ("vorgaenge", "kontakt_id", "INTEGER"),
+            ("vorgaenge", "kunde_email_resolved", "TEXT"),
+            ("vorgaenge", "projekt_nr", "TEXT"),
+            ("vorgaenge", "adresse", "TEXT"),
+            ("vorgang_links", "kanal", "TEXT DEFAULT 'email'"),
+        ]
+        for table, col, col_type in migrations:
+            try:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass  # Spalte existiert bereits
+        db.commit()
+        _projekt_columns_ensured = True
+    finally:
+        db.close()
+
+
+def _next_projekt_nr(db) -> str:
+    """Generiert eindeutige Projektnummer P-YYYY-NNN."""
+    year = datetime.now().year
+    row = db.execute(
+        "SELECT COUNT(*) as cnt FROM vorgaenge WHERE projekt_nr LIKE ?",
+        (f"P-{year}-%",)
+    ).fetchone()
+    seq = (row["cnt"] if row else 0) + 1
+    return f"P-{year}-{seq:03d}"
+
+
+def get_or_create_kontakt(email: str, name: str = None) -> int | None:
+    """
+    Kontakt in kunden.db suchen oder anlegen. Gibt kontakt_id zurück.
+    kunden.db = Vorläufer von customer_master (CRM-Vorbereitung).
+    """
+    if not email:
+        return None
+    email_clean = email.lower().strip()
+    if not KUNDEN_DB.exists():
+        return None
+    try:
+        kdb = sqlite3.connect(str(KUNDEN_DB))
+        kdb.row_factory = sqlite3.Row
+        row = kdb.execute(
+            "SELECT id FROM kunden WHERE LOWER(email) = ?", (email_clean,)
+        ).fetchone()
+        if row:
+            # Letztkontakt aktualisieren
+            kdb.execute(
+                "UPDATE kunden SET letztkontakt=?, anzahl_mails=anzahl_mails+1 WHERE id=?",
+                (_now(), row["id"])
+            )
+            kdb.commit()
+            kid = row["id"]
+            kdb.close()
+            return kid
+        # Neuen Kontakt anlegen
+        kdb.execute(
+            "INSERT INTO kunden (email, name, erstkontakt, letztkontakt, anzahl_mails, hauptkanal) "
+            "VALUES (?,?,?,?,1,'email')",
+            (email_clean, name or "", _now(), _now())
+        )
+        kid = kdb.execute("SELECT last_insert_rowid()").fetchone()[0]
+        kdb.commit()
+        kdb.close()
+        return kid
+    except Exception:
+        return None
+
+
+def create_projekt(
+    kunde_name: str,
+    titel: str,
+    kunde_email: str = None,
+    typ_detail: str = None,
+    adresse: str = None,
+    quelle: str = "kira",
+    notiz: str = None,
+) -> dict:
+    """
+    Neues Projekt als Vorgang (typ='projekt') anlegen.
+    Gibt {'vorgang_id': int, 'projekt_nr': str, 'kontakt_id': int|None} zurück.
+    """
+    _ensure_projekt_columns()
+
+    # Kontakt-Zuordnung (kunden.db)
+    kontakt_id = get_or_create_kontakt(kunde_email, kunde_name) if kunde_email else None
+
+    db = _get_db()
+    try:
+        vorgang_nr = _next_vorgang_nr(db)
+        projekt_nr = _next_projekt_nr(db)
+        now = _now()
+        initial_status = INITIAL_STATUS.get("projekt", "angefragt")
+
+        beschreibung = ""
+        if typ_detail:
+            beschreibung = f"Projekttyp: {typ_detail}"
+        if adresse:
+            beschreibung += f"\nAdresse: {adresse}" if beschreibung else f"Adresse: {adresse}"
+
+        db.execute("""
+            INSERT INTO vorgaenge
+                (vorgang_nr, typ, status, titel, kunden_email, kunden_name,
+                 konto, betrag, prioritaet, entscheidungsstufe, konfidenz,
+                 quelle, erstellt_am, aktualisiert_am, notiz,
+                 kontakt_id, kunde_email_resolved, projekt_nr, adresse)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            vorgang_nr, "projekt", initial_status,
+            titel, (kunde_email or "").lower(), kunde_name or "",
+            "", None, "mittel", "B", 0.8,
+            quelle, now, now, notiz or "",
+            kontakt_id, (kunde_email or "").lower(), projekt_nr, adresse or ""
+        ))
+        vorgang_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        db.execute("""
+            INSERT INTO vorgang_status_history
+                (vorgang_id, alter_status, neuer_status, grund, actor, erstellt_am)
+            VALUES (?,?,?,?,?,?)
+        """, (vorgang_id, None, initial_status, f"Projekt angelegt via {quelle}", "system", now))
+        db.commit()
+
+        return {"vorgang_id": vorgang_id, "projekt_nr": projekt_nr, "kontakt_id": kontakt_id}
+    finally:
+        db.close()
+
+
+def find_projekt(
+    kunde_name: str = None,
+    kunde_email: str = None,
+    titel_keywords: str = None,
+    status: str = "aktiv",
+    limit: int = 10,
+) -> list[dict]:
+    """
+    Projekt-Vorgänge suchen. Gibt Liste von Projekt-Dicts zurück.
+    status: 'aktiv' (nur offene), 'abgeschlossen', 'alle'
+    """
+    _ensure_projekt_columns()
+    db = _get_db()
+    try:
+        where = ["typ = 'projekt'"]
+        params = []
+
+        if status == "aktiv":
+            where.append("status NOT IN ('abgeschlossen','archiviert','abgebrochen')")
+        elif status == "abgeschlossen":
+            where.append("status IN ('abgeschlossen','archiviert','abgebrochen')")
+        # 'alle' → kein Filter
+
+        if kunde_email:
+            where.append("LOWER(kunden_email) = ?")
+            params.append(kunde_email.lower().strip())
+        if kunde_name:
+            where.append("LOWER(kunden_name) LIKE ?")
+            params.append(f"%{kunde_name.lower()}%")
+        if titel_keywords:
+            for kw in titel_keywords.split():
+                where.append("LOWER(titel) LIKE ?")
+                params.append(f"%{kw.lower()}%")
+
+        params.append(limit)
+        rows = db.execute(
+            f"SELECT * FROM vorgaenge WHERE {' AND '.join(where)} "
+            f"ORDER BY aktualisiert_am DESC LIMIT ?",
+            params
+        ).fetchall()
+
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
+def find_projekte_for_email(email: str, limit: int = 5) -> list[dict]:
+    """Alle aktiven Projekte für eine bestimmte E-Mail-Adresse (für Classifier-Kontext)."""
+    return find_projekt(kunde_email=email, limit=limit)
+
+
+def update_projekt(vorgang_id: int, **fields) -> bool:
+    """Projekt-Vorgang aktualisieren (Titel, Status, Adresse, Notizen...)."""
+    _ensure_projekt_columns()
+    allowed = {"titel", "adresse", "notiz", "kunden_name", "kunden_email",
+               "kunde_email_resolved", "kontakt_id", "status", "prioritaet"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    db = _get_db()
+    try:
+        sets = [f"{k}=?" for k in updates]
+        sets.append("aktualisiert_am=?")
+        vals = list(updates.values()) + [_now(), vorgang_id]
+        db.execute(
+            f"UPDATE vorgaenge SET {', '.join(sets)} WHERE id=?", vals
+        )
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def get_projekt_kontext(vorgang_id: int = None, projekt_nr: str = None) -> dict:
+    """
+    Vollständigen Projekt-Kontext laden: alle verknüpften Mails, Tasks, Dokumente.
+    Suche nach vorgang_id ODER projekt_nr.
+    """
+    _ensure_projekt_columns()
+    db = _get_db()
+    try:
+        if projekt_nr and not vorgang_id:
+            row = db.execute(
+                "SELECT id FROM vorgaenge WHERE projekt_nr=? AND typ='projekt'",
+                (projekt_nr,)
+            ).fetchone()
+            if not row:
+                return {"fehler": f"Projekt {projekt_nr} nicht gefunden"}
+            vorgang_id = row["id"]
+
+        if not vorgang_id:
+            return {"fehler": "Weder vorgang_id noch projekt_nr angegeben"}
+
+        projekt = db.execute("SELECT * FROM vorgaenge WHERE id=?", (vorgang_id,)).fetchone()
+        if not projekt:
+            return {"fehler": f"Vorgang #{vorgang_id} nicht gefunden"}
+
+        # Verknüpfte Entitäten über vorgang_links laden
+        links = db.execute(
+            "SELECT entitaet_typ, entitaet_id, rolle, kanal, erstellt_am "
+            "FROM vorgang_links WHERE vorgang_id=? ORDER BY erstellt_am DESC",
+            (vorgang_id,)
+        ).fetchall()
+
+        # Entitäten nach Typ gruppieren
+        tasks = []
+        mails = []
+        dokumente = []
+        sonstige = []
+        for link in links:
+            entry = {"id": link["entitaet_id"], "rolle": link["rolle"] or "",
+                     "kanal": link["kanal"] or "", "datum": link["erstellt_am"]}
+            typ = link["entitaet_typ"]
+            if typ == "task":
+                # Task-Details laden
+                t = db.execute("SELECT id, titel, kategorie, status, prioritaet FROM tasks WHERE id=?",
+                               (int(link["entitaet_id"]),)).fetchone()
+                if t:
+                    entry.update(dict(t))
+                tasks.append(entry)
+            elif typ == "mail":
+                mails.append(entry)
+            elif typ == "dokument":
+                dokumente.append(entry)
+            else:
+                entry["typ"] = typ
+                sonstige.append(entry)
+
+        # Mail-Details aus mail_index.db laden
+        if mails and MAIL_INDEX_DB.exists():
+            try:
+                mdb = sqlite3.connect(str(MAIL_INDEX_DB))
+                mdb.row_factory = sqlite3.Row
+                for m in mails:
+                    mr = mdb.execute(
+                        "SELECT betreff, absender, datum, kategorie FROM mails WHERE message_id=?",
+                        (m["id"],)
+                    ).fetchone()
+                    if mr:
+                        m.update({"betreff": mr["betreff"], "absender": mr["absender"],
+                                  "datum_mail": mr["datum"], "kategorie": mr["kategorie"]})
+                mdb.close()
+            except Exception:
+                pass
+
+        return {
+            "projekt": dict(projekt),
+            "tasks": tasks,
+            "mails": mails,
+            "dokumente": dokumente,
+            "sonstige": sonstige,
+            "anzahl_links": len(links),
+        }
+    finally:
+        db.close()
+
+
+def assign_to_projekt(
+    vorgang_id: int,
+    entitaet_typ: str,
+    entitaet_id: str | int,
+    kanal: str = "email",
+) -> int:
+    """
+    Entität einem Projekt-Vorgang zuordnen via link_entity().
+    Setzt zusätzlich kanal im vorgang_links-Eintrag.
+    """
+    _ensure_projekt_columns()
+    link_id = link_entity(vorgang_id, entitaet_typ, str(entitaet_id), rolle="projekt_zuordnung")
+
+    # kanal-Feld setzen
+    db = _get_db()
+    try:
+        db.execute("UPDATE vorgang_links SET kanal=? WHERE id=?", (kanal, link_id))
+        db.commit()
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+    return link_id
+
+
+def get_projekt_summary_for_kira(limit: int = 8) -> str:
+    """Kompakte Zusammenfassung aktiver Projekte für Kira-System-Prompt."""
+    _ensure_projekt_columns()
+    db = _get_db()
+    try:
+        rows = db.execute("""
+            SELECT id, projekt_nr, kunden_name, kunden_email, titel, status, aktualisiert_am
+            FROM vorgaenge
+            WHERE typ = 'projekt'
+              AND status NOT IN ('abgeschlossen','archiviert','abgebrochen')
+            ORDER BY aktualisiert_am DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        if not rows:
+            return ""
+
+        lines = [f"AKTIVE PROJEKTE ({len(rows)})"]
+        for r in rows:
+            name = r["kunden_name"] or r["kunden_email"] or "?"
+            pnr = r["projekt_nr"] or r["id"]
+            # Verknüpfte Entitäten zählen
+            cnt = db.execute(
+                "SELECT COUNT(*) as c FROM vorgang_links WHERE vorgang_id=?",
+                (r["id"],)
+            ).fetchone()
+            n_links = cnt["c"] if cnt else 0
+            datum = (r["aktualisiert_am"] or "")[:10]
+            lines.append(f"  [{pnr}] {name} — {r['titel']} ({r['status']}, {n_links} Verknüpfungen, {datum})")
+        return "\n".join(lines)
+    finally:
+        db.close()

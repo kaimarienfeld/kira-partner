@@ -53,7 +53,8 @@ def _build_classification_prompt(konto, absender, betreff, text, folder, is_sent
                                   kira_wissen: str = "", kunden_profil: str = "",
                                   mail_verlauf: str = "", anhaenge: list = None,
                                   lexware_kontext: str = "",
-                                  anhang_texte: str = ""):
+                                  anhang_texte: str = "",
+                                  projekt_kontext: str = ""):
     """Prompt für die LLM-Klassifizierung, inkl. Angebote-Kontext und Lernbeispiele."""
     text_snippet = (text or "")[:6000]
 
@@ -106,6 +107,16 @@ BISHERIGER MAIL-VERLAUF MIT DIESEM ABSENDER (älteste zuerst):
   Überfällige Rechnungen + Mail vom Kunden → könnte Zahlungsbezug haben.
 """
 
+    projekt_block = ""
+    if projekt_kontext:
+        projekt_block = f"""
+{projekt_kontext}
+→ PROJEKT-ZUORDNUNG: Prüfe ob diese Mail zu einem bestehenden Projekt gehört.
+  Wenn ja: setze projekt_zuordnung.aktion="bestehend" und die projekt_nr.
+  Wenn neues Thema/Projekt: setze projekt_zuordnung.aktion="neu" und schlage einen Titel vor.
+  Wenn unklar: setze projekt_zuordnung.aktion="unklar".
+"""
+
     # ── Profil-basierte Benutzer-Identität laden ──
     profil = get_active_profile()
     team = profil.get("team", [])
@@ -136,7 +147,7 @@ BENUTZER-IDENTITÄT:
 Wenn die E-Mail den Benutzer persönlich anspricht (z.B. {benutzer_anreden or benutzer_name}), ist sie an ihn gerichtet — das ist KEINE anonyme Werbung.
 Prüfe genau ob sie geschäftsrelevant ist, bevor du "Ignorieren" vergibst.
 
-{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}
+{angebote_block}{corrections_block}{wissen_block}{profil_block}{verlauf_block}{lexware_block}{projekt_block}
 MAIL-DATEN:
 - Konto: {konto}
 - Absender: {absender}
@@ -217,7 +228,8 @@ Antworte NUR als JSON:
   "erkannte_termine": [
     {{"text": "Beschreibung", "datum": "YYYY-MM-DD", "typ": "zahlung|frist|treffen|deadline"}}
   ],
-  "mail_zusammenhang": "1-Satz-Kontext der Mail im Geschäftszusammenhang"
+  "mail_zusammenhang": "1-Satz-Kontext der Mail im Geschäftszusammenhang",
+  "projekt_zuordnung": {{"aktion": "bestehend" | "neu" | "unklar", "projekt_nr": "P-2025-001 oder null", "vorgeschlagener_titel": "Projekttitel wenn neu", "begruendung": "Warum diese Zuordnung"}}
 }}
 
 erfordert_handlung=true NUR wenn der Benutzer persönlich etwas tun muss (antworten, entscheiden, unterschreiben).
@@ -282,6 +294,15 @@ def _parse_llm_response(text):
     data.setdefault("vorgeschlagene_aktionen", [])
     data.setdefault("erkannte_termine", [])
     data.setdefault("mail_zusammenhang", "")
+
+    # Projekt-Zuordnung validieren
+    pz = data.get("projekt_zuordnung")
+    if isinstance(pz, dict):
+        aktion = pz.get("aktion", "unklar")
+        if aktion not in ("bestehend", "neu", "unklar"):
+            pz["aktion"] = "unklar"
+    else:
+        data["projekt_zuordnung"] = {"aktion": "unklar"}
 
     # Validierung: Listen müssen Listen sein
     if not isinstance(data.get("vorgeschlagene_aktionen"), list):
@@ -773,11 +794,40 @@ def _extract_zip_contents(zip_path: Path, max_files: int, max_size: int, max_per
     return "\n".join(parts)
 
 
-def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
+def _get_projekt_kontext(absender_email: str) -> str:
+    """
+    Lädt offene Projekte für diesen Absender (als Classifier-Kontext).
+    Gibt dem LLM Überblick über bestehende Projekte zur Zuordnung.
+    """
+    if not absender_email:
+        return ""
+    try:
+        from case_engine import find_projekte_for_email
+        projekte = find_projekte_for_email(absender_email)
+        if not projekte:
+            return ""
+        lines = [f"OFFENE PROJEKTE DIESES KONTAKTS ({len(projekte)})"]
+        for p in projekte:
+            pnr = p.get("projekt_nr") or p.get("vorgang_nr") or p.get("id")
+            name = p.get("kunden_name") or "?"
+            titel = p.get("titel") or "?"
+            status = p.get("status") or "?"
+            datum = (p.get("aktualisiert_am") or "")[:10]
+            lines.append(f"  {pnr}: {name} — {titel} ({status}, letzte Aktivität {datum})")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8,
+                              thread_id: str = None) -> str:
     """
     Lädt die letzten Mails von/an diesen Absender aus mail_index.db.
     Gibt dem LLM vollständigen Kontext über bisherige Kommunikation.
     Zeigt sowohl empfangene als auch gesendete Mails (Konversation).
+
+    Wenn thread_id angegeben: Erst Thread-Mails laden (genauester Match),
+    dann Absender-Mails als Ergänzung.
     """
     if not absender_email or not MAIL_INDEX_DB.exists():
         return ""
@@ -787,6 +837,51 @@ def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
         conn = sqlite3.connect(str(MAIL_INDEX_DB))
         conn.row_factory = sqlite3.Row
 
+        thread_mails = []
+        thread_status_line = ""
+
+        # ── Thread-basierte Suche (genauester Match) ──
+        if thread_id:
+            thread_rows = conn.execute("""
+                SELECT betreff, datum_iso, datum, folder, text_plain,
+                       absender_short, absender, an
+                FROM mails
+                WHERE thread_id = ?
+                ORDER BY datum_iso ASC
+                LIMIT 15
+            """, (thread_id,)).fetchall()
+            if thread_rows:
+                # Thread-Status berechnen
+                n_total = len(thread_rows)
+                n_sent = sum(1 for r in thread_rows
+                             if 'gesendete' in (r['folder'] or '').lower()
+                             or 'sent' in (r['folder'] or '').lower())
+                n_recv = n_total - n_sent
+                letzte_mail = thread_rows[-1]
+                letzte_datum = (letzte_mail['datum_iso'] or letzte_mail['datum'] or '')[:10]
+                letzte_ist_gesendet = ('gesendete' in (letzte_mail['folder'] or '').lower()
+                                       or 'sent' in (letzte_mail['folder'] or '').lower())
+
+                if n_sent > 0:
+                    thread_status_line = (
+                        f"[THREAD-STATUS: Bestehender Thread, {n_total} Mails "
+                        f"({n_recv} empfangen, {n_sent} gesendet), "
+                        f"letzte {'Antwort vom Benutzer' if letzte_ist_gesendet else 'Mail vom Kontakt'} "
+                        f"am {letzte_datum}]"
+                    )
+                else:
+                    thread_status_line = (
+                        f"[THREAD-STATUS: Bestehender Thread, {n_total} Mails empfangen, "
+                        f"KEINE Antwort vom Benutzer gesendet, "
+                        f"letzte Mail am {letzte_datum}]"
+                    )
+
+                for r in thread_rows:
+                    is_sent = ('gesendete' in (r['folder'] or '').lower()
+                               or 'sent' in (r['folder'] or '').lower())
+                    thread_mails.append(("← Gesendet" if is_sent else "→ Empfangen", r))
+
+        # ── Absender-basierte Suche (Fallback / Ergänzung) ──
         # Mails vom Absender (empfangen)
         rows_von = conn.execute("""
             SELECT betreff, datum_iso, datum, folder, text_plain, absender_short, absender
@@ -817,23 +912,43 @@ def _get_mail_verlauf_kontext(absender_email: str, max_mails: int = 8) -> str:
             """, (f"%@{domain}%", f"%{email_clean}%")).fetchall()
             rows_von = list(rows_von) + list(rows_domain)
 
+        # Thread-Status für Kontakte ohne Thread
+        if not thread_status_line:
+            total_kontakt = len(rows_von) + len(rows_an)
+            if total_kontakt == 0:
+                thread_status_line = "[THREAD-STATUS: Neue Konversation, kein vorheriger Kontakt]"
+            else:
+                has_sent = len(rows_an) > 0
+                thread_status_line = (
+                    f"[THREAD-STATUS: Bekannter Kontakt, {total_kontakt} Mails im Verlauf"
+                    f"{', Benutzer hat bereits geantwortet' if has_sent else ', KEINE Antwort vom Benutzer'}]"
+                )
+
         conn.close()
 
-        if not rows_von and not rows_an:
-            return ""
+        # Kombinieren: Thread-Mails haben Vorrang, Absender-Mails ergänzen
+        all_mails = list(thread_mails)
+        seen_dates = {(r[1]["datum_iso"] or r[1]["datum"] or "") for r in thread_mails}
 
-        # Alle Mails nach Datum sortieren (kombinierter Verlauf)
-        all_mails = []
         for r in rows_von:
-            all_mails.append(("→ Empfangen", r))
+            key = r["datum_iso"] or r["datum"] or ""
+            if key not in seen_dates:
+                all_mails.append(("→ Empfangen", r))
+                seen_dates.add(key)
         for r in rows_an:
-            all_mails.append(("← Gesendet", r))
+            key = r["datum_iso"] or r["datum"] or ""
+            if key not in seen_dates:
+                all_mails.append(("← Gesendet", r))
+                seen_dates.add(key)
+
+        if not all_mails and not thread_status_line:
+            return ""
 
         all_mails.sort(key=lambda x: (x[1]["datum_iso"] or x[1]["datum"] or ""), reverse=False)
         # Nur die letzten max_mails zeigen
         all_mails = all_mails[-max_mails:]
 
-        lines = []
+        lines = [thread_status_line] if thread_status_line else []
         for richtung, r in all_mails:
             dt = (r["datum_iso"] or r["datum"] or "")[:16]
             ab = r["absender_short"] or r["absender"] or "?"
@@ -1047,7 +1162,8 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                       anhaenge: list = None, folder: str = "",
                       is_sent: bool = False, mail_datum: str = "",
                       kanal: str = "email",
-                      anhaenge_pfad: str = "") -> dict:
+                      anhaenge_pfad: str = "",
+                      thread_id: str = None) -> dict:
     """
     kanal: "email" | "whatsapp" | "instagram" | "sms" | ...
     Alle Kanäle durchlaufen dieselbe LLM-Pipeline.
@@ -1107,8 +1223,9 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
         correction_beispiele = _get_correction_beispiele_relevant(absender, betreff, text)
         kira_wissen          = _get_kira_wissen_relevant(absender, betreff, text)
         kunden_profil        = _get_kunden_profil(kunden_email_raw)
-        mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw)
+        mail_verlauf         = _get_mail_verlauf_kontext(kunden_email_raw, thread_id=thread_id)
         lexware_kontext      = _get_lexware_kontext(kunden_email_raw)
+        projekt_kontext      = _get_projekt_kontext(kunden_email_raw)
 
         # Anhang-Text-Extraktion (PDF/DOCX/ZIP/OCR + Vision-Fallback)
         anhang_result = _extract_attachment_texts(
@@ -1128,6 +1245,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
             lexware_kontext=lexware_kontext,
             anhaenge=anhaenge,
             anhang_texte=anhang_texte,
+            projekt_kontext=projekt_kontext,
         )
 
         # Klassifizierungs-Aufruf (Haiku, 768 max_tokens) — mit Vision wenn Bilder vorhanden
@@ -1178,6 +1296,7 @@ def classify_mail_llm(konto: str, absender: str, betreff: str, text: str,
                 "geschaeft":          geschaeft,
                 "angebot_aktion":     angebot_aktion,
                 "angebot_nummer":     angebot_nummer,
+                "projekt_zuordnung":  parsed.get("projekt_zuordnung", {"aktion": "unklar"}),
             }
 
     except Exception as e:
@@ -1206,8 +1325,9 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   anhaenge: list = None, folder: str = "",
                   is_sent: bool = False, mail_datum: str = "",
                   kanal: str = "email",
-                  anhaenge_pfad: str = "") -> dict:
+                  anhaenge_pfad: str = "",
+                  thread_id: str = None) -> dict:
     """Alias — Drop-in-Replacement, bereit für Multi-Kanal (kanal='whatsapp' etc.)."""
     return classify_mail_llm(konto, absender, betreff, text, anhaenge, folder,
                              is_sent, mail_datum=mail_datum, kanal=kanal,
-                             anhaenge_pfad=anhaenge_pfad)
+                             anhaenge_pfad=anhaenge_pfad, thread_id=thread_id)

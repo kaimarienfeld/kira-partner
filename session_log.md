@@ -1,5 +1,18 @@
 # Session Log
 
+## 2026-04-08 22:15 — Session-Start (session-oo)
+**Auftrag:** Universelle Verknüpfung + Projekt-System — Thread-Awareness im Classifier, Projekt-Vorgänge (typ='projekt'), automatische Zuordnung, 4 Kira Projekt-Tools, CRM-Vorbereitung.
+**Status:** erledigt
+
+### Änderungen:
+- Phase 1: Thread-Awareness — `_get_mail_verlauf_kontext()` erweitert (thread_id, THREAD-STATUS), `classify_mail_llm()` + `classify_mail()` Signatur erweitert, mail_monitor + daily_check thread_id durchgereicht
+- Phase 2: Projekt-Vorgänge — `case_engine.py` erweitert (12 neue Funktionen), `llm_classifier.py` projekt_zuordnung im Classifier-Output, `mail_monitor.py` automatische Projekt-Zuordnung
+- Phase 3: Kira-Tools — 4 neue Tools + Handler + Dispatch + System-Prompt in `kira_llm.py`
+- Phase 4: CRM-Vorbereitung — AGENT.md §5c aktualisiert, CRM-Kompatibilität dokumentiert
+- CRM-Arbeitsanweisung v2 gelesen und Kompatibilität geprüft: Keine separate projekte-Tabelle, stattdessen vorgaenge typ='projekt'
+
+---
+
 ## 2026-04-08 17:30 — Session-Start (session-ffff-universal)
 **Auftrag:** Universelle Kira-Handlungsfähigkeit — mail_korrektur → korrektur (universal), neue CRUD-Tools, kiraOpenWithContext() für alle Module, Architektur-Regel.
 **Status:** erledigt

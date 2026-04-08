@@ -1634,7 +1634,8 @@ def _process_mail(mail_data, konto_label, folder_name):
                           folder=folder_name, is_sent=is_sent,
                           mail_datum=mail_data.get("datum", ""),
                           kanal="email",
-                          anhaenge_pfad=_att_pfad)
+                          anhaenge_pfad=_att_pfad,
+                          thread_id=thread_id)
     kat_ms = int((time.monotonic() - t0) * 1000)
 
     # Bei LLM-Ausfall: Mail nur indexieren, keinen Task erstellen
@@ -1843,6 +1844,56 @@ def _process_mail(mail_data, konto_label, folder_name):
               source='mail_monitor', modul='vorgang_router', actor_type='system', status='fehler')
 
     # (Buchhaltungs-Scans jetzt VOR Early-Returns, siehe oben — hier nicht mehr nötig)
+
+    # ── Projekt-Zuordnung (session-oo) ────────────────────────────────────────
+    try:
+        _tid_p = task_id_new
+        pz = result.get("projekt_zuordnung", {})
+        pz_aktion = pz.get("aktion", "unklar") if isinstance(pz, dict) else "unklar"
+        _kunden_name_p = (absender.split("<")[0].strip() if "<" in absender else "") or ""
+
+        if pz_aktion == "bestehend" and pz.get("projekt_nr"):
+            # Bestehendes Projekt verknüpfen
+            from case_engine import find_projekt, assign_to_projekt
+            treffer = find_projekt(titel_keywords=pz["projekt_nr"], status="alle", limit=1)
+            if not treffer:
+                # Fallback: nach projekt_nr in vorgaenge direkt suchen
+                import sqlite3 as _sq
+                _pdb = _sq.connect(str(TASKS_DB))
+                _pdb.row_factory = _sq.Row
+                _pr = _pdb.execute(
+                    "SELECT id FROM vorgaenge WHERE projekt_nr=? AND typ='projekt'",
+                    (pz["projekt_nr"],)
+                ).fetchone()
+                _pdb.close()
+                if _pr:
+                    treffer = [{"id": _pr["id"]}]
+            if treffer:
+                assign_to_projekt(treffer[0]["id"], "task", str(_tid_p), kanal="email")
+                assign_to_projekt(treffer[0]["id"], "mail", msg_id, kanal="email")
+                _elog('system', 'projekt_zuordnung',
+                      f"Task #{_tid_p} + Mail → Projekt {pz['projekt_nr']}",
+                      source='mail_monitor', modul='projekt', status='ok')
+        elif pz_aktion == "neu" and pz.get("vorgeschlagener_titel"):
+            # Neues Projekt anlegen
+            from case_engine import create_projekt, assign_to_projekt
+            p_result = create_projekt(
+                kunde_name=_kunden_name_p,
+                titel=pz["vorgeschlagener_titel"],
+                kunde_email=_kunden_email_resolved,
+                quelle="classifier",
+            )
+            if p_result.get("vorgang_id"):
+                assign_to_projekt(p_result["vorgang_id"], "task", str(_tid_p), kanal="email")
+                assign_to_projekt(p_result["vorgang_id"], "mail", msg_id, kanal="email")
+                _elog('system', 'projekt_erstellt',
+                      f"Neues Projekt {p_result['projekt_nr']}: {pz['vorgeschlagener_titel']} → Task #{_tid_p}",
+                      source='mail_monitor', modul='projekt', status='ok')
+    except NameError:
+        pass  # task_id_new nicht gesetzt
+    except Exception as _pe:
+        _elog('system', 'projekt_zuordnung_fehler', f"Projekt-Fehler: {_pe}",
+              source='mail_monitor', modul='projekt', status='fehler')
 
     # ── Anthropic Billing Push ────────────────────────────────────────────────
     _check_anthropic_billing(absender, betreff, text)

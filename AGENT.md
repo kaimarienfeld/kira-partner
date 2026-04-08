@@ -344,6 +344,52 @@ Jedes neue Modul oder jede neue Funktion die Daten verwaltet MUSS folgendes mitb
 
 ---
 
+## 5c. Universelle Verknüpfung + Projekt-Zuordnung (ARCHITEKTUR-GRUNDSATZ)
+
+**Alles gehört zusammen — über alle Kanäle, projektbezogen, nicht nur kundenbasiert.**
+
+### Grundprinzip
+Jede Entität (Mail, Capture, WhatsApp-Nachricht, Dokument, Angebot, Rechnung, Social DM) muss:
+1. **Einem Kunden** zugeordnet werden können (`kontakt_id` → `kunden.db` = Vorläufer von `customer_master`)
+2. **Einem Projekt** zugeordnet werden können — Projekt = Vorgang mit `typ='projekt'` in `vorgaenge`-Tabelle
+3. **Einem Thread/Konversation** zugehören (Thread-ID via In-Reply-To, Betreff-Matching, oder manuelle Zuordnung)
+
+### Implementierung (session-oo)
+- **Projekt = Vorgang** mit `typ='projekt'` — KEINE separate `projekte`-Tabelle
+- **Projektnummer** = `P-YYYY-NNN` im Feld `projekt_nr` der `vorgaenge`-Tabelle
+- **Verknüpfungen** über `vorgang_links` (mit `kanal`-Feld)
+- **Kunden-Brücke** über `kontakt_id` in `vorgaenge` → `kunden.db`
+- **Automatische Zuordnung**: Classifier gibt `projekt_zuordnung` zurück (bestehend/neu/unklar)
+- **Thread-Awareness**: Classifier nutzt `thread_id` + THREAD-STATUS für Mail-Kontext
+- **State Machine**: `TRANSITIONS["projekt"]` = angefragt→beauftragt→laufend→abgeschlossen
+
+### Projekt ≠ Kunde
+- Kunde "Müller" hat Projekt P-2025-001 "Betondecke Sanierung" und P-2026-001 "Wände EG"
+- Mängelrüge zur Decke → Projekt P-2025-001, NICHT ein neues Projekt
+- Neue Anfrage zu Wänden → neues Projekt P-2026-002
+- Classifier + Kira erkennen den Unterschied via Projekt-Kontext im Prompt
+
+### Kira-Tools (4 Projekt-Tools)
+- `projekt_anlegen` — Neues Projekt als Vorgang, automatische Projektnummer, Kontakt-Zuordnung
+- `projekt_suchen` — Nach Kunde/E-Mail/Stichwort suchen
+- `projekt_zuordnen` — Entitäten (task/mail/dokument/capture) via `vorgang_links` verknüpfen
+- `projekt_kontext_laden` — Vollständigen Kontext mit allen Verknüpfungen laden
+
+### CRM-Kompatibilität (Arbeitsanweisung v2 geprüft)
+- `vorgaenge` = zukünftige `case_records` → kein Refactoring beim CRM-Aufbau
+- `vorgang_links` = zukünftige `case_links` → direkt wiederverwendbar
+- `kunden.db` = zukünftiger `customer_master` → `kontakt_id` ist die Brücke
+- Thread-Gruppierung = Voraussetzung für CRM's Konversations-Gruppierung
+- Routing-Klassen (task/buchhaltung/feed/kira_vorschlag/archivieren) bleiben unberührt
+
+### Jedes neue Modul MUSS
+- `kontakt_id` als optionales Feld haben (Brücke zu kunden.db/CRM)
+- Verknüpfungen über `vorgang_links` herstellen (nicht eigene Link-Tabellen!)
+- Bei der Kira-Integration: Projekt-Kontext im Prompt mitliefern
+- `kanal`-Feld beim Verknüpfen setzen (email/capture/whatsapp/manuell/chat)
+
+---
+
 ## 6. Offene Feature-Wünsche (Future List)
 
 Detaillierte Übersicht in `KIRA_KOMPLETT_UEBERSICHT.md` → Kapitel 7.
