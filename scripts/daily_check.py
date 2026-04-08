@@ -908,8 +908,9 @@ def get_reclassify_progress() -> dict:
     return dict(_reclassify_progress)
 
 
-def reclassify_low_confidence() -> dict:
-    """Klassifiziert Mails mit fehlender oder regelbasierter Klassifizierung per LLM nach."""
+def reclassify_low_confidence(seit: str = "") -> dict:
+    """Klassifiziert Mails mit fehlender oder regelbasierter Klassifizierung per LLM nach.
+    seit: optionaler ISO-Datums-String (z.B. '2026-01-08') — nur Mails ab diesem Datum."""
     from llm_classifier import classify_mail
 
     _reclassify_progress.update({
@@ -922,7 +923,8 @@ def reclassify_low_confidence() -> dict:
 
     mi_db = sqlite3.connect(str(MAIL_INDEX_DB))
     mi_db.row_factory = sqlite3.Row
-    kandidaten = mi_db.execute("""
+
+    sql = """
         SELECT message_id, konto, konto_label, absender, betreff, text_plain,
                folder, datum, an, anhaenge, kategorie, anhaenge_pfad
         FROM mails
@@ -932,8 +934,14 @@ def reclassify_low_confidence() -> dict:
             kategorie IS NULL OR kategorie = ''
             OR konfidenz = '0' OR konfidenz IS NULL OR konfidenz = ''
           )
-        ORDER BY datum DESC
-    """).fetchall()
+    """
+    params = []
+    if seit:
+        sql += "  AND datum_iso >= ?\n"
+        params.append(seit)
+    sql += "  ORDER BY datum DESC"
+
+    kandidaten = mi_db.execute(sql, params).fetchall()
     mi_db.close()
 
     stats = {"gesamt": len(kandidaten), "geprueft": 0, "reklassifiziert": 0,

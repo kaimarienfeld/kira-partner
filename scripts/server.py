@@ -8154,6 +8154,19 @@ setTimeout(esRenderRssFeeds,100);
       </div>
     </div>
     <div id="es-recheck-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
+    <div class="es-row" style="border-top:1px solid var(--border);padding-top:10px">
+      <div class="es-row-label">
+        <span>&#x1F50D; Unklassifizierte mit Anh&auml;ngen nachqualifizieren</span>
+        <span class="es-row-hint">525 Mails ohne Kategorie nochmal per LLM (inkl. Anhang-Extraktion) klassifizieren. Voreinstellung: letzte 3 Monate (195 Mails).</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="es-reclass-seit"
+               style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">
+        <button class="es-mk-btn sec" id="btn-mail-reclass"
+                onclick="esMailReklassifizieren(this)">&#x1F50D; Reklassifizieren</button>
+      </div>
+    </div>
+    <div id="es-reclass-progress" style="font-size:12px;color:var(--text-muted);padding:2px 0 6px 4px;min-height:16px"></div>
   </div>
 
   <!-- ── Anhang-Extraktion ── -->
@@ -9340,6 +9353,57 @@ setTimeout(esRenderRssFeeds,100);
       }},2000);
     }}).catch(()=>{{
       if(btn){{ btn.disabled=false; btn.textContent='\u21BA Nachklassifizieren'; }}
+      if(prog) prog.textContent='Verbindungsfehler';
+    }});
+  }};
+
+  // Default-Datum für Reklassifizierung: 3 Monate zurück
+  (function(){{
+    var d=new Date(); d.setMonth(d.getMonth()-3);
+    var el=document.getElementById('es-reclass-seit');
+    if(el && !el.value) el.value=d.toISOString().slice(0,10);
+  }})();
+
+  window.esMailReklassifizieren = function(btn) {{
+    const seitEl = document.getElementById('es-reclass-seit');
+    const seit = seitEl ? seitEl.value : '';
+    if(btn) {{ btn.disabled=true; btn.textContent='L\u00e4uft\u2026'; }}
+    const prog = document.getElementById('es-reclass-progress');
+    if(prog) prog.textContent = 'Starte\u2026';
+    fetch('/api/mail/reclassify', {{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{seit: seit}})
+    }}).then(r=>r.json()).then(d=>{{
+      if(!d.ok) {{
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+        if(btn){{ btn.disabled=false; btn.textContent='\uD83D\uDD0D Reklassifizieren'; }}
+        return;
+      }}
+      showToast(d.message,'ok');
+      let polls=0;
+      const timer=setInterval(()=>{{
+        polls++;
+        fetch('/api/mail/reclassify/status').then(r=>r.json()).then(p=>{{
+          const pct=p.gesamt>0?Math.round(100*p.geprueft/p.gesamt):0;
+          if(prog){{
+            if(p.finished){{
+              prog.textContent='Fertig: '+p.gesamt+' gepr\u00fcft \u00b7 '+p.reklassifiziert+' reklassifiziert \u00b7 '+p.unveraendert+' unver\u00e4ndert'+(p.fehler?' \u00b7 '+p.fehler+' Fehler':'');
+            }} else if(p.paused){{
+              prog.textContent='Pausiert: '+(p.pause_grund||'');
+            }} else {{
+              prog.textContent=p.geprueft+'/'+p.gesamt+' ('+pct+'%) \u00b7 '+p.reklassifiziert+' neu \u00b7 '+((p.aktuell||'').slice(0,50));
+            }}
+          }}
+          if(p.finished||p.paused||polls>1200){{
+            clearInterval(timer);
+            if(btn){{ btn.disabled=false; btn.textContent='\uD83D\uDD0D Reklassifizieren'; }}
+            if(p.reklassifiziert>0) showToast(p.reklassifiziert+' Mails reklassifiziert','ok');
+          }}
+        }}).catch(()=>clearInterval(timer));
+      }},3000);
+    }}).catch(()=>{{
+      if(btn){{ btn.disabled=false; btn.textContent='\uD83D\uDD0D Reklassifizieren'; }}
       if(prog) prog.textContent='Verbindungsfehler';
     }});
   }};
@@ -27250,9 +27314,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if prog.get("running"):
                     self._json({"ok": False, "error": "Nachklassifizierung läuft bereits"})
                     return
+                seit = body.get("seit", "") if body else ""
                 import threading
-                threading.Thread(target=reclassify_low_confidence, daemon=True).start()
-                self._json({"ok": True, "message": "Nachklassifizierung gestartet"})
+                threading.Thread(target=reclassify_low_confidence, args=(seit,), daemon=True).start()
+                msg = f"Nachklassifizierung gestartet (ab {seit})" if seit else "Nachklassifizierung gestartet (alle)"
+                self._json({"ok": True, "message": msg})
             except Exception as e:
                 self._json({"ok": False, "error": str(e)})
             return

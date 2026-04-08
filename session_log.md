@@ -166,3 +166,12 @@
 - Phase 5: Einstellungen-UI (server.py) — 5 Toggles/Inputs in "Anhang-Extraktion bei Klassifizierung" Gruppe + saveSettings() erweitert
 **Verifiziert:** Syntax-Check alle 4 .py-Dateien OK, config.json valide, Server 0 JS-Fehler, alle UI-Elemente im DOM, saveSettings() sendet anhang_extraktion korrekt
 **Status:** erledigt
+
+---
+## 2026-04-08 10:30 — Session-Start (session-gggg)
+**Auftrag:** Crash-Recovery nach Windows-Update-Neustart. Status prüfen + Reklassifizierung (letzte 3 Monate, 195 unklassifizierte Mails mit Anhang-Kontext) vorbereiten zum späteren Starten.
+**Status:** erledigt
+
+### 2026-04-08 10:45 — Reklassifizierung mit Zeitfilter vorbereitet
+**Was:** (1) daily_check.py: `reclassify_low_confidence(seit="")` — optionaler `seit`-Parameter für Datum-Filter in SQL-Query. (2) server.py POST /api/mail/reclassify: liest `seit` aus Body, übergibt an Thread. (3) Einstellungen-UI: Neuer Button "Unklassifizierte mit Anhängen nachqualifizieren" mit Datum-Input (Default: 3 Monate zurück), Progress-Anzeige, Polling alle 3s. JS-Funktion `esMailReklassifizieren()`.
+**Status:** erledigt
