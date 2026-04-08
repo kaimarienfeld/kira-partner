@@ -733,7 +733,9 @@ def _build_leistungs_prompt(leistungen: dict) -> str:
         lines.append("Angebotene Leistungen:")
         for l in katalog:
             kern = " [KERN]" if l.get("ist_kernleistung") else ""
-            lines.append(f"  • {l['name']}{kern}: {l.get('beschreibung', '')}")
+            quelle = l.get("quelle", "")
+            url_hint = f" → Website: {quelle}" if quelle and quelle != "manuell" and quelle.startswith("http") else ""
+            lines.append(f"  • {l['name']}{kern}: {l.get('beschreibung', '')}{url_hint}")
     if nicht_l:
         lines.append("\nNICHT angebotene Leistungen:")
         for nl in nicht_l:
@@ -749,6 +751,8 @@ def _build_leistungs_prompt(leistungen: dict) -> str:
         "\n    3. Antwort-Entwurf vorbereiten der höflich auf die passende eigene Leistung verweist"
         "\n    4. Dem Benutzer vorschlagen: 'Soll ich eine passende Antwort mit Alternativ-Angebot vorbereiten?'"
         "\n  - Bei Antwort-Entwürfen: Leistungsspektrum immer berücksichtigen, eigene Stärken hervorheben"
+        "\n  - Wenn eine Leistung eine Website-URL hat (→ Website: ...), baue diese als 'Mehr erfahren'-Link in Antwort-Entwürfe ein"
+        "\n    Beispiel: 'Mehr zu unseren Leistungen finden Sie hier: [URL]'"
     )
     return "\n".join(lines)
 

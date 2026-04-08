@@ -29928,7 +29928,8 @@ Antworte NUR als JSON-Objekt (kein Markdown, kein Code-Block):
       "beschreibung": "Kurze Beschreibung",
       "stichworte": ["Stichwort1", "Stichwort2"],
       "zielgruppe": "z.B. Architekten, Bauherren",
-      "ist_kernleistung": true
+      "ist_kernleistung": true,
+      "quelle_url": "https://domain.de/unterseite-wo-diese-leistung-beschrieben-wird"
     }}
   ],
   "nicht_leistungen": ["Dinge die das Unternehmen NICHT anbietet, wenn erkennbar"]
@@ -29939,7 +29940,8 @@ Regeln:
 - ist_kernleistung=true für die Hauptleistungen (max. 3-5)
 - nicht_leistungen: häufige Verwechslungen oder Anfragen die NICHT bedient werden
 - Maximal 20 Leistungen, fokussiere auf die wichtigsten
-- Keine Duplikate"""
+- Keine Duplikate
+- quelle_url: Die spezifische Unterseiten-URL wo diese Leistung beschrieben wird (aus den Seitenmarkern "--- Seite: URL ---" ablesen). Wenn nur auf der Hauptseite, dann die Haupt-URL nehmen."""
 
                 from kira_llm import _call_llm_simple
                 llm_response = _call_llm_simple(prompt, max_tokens=2500)
@@ -29949,9 +29951,9 @@ Regeln:
                 if not json_match:
                     return self._json({"ok": False, "error": "LLM-Antwort konnte nicht geparst werden"})
                 result = json.loads(json_match.group())
-                # Quelle pro Leistung taggen
+                # Quelle pro Leistung taggen (seitenspezifische URL wenn LLM eine zurückgibt)
                 for item in result.get("katalog", []):
-                    item["quelle"] = url
+                    item["quelle"] = item.pop("quelle_url", url) or url
                 result["website_url"] = url
                 result["pages_crawled"] = pages_crawled
                 rlog('settings', 'leistungen_import', f'Website-Import von {url}: {len(result.get("katalog", []))} Leistungen aus {pages_crawled} Seiten',
