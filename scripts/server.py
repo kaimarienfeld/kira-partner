@@ -15378,6 +15378,22 @@ def generate_html() -> str:
 
     alarm_dot = "<span class='alarm-dot'></span>" if n_antwort > 0 else ""
 
+    # Dynamische Kategorien für Korrektur-Modal
+    try:
+        from task_manager import get_kategorien as _gk
+        _alle_kats = _gk(include_lernphase=True)
+        _korr_kat_options = "\n".join(
+            f'<option value="{esc(k["name"])}">{esc(k["name"])}{" (Lernphase)" if k.get("lernphase") else ""}</option>'
+            for k in _alle_kats
+        )
+    except Exception:
+        _korr_kat_options = (
+            '<option value="Antwort erforderlich">Antwort erforderlich</option>'
+            '<option value="Neue Lead-Anfrage">Neue Lead-Anfrage</option>'
+            '<option value="Zur Kenntnis">Zur Kenntnis</option>'
+            '<option value="Ignorieren">Ignorieren</option>'
+        )
+
     # Kira context for JS
     kira_ctx = {}
     for t in tasks:
