@@ -7098,6 +7098,7 @@ function esInfoPopup(btn, text) {{
     <span style="font-size:11px;color:var(--muted)">Profildaten werden f&uuml;r Klassifizierung und Kira-Chat verwendet</span>
   </div>
 </div>
+<script>window._bpKonten={json.dumps(_alle_konten, ensure_ascii=False)};window._bpKontoLabels={json.dumps(_konto_labels, ensure_ascii=False)};</script>
 
 <!-- ── SECTION: BENACHRICHTIGUNGEN ────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-benachrichtigungen">
@@ -17214,12 +17215,12 @@ function resetAccent() {{
   applyAccent(def);
 }}
 // ── Benutzerprofile: Team-Mitglieder verwalten ──
-const _bpKonten = {json.dumps(_alle_konten, ensure_ascii=False)};
-const _bpKontoLabels = {json.dumps(_konto_labels, ensure_ascii=False)};
 function _bpEmailCheckboxes(selected) {{
-  if(!_bpKonten.length) return '<span style="font-size:11px;color:var(--muted)">Keine Konten konfiguriert</span>';
-  return _bpKonten.map(k => {{
-    const lbl = _bpKontoLabels[k] ? ` <span style="color:var(--muted);font-size:10px">${{_bpKontoLabels[k]}}</span>` : '';
+  const konten = window._bpKonten || [];
+  const labels = window._bpKontoLabels || {{}};
+  if(!konten.length) return '<span style="font-size:11px;color:var(--muted)">Keine Konten konfiguriert</span>';
+  return konten.map(k => {{
+    const lbl = labels[k] ? ` <span style="color:var(--muted);font-size:10px">${{labels[k]}}</span>` : '';
     const chk = selected.includes(k) ? ' checked' : '';
     return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:2px 0"><input type="checkbox" class="bp-email-cb" value="${{k}}"${{chk}}><span style="color:var(--text)">${{k}}</span>${{lbl}}</label>`;
   }}).join('');
