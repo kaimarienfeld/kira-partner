@@ -6225,6 +6225,71 @@ def build_einstellungen():
     _profil_katalog = _profil_leistungen.get("katalog", [])
     _profil_nicht_leistungen = _profil_leistungen.get("nicht_leistungen", [])
     _profil_website_url = _profil_leistungen.get("website_url", "")
+    # Leistungen nach Quelle gruppieren (für Akkordeon)
+    _lk_gruppen = {}  # quelle -> [leistungen]
+    for _lk_item in _profil_katalog:
+        _lk_q = _lk_item.get("quelle", "manuell") or "manuell"
+        _lk_gruppen.setdefault(_lk_q, []).append(_lk_item)
+    # Sortierung: "manuell" zuerst, dann Websites alphabetisch
+    _lk_gruppen_sorted = []
+    if "manuell" in _lk_gruppen:
+        _lk_gruppen_sorted.append(("manuell", _lk_gruppen.pop("manuell")))
+    for _lk_k in sorted(_lk_gruppen.keys()):
+        _lk_gruppen_sorted.append((_lk_k, _lk_gruppen[_lk_k]))
+
+    # Akkordeon-HTML vorab bauen (verschachtelte f-strings vermeiden)
+    def _build_lk_card(l, quelle):
+        _q = esc(quelle)
+        _n = esc(l.get("name", ""))
+        _b = esc(l.get("beschreibung", ""))
+        _s = esc(", ".join(l.get("stichworte", [])))
+        _z = esc(l.get("zielgruppe", ""))
+        _k = " checked" if l.get("ist_kernleistung") else ""
+        return (
+            f'<div class="bp-leistung-card" data-quelle="{_q}">'
+            f'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'
+            f'<input class="es-inp bp-l-name" value="{_n}" placeholder="Leistungsname" style="flex:1;min-width:180px;font-weight:600">'
+            f'<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern"{_k}> Kernleistung</label>'
+            f'<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest(\'.bp-leistung-card\').remove();bpUpdateGroupCount(this)" title="Entfernen">&times;</button>'
+            f'</div>'
+            f'<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung&hellip;">{_b}</textarea>'
+            f'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+            f'<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>'
+            f'<input class="es-inp bp-l-stichworte" value="{_s}" placeholder="Stichwort1, Stichwort2&hellip;" style="width:100%"></div>'
+            f'<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Zielgruppe</div>'
+            f'<input class="es-inp bp-l-zielgruppe" value="{_z}" placeholder="z.B. Architekten, Bauherren&hellip;" style="width:100%"></div>'
+            f'</div></div>'
+        )
+
+    def _build_lk_group(quelle, items):
+        _q = esc(quelle)
+        _icon = "&#x270D;" if quelle == "manuell" else "&#x1F310;"
+        _title = "Manuell angelegt" if quelle == "manuell" else _q
+        _count = len(items)
+        _count_txt = f'{_count} Leistung{"en" if _count != 1 else ""}'
+        _cards = "".join(_build_lk_card(l, quelle) for l in items)
+        _del_btn = "" if quelle == "manuell" else (
+            '<button class="es-btn bp-lk-del-grp" style="color:#e84545;border-color:#e84545;padding:1px 8px;font-size:11px;margin-left:auto" '
+            'onclick="event.stopPropagation();bpDeleteGroup(this)" title="Alle Leistungen dieser Website entfernen">&times; Entfernen</button>'
+        )
+        _add_btn = (
+            '<button class="es-btn" style="padding:1px 8px;font-size:11px;margin-left:auto" '
+            "onclick=\"event.stopPropagation();bpAddLeistung('manuell')\" title=\"Neue Leistung manuell anlegen\">+ Hinzuf&uuml;gen</button>"
+        ) if quelle == "manuell" else ""
+        return (
+            f'<div class="bp-lk-group" data-quelle="{_q}">'
+            f'<div class="bp-lk-header" onclick="bpToggleGroup(this)">'
+            f'<span class="bp-lk-arrow">&#x25B6;</span>'
+            f'<span class="bp-lk-icon">{_icon}</span>'
+            f'<span class="bp-lk-title">{_title}</span>'
+            f'<span class="bp-lk-count">{_count_txt}</span>'
+            f'{_del_btn}{_add_btn}'
+            f'</div>'
+            f'<div class="bp-lk-body" style="display:none">{_cards}</div>'
+            f'</div>'
+        )
+
+    _lk_accordion_html = "".join(_build_lk_group(q, items) for q, items in _lk_gruppen_sorted)
     _alle_konten = config.get("combined_postfach", {}).get("konten", [])
     # Dynamische Kategorien für Korrektur-Modal
     try:
@@ -6581,6 +6646,16 @@ def build_einstellungen():
 .es-sel{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;cursor:pointer;min-width:140px;}}
 .es-inp{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:200px;}}
 .bp-leistung-card .es-inp,.bp-nl-row .es-inp{{width:auto;flex:1;min-width:0;box-sizing:border-box;}}
+.bp-lk-group{{border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden;background:var(--bg);}}
+.bp-lk-header{{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--bg-raised);transition:background .15s;user-select:none;}}
+.bp-lk-header:hover{{background:var(--bg-overlay);}}
+.bp-lk-arrow{{font-size:10px;transition:transform .2s;color:var(--muted);width:14px;text-align:center;}}
+.bp-lk-group.open .bp-lk-arrow{{transform:rotate(90deg);}}
+.bp-lk-icon{{font-size:16px;}}
+.bp-lk-title{{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;}}
+.bp-lk-count{{font-size:11px;color:var(--muted);white-space:nowrap;}}
+.bp-lk-body{{padding:8px 14px 12px;}}
+.bp-leistung-card{{border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised);}}
 .es-inp-sm{{background:var(--bg);border:0.5px solid var(--border-strong);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);color:var(--text);font-family:inherit;width:100px;}}
 .es-badge{{font-size:var(--fs-xs);padding:3px 10px;border-radius:5px;font-weight:500;flex-shrink:0;white-space:nowrap;}}
 .es-badge.on{{background:#EAF3DE;color:#3B6D11;}}
@@ -7164,37 +7239,18 @@ function esInfoPopup(btn, text) {{
       <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">Kira pr&uuml;ft bei jeder Anfrage ob die Leistung zu eurem Spektrum passt</span>
     </div>
     <div class="es-row" style="flex-direction:column;align-items:stretch">
-      <div class="es-rl" style="margin-bottom:4px">Website-URL<div class="es-rd">Kira kann eure Website scannen und Leistungen automatisch importieren</div></div>
+      <div class="es-rl" style="margin-bottom:4px">Website importieren<div class="es-rd">Hauptseite + bis zu 8 Unterseiten werden gescannt und per KI analysiert</div></div>
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="es-inp" id="cfg-leistungen-url" value="{esc(_profil_website_url)}" placeholder="https://beispiel.de" style="flex:1;width:auto">
-        <button class="es-btn" onclick="leistungenImportieren()" id="btn-leistungen-import" style="white-space:nowrap">Von Website importieren</button>
+        <input class="es-inp" id="cfg-leistungen-url" value="" placeholder="https://beispiel.de" style="flex:1;width:auto">
+        <button class="es-btn" onclick="leistungenImportieren()" id="btn-leistungen-import" style="white-space:nowrap">Website importieren</button>
       </div>
     </div>
-    <div class="es-row" style="flex-direction:column;align-items:stretch">
-      <div class="es-rl" style="margin-bottom:6px">Angebotene Leistungen<div class="es-rd">Kira nutzt diese bei der Klassifizierung und bei Antwort-Entw&uuml;rfen</div></div>
-      <div id="bp-leistungen-list">
-        {"".join(f'''<div class="bp-leistung-card" style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-            <input class="es-inp bp-l-name" value="{esc(l.get("name",""))}" placeholder="Leistungsname" style="flex:1;min-width:180px;font-weight:600">
-            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern" {"checked" if l.get("ist_kernleistung") else ""}> Kernleistung</label>
-            <button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>
-          </div>
-          <textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung der Leistung&hellip;">{esc(l.get("beschreibung",""))}</textarea>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <div style="flex:1;min-width:200px">
-              <div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>
-              <input class="es-inp bp-l-stichworte" value="{esc(", ".join(l.get("stichworte",[])))}" placeholder="Stichwort1, Stichwort2&hellip;" style="width:100%">
-            </div>
-            <div style="flex:1;min-width:200px">
-              <div style="font-size:10px;color:var(--muted)">Zielgruppe</div>
-              <input class="es-inp bp-l-zielgruppe" value="{esc(l.get("zielgruppe",""))}" placeholder="z.B. Architekten, Bauherren&hellip;" style="width:100%">
-            </div>
-          </div>
-        </div>''' for l in _profil_katalog)}
-      </div>
-      <button class="es-btn" onclick="bpAddLeistung()" style="margin-top:4px;align-self:flex-start">+ Leistung hinzuf&uuml;gen</button>
+
+    <div id="bp-leistungen-accordion" style="margin-top:8px">
+      {_lk_accordion_html}
     </div>
-    <div class="es-row" style="flex-direction:column;align-items:stretch">
+
+    <div class="es-row" style="flex-direction:column;align-items:stretch;margin-top:8px">
       <div class="es-rl" style="margin-bottom:4px">Nicht angebotene Leistungen<div class="es-rd">Kira ber&uuml;cksichtigt diese &uuml;berall: Klassifizierung, Antwort-Entw&uuml;rfe, Chat, WhatsApp &mdash; unpassende Anfragen werden erkannt</div></div>
       <div id="bp-nicht-leistungen-list">
         {"".join(f'<div class="bp-nl-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="es-inp bp-nl-val" value="{esc(nl)}" placeholder="z.B. Kostenlose Beratung f&uuml;r Heimwerker" style="flex:1"><button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.parentElement.remove()" title="Entfernen">&times;</button></div>' for nl in _profil_nicht_leistungen)}
@@ -17381,27 +17437,88 @@ function _bpCollectDomains() {{
   const rows = document.querySelectorAll('#bp-domain-list .bp-domain-val');
   return Array.from(rows).map(inp => inp.value.trim()).filter(Boolean);
 }}
-// ── Benutzerprofile: Leistungskatalog verwalten ──
-function bpAddLeistung() {{
-  const list = document.getElementById('bp-leistungen-list');
-  if(!list) return;
-  const card = document.createElement('div');
-  card.className = 'bp-leistung-card';
-  card.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;background:var(--bg-raised)';
-  card.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">`
+// ── Benutzerprofile: Leistungskatalog Akkordeon ──
+function _bpLeistungCardHtml(quelle) {{
+  return `<div class="bp-leistung-card" data-quelle="${{quelle||'manuell'}}">`
+    +`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">`
     +`<input class="es-inp bp-l-name" value="" placeholder="Leistungsname" style="flex:1;min-width:180px;font-weight:600">`
     +`<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bp-l-kern"> Kernleistung</label>`
-    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove()" title="Entfernen">&times;</button>`
+    +`<button class="es-btn" style="color:#e84545;border-color:#e84545;padding:2px 8px" onclick="this.closest('.bp-leistung-card').remove();bpUpdateGroupCount()" title="Entfernen">&times;</button>`
     +`</div>`
-    +`<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung der Leistung\u2026"></textarea>`
+    +`<textarea class="es-inp bp-l-beschr" rows="2" style="resize:vertical;margin-bottom:4px;width:100%;box-sizing:border-box" placeholder="Beschreibung\u2026"></textarea>`
     +`<div style="display:flex;gap:8px;flex-wrap:wrap">`
     +`<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Stichworte (kommagetrennt)</div>`
     +`<input class="es-inp bp-l-stichworte" value="" placeholder="Stichwort1, Stichwort2\u2026" style="width:100%"></div>`
     +`<div style="flex:1;min-width:200px"><div style="font-size:10px;color:var(--muted)">Zielgruppe</div>`
     +`<input class="es-inp bp-l-zielgruppe" value="" placeholder="z.B. Architekten, Bauherren\u2026" style="width:100%"></div>`
-    +`</div>`;
-  list.appendChild(card);
-  card.querySelector('.bp-l-name').focus();
+    +`</div></div>`;
+}}
+function bpToggleGroup(header) {{
+  const grp = header.closest('.bp-lk-group');
+  if(!grp) return;
+  const wasOpen = grp.classList.contains('open');
+  // Alle anderen schlie\u00dfen (Akkordeon)
+  document.querySelectorAll('#bp-leistungen-accordion .bp-lk-group.open').forEach(g => {{
+    g.classList.remove('open');
+    const body = g.querySelector('.bp-lk-body');
+    if(body) body.style.display = 'none';
+  }});
+  // Diese \u00f6ffnen/schlie\u00dfen
+  if(!wasOpen) {{
+    grp.classList.add('open');
+    const body = grp.querySelector('.bp-lk-body');
+    if(body) body.style.display = '';
+  }}
+}}
+function bpUpdateGroupCount() {{
+  document.querySelectorAll('#bp-leistungen-accordion .bp-lk-group').forEach(grp => {{
+    const n = grp.querySelectorAll('.bp-leistung-card').length;
+    const cnt = grp.querySelector('.bp-lk-count');
+    if(cnt) cnt.textContent = n + ' Leistung' + (n !== 1 ? 'en' : '');
+  }});
+}}
+function bpDeleteGroup(btn) {{
+  const grp = btn.closest('.bp-lk-group');
+  if(!grp) return;
+  const quelle = grp.dataset.quelle || '';
+  const n = grp.querySelectorAll('.bp-leistung-card').length;
+  if(!confirm(`Alle ${{n}} Leistungen von "${{quelle}}" entfernen?`)) return;
+  grp.remove();
+}}
+function bpAddLeistung(quelle) {{
+  quelle = quelle || 'manuell';
+  const acc = document.getElementById('bp-leistungen-accordion');
+  if(!acc) return;
+  // Gruppe finden oder erstellen
+  let grp = acc.querySelector(`.bp-lk-group[data-quelle="${{quelle}}"]`);
+  if(!grp) {{
+    grp = document.createElement('div');
+    grp.className = 'bp-lk-group';
+    grp.dataset.quelle = quelle;
+    const isManual = quelle === 'manuell';
+    grp.innerHTML = `<div class="bp-lk-header" onclick="bpToggleGroup(this)">`
+      +`<span class="bp-lk-arrow">&#x25B6;</span>`
+      +`<span class="bp-lk-icon">${{isManual ? '&#x270D;' : '&#x1F310;'}}</span>`
+      +`<span class="bp-lk-title">${{isManual ? 'Manuell angelegt' : quelle}}</span>`
+      +`<span class="bp-lk-count">0 Leistungen</span>`
+      +`${{isManual ? '<button class="es-btn" style="padding:1px 8px;font-size:11px;margin-left:auto" onclick="event.stopPropagation();bpAddLeistung(\\x27manuell\\x27)" title="Neue Leistung">+ Hinzuf\\u00fcgen</button>' : '<button class="es-btn bp-lk-del-grp" style="color:#e84545;border-color:#e84545;padding:1px 8px;font-size:11px;margin-left:auto" onclick="event.stopPropagation();bpDeleteGroup(this)">&times; Entfernen</button>'}}`
+      +`</div><div class="bp-lk-body"></div>`;
+    // Manuell immer oben
+    if(isManual) acc.prepend(grp); else acc.appendChild(grp);
+  }}
+  // Gruppe \u00f6ffnen
+  document.querySelectorAll('#bp-leistungen-accordion .bp-lk-group.open').forEach(g => {{
+    g.classList.remove('open');
+    g.querySelector('.bp-lk-body').style.display = 'none';
+  }});
+  grp.classList.add('open');
+  const body = grp.querySelector('.bp-lk-body');
+  body.style.display = '';
+  // Karte einf\u00fcgen
+  body.insertAdjacentHTML('beforeend', _bpLeistungCardHtml(quelle));
+  const cards = body.querySelectorAll('.bp-leistung-card');
+  cards[cards.length - 1].querySelector('.bp-l-name').focus();
+  bpUpdateGroupCount();
 }}
 function bpAddNichtLeistung() {{
   const list = document.getElementById('bp-nicht-leistungen-list');
@@ -17416,7 +17533,7 @@ function bpAddNichtLeistung() {{
 }}
 function _bpCollectLeistungen() {{
   const katalog = [];
-  document.querySelectorAll('#bp-leistungen-list .bp-leistung-card').forEach(card => {{
+  document.querySelectorAll('#bp-leistungen-accordion .bp-leistung-card').forEach(card => {{
     const name = (card.querySelector('.bp-l-name')?.value || '').trim();
     if(!name) return;
     katalog.push({{
@@ -17424,7 +17541,8 @@ function _bpCollectLeistungen() {{
       beschreibung: (card.querySelector('.bp-l-beschr')?.value || '').trim(),
       stichworte: (card.querySelector('.bp-l-stichworte')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
       zielgruppe: (card.querySelector('.bp-l-zielgruppe')?.value || '').trim(),
-      ist_kernleistung: card.querySelector('.bp-l-kern')?.checked ?? false
+      ist_kernleistung: card.querySelector('.bp-l-kern')?.checked ?? false,
+      quelle: card.dataset.quelle || card.closest('.bp-lk-group')?.dataset.quelle || 'manuell'
     }});
   }});
   const nicht = [];
@@ -17433,34 +17551,31 @@ function _bpCollectLeistungen() {{
     if(v) nicht.push(v);
   }});
   return {{
-    website_url: (document.getElementById('cfg-leistungen-url')?.value || '').trim(),
     letzte_aktualisierung: new Date().toISOString().slice(0,10),
     katalog: katalog,
-    nicht_leistungen: nicht,
-    quelle: 'manuell'
+    nicht_leistungen: nicht
   }};
 }}
 function leistungenImportieren() {{
   const url = (document.getElementById('cfg-leistungen-url')?.value || '').trim();
   if(!url) {{ showToast('Bitte erst Website-URL eingeben'); return; }}
   const btn = document.getElementById('btn-leistungen-import');
-  if(btn) {{ btn.disabled=true; btn.textContent='Importiere\u2026'; }}
+  if(btn) {{ btn.disabled=true; btn.textContent='Scanne Seiten\u2026'; }}
   fetch('/api/leistungen/import', {{
     method:'POST',
     headers:{{'Content-Type':'application/json'}},
     body: JSON.stringify({{url: url}})
   }}).then(r=>r.json()).then(d=>{{
-    if(btn) {{ btn.disabled=false; btn.textContent='Von Website importieren'; }}
+    if(btn) {{ btn.disabled=false; btn.textContent='Website importieren'; }}
     if(d.ok && d.leistungen) {{
-      // Importierte Leistungen als Karten einf\u00fcgen
-      const list = document.getElementById('bp-leistungen-list');
-      (d.leistungen.katalog || []).forEach(l => {{
-        // Pr\u00fcfen ob Name schon existiert
-        const existing = Array.from(list.querySelectorAll('.bp-l-name')).map(i=>i.value.trim().toLowerCase());
-        if(existing.includes(l.name.toLowerCase())) return;
-        // Neue Karte hinzuf\u00fcgen
-        bpAddLeistung();
-        const cards = list.querySelectorAll('.bp-leistung-card');
+      const items = d.leistungen.katalog || [];
+      // Neue Akkordeon-Gruppe f\u00fcr diese Website anlegen
+      items.forEach(l => {{
+        bpAddLeistung(url);
+        const acc = document.getElementById('bp-leistungen-accordion');
+        const grp = acc.querySelector(`.bp-lk-group[data-quelle="${{CSS.escape(url)}}"]`);
+        if(!grp) return;
+        const cards = grp.querySelectorAll('.bp-leistung-card');
         const last = cards[cards.length-1];
         if(!last) return;
         last.querySelector('.bp-l-name').value = l.name || '';
@@ -17478,13 +17593,16 @@ function leistungenImportieren() {{
         const rows = nlList.querySelectorAll('.bp-nl-val');
         rows[rows.length-1].value = nl;
       }});
-      showToast(`${{(d.leistungen.katalog||[]).length}} Leistungen importiert`);
+      bpUpdateGroupCount();
+      const pages = d.leistungen.pages_crawled || 1;
+      showToast(`${{items.length}} Leistungen aus ${{pages}} Seiten importiert`);
+      document.getElementById('cfg-leistungen-url').value = '';
     }} else {{
       showToast(d.error||'Import fehlgeschlagen');
     }}
-  }}).catch(()=>{{
-    if(btn) {{ btn.disabled=false; btn.textContent='Von Website importieren'; }}
-    showToast('Import-Fehler');
+  }}).catch(e=>{{
+    if(btn) {{ btn.disabled=false; btn.textContent='Website importieren'; }}
+    showToast('Import-Fehler: ' + e.message);
   }});
 }}
 function _bpCollectProfile() {{
@@ -29671,41 +29789,78 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)})
 
-        # Leistungskatalog von Website importieren
+        # Leistungskatalog von Website importieren (mit Subpage-Crawler)
         if self.path == '/api/leistungen/import':
             try:
                 url = body.get("url", "").strip()
                 if not url:
                     return self._json({"ok": False, "error": "Keine URL angegeben"})
-                # Website-Inhalt abrufen
-                import urllib.request
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 KiraBot/1.0"})
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    html_content = resp.read().decode('utf-8', errors='replace')
-                # HTML-Tags entfernen, nur sichtbaren Text behalten
-                import re as _re
-                # Script/Style-Blöcke entfernen
-                text = _re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', html_content, flags=_re.DOTALL|_re.IGNORECASE)
-                text = _re.sub(r'<[^>]+>', ' ', text)
-                text = _re.sub(r'\s+', ' ', text).strip()
-                # Auf sinnvolle Länge begrenzen
-                if len(text) > 8000:
-                    text = text[:8000]
-                # LLM-Analyse: Leistungen extrahieren
+                import urllib.request, re as _re
+                from urllib.parse import urljoin, urlparse
+                _ua = {"User-Agent": "Mozilla/5.0 KiraBot/1.0"}
+                _parsed_base = urlparse(url)
+                _base_domain = _parsed_base.netloc
+
+                def _fetch_page(page_url):
+                    try:
+                        req = urllib.request.Request(page_url, headers=_ua)
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            return resp.read().decode('utf-8', errors='replace')
+                    except Exception:
+                        return ""
+
+                def _extract_text(html):
+                    t = _re.sub(r'<(script|style|noscript|header|footer|nav)[^>]*>.*?</\1>', '', html, flags=_re.DOTALL|_re.IGNORECASE)
+                    t = _re.sub(r'<[^>]+>', ' ', t)
+                    return _re.sub(r'\s+', ' ', t).strip()
+
+                def _extract_links(html, base_url):
+                    links = set()
+                    for m in _re.finditer(r'<a[^>]+href=["\']([^"\'#]+)', html, _re.IGNORECASE):
+                        href = m.group(1)
+                        full = urljoin(base_url, href)
+                        p = urlparse(full)
+                        if p.netloc == _base_domain and p.scheme in ('http', 'https'):
+                            clean = f"{p.scheme}://{p.netloc}{p.path}"
+                            if not _re.search(r'\.(pdf|jpg|png|gif|svg|css|js|zip|mp4|mp3)$', clean, _re.IGNORECASE):
+                                links.add(clean)
+                    return links
+
+                # Hauptseite holen + Links sammeln
+                main_html = _fetch_page(url)
+                if not main_html:
+                    return self._json({"ok": False, "error": f"Website {url} nicht erreichbar"})
+                all_texts = [_extract_text(main_html)]
+                crawled = {url}
+                sublinks = _extract_links(main_html, url) - crawled
+                pages_crawled = 1
+
+                # Bis zu 8 Unterseiten crawlen
+                for sub_url in list(sublinks)[:8]:
+                    sub_html = _fetch_page(sub_url)
+                    if sub_html:
+                        sub_text = _extract_text(sub_html)
+                        if len(sub_text) > 100:
+                            all_texts.append(f"--- Seite: {sub_url} ---\n{sub_text}")
+                            pages_crawled += 1
+                    crawled.add(sub_url)
+
+                combined_text = "\n\n".join(all_texts)
+                if len(combined_text) > 12000:
+                    combined_text = combined_text[:12000]
+
+                # LLM-Analyse
                 _cfg_import = json.loads((SCRIPTS_DIR / "config.json").read_text('utf-8'))
-                providers = _cfg_import.get("llm", {}).get("providers", [])
-                aktive = [p for p in providers if p.get("aktiv")]
-                if not aktive:
-                    return self._json({"ok": False, "error": "Kein aktiver LLM-Provider konfiguriert"})
                 from task_manager import get_active_profile
                 profil = get_active_profile(_cfg_import)
                 firma_name = profil.get("firma_name", "")
                 firma_branche = profil.get("firma_branche", "")
-                prompt = f"""Analysiere den folgenden Website-Text von "{firma_name}" (Branche: {firma_branche}).
-Extrahiere die angebotenen Leistungen/Dienstleistungen und erstelle einen strukturierten Leistungskatalog.
+                prompt = f"""Analysiere den Website-Text von "{firma_name}" (Branche: {firma_branche}).
+Es wurden {pages_crawled} Seiten von {url} gescannt.
+Extrahiere alle angebotenen Leistungen/Dienstleistungen.
 
 Website-Text:
-{text}
+{combined_text}
 
 Antworte NUR als JSON-Objekt (kein Markdown, kein Code-Block):
 {{
@@ -29725,24 +29880,25 @@ Regeln:
 - Nur TATSÄCHLICH angebotene Leistungen aufnehmen
 - ist_kernleistung=true für die Hauptleistungen (max. 3-5)
 - nicht_leistungen: häufige Verwechslungen oder Anfragen die NICHT bedient werden
-- Maximal 15 Leistungen, fokussiere auf die wichtigsten"""
+- Maximal 20 Leistungen, fokussiere auf die wichtigsten
+- Keine Duplikate"""
 
                 from kira_llm import _call_llm_simple
-                llm_response = _call_llm_simple(prompt, max_tokens=2000)
+                llm_response = _call_llm_simple(prompt, max_tokens=2500)
                 if not llm_response:
                     return self._json({"ok": False, "error": "LLM konnte keine Antwort generieren"})
-                # JSON parsen
-                import re as _re2
-                json_match = _re2.search(r'\{[\s\S]*\}', llm_response)
+                json_match = _re.search(r'\{[\s\S]*\}', llm_response)
                 if not json_match:
                     return self._json({"ok": False, "error": "LLM-Antwort konnte nicht geparst werden"})
-                leistungen = json.loads(json_match.group())
-                leistungen["website_url"] = url
-                leistungen["letzte_aktualisierung"] = datetime.now().strftime("%Y-%m-%d")
-                leistungen["quelle"] = "website-import"
-                rlog('settings', 'leistungen_import', f'Website-Import von {url}: {len(leistungen.get("katalog", []))} Leistungen',
+                result = json.loads(json_match.group())
+                # Quelle pro Leistung taggen
+                for item in result.get("katalog", []):
+                    item["quelle"] = url
+                result["website_url"] = url
+                result["pages_crawled"] = pages_crawled
+                rlog('settings', 'leistungen_import', f'Website-Import von {url}: {len(result.get("katalog", []))} Leistungen aus {pages_crawled} Seiten',
                      source='server', modul='einstellungen', actor_type='user', status='ok')
-                return self._json({"ok": True, "leistungen": leistungen})
+                return self._json({"ok": True, "leistungen": result})
             except json.JSONDecodeError:
                 return self._json({"ok": False, "error": "LLM-Antwort war kein gültiges JSON"})
             except Exception as e:
