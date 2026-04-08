@@ -1378,6 +1378,37 @@ def get_tools(config=None):
         }
     })
     tools.append({
+        "name": "mail_korrektur",
+        "description": (
+            "Korrigiert die Kategorie einer falsch klassifizierten Mail/Aufgabe. "
+            "Speichert die Korrektur als Lernbeispiel — zukünftige Mails werden dadurch besser klassifiziert. "
+            "Nutze dieses Tool wenn der Benutzer sagt, dass eine Mail falsch eingeordnet ist. "
+            "Die Korrektur wird in der corrections-DB und optional als Wissensregel gespeichert."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "ID der Aufgabe/Mail die korrigiert werden soll"},
+                "neue_kategorie": {
+                    "type": "string",
+                    "description": "Die korrekte Kategorie",
+                    "enum": [
+                        "Antwort erforderlich", "Neue Lead-Anfrage", "Angebotsrueckmeldung",
+                        "Rechnung / Beleg", "Zur Kenntnis", "Newsletter / Werbung",
+                        "Shop / System", "Ignorieren", "Abgeschlossen"
+                    ]
+                },
+                "grund": {"type": "string", "description": "Warum die alte Kategorie falsch war — wird als Lernregel gespeichert"},
+                "auch_task_status": {
+                    "type": "string",
+                    "enum": ["offen", "erledigt", ""],
+                    "description": "Optional: Task-Status gleich mitändern (leer = nicht ändern)"
+                }
+            },
+            "required": ["task_id", "neue_kategorie", "grund"]
+        }
+    })
+    tools.append({
         "name": "task_erledigen",
         "description": (
             "Markiert eine oder mehrere Aufgaben als erledigt/abgelegt OHNE sie zu löschen. "
@@ -1853,6 +1884,7 @@ def execute_tool(name, params):
             "kunde_nachschlagen": _tool_kunde_nachschlagen,
             "nachfass_email_entwerfen": _tool_nachfass_email,
             "wissen_speichern": _tool_wissen_speichern,
+            "mail_korrektur": _tool_mail_korrektur,
             "rechnungsdetails_abrufen": _tool_rechnungsdetails,
             "angebot_pruefen": _tool_angebot_pruefen,
             "web_recherche": _tool_web_recherche,
@@ -2246,6 +2278,66 @@ def _tool_duplikate_suchen(p):
     if not clusters:
         return {"cluster": [], "hinweis": f"Keine Duplikat-Cluster gefunden (Schwellwert: {min_sim:.0%})."}
     return {"cluster": clusters, "gesamt_cluster": len(clusters)}
+
+
+def _tool_mail_korrektur(p):
+    """Korrigiert Kategorie einer Mail/Aufgabe und speichert als Lernbeispiel."""
+    task_id = p.get("task_id")
+    neue_kat = p.get("neue_kategorie", "")
+    grund = p.get("grund", "")
+    auch_status = p.get("auch_task_status", "")
+    if not task_id or not neue_kat:
+        return {"ok": False, "error": "task_id und neue_kategorie sind Pflicht"}
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        task = db.execute("SELECT id, kategorie, betreff, message_id, zusammenfassung, absender_rolle FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not task:
+            db.close()
+            return {"ok": False, "error": f"Task {task_id} nicht gefunden"}
+        alter_typ = task["kategorie"] or "unbekannt"
+        now = datetime.now().isoformat()
+        # 1. Korrektur in corrections-Tabelle speichern (= Lernbeispiel für Classifier)
+        try:
+            db.execute(
+                "INSERT INTO corrections (task_id, alter_typ, neuer_typ, notiz, erstellt_am) VALUES (?,?,?,?,?)",
+                (task_id, alter_typ, neue_kat, grund, now))
+        except Exception:
+            pass
+        # 2. Task-Kategorie aktualisieren
+        db.execute("UPDATE tasks SET kategorie=? WHERE id=?", (neue_kat, task_id))
+        # 3. Optional: Task-Status ändern
+        if auch_status and auch_status in ("offen", "erledigt"):
+            db.execute("UPDATE tasks SET status=? WHERE id=?", (auch_status, task_id))
+        # 4. Wissensregel speichern wenn Grund gegeben
+        if grund:
+            titel = f"Korrektur: {alter_typ} → {neue_kat}"
+            inhalt = f"Mail \"{(task['betreff'] or '')[:80]}\" war als '{alter_typ}' klassifiziert, korrekt ist '{neue_kat}'. Grund: {grund}"
+            db.execute(
+                "INSERT INTO wissen_regeln (kategorie, titel, inhalt, quelle, status, erstellt_am) VALUES (?,?,?,?,?,?)",
+                ("klassifizierung", titel, inhalt, "Kira-Chat Korrektur", "aktiv", now))
+        # 5. mail_index.db auch aktualisieren
+        msgid = task["message_id"] or ""
+        if msgid:
+            try:
+                mi_db = sqlite3.connect(str(KNOWLEDGE_DIR / "mail_index.db"))
+                mi_db.execute("UPDATE mails SET kategorie=?, klassifiziert_am=? WHERE message_id=?",
+                              (neue_kat, now, msgid))
+                mi_db.commit()
+                mi_db.close()
+            except Exception:
+                pass
+        db.commit()
+        db.close()
+        return {
+            "ok": True,
+            "message": f"Korrektur gespeichert: '{alter_typ}' → '{neue_kat}'. "
+                       f"Wird als Lernbeispiel für zukünftige Klassifizierungen verwendet.",
+            "alter_typ": alter_typ,
+            "neuer_typ": neue_kat
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def _tool_task_erledigen(p):

@@ -4666,8 +4666,16 @@ window.pfKiraMailContext = async function() {
     });
   }
 
+  // Aktuelle Kategorie + Task-ID mitgeben
+  const taskKat = ctx?.kategorie || _pfCurrentMail?.kategorie || '';
+  const taskId = ctx?.task_id || _pfCurrentMail?.task_id || '';
+  if(taskKat) lines.push('', 'Aktuelle Kategorie: **' + taskKat + '**' + (taskId ? ' (Task #' + taskId + ')' : ''));
+
   lines.push('', '---');
-  lines.push('Bitte lies diese Mail, fasse kurz zusammen was wichtig ist, und frag mich was du brauchst um zu helfen. Welcher n\u00e4chste Schritt w\u00e4re sinnvoll?');
+  lines.push('Ich habe dir diese Mail geladen. Bitte lies sie und frag mich direkt:');
+  lines.push('1. Ist die Kategorie \"' + (taskKat || 'unbekannt') + '\" korrekt? Wenn nicht, sag mir die richtige — ich korrigiere das sofort (mit mail_korrektur Tool) und es wird als Lernbeispiel gespeichert.');
+  lines.push('2. Was m\u00f6chtest du damit tun? (Antworten, Erledigen, Ignorieren, Weiterleiten, Erinnerung setzen?)');
+  lines.push('3. Falls du Informationen brauchst die ich nachschlagen kann — frag einfach.');
 
   const msg = lines.join('\\n');
 
@@ -24372,6 +24380,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         result = {
             "betreff": "", "absender": "", "datum": "", "an": "",
             "text": "", "anhaenge": [],
+            "kategorie": "",        # aktuelle Klassifizierung
+            "task_id": None,        # zugehörige Task-ID (falls vorhanden)
             "sender_verlauf": [],   # letzte 5 Mails desselben Absenders
             "offene_tasks": [],     # passende offene Tasks
         }
@@ -24382,7 +24392,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             conn = sqlite3.connect(str(MAIL_INDEX_DB))
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                "SELECT betreff,absender,an,datum,text_plain,mail_folder_pfad,eml_path "
+                "SELECT betreff,absender,an,datum,text_plain,mail_folder_pfad,eml_path,kategorie "
                 "FROM mails WHERE message_id=?", (msg_id,)
             ).fetchone()
             if row:
@@ -24400,6 +24410,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         if t and len(t) > len(result["text"]):
                             result["text"] = t
                         break
+                result["kategorie"] = row["kategorie"] or ""
+                # Task-ID aus tasks.db suchen
+                try:
+                    _tdb = get_db()
+                    _trow = _tdb.execute("SELECT id FROM tasks WHERE message_id=? LIMIT 1", (msg_id,)).fetchone()
+                    if _trow:
+                        result["task_id"] = _trow["id"]
+                    _tdb.close()
+                except Exception:
+                    pass
                 # Absender-E-Mail extrahieren für Verlauf-Suche
                 import re as _re3
                 m_addr = _re3.search(r'[\w.+-]+@[\w.-]+', result["absender"])
