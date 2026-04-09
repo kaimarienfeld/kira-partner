@@ -13411,12 +13411,15 @@ def build_admin():
       <!-- ══ E-MAIL VERSAND (OAuth2) ══ -->
       <div class="adm-sec" id="adm-sec-smtp">
         <div class="es-grp-h" style="margin-bottom:4px">E-Mail-Versand</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">System-Mails (Benachrichtigungen, Partnereinladungen) werden über ein bestehendes Mail-Konto mit OAuth2 gesendet — kein separates SMTP-Passwort nötig.</div>
-        <div class="es-grp">
+        <div class="es-grp-sub" style="margin-bottom:16px">System-Mails werden über ein bestehendes Mail-Konto mit OAuth2 gesendet — kein separates SMTP-Passwort nötig. <em>Entwickler-Einstellung — nicht in Verkaufsversion sichtbar.</em></div>
+
+        <!-- Absender & System-Empfänger -->
+        <div class="es-grp" style="margin-bottom:18px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Absender &amp; Empfänger</div>
           <div class="adm-field">
             <div class="adm-field-lbl">
               <div class="adm-field-key">Absender-Konto</div>
-              <div class="adm-field-hint">Über welches Konto sollen System-Mails gesendet werden? (Standard: info@)</div>
+              <div class="adm-field-hint">Über welches Konto werden System-Mails gesendet? (Standard: info@)</div>
             </div>
             <select id="adm-f-smtp-email" class="adm-inp adm-inp-wide" style="max-width:380px">
               <option value="">Automatisch (info@ bevorzugt)</option>
@@ -13424,18 +13427,45 @@ def build_admin():
           </div>
           <div class="adm-field">
             <div class="adm-field-lbl">
-              <div class="adm-field-key">Empfänger für System-Benachrichtigungen</div>
-              <div class="adm-field-hint">Wohin gehen Test-Mails und Benachrichtigungen</div>
+              <div class="adm-field-key">System-Mail-Empfänger</div>
+              <div class="adm-field-hint">Wer bekommt System-Benachrichtigungen, Fehler-Reports und Test-Mails</div>
             </div>
             <input id="adm-f-smtp-empf" type="email" class="adm-inp adm-inp-wide" placeholder="kai@raumkult.eu">
           </div>
         </div>
+
+        <!-- Partner-View Mails -->
+        <div class="es-grp" style="margin-bottom:18px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Partner-View Mails</div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Partner-Empfänger (Leni)</div>
+              <div class="adm-field-hint">An wen gehen Einladungen, Passwörter und Update-Mails</div>
+            </div>
+            <input id="adm-f-partner-to" type="email" class="adm-inp adm-inp-wide" placeholder="leni@example.com">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">BCC-Kopie an</div>
+              <div class="adm-field-hint">Du bekommst eine Blindkopie jeder Partner-Mail (leer = keine Kopie)</div>
+            </div>
+            <input id="adm-f-partner-bcc" type="email" class="adm-inp adm-inp-wide" placeholder="info@raumkult.eu">
+          </div>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Partner-View URL</div>
+              <div class="adm-field-hint">Link der in Partner-Mails eingefügt wird</div>
+            </div>
+            <input id="adm-f-partner-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://...">
+          </div>
+        </div>
+
         <div style="background:var(--bg-overlay);border-radius:10px;padding:12px 16px;margin:12px 0;font-size:12.5px;color:var(--muted);line-height:1.6">
           <strong style="color:var(--text)">&#x1F512; Sicher via OAuth2</strong> — Kein Passwort gespeichert. Die Authentifizierung läuft über das bestehende Microsoft/Google OAuth2-Token des gewählten Mail-Kontos.
         </div>
         <div class="es-save-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="admSaveSection('smtp')">&#x1F4BE; Speichern</button>
-          <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an Empfänger senden">&#x2709; Testmail senden</button>
+          <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an System-Empfänger senden">&#x2709; Testmail senden</button>
           <span id="adm-smtp-test-res" style="font-size:12px;font-weight:600;margin-left:4px"></span>
           <span id="adm-save-smtp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
           <span id="adm-smtp-status-badge" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600"></span>
@@ -13873,6 +13903,11 @@ function admLoadData() {
       if (smtp.system_mail_konto) smtpSel.value = smtp.system_mail_konto;
     }
     setVal('adm-f-smtp-empf', smtp.empfaenger_email);
+    // Partner-View Felder
+    var pv = c.partner_view || {};
+    setVal('adm-f-partner-to', pv.leni_email || '');
+    setVal('adm-f-partner-bcc', pv.leni_mail_bcc || '');
+    setVal('adm-f-partner-url', pv.partner_url || '');
     // SMTP Status-Badge
     var smtpBadge = document.getElementById('adm-smtp-status-badge');
     if (smtpBadge) {
@@ -13957,7 +13992,8 @@ function admSaveSection(section) {
     payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'),
       provider_keys: provKeys, lex_api_key: g('adm-f-lex-key'), lex_api_base_url: g('adm-f-lex-url')};
   } else if (section === 'smtp') {
-    payload.data = {system_mail_konto: g('adm-f-smtp-email'), empfaenger_email: g('adm-f-smtp-empf')};
+    payload.data = {system_mail_konto: g('adm-f-smtp-email'), empfaenger_email: g('adm-f-smtp-empf'),
+      partner_to: g('adm-f-partner-to'), partner_bcc: g('adm-f-partner-bcc'), partner_url: g('adm-f-partner-url')};
   } else if (section === 'passwoerter') {
     var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
     if (pw1 && pw1 !== pw2) { showToast('Passwörter stimmen nicht überein', 'fehler'); return; }
@@ -31922,14 +31958,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     _sys.path.insert(0, str(SCRIPTS_DIR))
                 import mail_monitor as _mm
                 mail_type = body.get('type', 'welcome')
-                to_addr   = body.get('to', '').strip()
-                link      = body.get('link', '')
+                _pv_cfg = CFG.get('partner_view', {})
+                to_addr = (body.get('to') or _pv_cfg.get('leni_email') or '').strip()
+                link = body.get('link') or _pv_cfg.get('partner_url') or ''
                 if not to_addr:
-                    self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail angegeben'})
+                    self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail — bitte im Admin unter E-Mail-Versand eintragen'})
                     return
                 bcc_addr = (
                     body.get('bcc')
-                    or CFG.get('partner_view', {}).get('leni_mail_bcc')
+                    or _pv_cfg.get('leni_mail_bcc')
                     or ''
                 )
                 if mail_type == 'welcome':
@@ -34613,7 +34650,19 @@ def _method_api_admin_data_get(self):
             "mail_archiv": {"pfad": cfg.get("mail_archiv", {}).get("pfad", "")},
             "backup": cfg.get("backup", {}),
             "cloudflare_tunnel": {k: v for k, v in cfg.get("cloudflare_tunnel", {}).items() if not k.startswith("_")},
+            "partner_view": {k: v for k, v in cfg.get("partner_view", {}).items() if not k.startswith("_")},
+            "mail_konten": cfg.get("mail_konten", {}),
         }
+        # Aktive Mail-Konten aus Archiver-Config laden (für Absender-Dropdown)
+        try:
+            import sys as _sys
+            if str(SCRIPTS_DIR) not in _sys.path:
+                _sys.path.insert(0, str(SCRIPTS_DIR))
+            import mail_monitor as _mm
+            _konten = _mm._load_accounts()
+            admin_cfg["mail_konten"]["konten"] = [k["email"] for k in _konten]
+        except Exception:
+            pass
         self._json({"ok": True, "secrets": secs_clean, "config": admin_cfg})
     except Exception as e:
         self._json({"ok": False, "error": str(e)})
@@ -34665,10 +34714,20 @@ def _method_api_admin_save(self, body):
 
         elif section == "smtp":
             smtp = cfg.get("email_notification", {})
-            for k, v in data.items():
-                if v is not None and v != "":
-                    smtp[k] = v
+            if "system_mail_konto" in data:
+                smtp["system_mail_konto"] = data["system_mail_konto"]
+            if "empfaenger_email" in data:
+                smtp["empfaenger_email"] = data["empfaenger_email"]
             cfg["email_notification"] = smtp
+            # Partner-View Felder
+            pv = cfg.get("partner_view", {})
+            if "partner_to" in data:
+                pv["leni_email"] = data["partner_to"]
+            if "partner_bcc" in data:
+                pv["leni_mail_bcc"] = data["partner_bcc"]
+            if "partner_url" in data:
+                pv["partner_url"] = data["partner_url"]
+            cfg["partner_view"] = pv
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
         elif section == "smtp_test_ok":
