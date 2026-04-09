@@ -22616,14 +22616,62 @@ function saveKorrektur(){{
   // Custom-Kategorie hat Vorrang wenn ausgefüllt
   if(custom) neu = custom;
   if(!neu&&!notiz){{ showToast('Bitte Kategorie oder Notiz angeben'); return; }}
+  // Speichern-Button deaktivieren + Lade-Anzeige
+  const saveBtn = document.querySelector('#korrModal .btn-done');
+  if(saveBtn){{ saveBtn.disabled=true; saveBtn.textContent='Kira analysiert\u2026'; }}
   fetch('/api/task/'+tid+'/korrektur',{{
     method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify({{alter_typ:alt,neuer_typ:neu,notiz}})
   }}).then(r=>r.json()).then(d=>{{
     closeKorrModal();
-    showKiraToast(d.kira_antwort || 'Korrektur gespeichert.');
-    setTimeout(()=>location.reload(),1800);
+    if(d.ok){{
+      // Kira-Vorschlag im Preview anzeigen statt Seite neu laden
+      _korrekturUpdatePreview(tid, d);
+      // Kategorie-Badge auf der Karte aktualisieren
+      const card = document.getElementById('task-'+tid);
+      if(card && d.neue_kategorie){{
+        const badges = card.querySelectorAll('.wi-kat-badge,.km-kat');
+        badges.forEach(b=>{{ b.textContent = d.neue_kategorie; }});
+      }}
+    }} else {{
+      showKiraToast(d.kira_antwort || 'Korrektur gespeichert.');
+      setTimeout(()=>location.reload(),1800);
+    }}
   }}).catch(()=>showToast('Fehler'));
+}}
+function _korrekturUpdatePreview(tid, d){{
+  const prev = document.getElementById('km-preview');
+  if(!prev){{ showKiraToast(d.kira_antwort||'Gespeichert'); return; }}
+  const kiraBlock = prev.querySelector('.kira-korrektur-vorschlag');
+  let parts = [];
+  parts.push('<div class="kira-korrektur-vorschlag" style="background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border-left:4px solid #4285f4;border-radius:8px;padding:16px;margin:16px 0;">');
+  parts.push('<div style="font-weight:600;color:#1a73e8;margin-bottom:8px;font-size:15px;">Kira — Neuer Vorschlag nach Korrektur</div>');
+  parts.push('<div style="color:#333;line-height:1.6;margin-bottom:12px;">'+escH(d.kira_antwort||'')+'</div>');
+  if(d.neue_aktion) parts.push('<div style="background:#fff;border-radius:6px;padding:10px 14px;margin-bottom:10px;border:1px solid #dadce0;"><strong>Empfohlene Aktion:</strong> '+escH(d.neue_aktion)+'</div>');
+  if(d.antwort_entwurf){{
+    parts.push('<div style="background:#fff;border-radius:6px;padding:10px 14px;border:1px solid #dadce0;"><strong>Antwort-Entwurf:</strong>');
+    parts.push('<div class="kira-entwurf-text" style="white-space:pre-wrap;margin-top:6px;color:#444;font-size:13px;">'+escH(d.antwort_entwurf)+'</div>');
+    parts.push('<button class="kira-copy-btn" style="margin-top:8px;padding:4px 12px;border:1px solid #4285f4;border-radius:4px;background:#fff;color:#4285f4;cursor:pointer;font-size:12px;">Entwurf kopieren</button></div>');
+  }}
+  parts.push('</div>');
+  const html = parts.join('');
+  if(kiraBlock){{ kiraBlock.outerHTML = html; }}
+  else{{
+    const actions = prev.querySelector('.km-preview-actions,.wi-detail-actions');
+    if(actions) actions.insertAdjacentHTML('beforebegin', html);
+    else prev.insertAdjacentHTML('beforeend', html);
+  }}
+  // Copy-Button Event
+  const copyBtn = prev.querySelector('.kira-copy-btn');
+  if(copyBtn){{ copyBtn.onclick = function(){{
+    const txt = prev.querySelector('.kira-entwurf-text');
+    if(txt) navigator.clipboard.writeText(txt.textContent).then(()=>showToast('Kopiert','ok')).catch(()=>showToast('Kopieren fehlgeschlagen','fehler'));
+  }}; }}
+  if(d.neue_aktion){{
+    const aktionEl = prev.querySelector('.wi-empf-aktion,.empfohlene-aktion');
+    if(aktionEl) aktionEl.textContent = d.neue_aktion;
+  }}
+  showKiraToast(d.kira_antwort||'Korrektur gespeichert — Kira hat einen neuen Vorschlag.');
 }}
 
 // Kira Aufgabenliste
@@ -32150,20 +32198,78 @@ Regeln:
                 return
             finally:
                 db.close()
-            # Kira gibt aktives Feedback zur Korrektur
-            kira_antwort = 'Korrektur gespeichert und wird beim nächsten Klassifizierungs-Scan berücksichtigt.'
+            # Kira generiert konkreten Aktionsvorschlag nach Korrektur
+            kira_antwort = 'Korrektur gespeichert.'
+            neue_aktion = ''
+            antwort_entwurf = ''
             try:
-                kat_info  = f' von „{alter}" nach „{neu}"' if neu and neu != alter else ''
-                notiz_info = f' Deine Notiz: „{notiz}"' if notiz else ''
-                kira_prompt = (
-                    f'Ich habe soeben eine Korrektur für Aufgabe #{task_id} gespeichert{kat_info}.{notiz_info} '
-                    f'Bestätige kurz in 1–2 Sätzen (auf Deutsch), dass du das aufgenommen hast, '
-                    f'wo du es abgelegt hast (wissen_regeln / Lernhistorie) und wie du es beim nächsten Scan anwendest.')
-                kira_result = kira_chat(kira_prompt)
-                kira_antwort = kira_result.get('antwort', kira_antwort)
+                # Task-Daten laden für Kontext
+                _kdb = get_db()
+                _task = _kdb.execute(
+                    "SELECT betreff, beschreibung, kunden_email, kunden_name, zusammenfassung "
+                    "FROM tasks WHERE id=?", (task_id,)
+                ).fetchone()
+                _kdb.close()
+                if _task:
+                    _betreff = _task["betreff"] or ""
+                    _mail_text = (_task["beschreibung"] or "")[:1500]
+                    _kunde = _task["kunden_name"] or _task["kunden_email"] or "?"
+                    _zusammenfassung = _task["zusammenfassung"] or ""
+                    kat_info = f' von „{alter}" nach „{neu}"' if neu and neu != alter else ''
+                    notiz_info = f' Kais Notiz: „{notiz}"' if notiz else ''
+                    kira_prompt = (
+                        f'[SYSTEM: Korrektur-Aktionsvorschlag]\n\n'
+                        f'Kai hat die Kategorie einer Aufgabe korrigiert{kat_info}.{notiz_info}\n\n'
+                        f'Aufgabe #{task_id}:\n'
+                        f'Betreff: {_betreff}\n'
+                        f'Kunde: {_kunde}\n'
+                        f'Zusammenfassung: {_zusammenfassung}\n'
+                        f'Mail-Text (Auszug): {_mail_text[:800]}\n\n'
+                        f'Neue Kategorie: {neu or alter}\n\n'
+                        f'Antworte mit einem JSON-Objekt:\n'
+                        f'{{"kira_antwort": "Kurze Bestätigung + dein konkreter Vorschlag was Kai jetzt tun sollte (2-3 Sätze, auf Deutsch)", '
+                        f'"empfohlene_aktion": "Konkrete nächste Aktion in einem Satz (z.B. Höfliche Absage senden, Rückruf vereinbaren, etc.)", '
+                        f'"antwort_entwurf": "Falls eine E-Mail-Antwort sinnvoll ist: Formuliere einen höflichen, professionellen Entwurf (3-5 Sätze). Falls keine Antwort nötig: leerer String."}}'
+                    )
+                    kira_result = kira_chat(kira_prompt)
+                    raw = kira_result.get('antwort', '')
+                    # JSON aus Antwort extrahieren
+                    import re as _re_korr
+                    _m = _re_korr.search(r'\{[\s\S]*\}', raw)
+                    if _m:
+                        _parsed = json.loads(_m.group(0))
+                        kira_antwort = _parsed.get('kira_antwort', kira_antwort)
+                        neue_aktion = _parsed.get('empfohlene_aktion', '')
+                        antwort_entwurf = _parsed.get('antwort_entwurf', '')
+                    else:
+                        kira_antwort = raw or kira_antwort
+
+                    # Task in DB aktualisieren: neue empfohlene_aktion + ggf. Antwort-Entwurf
+                    if neue_aktion or antwort_entwurf:
+                        _udb = get_db()
+                        _updates = []
+                        _params = []
+                        if neue_aktion:
+                            _updates.append("empfohlene_aktion=?")
+                            _params.append(neue_aktion[:300])
+                        if antwort_entwurf:
+                            _updates.append("antwort_entwurf=?")
+                            _params.append(antwort_entwurf[:4000])
+                        _params.append(task_id)
+                        _udb.execute(
+                            f"UPDATE tasks SET {','.join(_updates)} WHERE id=?",
+                            _params)
+                        _udb.commit()
+                        _udb.close()
             except Exception:
                 pass
-            self._json({'ok': True, 'kira_antwort': kira_antwort})
+            self._json({
+                'ok': True,
+                'kira_antwort': kira_antwort,
+                'neue_aktion': neue_aktion,
+                'antwort_entwurf': antwort_entwurf,
+                'neue_kategorie': neu or alter,
+            })
 
         elif action == 'spaeter':
             wann_text = body.get('wann', '').strip()
