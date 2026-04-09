@@ -4827,8 +4827,7 @@ window.pfOpenMail = function(m, el) {
   document.getElementById('pf-thread-wrap').style.display = 'none';
   const body = document.getElementById('pf-prev-body');
   body.className = 'pf-prev-body';
-  body.innerHTML = '';
-  body.textContent = 'Lade...';
+  body.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--text-muted)"><div class="spinner" style="width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite"></div> Lade E-Mail...</div>';
 
   // ── Load mail content ──────────────────────────────────
   fetch('/api/mail/read?message_id='+encodeURIComponent(m.message_id)).then(r=>r.json()).then(d=>{
@@ -26356,6 +26355,162 @@ class DashboardHandler(BaseHTTPRequestHandler):
             html = _re.sub(r'(href|src)\s*=\s*["\']javascript:[^"\']*["\']', 'href="#"', html, flags=_re.IGNORECASE)
         return text, html
 
+    @staticmethod
+    def _fetch_mail_html_from_imap(message_id: str, konto_email: str = '', folder: str = ''):
+        """Holt eine Mail direkt vom IMAP-Server per Message-ID.
+        Gibt (text_plain, html_with_cid_resolved) zurück.
+        Nutzt imap_connect() aus mail_monitor für Auth (OAuth2/Password)."""
+        import imaplib as _imaplib
+        import email as _email
+        from email import policy as _ep
+        import base64 as _b64
+        import re as _re
+
+        text, html = '', ''
+
+        try:
+            from mail_monitor import imap_connect, _imap_connect_konto
+
+            # IMAP-Verbindung aufbauen
+            imap = None
+            if konto_email:
+                imap = _imap_connect_konto(konto_email)
+            if not imap:
+                # Fallback: alle Konten aus Config probieren
+                cfg = json.loads(CONFIG_FILE.read_text('utf-8'))
+                konten = cfg.get('mail_konten', {}).get('konten', [])
+                for k in konten:
+                    try:
+                        imap = imap_connect(k)
+                        break
+                    except Exception:
+                        continue
+            if not imap:
+                return '', ''
+
+            # Message-ID suchen — zuerst im angegebenen Ordner, dann INBOX
+            folders_to_try = []
+            if folder:
+                folders_to_try.append(folder)
+            folders_to_try.extend(['INBOX', 'Sent Items', 'Gesendete Elemente',
+                                    'INBOX.Sent', 'Sent', 'Junk-E-Mail', 'Drafts'])
+            # Duplikate entfernen
+            seen = set()
+            folders_to_try = [f for f in folders_to_try if not (f in seen or seen.add(f))]
+
+            raw_bytes = None
+            # Message-ID für IMAP-SEARCH bereinigen (manche haben <>)
+            search_id = message_id.strip()
+            if not search_id.startswith('<'):
+                search_id = '<' + search_id
+            if not search_id.endswith('>'):
+                search_id = search_id + '>'
+
+            for fld in folders_to_try:
+                try:
+                    status, _ = imap.select(f'"{fld}"', readonly=True)
+                    if status != 'OK':
+                        continue
+                    # SEARCH by Message-ID Header
+                    status, data = imap.uid('SEARCH', None, f'HEADER Message-ID "{search_id}"')
+                    if status == 'OK' and data and data[0]:
+                        uids = data[0].split()
+                        if uids:
+                            # Erste passende UID nehmen
+                            uid = uids[0]
+                            status, msg_data = imap.uid('FETCH', uid, '(RFC822)')
+                            if status == 'OK' and msg_data:
+                                for item in msg_data:
+                                    if isinstance(item, tuple) and len(item) >= 2:
+                                        raw_bytes = item[1]
+                                        break
+                            if raw_bytes:
+                                break
+                except Exception:
+                    continue
+
+            try:
+                imap.logout()
+            except:
+                pass
+
+            if not raw_bytes:
+                return '', ''
+
+            # RFC822-Bytes parsen — gleiche Logik wie _parse_eml_content
+            msg = _email.message_from_bytes(raw_bytes, policy=_ep.compat32)
+            cid_map = {}
+            if msg.is_multipart():
+                # Pass 1: cid-Bilder sammeln
+                for part in msg.walk():
+                    ct = part.get_content_type()
+                    cid = part.get('Content-ID', '')
+                    if cid and ct.startswith('image/'):
+                        cid_clean = cid.strip('<> ')
+                        try:
+                            payload = part.get_payload(decode=True)
+                            if payload and len(payload) < 2_000_000:
+                                b64 = _b64.b64encode(payload).decode('ascii')
+                                cid_map[cid_clean] = f"data:{ct};base64,{b64}"
+                        except:
+                            pass
+                # Pass 2: Text + HTML extrahieren
+                for part in msg.walk():
+                    ct = part.get_content_type()
+                    cd = str(part.get('Content-Disposition', ''))
+                    if 'attachment' in cd.lower():
+                        continue
+                    if ct == 'text/plain' and not text:
+                        try:
+                            charset = part.get_content_charset('utf-8') or 'utf-8'
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                text = payload.decode(charset, errors='replace')
+                        except:
+                            pass
+                    elif ct == 'text/html' and not html:
+                        try:
+                            charset = part.get_content_charset('utf-8') or 'utf-8'
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                html = payload.decode(charset, errors='replace')
+                        except:
+                            pass
+            else:
+                ct = msg.get_content_type()
+                charset = msg.get_content_charset('utf-8') or 'utf-8'
+                try:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        content = payload.decode(charset, errors='replace')
+                        if ct == 'text/html':
+                            html = content
+                        else:
+                            text = content
+                except:
+                    pass
+
+            # cid: Referenzen auflösen
+            if html and cid_map:
+                for cid_key, data_url in cid_map.items():
+                    html = html.replace(f'cid:{cid_key}', data_url)
+
+            # Sanitize (wie _parse_eml_content)
+            if html:
+                for tag in ['script', 'form', 'iframe', 'object', 'embed']:
+                    html = _re.sub(rf'<{tag}[^>]*>.*?</{tag}>', '', html, flags=_re.DOTALL | _re.IGNORECASE)
+                    html = _re.sub(rf'<{tag}[^>]*/>', '', html, flags=_re.IGNORECASE)
+                html = _re.sub(r'<base[^>]*/?>',  '', html, flags=_re.IGNORECASE)
+                html = _re.sub(r'\son\w+\s*=\s*["\'][^"\']*["\']', '', html, flags=_re.IGNORECASE)
+                html = _re.sub(r'\son\w+\s*=\s*[^\s>]+', '', html, flags=_re.IGNORECASE)
+                html = _re.sub(r'(href|src)\s*=\s*["\']javascript:[^"\']*["\']', 'href="#"', html, flags=_re.IGNORECASE)
+
+            return text, html
+
+        except Exception as e:
+            log.debug(f"IMAP-Direktabruf fehlgeschlagen für {message_id}: {e}")
+            return '', ''
+
     def _read_mail(self):
         """GET /api/mail/read — EML ist primäre Quelle (beste Formatierung für Anzeige).
         KIRA nutzt weiterhin text_plain aus mail_index.db."""
@@ -26472,6 +26627,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 except: pass
                 kdb.close()
             except: pass
+
+        # ── 3. IMAP-Direktabruf: Wenn kein HTML vorhanden → direkt vom Server holen ──
+        if not result["html"]:
+            try:
+                # konto + folder aus DB für gezielte IMAP-Suche
+                konto_email = ''
+                imap_folder = ''
+                try:
+                    _mi = sqlite3.connect(str(MAIL_INDEX_DB))
+                    _mi.row_factory = sqlite3.Row
+                    _mr = _mi.execute("SELECT konto, folder FROM mails WHERE message_id=?", (msg_id,)).fetchone()
+                    if _mr:
+                        konto_email = _mr["konto"] or ''
+                        imap_folder = _mr["folder"] or ''
+                    _mi.close()
+                except:
+                    pass
+                imap_text, imap_html = self._fetch_mail_html_from_imap(msg_id, konto_email, imap_folder)
+                if imap_html:
+                    result["html"] = imap_html
+                    result["_source"] = "imap_live"
+                if imap_text and not result["text"]:
+                    result["text"] = imap_text
+            except Exception:
+                pass
 
         self._json(result)
 
