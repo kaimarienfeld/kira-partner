@@ -2938,6 +2938,42 @@ let _pfHealthCache = {};
 let _pfTotalUnread = 0;
 let _pfHasHealthError = false;
 
+// Sofortiges Badge-Update ohne Server-Roundtrip
+function _pfAdjustUnreadBadge(konto, folder, delta) {
+  if(!konto || !folder || delta===0) return;
+  // 1. Ordner-Badge im Folder-Tree aktualisieren
+  const safe = konto.replace(/[@.]/g,'_');
+  const fid = 'pf-fi-'+safe+'_'+folder.replace(/[^a-z0-9]/gi,'_');
+  const folderEl = document.getElementById(fid);
+  if(folderEl) {
+    let b = folderEl.querySelector('.pf-folder-badge,.pf-folder-badge-inbox');
+    const cur = b ? parseInt(b.textContent)||0 : 0;
+    const neu = Math.max(0, cur + delta);
+    if(neu > 0) {
+      if(b) b.textContent = neu;
+      else { const s=document.createElement('span'); s.className='pf-folder-badge'; s.textContent=neu; folderEl.appendChild(s); }
+    } else if(b) b.remove();
+  }
+  // 2. Favoriten-Badge aktualisieren (sowohl gespeicherte als auch Auto-Ungelesen)
+  document.querySelectorAll('.pf-fav-item').forEach(fi=>{
+    if(fi.dataset.konto===konto && fi.dataset.folder===folder) {
+      let fb = fi.querySelector('.pf-fav-badge');
+      const cur = fb ? parseInt(fb.textContent)||0 : 0;
+      const neu = Math.max(0, cur + delta);
+      if(neu > 0) {
+        if(fb) fb.textContent = neu;
+        else { const s=document.createElement('span'); s.className='pf-fav-badge'; s.textContent=neu; fi.appendChild(s); }
+      } else if(fb) fb.textContent = '0';
+    }
+  });
+  // 3. Sidebar-Gesamtzahl + Badge
+  const isInbox = /inbox|posteingang/i.test(folder);
+  if(isInbox) {
+    _pfTotalUnread = Math.max(0, _pfTotalUnread + delta);
+    _pfUpdateSidebarBadge();
+  }
+}
+
 function _pfUpdateSidebarBadge() {
   const badge = document.getElementById('nav-postfach-badge');
   if(!badge) return;
@@ -3386,6 +3422,12 @@ function pfClearSelection() {
 function pfBulkMarkRead(gelesen) {
   const ids=[..._pfSelected];
   if(!ids.length) return;
+  // Zähle nur tatsächlich veränderte Items für Badge-Delta
+  let changed=0;
+  ids.forEach(id=>{
+    const el=document.querySelector('[data-msgid="'+id+'"]');
+    if(el){ if(gelesen && el.classList.contains('unread')) changed++; else if(!gelesen && !el.classList.contains('unread')) changed++; }
+  });
   fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids,gelesen})})
   .then(r=>r.json()).then(d=>{
     if(d.ok){
@@ -3398,7 +3440,8 @@ function pfBulkMarkRead(gelesen) {
         }
       });
       pfClearSelection();
-      _pfUpdateSidebarBadge();
+      // Sofort alle Badges aktualisieren
+      if(changed>0) _pfAdjustUnreadBadge(_pfCurrentKonto, _pfCurrentFolder, gelesen ? -changed : changed);
     }
   }).catch(()=>{});
 }
@@ -3424,9 +3467,8 @@ function pfToggleRead(msgId, el) {
   .then(r=>r.json()).then(d=>{
     if(d.ok){
       if(gelesen) el.classList.remove('unread'); else el.classList.add('unread');
-      _pfTotalUnread+=(gelesen?-1:1);
-      if(_pfTotalUnread<0)_pfTotalUnread=0;
-      _pfUpdateSidebarBadge();
+      // Sofort alle Badges aktualisieren (kein Warten auf Server-Refresh)
+      _pfAdjustUnreadBadge(_pfCurrentKonto, _pfCurrentFolder, gelesen ? -1 : 1);
       // Im Ungelesen-Filter: gelesene Mails aus Liste entfernen
       if(_pfUnreadOnly && gelesen) { el.style.opacity='0.3'; setTimeout(()=>el.remove(),400); }
     }
@@ -4789,8 +4831,8 @@ function pfDoMarkRead(m) {
       // Im Ungelesen-Filter: gelesene Mail aus Liste entfernen
       if(_pfUnreadOnly) { itemEl.style.opacity='0.3'; setTimeout(()=>itemEl.remove(),400); }
     }
-    _pfTotalUnread=Math.max(0,_pfTotalUnread-1);
-    _pfUpdateSidebarBadge();
+    // Sofort alle Badges aktualisieren (Ordner + Favoriten + Sidebar)
+    _pfAdjustUnreadBadge(m.konto||_pfCurrentKonto, _pfCurrentFolder, -1);
   };
   if(delay===0) doMark();
   else _pfMarkReadTimer=setTimeout(doMark, delay);
