@@ -25510,6 +25510,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
 
+        elif self.path == '/api/partner/settings':
+            # Partner-View Settings aus config.json liefern (Sync mit KIRA Admin)
+            try:
+                pv = CFG.get('partner_view', {})
+                self._json({
+                    'ok': True,
+                    'leni_email': pv.get('leni_email', ''),
+                    'leni_mail_bcc': pv.get('leni_mail_bcc', ''),
+                    'partner_url': pv.get('partner_url', ''),
+                    'leni_notif_method': pv.get('leni_notif_method', 'ntfy'),
+                    'leni_notif_freq': pv.get('leni_notif_freq', 'sofort'),
+                })
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
+
         elif self.path == '/api/tasks/open':
             db = get_db()
             rows = db.execute("SELECT * FROM tasks WHERE status='offen' ORDER BY prioritaet DESC, datum_mail DESC").fetchall()
@@ -31849,6 +31864,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({"ok": True})
             except Exception as e:
                 self._json({"ok": False, "error": str(e)})
+            return
+
+        # Partner-View: Settings in config.json speichern (Sync mit KIRA Admin)
+        if self.path == '/api/partner/settings':
+            try:
+                cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
+                pv = cfg.setdefault('partner_view', {})
+                if 'leni_email' in body:
+                    pv['leni_email'] = body['leni_email'].strip()
+                if 'leni_mail_bcc' in body:
+                    pv['leni_mail_bcc'] = body['leni_mail_bcc'].strip()
+                if 'partner_url' in body:
+                    pv['partner_url'] = body['partner_url'].strip()
+                if 'leni_notif_method' in body:
+                    pv['leni_notif_method'] = body['leni_notif_method']
+                if 'leni_notif_freq' in body:
+                    pv['leni_notif_freq'] = body['leni_notif_freq']
+                cfg['partner_view'] = pv
+                (SCRIPTS_DIR / 'config.json').write_text(
+                    json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
+                CFG.update(cfg)
+                self._json({'ok': True})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)})
             return
 
         # Partner-View: Leni-Feedback als GitHub-Issue anlegen

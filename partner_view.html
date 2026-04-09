@@ -816,7 +816,8 @@ body{
           </button>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
-          Mail wird über dein lokales Kira-Dashboard gesendet (localhost:8765 muss laufen).
+          Mail wird über dein lokales Kira-Dashboard gesendet (localhost:8765 muss laufen).<br>
+          E-Mail-Einstellungen werden automatisch mit dem KIRA Admin synchronisiert.
         </div>
       </div>
       <button class="btn-save-settings" onclick="saveAdminSettings()">💾 Einstellungen speichern</button>
@@ -1500,6 +1501,15 @@ function saveAdminSettings() {
     last_push: s.last_push, last_push_ok: s.last_push_ok
   };
   localStorage.setItem('kira_pv_admin', JSON.stringify(upd));
+  // Sync relevante Felder nach config.json (KIRA Admin)
+  fetch('http://localhost:8765/api/partner/settings',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      leni_email: upd.leni_email,
+      leni_notif_method: upd.leni_notif_method,
+      leni_notif_freq: upd.leni_notif_freq
+    })
+  }).catch(()=>{});
   showToast('Einstellungen gespeichert! Jetzt im Tab "GitHub Sync" pushen.','✓');
 }
 function fillAdminForm() {
@@ -1515,6 +1525,13 @@ function fillAdminForm() {
   document.getElementById('cfg-leni-email').value         = s.leni_email;
   document.getElementById('cfg-leni-notif-method').value  = s.leni_notif_method;
   document.getElementById('cfg-leni-notif-freq').value    = s.leni_notif_freq;
+  // Sync mit KIRA config.json — überschreibt localStorage-Werte mit Server-Stand
+  fetch('http://localhost:8765/api/partner/settings').then(r=>r.json()).then(d=>{
+    if(!d.ok) return;
+    if(d.leni_email) document.getElementById('cfg-leni-email').value=d.leni_email;
+    if(d.leni_notif_method) document.getElementById('cfg-leni-notif-method').value=d.leni_notif_method;
+    if(d.leni_notif_freq) document.getElementById('cfg-leni-notif-freq').value=d.leni_notif_freq;
+  }).catch(()=>{/* Kira-App offline — localStorage-Werte bleiben */});
   const dot=document.getElementById('sync-dot'),label=document.getElementById('sync-label'),sub=document.getElementById('sync-sub');
   if (s.last_push) {
     dot.className = s.last_push_ok ? 'sync-dot ok' : 'sync-dot warn';
