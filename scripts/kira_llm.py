@@ -3533,7 +3533,7 @@ def _tool_lexware_eingangsbeleg_klassifizieren(p):
 
 
 # ── Provider-Adapter ─────────────────────────────────────────────────────────
-def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7):
+def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7, conversation_history=None):
     """Anthropic Claude API Aufruf mit Tool-Loop, Circuit Breaker und Exponential Backoff (Paket 1, session-oo)."""
     import anthropic
 
@@ -3551,7 +3551,11 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
     client = anthropic.Anthropic(api_key=key)
     model = provider.get("model", "claude-sonnet-4-20250514")
 
-    messages = [{"role": "user", "content": user_message}]
+    # Konversations-History + aktuelle Nachricht als Messages-Array
+    messages = []
+    if conversation_history:
+        messages.extend(conversation_history)
+    messages.append({"role": "user", "content": user_message})
     final_text = ""
     all_tool_results = []
     response = None
@@ -3629,7 +3633,7 @@ def _call_anthropic(provider, user_message, system_prompt, tools, max_tokens=204
     }
 
 
-def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7):
+def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens=2048, temperature=0.7, conversation_history=None):
     """OpenAI-kompatible API (OpenAI, OpenRouter, Ollama, Custom) mit Tool-Loop."""
     import openai
 
@@ -3674,10 +3678,10 @@ def _call_openai_compat(provider, user_message, system_prompt, tools, max_tokens
                 oai_content.append({"type": "text", "text": str(block)})
         oai_user_content = oai_content
 
-    messages = [
-        {"role": "system", "content": sys_content},
-        {"role": "user", "content": oai_user_content}
-    ]
+    messages = [{"role": "system", "content": sys_content}]
+    if conversation_history:
+        messages.extend(conversation_history)
+    messages.append({"role": "user", "content": oai_user_content})
 
     final_text = ""
     all_tool_results = []
@@ -4194,6 +4198,39 @@ def chat(user_message, session_id=None, history=None, bild=None):
     if config.get("konversationen_speichern", True):
         _save_message(session_id, "user", user_message)
 
+    # ── Konversations-History laden (letzte N Nachrichten der Session) ──
+    conv_history = []
+    try:
+        max_history = int(config.get("llm", {}).get("kontext_nachrichten", 20))
+    except (ValueError, TypeError):
+        max_history = 20
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.row_factory = sqlite3.Row
+        # Alle Nachrichten dieser Session laden (außer der gerade gespeicherten letzten User-Msg)
+        rows = db.execute(
+            "SELECT rolle, nachricht FROM kira_konversationen WHERE session_id=? ORDER BY id",
+            (session_id,)
+        ).fetchall()
+        db.close()
+        # In Messages-Format konvertieren (user/assistant Paare)
+        for r in rows:
+            rolle = r["rolle"]
+            text = r["nachricht"] or ""
+            if rolle in ("user", "assistant") and text.strip():
+                conv_history.append({"role": rolle, "content": text})
+        # Letzte User-Nachricht abschneiden (wird von _call_* selbst hinzugefügt)
+        if conv_history and conv_history[-1]["role"] == "user":
+            conv_history = conv_history[:-1]
+        # Auf max_history begrenzen (von hinten, damit neueste erhalten bleiben)
+        if len(conv_history) > max_history:
+            conv_history = conv_history[-max_history:]
+        # Muss mit user beginnen (Anthropic-Anforderung: user/assistant/user/... alternierend)
+        while conv_history and conv_history[0]["role"] != "user":
+            conv_history.pop(0)
+    except Exception:
+        conv_history = []
+
     last_error = None
     result = None
     used_provider = None
@@ -4212,10 +4249,10 @@ def chat(user_message, session_id=None, history=None, bild=None):
 
         try:
             if typ == "anthropic":
-                result = _call_anthropic(provider, user_content, system_prompt, tools, temperature=_chat_temperature)
+                result = _call_anthropic(provider, user_content, system_prompt, tools, temperature=_chat_temperature, conversation_history=conv_history)
             else:
                 # OpenAI-kompatible Provider: Vision nur wenn Bild-URL-Format
-                result = _call_openai_compat(provider, user_message, system_prompt, tools, temperature=_chat_temperature)
+                result = _call_openai_compat(provider, user_message, system_prompt, tools, temperature=_chat_temperature, conversation_history=conv_history)
             used_provider = provider
             break
         except ProviderUnavailableError as e:
