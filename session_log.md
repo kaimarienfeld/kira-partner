@@ -1,5 +1,42 @@
 # Session Log
 
+## 2026-04-09 05:30 — Session-Start (session-qq)
+**Auftrag:** Postfach Compose vollwertig machen: Rich-Text-Editor, Modal-Fenstermodus (wie Outlook), Signatur-Integration, Entwurf-Speicherung, Formatierung
+**Status:** erledigt
+
+### 2026-04-09 06:00 — Session-Ende
+**Erledigt:**
+- Quill.js Rich-Text-Editor mit voller Toolbar in Compose eingebaut (Inline + Modal)
+- Modal-Fenstermodus mit abgedunkeltem Backdrop (820px, blur)
+- Signatur-Auto-Einfügung: Standard-Signatur wird beim Öffnen geladen, Konto-Wechsel ersetzt korrekt
+- Zero-Width-Space Marker für Quill-kompatible Signatur-Position (Quill filtert HTML-Kommentare und display:none)
+- Entwurf-System: mail_drafts DB-Tabelle + /api/mail/draft/save Endpoint
+- Kira-Draft-Button: Mail per /api/kira/chat formulieren lassen
+- Inline↔Modal Sync (Felder + Quill-Inhalt)
+- body_html wird beim Senden als MIME text/html mitgeschickt
+- 0 JS-Fehler, Playwright-verifiziert
+**Commit:** 27cc408
+
+### 2026-04-09 06:30 — Dateianhänge + Autovervollständigung
+**Erledigt:**
+- POST /api/mail/upload-attachments: Multipart-Upload mit UUID-Temp-Speicherung
+- _pfDoSend() lädt Anhänge hoch → sendet mit attachment_ids → mail_sender.py bindet als MIME ein
+- GET /api/mail/kontakte: 500 bekannte Adressen aus mail_index.db
+- HTML datalist auf An/CC/BCC-Feldern (Inline + Modal)
+- Playwright-verifiziert: Anhang-Chips sichtbar, Upload-Endpoint funktioniert, 0 JS-Fehler
+**Commit:** eb31dca
+
+### 2026-04-09 07:00 — Autocomplete-Fixes + Validierung + Kontakte speichern
+**Erledigt:**
+- Autovervollständigung: datalist durch eigenes Dropdown ersetzt (erst ab 2 Zeichen, max 12, Pfeiltasten+Escape)
+- Gesendete Empfänger: mail_kontakte DB-Tabelle, beim Senden automatisch gespeichert, priorisiert in Suche
+- Betreff-Warnung: confirm() statt stummem Abbruch
+- Anhang-Vergessen-Check: Textscan auf dt.+engl. Keywords, Warnung wenn Anhang erwähnt aber keiner da
+**Commit:** 061ba05
+**Offen geblieben:** —
+
+---
+
 ## 2026-04-08 23:15 — Session-Ende (session-pp-cont4)
 **Auftrag:** Artikel-UI fertigstellen: Beschreibungs-Spalte, Sync-UI, Änderungshistorie, Netto-Preis-Fix, Playwright reparieren.
 **Status:** erledigt

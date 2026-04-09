@@ -1482,28 +1482,39 @@ const renderers={{A:renderDashA,B:renderDashB,C:renderDashC}};
 
 function renderDashboard(data){{
   const render=renderers[DCFG.layout]||renderers.B;
+  const root=document.getElementById("dash-root");
+  const isRefresh=!_initialLoad&&root&&root.offsetHeight>0;
+  // Bei Auto-Refresh: Layout-Höhe sichern damit nichts springt
+  if(isRefresh)root.style.minHeight=root.offsetHeight+'px';
   render(data);
   // Re-insert widget strip after layout rebuild (widgets live outside layout innerHTML)
   if(typeof renderWidgetStrip==="function")renderWidgetStrip();
 
   // Animate KPI values
   requestAnimationFrame(()=>{{
+    // Bei Auto-Refresh: Werte sofort setzen statt animieren
     document.querySelectorAll(".dlive-kpi-val,.dlive-chip-val").forEach(el=>{{
       const target=parseFloat(el.dataset.target)||0;
-      countUp(el,target,_initialLoad?900:500);
-    }});
-    // Stagger cards in
-    const cards=document.querySelectorAll(".dlive-card");
-    if(_initialLoad)staggerIn(Array.from(cards),80);
-    // Animate sparkline bars
-    document.querySelectorAll(".dlive-spark-svg rect").forEach((r,i)=>{{
-      const h=r.getAttribute("height");
-      const y=r.getAttribute("y");
-      if(!DCFG.reduced){{
-        r.setAttribute("height","0");r.setAttribute("y",String(parseFloat(y)+parseFloat(h)));
-        setTimeout(()=>{{r.style.transition="height .6s cubic-bezier(.16,1,.3,1),y .6s cubic-bezier(.16,1,.3,1)";r.setAttribute("height",h);r.setAttribute("y",y);}},200+i*80);
+      if(isRefresh){{
+        el.textContent=el.dataset.currency==="1"?fmtEur(target):fmt(target);
+      }}else{{
+        countUp(el,target,_initialLoad?900:500);
       }}
     }});
+    // Stagger cards in (nur bei Initial-Load)
+    const cards=document.querySelectorAll(".dlive-card");
+    if(_initialLoad)staggerIn(Array.from(cards),80);
+    // Sparkline-Animation (nur bei Initial-Load)
+    if(!isRefresh){{
+      document.querySelectorAll(".dlive-spark-svg rect").forEach((r,i)=>{{
+        const h=r.getAttribute("height");
+        const y=r.getAttribute("y");
+        if(!DCFG.reduced){{
+          r.setAttribute("height","0");r.setAttribute("y",String(parseFloat(y)+parseFloat(h)));
+          setTimeout(()=>{{r.style.transition="height .6s cubic-bezier(.16,1,.3,1),y .6s cubic-bezier(.16,1,.3,1)";r.setAttribute("height",h);r.setAttribute("y",y);}},200+i*80);
+        }}
+      }});
+    }}
     // Detect changes and pulse
     if(_prevData&&!_initialLoad){{
       _prevData.kpis.forEach((pk,i)=>{{
@@ -1515,6 +1526,8 @@ function renderDashboard(data){{
     }}
     _prevData=JSON.parse(JSON.stringify(data));
     _initialLoad=false;
+    // minHeight nach Paint entfernen
+    if(isRefresh)requestAnimationFrame(()=>{{if(root)root.style.minHeight='';}});
     // Kalender async nachladen
     if(typeof loadDashKalender==="function")setTimeout(loadDashKalender,300);
   }});
@@ -1527,6 +1540,12 @@ async function fetchAndRender(){{
     const data=await resp.json();
     const loading=document.getElementById("dashLoading");
     if(loading)loading.style.display="none";
+    // Bei Auto-Refresh: nur rendern wenn sich Daten geändert haben (verhindert Flicker)
+    if(_prevData && !_initialLoad){{
+      try{{
+        if(JSON.stringify(data)===JSON.stringify(_prevData))return;
+      }}catch(e){{}}
+    }}
     renderDashboard(data);
   }}catch(e){{
     console.error("Dashboard fetch error:",e);
@@ -19133,6 +19152,66 @@ function setStatus(id, status) {{
   }}).catch(()=>showToast('Fehler'));
 }}
 
+// ── Sofortige Badge-Aktualisierung nach Aktion ──────────────
+function _kmDecrementBadge(n) {{
+  // Segment-Tab-Badges aktualisieren
+  const tabs = document.querySelectorAll('#km-seg-nav .km-seg-t');
+  tabs.forEach(tab=>{{
+    const isActive = tab.classList.contains('active');
+    const isAlleTab = tab.textContent.trim().startsWith('Alle');
+    const cnt = tab.querySelector('.km-seg-cnt');
+    if(!cnt) return;
+    const cur = parseInt(cnt.textContent)||0;
+    if(isAlleTab || isActive) cnt.textContent = Math.max(0, cur - n);
+    // Kategorie-spezifische Tabs: nur 'Alle' und aktiver Tab dekrementieren
+  }});
+}}
+function _kmUpdateBadgesAfterAction(kat, count) {{
+  const n = count || 1;
+  // 1. Aktiven Segment-Tab dekrementieren
+  const tabs = document.querySelectorAll('#km-seg-nav .km-seg-t');
+  tabs.forEach(tab=>{{
+    const cnt = tab.querySelector('.km-seg-cnt');
+    if(!cnt) return;
+    const cur = parseInt(cnt.textContent)||0;
+    const label = tab.textContent.replace(/\\d+$/,'').trim();
+    const isAlleTab = label === 'Alle';
+    // Prüfe ob dieser Tab zur Kategorie passt
+    const tabKatMap = {{'Antwort erforderlich':'Antwort erforderlich','Neue Leads':'Neue Lead-Anfrage','Angebotsrückm.':'Angebotsrückmeldung','Zur Kenntnis':'Zur Kenntnis','Newsletter / System':'Shop / System'}};
+    const matchesKat = tabKatMap[label] === kat;
+    if(isAlleTab || matchesKat) cnt.textContent = Math.max(0, cur - n);
+  }});
+  // 2. Header-Badge dekrementieren ("41 offen")
+  const hdrBadge = document.getElementById('headerBadgeCount');
+  if(hdrBadge) hdrBadge.textContent = Math.max(0, (parseInt(hdrBadge.textContent)||0) - n);
+  // 3. Kommunikation-Header Stats aktualisieren
+  const stats = document.querySelectorAll('.km-stat b');
+  if(stats.length > 0) stats[0].textContent = Math.max(0, (parseInt(stats[0].textContent)||0) - n);
+  // 4. Sidebar-Badge (Start) aktualisieren
+  const sidebarBadges = document.querySelectorAll('.sidebar .nav-item .badge');
+  sidebarBadges.forEach(b=>{{
+    const navItem = b.closest('.nav-item');
+    if(navItem && navItem.textContent.includes('Start')) {{
+      b.textContent = Math.max(0, (parseInt(b.textContent)||0) - n);
+    }}
+  }});
+}}
+function _kmClearOrNextPreview(removedId) {{
+  // Nach Aktion: nächsten Task selektieren oder leeren Zustand zeigen
+  setTimeout(()=>{{
+    const remaining = document.querySelectorAll('#km-items .wi:not([style*="opacity"])');
+    if(remaining.length > 0) {{
+      // Nächsten Task selektieren
+      const nextId = remaining[0].id?.replace('task-','');
+      if(nextId) selectKommItem(parseInt(nextId));
+    }} else {{
+      // Leerer Zustand
+      const el = document.getElementById('km-ctx-content');
+      if(el) el.innerHTML = '<div class="km-ctx-empty"><span style="font-size:36px;opacity:.2">&#x2714;</span><span>Alle Aufgaben erledigt</span><span style="font-size:11px;opacity:.6">Keine weiteren Aufgaben in dieser Ansicht</span></div>';
+    }}
+  }}, 400); // nach der fade-out Animation (320ms)
+}}
+
 // Status setzen + KI-Lern-Eintrag speichern (einzeln, nicht bulk)
 function setStatusLernen(id, status, kat) {{
   if(status === 'ignorieren') {{ confirmIgnorieren(id, kat); return; }}
@@ -19143,6 +19222,8 @@ function setStatusLernen(id, status, kat) {{
       if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),320);}}
       const label = {{erledigt:'Erledigt ✓',zur_kenntnis:'Zur Kenntnis ✓'}}[status]||'Gespeichert';
       showToast(label+' — KI lernt');
+      _kmUpdateBadgesAfterAction(kat, 1);
+      _kmClearOrNextPreview(id);
     }}
   }}).catch(()=>showToast('Fehler'));
 }}
@@ -19187,6 +19268,8 @@ async function saveIgnorieren() {{
       if(el){{ el.style.opacity='0.2'; setTimeout(()=>el.remove(),320); }}
       closeIgnorierModal();
       showToast('Ignoriert \u2014 Kira hat daraus gelernt');
+      _kmUpdateBadgesAfterAction(kat, 1);
+      _kmClearOrNextPreview(tid);
     }} else {{
       showToast('Fehler: '+(d.error||'Unbekannt'));
       btn.textContent='Ignorieren \u0026 Kira lernt'; btn.disabled=false;
@@ -19240,6 +19323,28 @@ async function multiAction(status) {{
   }}
   clearSelection();
   showToast(done+' Mails aktualisiert — KI lernt aus jeder Entscheidung');
+  if(done > 0) {{
+    // Badges mit Gesamtzahl der erledigten aktualisieren (kat ist nicht eindeutig bei bulk, daher alle Tabs via fetch nachladen)
+    const hdrBadge = document.getElementById('headerBadgeCount');
+    if(hdrBadge) hdrBadge.textContent = Math.max(0, (parseInt(hdrBadge.textContent)||0) - done);
+    const stats = document.querySelectorAll('.km-stat b');
+    if(stats.length > 0) stats[0].textContent = Math.max(0, (parseInt(stats[0].textContent)||0) - done);
+    // Segment-Tabs: alle Zähler per DOM-Zählung aktualisieren
+    setTimeout(()=>{{
+      const tabs = document.querySelectorAll('#km-seg-nav .km-seg-t');
+      const allItems = document.querySelectorAll('#km-items .wi');
+      tabs.forEach(tab=>{{
+        const cnt = tab.querySelector('.km-seg-cnt');
+        if(!cnt) return;
+        const label = tab.textContent.replace(/\\d+$/,'').trim();
+        if(label === 'Alle') {{ cnt.textContent = allItems.length; return; }}
+        const tabKatMap = {{'Antwort erforderlich':'Antwort erforderlich','Neue Leads':'Neue Lead-Anfrage','Angebotsrückm.':'Angebotsrückmeldung','Zur Kenntnis':'Zur Kenntnis','Newsletter / System':'Shop / System'}};
+        const kat = tabKatMap[label];
+        if(kat) cnt.textContent = document.querySelectorAll('#km-items .wi[data-kat="'+kat+'"]').length;
+      }});
+    }}, 400);
+    _kmClearOrNextPreview(0);
+  }}
 }}
 // Löschen + Kira lernt
 function confirmLoeschen(tid) {{
