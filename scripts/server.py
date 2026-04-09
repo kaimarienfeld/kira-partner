@@ -3031,6 +3031,7 @@ function pfInit() {
       const mins=(cfg.mail_postfach?.refresh_intervall_min)||0;
       if(mins>0) _pfRefreshTimer=setInterval(pfRefreshBadge, mins*60000);
       _pfMarkReadMode=cfg.mail_postfach?.lese_markierung||'sofort';
+      _pfAfterRemove=cfg.mail_postfach?.after_remove||'none';
     }).catch(()=>{}); // Bei Fehler: kein Auto-Refresh
   }).catch(e=>{
     document.getElementById('pf-folders-loading').textContent='Konten konnten nicht geladen werden.';
@@ -3142,6 +3143,7 @@ window.pfSaveCombinedKonten = function() {
 };
 window.pfSelectCombined = function() {
   _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType='all'; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
+  _pfClearPreview();
   document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach';
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
@@ -3161,6 +3163,7 @@ window.pfSelectCombinedSub = function(folderType, label, el, e) {
   if(e) e.stopPropagation();
   _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType=folderType;
   _pfCurrentFolderLabel=label; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
+  _pfClearPreview();
   document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach — '+label;
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn').forEach(x=>x.classList.remove('active'));
@@ -3215,6 +3218,39 @@ let _pfSelected = new Set();    // selected message_ids for bulk actions
 let _pfCurrentMail = null;      // currently open mail object
 let _pfMarkReadMode = 'sofort'; // sofort|5s|30s|manuell
 let _pfMarkReadTimer = null;    // pending mark-read timeout
+let _pfAfterRemove = 'none';    // 'none' = "Keine Mail ausgewählt", 'next' = nächste Mail anzeigen
+
+// Preview zurücksetzen → "Keine E-Mail ausgewählt"
+function _pfClearPreview() {
+  _pfCurrentMail = null;
+  _pfCurrentMsgId = null;
+  window._pfCurrentKiraItem = null;
+  if(_pfMarkReadTimer) { clearTimeout(_pfMarkReadTimer); _pfMarkReadTimer=null; }
+  const preview = document.getElementById('pf-preview');
+  const empty = document.getElementById('pf-preview-empty');
+  if(preview) preview.style.display = 'none';
+  if(empty) empty.style.display = 'flex';
+  // Aktives Item in Liste deaktivieren
+  document.querySelectorAll('.pf-mail-item.active').forEach(el=>el.classList.remove('active'));
+}
+
+// Nach Entfernung einer Mail: nächste oder leere Anzeige je nach Einstellung
+function _pfAfterItemRemoved(removedMsgId) {
+  if(_pfAfterRemove === 'next') {
+    // Nächstes Element in der Liste finden und anklicken
+    const items = document.querySelectorAll('#pf-list .pf-mail-item:not(.pf-thread-child)');
+    let found = false;
+    for(const item of items) {
+      if(found) { item.click(); return; }
+      if(item.dataset.msgid === removedMsgId) found = true;
+    }
+    // Kein nächstes gefunden → vorheriges oder leere Anzeige
+    if(items.length > 0 && items[items.length-1].dataset.msgid !== removedMsgId) {
+      items[items.length-1].click(); return;
+    }
+  }
+  _pfClearPreview();
+}
 
 // ── SVG Icons ────────────────────────────────────────────
 const _SVG_READ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg>';
@@ -3442,6 +3478,10 @@ function pfBulkMarkRead(gelesen) {
       pfClearSelection();
       // Sofort alle Badges aktualisieren
       if(changed>0) _pfAdjustUnreadBadge(_pfCurrentKonto, _pfCurrentFolder, gelesen ? -changed : changed);
+      // Preview zurücksetzen wenn aktuelle Mail entfernt wurde
+      if(_pfUnreadOnly && gelesen && _pfCurrentMail && ids.includes(_pfCurrentMail.message_id)) {
+        setTimeout(()=>_pfClearPreview(), 450);
+      }
     }
   }).catch(()=>{});
 }
@@ -3452,8 +3492,10 @@ function pfBulkDelete() {
     fetch('/api/mail/loeschen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})})
     .then(r=>r.json()).then(d=>{
       if(d.ok){
+        const hadCurrent = ids.includes(_pfCurrentMsgId);
         ids.forEach(id=>{const el=document.querySelector('[data-msgid="'+id+'"]');if(el)el.remove();});
         pfClearSelection();
+        if(hadCurrent) _pfAfterItemRemoved(_pfCurrentMsgId);
       }
     }).catch(()=>{});
   },'Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden.');
@@ -3469,8 +3511,8 @@ function pfToggleRead(msgId, el) {
       if(gelesen) el.classList.remove('unread'); else el.classList.add('unread');
       // Sofort alle Badges aktualisieren (kein Warten auf Server-Refresh)
       _pfAdjustUnreadBadge(_pfCurrentKonto, _pfCurrentFolder, gelesen ? -1 : 1);
-      // Im Ungelesen-Filter: gelesene Mails aus Liste entfernen
-      if(_pfUnreadOnly && gelesen) { el.style.opacity='0.3'; setTimeout(()=>el.remove(),400); }
+      // Im Ungelesen-Filter: gelesene Mails aus Liste entfernen + Preview aktualisieren
+      if(_pfUnreadOnly && gelesen) { el.style.opacity='0.3'; setTimeout(()=>{ el.remove(); _pfAfterItemRemoved(msgId); },400); }
     }
   }).catch(()=>{});
 }
@@ -3784,6 +3826,8 @@ window.pfSelectFolder = function(email, folder, label, favEl, unreadOnly) {
   _pfUnreadOnly = !!unreadOnly;
   _pfCurrentFolderLabel = label;
   document.getElementById('pf-mid-title').textContent=label;
+  // Preview zurücksetzen bei Ordnerwechsel — verhindert verwirrende Restanzeige
+  _pfClearPreview();
   const emptyDiv2=document.getElementById('pf-list-empty'); if(emptyDiv2){const t2=emptyDiv2.querySelector('div:last-child');if(t2)t2.textContent='Keine Mails vorhanden';}
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
@@ -3804,6 +3848,7 @@ window.pfSelectFolder = function(email, folder, label, favEl, unreadOnly) {
 var _pfKiraStatus = null;
 window.pfSelectKiraFolder = function(status) {
   _pfCurrentKonto='_kira_'; _pfCurrentFolder=status; _pfKiraStatus=status; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
+  _pfClearPreview();
   const labels={pending:'Entwürfe',sent:'Gesendet',rejected:'Abgelehnt',expired:'Abgelaufen'};
   _pfCurrentFolderLabel = 'Kira — '+(labels[status]||status);
   document.getElementById('pf-mid-title').textContent=_pfCurrentFolderLabel;
@@ -4846,8 +4891,12 @@ function pfDoMarkRead(m) {
     const itemEl=document.querySelector('[data-msgid="'+m.message_id+'"]');
     if(itemEl) {
       itemEl.classList.remove('unread');
-      // Im Ungelesen-Filter: gelesene Mail aus Liste entfernen
-      if(_pfUnreadOnly) { itemEl.style.opacity='0.3'; setTimeout(()=>itemEl.remove(),400); }
+      // Im Ungelesen-Filter: gelesene Mail aus Liste entfernen + Preview aktualisieren
+      if(_pfUnreadOnly) {
+        const _rmId=m.message_id;
+        itemEl.style.opacity='0.3';
+        setTimeout(()=>{ itemEl.remove(); _pfAfterItemRemoved(_rmId); },400);
+      }
     }
     // Sofort alle Badges aktualisieren (Ordner + Favoriten + Sidebar)
     _pfAdjustUnreadBadge(m.konto||_pfCurrentKonto, _pfCurrentFolder, -1);
@@ -5523,9 +5572,10 @@ window.pfVerschiebenNach = function(zielOrdner) {
   }).then(r=>r.json()).then(d=>{
     if(d.ok) {
       showToast('Mail verschoben nach '+zielOrdner,'ok');
-      pfLoadList(true); // Liste neu laden
-      document.getElementById('pf-preview').style.display='none';
-      document.getElementById('pf-preview-empty').style.display='flex';
+      const movedId = _pfCurrentMsgId;
+      const movedEl = document.querySelector('[data-msgid="'+movedId+'"]');
+      if(movedEl) movedEl.remove();
+      _pfAfterItemRemoved(movedId);
     } else {
       showToast('Fehler: '+(d.error||'?'),'fehler');
     }
@@ -9332,6 +9382,13 @@ setTimeout(esRenderRssFeeds,100);
         <option value="manuell">Nur manuell (nur per Klick)</option>
       </select>
     </div>
+    <div class="es-row">
+      <div class="es-row-label"><span>Nach Entfernung aus Liste</span><span class="es-row-hint">Was passiert im Vorschaufenster, wenn eine Mail entfernt wird (gelesen/gel&ouml;scht/verschoben)</span></div>
+      <select id="cfg-after-remove" style="background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;color:var(--text);cursor:pointer">
+        <option value="next">N&auml;chste Mail anzeigen</option>
+        <option value="none">Keine Auswahl (leere Vorschau)</option>
+      </select>
+    </div>
     <div class="es-row" style="border-bottom:none">
       <div class="es-row-label">
         <span>Letzter Abruf</span>
@@ -10845,6 +10902,10 @@ setTimeout(esRenderRssFeeds,100);
       const lm=d.mail_postfach?.lese_markierung||'sofort';
       const lmSel=document.getElementById('cfg-lese-markierung');
       if(lmSel) lmSel.value=lm;
+      // Nach-Entfernung-Verhalten
+      const ar=d.mail_postfach?.after_remove||'none';
+      const arSel=document.getElementById('cfg-after-remove');
+      if(arSel) arSel.value=ar;
       // ── Eigene Domains laden ──
       esLoadEigeneDomains(d);
     }}).catch(()=>{{}});
@@ -20752,7 +20813,8 @@ function saveSettings() {{
     }},
     mail_postfach: {{
       refresh_intervall_min: parseInt(document.getElementById('cfg-postfach-refresh')?.value)||0,
-      lese_markierung: document.getElementById('cfg-lese-markierung')?.value||'sofort'
+      lese_markierung: document.getElementById('cfg-lese-markierung')?.value||'sofort',
+      after_remove: document.getElementById('cfg-after-remove')?.value||'none'
     }},
     mail_klassifizierung: {{
       classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
@@ -29617,7 +29679,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'phone_number_id': secrets.get('whatsapp_phone_number_id', ''),
                 },
                 'mail_klassifizierung': cfg.get('mail_klassifizierung', {}),
-                'mail_postfach': {**{'refresh_intervall_min': 0, 'lese_markierung': 'sofort'}, **cfg.get('mail_postfach', {})},
+                'mail_postfach': {**{'refresh_intervall_min': 0, 'lese_markierung': 'sofort', 'after_remove': 'none'}, **cfg.get('mail_postfach', {})},
             })
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
