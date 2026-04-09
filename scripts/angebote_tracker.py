@@ -225,18 +225,55 @@ def check_all_open_angebote():
                 elif new_status == "nachfrage":
                     alerts.append(f"Angebot {a_nr}: Kunde hat Rückfragen — bitte prüfen")
 
-        # 2. Nachfass prüfen (nur wenn keine Antwort gefunden)
+        # 2. Vor Nachfass: Prüfen ob Rechnung/Zahlung existiert (→ Angebot bereits abgeschlossen)
         if tage_offen > 0:
-            action = suggest_next_action(ang, tage_offen, nachfass_count)
-            if action:
-                nachfass_faellig.append({
-                    "a_nummer": a_nr,
-                    "kunde": ang['kunde_name'] or kunde_email,
-                    "betrag": ang['betrag_geschaetzt'] or 0,
-                    "tage_offen": tage_offen,
-                    "nachfass_count": nachfass_count,
-                    **action,
-                })
+            skip_nachfass = False
+            try:
+                # Rechnung zum Angebot suchen (a_nummer in Rechnungs-Referenz oder task_id Verknüpfung)
+                rechnungen = db.execute("""
+                    SELECT id, status, bezahlt FROM ausgangsrechnungen
+                    WHERE angebots_nummer = ? OR referenz LIKE ?
+                """, (a_nr, f"%{a_nr}%")).fetchall()
+                if rechnungen:
+                    skip_nachfass = True
+                    # Automatisch Status aktualisieren
+                    bezahlt = any(r['bezahlt'] or (r['status'] or '').lower() in ('bezahlt', 'paid') for r in rechnungen)
+                    new_status = 'angenommen'
+                    grund = f"Rechnung gefunden (bezahlt: {'ja' if bezahlt else 'nein'})"
+                    db.execute("UPDATE angebote SET status=?, notiz=? WHERE id=?",
+                               (new_status, f"Auto: {grund}", ang['id']))
+                    updates.append({"a_nummer": a_nr, "neuer_status": new_status,
+                                    "grund": grund, "confidence": 1.0})
+                    continue
+                # Task zum Angebot prüfen — wenn erledigt/abgeschlossen, kein Nachfass
+                task_row = db.execute("""
+                    SELECT id, status FROM tasks
+                    WHERE (betreff LIKE ? OR beschreibung LIKE ?)
+                      AND status IN ('erledigt', 'abgeschlossen', 'archiviert')
+                    LIMIT 1
+                """, (f"%{a_nr}%", f"%{a_nr}%")).fetchone()
+                if task_row:
+                    skip_nachfass = True
+                    db.execute("UPDATE angebote SET status='angenommen', notiz=? WHERE id=?",
+                               (f"Auto: Task #{task_row['id']} ist {task_row['status']}", ang['id']))
+                    updates.append({"a_nummer": a_nr, "neuer_status": "angenommen",
+                                    "grund": f"Task #{task_row['id']} bereits {task_row['status']}",
+                                    "confidence": 0.9})
+                    continue
+            except Exception:
+                pass  # Tabelle existiert ggf. noch nicht
+
+            if not skip_nachfass:
+                action = suggest_next_action(ang, tage_offen, nachfass_count)
+                if action:
+                    nachfass_faellig.append({
+                        "a_nummer": a_nr,
+                        "kunde": ang['kunde_name'] or kunde_email,
+                        "betrag": ang['betrag_geschaetzt'] or 0,
+                        "tage_offen": tage_offen,
+                        "nachfass_count": nachfass_count,
+                        **action,
+                    })
 
     db.commit()
     db.close()

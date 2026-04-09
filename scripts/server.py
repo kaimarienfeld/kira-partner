@@ -2462,7 +2462,7 @@ def build_postfach():
 .pf-item-att svg{width:16px;height:16px}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
 /* RIGHT PREVIEW */
-.pf-right{flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.pf-right{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;position:relative}
 .pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
 .pf-prev-hdr{padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-prev-betreff{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3}
@@ -2475,7 +2475,7 @@ def build_postfach():
 .pf-prev-anhaenge{padding:8px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
 .pf-att-chip:hover{border-color:#3b82f6;color:#3b82f6}
-.pf-prev-body{flex:1;overflow-y:auto;min-height:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.pf-prev-body{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;max-width:100%;box-sizing:border-box}
 .pf-prev-body.iframe-mode{overflow:hidden;padding:0;display:flex;flex-direction:column}
 .pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
 .pf-thread-cnt{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px}
@@ -2759,7 +2759,7 @@ def build_postfach():
 [data-theme="light"] .pf-ribbon-wrap .pf-rbn-edge:hover{color:#1a73e8}
 
 /* ── DETAIL FRAME (Mail-Lesefläche) ──────────────────────── */
-.pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden}
+.pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden;min-width:0}
 
 /* ── MAIL-KOPF ───────────────────────────────────────────── */
 .pf-mail-head{padding:14px 20px 10px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0}
@@ -2830,7 +2830,7 @@ def build_postfach():
 [data-theme="light"] .pf-attachment-row{background:#fff}
 
 /* ── VIEWER / CONTENT-SECTION ─────────────────────────────── */
-.pf-content-section{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pf-content-section{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
 .pf-viewer-toolbar{display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-state-chip{font-size:11px;padding:2px 8px;border-radius:9px;font-weight:500;white-space:nowrap}
 .pf-chip-html{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)}
@@ -4712,7 +4712,8 @@ window.pfOpenMail = function(m, el) {
       pfUpdateViewerState('text');
       body.classList.remove('iframe-mode');
       body.style.padding = '20px';
-      body.style.overflow = 'auto';
+      body.style.overflowY = 'auto';
+      body.style.overflowX = 'hidden';
       body.style.whiteSpace = 'pre-wrap';
       const tmp = document.createElement('div');
       tmp.innerHTML = rawText;
@@ -27382,7 +27383,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
                 # Nachklassifizierung bei falscher Klassifizierung
                 reclassified = None
-                if not class_correct and row.get("in_reply_to"):
+                if not class_correct and row["in_reply_to"]:
                     try:
                         _orig_msgid = row["in_reply_to"]
                         _mdb = sqlite3.connect(str(MAIL_INDEX_DB))
@@ -27494,7 +27495,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     )
                     db.commit()
                     # kira_vorschlag wenn Mail von Kira-Entwurf stammte, sonst user
-                    _at = "kira_vorschlag" if row.get("erstellt_von") == "kira" else "user"
+                    _at = "kira_vorschlag" if (row["erstellt_von"] if "erstellt_von" in row.keys() else "") == "kira" else "user"
                     rlog("server", "mail_gesendet",
                          f"Mail #{queue_id} an {row['an']} gesendet ({action})",
                          modul="server", source="server", actor_type=_at,
