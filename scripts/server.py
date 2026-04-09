@@ -208,6 +208,7 @@ def _ensure_mail_columns():
             ('konfidenz',       'TEXT'),
             ('antwort_noetig',  'INTEGER DEFAULT 0'),
             ('klassifiziert_am','TEXT'),
+            ('html_cache',     'TEXT'),
         ]:
             try:
                 conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {typedef}")
@@ -26752,10 +26753,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 kdb.close()
             except: pass
 
-        # ── 3. IMAP-Direktabruf: Wenn kein HTML vorhanden → direkt vom Server holen ──
+        # ── 3. HTML-Cache prüfen → IMAP-Direktabruf nur wenn nötig ──────────────
         if not result["html"]:
+            # 3a. Cache aus mail_index.db lesen
             try:
-                # konto + folder aus DB für gezielte IMAP-Suche
+                _ensure_mail_columns()
+                _cc = sqlite3.connect(str(MAIL_INDEX_DB))
+                _cr = _cc.execute("SELECT html_cache FROM mails WHERE message_id=?", (msg_id,)).fetchone()
+                if _cr and _cr[0]:
+                    result["html"] = _cr[0]
+                    result["_source"] = "html_cache"
+                _cc.close()
+            except Exception:
+                pass
+
+        if not result["html"]:
+            # 3b. IMAP-Direktabruf
+            try:
                 konto_email = ''
                 imap_folder = ''
                 try:
@@ -26772,6 +26786,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if imap_html:
                     result["html"] = imap_html
                     result["_source"] = "imap_live"
+                    # 3c. In Cache speichern für nächstes Mal
+                    try:
+                        _wc = sqlite3.connect(str(MAIL_INDEX_DB))
+                        _wc.execute("UPDATE mails SET html_cache=? WHERE message_id=?", (imap_html, msg_id))
+                        _wc.commit()
+                        _wc.close()
+                    except Exception:
+                        pass
                 if imap_text and not result["text"]:
                     result["text"] = imap_text
             except Exception:
