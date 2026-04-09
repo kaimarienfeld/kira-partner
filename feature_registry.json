@@ -1255,7 +1255,33 @@
       "session": "session-pp-cont4",
       "module": "server.py",
       "description": "POST /api/config/patch — dot-notation Pfade (z.B. artikel_sync.intervall)"
+    },
+    {
+      "id": "kira-chat-kontext",
+      "name": "Kira Chat-Gedächtnis (Konversations-History)",
+      "icon": "🧠",
+      "leni_name": "Kira merkt sich das Gespräch",
+      "leni_desc": "Kira vergisst nicht mehr, worüber ihr gerade redet. Bei Folgefragen wie 'Ja bitte' weiß sie genau, worum es ging — wie in einem echten Gespräch.",
+      "leni_visible": true,
+      "status": "done",
+      "last_updated": "2026-04-09",
+      "session": "session-qq-cont6",
+      "module": "kira_llm.py",
+      "description": "chat() lädt bisherige Session-Messages aus DB und übergibt sie als conversation_history an _call_anthropic/_call_openai_compat. Max 20 Nachrichten (konfigurierbar). Einstellungen-UI mit Slider + Token-Kosten-Anzeige."
+    },
+    {
+      "id": "kira-chat-projekte",
+      "name": "Kira Chat-Projekte (wie OpenAI/Claude)",
+      "icon": "📂",
+      "leni_name": "Chat-Projekte — Gespräche organisieren",
+      "leni_desc": "Eigene Projekte anlegen und Kira-Chats darin sortieren — so findest du jedes Gespräch wieder. Wie bei ChatGPT, nur direkt in KIRA.",
+      "leni_visible": true,
+      "status": "planned",
+      "last_updated": "2026-04-09",
+      "session": "session-qq-cont6",
+      "module": "server.py + kira_llm.py",
+      "description": "Chat-Liste in Sidebar, Projekt-Ordner, Archivierung, Konversation fortsetzen/umbenennen. DB: kira_konversationen mit session_id bereits vorbereitet."
     }
   ],
-  "_total": 97
+  "_total": 102
 }

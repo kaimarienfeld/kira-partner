@@ -8888,13 +8888,6 @@ setTimeout(esRenderRssFeeds,100);
       </label>
     </div>
     <div class="es-row">
-      <div class="es-rl">Konversations-Kontext<div class="es-rd">Verlauf der letzten Nachrichten einbeziehen</div></div>
-      <label class="es-toggle-wrap">
-        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konversationen_speichern', True) else ''}>
-        <div class="es-toggle-vis"></div>
-      </label>
-    </div>
-    <div class="es-row">
       <div class="es-rl">Max. Kontext-Items<div class="es-rd">Wie viele Eintr&auml;ge (Tasks, Mails, Rechnungen) Kira gleichzeitig sieht</div></div>
       <input class="es-inp-sm" type="number" id="cfg-llm-max-items" value="{llm.get('max_kontext_items', 50)}" min="5" max="200" style="width:72px">
     </div>
@@ -8945,6 +8938,42 @@ setTimeout(esRenderRssFeeds,100);
         <option value="relevant" {'selected' if kira_kontext_rechnungen=='relevant' else ''}>Nur wenn offen</option>
         <option value="nie" {'selected' if kira_kontext_rechnungen=='nie' else ''}>Nie</option>
       </select>
+    </div>
+  </div>
+
+  <div class="es-grp" id="llm-grp-gedaechtnis">
+    <div class="es-grp-h">&#x1F9E0; Chat-Ged&auml;chtnis</div>
+    <div class="es-grp-sub">Steuert, wie viel Kira sich innerhalb eines Gespr&auml;chs merkt. Mehr Nachrichten = besserer Kontext, aber h&ouml;here Token-Kosten.</div>
+    <div class="es-row">
+      <div class="es-rl">Verlauf speichern<div class="es-rd">Kira speichert alle Nachrichten und kann sp&auml;ter darauf zur&uuml;ckgreifen</div></div>
+      <label class="es-toggle-wrap">
+        <input class="es-toggle-inp" type="checkbox" id="cfg-llm-konv" {'checked' if llm.get('konversationen_speichern', True) else ''} onchange="document.getElementById('llm-ged-details').style.opacity=this.checked?'1':'0.4'">
+        <div class="es-toggle-vis"></div>
+      </label>
+    </div>
+    <div id="llm-ged-details" style="opacity:{'1' if llm.get('konversationen_speichern', True) else '0.4'};transition:opacity .3s">
+    <div class="es-row" style="flex-wrap:wrap;gap:8px">
+      <div class="es-rl" style="min-width:200px">Nachrichten pro Gespr&auml;ch<div class="es-rd">Wie viele fr&uuml;here Nachrichten Kira bei jeder Antwort mitlesen darf</div></div>
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+        <input type="range" id="cfg-llm-kontext-msgs" min="2" max="50" step="2" value="{llm.get('kontext_nachrichten', 20)}"
+               style="flex:1;accent-color:var(--accent);min-width:100px"
+               oninput="(function(v){{document.getElementById('cfg-llm-kontext-msgs-val').textContent=v;var c=document.getElementById('cfg-llm-kontext-msgs-cost');var t=Math.round(v*350);c.textContent='~'+t+' Tokens/Antwort';c.style.color=v<=20?'var(--success,#3dae6a)':v<=30?'var(--warning,#e6a817)':'var(--danger,#e84545)'}})(this.value)">
+        <span id="cfg-llm-kontext-msgs-val" style="min-width:28px;font-weight:700;font-size:15px;color:var(--text);text-align:center">{llm.get('kontext_nachrichten', 20)}</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;margin:-4px 0 6px">
+      <div style="display:flex;gap:4px;align-items:center;flex:1">
+        <div style="height:6px;border-radius:3px;flex:1;background:linear-gradient(90deg,var(--success,#3dae6a) 0%,var(--success,#3dae6a) 40%,var(--warning,#e6a817) 60%,var(--danger,#e84545) 100%);opacity:0.5"></div>
+      </div>
+      <span id="cfg-llm-kontext-msgs-cost" style="font-size:11px;white-space:nowrap;color:{'var(--success,#3dae6a)' if llm.get('kontext_nachrichten', 20) <= 20 else 'var(--warning,#e6a817)' if llm.get('kontext_nachrichten', 20) <= 30 else 'var(--danger,#e84545)'}">~{llm.get('kontext_nachrichten', 20)*350} Tokens/Antwort</span>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:4px 0 2px;font-size:11px;color:var(--muted);line-height:1.6">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><span style="font-weight:600;color:var(--text)">2&ndash;10</span> &mdash; Kurzes Ged&auml;chtnis, minimale Kosten</div>
+        <div><span style="font-weight:600;color:var(--text)">20</span> &mdash; Standard, guter Kompromiss <span style="color:var(--success,#3dae6a)">&bull; empfohlen</span></div>
+        <div><span style="font-weight:600;color:var(--text)">30&ndash;50</span> &mdash; Lange Gespr&auml;che, h&ouml;here Kosten</div>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -20714,6 +20743,7 @@ function saveSettings() {{
       internet_recherche:      document.getElementById('cfg-llm-internet')?.checked ?? false,
       geschaeftsdaten_teilen:  document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
       konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
+      kontext_nachrichten:      parseInt(document.getElementById('cfg-llm-kontext-msgs')?.value || '20', 10),
       max_kontext_items:        parseInt(document.getElementById('cfg-llm-max-items')?.value || '50', 10),
       auto_wissen_extrahieren:  document.getElementById('cfg-llm-auto-wissen')?.checked ?? true,
       antwort_laenge:           document.getElementById('cfg-llm-antwort-laenge')?.value || 'normal',

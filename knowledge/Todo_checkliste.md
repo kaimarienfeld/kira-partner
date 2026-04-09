@@ -155,6 +155,16 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Geschäfts-Kontext | `cfg-llm-geschaeft` / `llm.geschaeftsdaten_teilen` | session-t |
 | ✅ | Konversations-Kontext | `cfg-llm-konv` / `llm.konversationen_speichern` | session-t |
 
+### 6b-2. Chat-Gedächtnis (neu session-qq-cont6)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Verlauf speichern Toggle | `cfg-llm-konv` / `llm.konversationen_speichern` | Aktiviert/deaktiviert Chat-History |
+| ✅ | Nachrichten pro Gespräch (Slider) | `cfg-llm-kontext-msgs` / `llm.kontext_nachrichten` | Range 2–50, Default 20, Token-Kosten-Anzeige, session-qq-cont6 |
+| ✅ | History an LLM übergeben | `kira_llm.py:chat()` | conv_history aus kira_konversationen geladen + an _call_anthropic/_call_openai_compat übergeben |
+| 📋 | Chat-Projekte (wie OpenAI) | — | Chat-Liste in Sidebar, Projekt-Ordner, Konversation fortsetzen/umbenennen/archivieren. DB vorbereitet (kira_konversationen.session_id) |
+| 📋 | Chat-Suche | — | Volltextsuche über alle Kira-Konversationen |
+| 📋 | Chat exportieren | — | Konversation als PDF/Markdown exportieren |
+
 ### 6c. Mail-Klassifizierung / Budget-Modell (neu session-t)
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
