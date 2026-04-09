@@ -379,3 +379,35 @@
 5. Weitere Todos: Chat-Projekte vorgemerkt
 **Git:** 2aee293
 **Status:** erledigt
+
+## 2026-04-09 10:30 — session-qq-cont7: E-Mail-Darstellung wie Outlook
+**Auftrag:** Mails sehen in KIRA komplett anders aus als in Outlook — fehlende Bilder, kaputtes Layout, nur Text statt HTML
+**Root-Cause:** `_parse_eml_content()` entfernte `<style>`, `<meta>`, `<link>` Tags bei der Sanitierung → gesamtes CSS-Layout ging verloren. Inline-Bilder (`cid:`) wurden nicht aufgelöst.
+**Fixes:**
+1. Sanitierung: `<style>`/`<meta>`/`<link>` beibehalten (iframe sandbox isoliert bereits)
+2. `cid:` Inline-Bilder → `data:` base64 URLs eingebettet (max 2MB/Bild)
+3. iframe: responsive CSS injiziert (`img max-width:100%`, `table max-width`)
+4. Links öffnen in neuem Tab (`<base target="_blank">`)
+5. `mail.json` HTML-Fallback wenn EML kein HTML hat
+6. Kommunikations-Modul `readMail()`: iframe statt `textContent` für HTML-Mails
+**Git:** d74de77
+**Status:** ⚠️ NICHT AUSREICHEND — EML-Fix allein reicht nicht (s. cont8)
+
+## 2026-04-09 17:20 — session-qq-cont8: IMAP-Direktabruf für E-Mail-Rendering
+**Auftrag:** E-Mails sehen immer noch falsch aus (cont7-Fix hat nichts geändert). Kai: "was ist mit der direkt anzeige über die smtp verbindung.. ich denke das eigene zusammenstellen oder nachbilden der mails bringt auf dauer immer probleme"
+**Diagnose:**
+- Letzte 50 Mails haben KEIN `mail_folder_pfad` (leer) → keine EML-Dateien vorhanden
+- `mail_archiv.pfad` in config.json war leer → _save_to_archive() speicherte nichts
+- `_extract_text()` speichert nur text/plain in DB (HTML wird verworfen via `strip_html()`)
+- 12.500+ Mails nur mit text_plain, kein HTML → cont7-Fix griff nie
+**Fix: IMAP-Direktabruf**
+1. `_fetch_mail_html_from_imap()` — neue statische Methode in server.py
+   - IMAP-Verbindung per `imap_connect()` aus mail_monitor (OAuth2/Password)
+   - SEARCH HEADER Message-ID → FETCH RFC822
+   - Parse mit cid:-Inline-Bilder-Auflösung + HTML-Sanitierung
+   - Probiert bis zu 7 IMAP-Ordner (INBOX, Sent Items, etc.)
+2. `_read_mail()` erweitert: IMAP als 3. Fallback nach EML und kunden.db
+3. Ladeindikator mit Spinner statt nur "Lade..."
+**Playwright-Test:** LinkedIn (Logo+rote Badges ✓), Finom (Logo+Layout ✓), business-wissen.de (Logo+Formatierung ✓), rauMKult Formulare/Akademie/Betonkosmetik (Dark-Theme ✓)
+**Git:** 76c0fb0
+**Status:** ✅ erledigt — alle Mails rendern jetzt wie in Outlook

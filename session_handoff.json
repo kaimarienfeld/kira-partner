@@ -1,6 +1,6 @@
 {
-  "last_session": "session-qq-cont6",
-  "date": "2026-04-09 09:35",
+  "last_session": "session-qq-cont7",
+  "date": "2026-04-09 10:30",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -307,9 +307,11 @@
     "session-qq-cont3 (2026-04-09): Task-Persistence-Bug gefixt. (1) Root-Cause: kira_proaktiv.py _task_exists() filterte erledigt/ignorieren/archiviert aus → proaktiv-Tasks wurden nach TTL-Ablauf neu erstellt. Fix: Status-Filter entfernt, alle Status als Duplikat erkannt. (2) Kaskadierende Status-Änderung: Wenn Lead-Erinnerung (#273) als erledigt/zur_kenntnis markiert wird, wird Original-Task (#239) ebenfalls als beantwortet+gleicher Status gesetzt. Verhindert Endlos-Erinnerungen.",
     "session-qq-cont4 (2026-04-09): Universal Learning + 4 Postfach-Fixes. (1) Universal Learning: Jeder Aktions-Button erfasst Kontext (Commits 014f6fa, aab9f3d, 20cc368). (2) Favoriten Ungelesen-Filter (e1f3c46). (3) Badge-Sofort-Update ohne Roundtrip (389aa15). (4) Kein Flackern bei Auto-Refresh: Banner statt Liste-Zerstörung, Scroll-Position-Wiederherstellung (992d492).",
     "session-qq-cont5 (2026-04-09): Preview-Persistenz komplett behoben (8064d32). (1) _pfClearPreview() bei jedem Ordnerwechsel (pfSelectFolder/pfSelectCombined/pfSelectCombinedSub/pfSelectKiraFolder). (2) _pfAfterItemRemoved(): Zeigt nächste Mail oder leere Vorschau nach Entfernung. (3) pfBulkDelete + pfVerschiebenNach nutzen _pfAfterItemRemoved. (4) Neue Einstellung 'Nach Entfernung aus Liste' (next/none) in Einstellungen > Mail > Postfach. (5) Config mail_postfach.after_remove geladen bei pfInit + gespeichert bei saveSettings.",
-    "session-qq-cont6 (2026-04-09): KRITISCHER BUG — Kira Chat-Kontext gefixt (b026baf). Root-Cause: _call_anthropic() + _call_openai_compat() starteten immer mit nur 1 Nachricht, History aus kira_konversationen wurde nie geladen. Fix: chat() lädt bisherige Session-Messages aus DB (max 20, konfigurierbar via llm.kontext_nachrichten), übergibt als conversation_history an beide API-Funktionen."
+    "session-qq-cont6 (2026-04-09): KRITISCHER BUG — Kira Chat-Kontext gefixt (b026baf). Root-Cause: _call_anthropic() + _call_openai_compat() starteten immer mit nur 1 Nachricht, History aus kira_konversationen wurde nie geladen. Fix: chat() lädt bisherige Session-Messages aus DB (max 20, konfigurierbar via llm.kontext_nachrichten), übergibt als conversation_history an beide API-Funktionen.",
+    "session-qq-cont7 (2026-04-09): E-Mail-Darstellung wie Outlook (d74de77). Root-Cause: <style>/<meta>/<link> in Sanitierung entfernt → CSS zerstört. Fix: (1) Nur <script>/<form>/<object> entfernen, Style beibehalten (iframe sandboxed). (2) cid: Inline-Bilder → data: base64 URLs. (3) Responsive CSS injiziert. (4) Links in neuem Tab. (5) mail.json HTML-Fallback. (6) Kommunikations-Modul: iframe statt textContent.",
+    "session-qq-cont8 (2026-04-09 17:20): IMAP-Direktabruf für E-Mail-Rendering (76c0fb0). Root-Cause: 12500+ Mails hatten kein lokales Archiv (mail_folder_pfad leer, mail_archiv.pfad in config.json leer) → nur text_plain vorhanden, kein HTML. Fix: _fetch_mail_html_from_imap() — holt Mail direkt vom IMAP-Server per Message-ID SEARCH, parst RFC822 mit cid:-Inline-Bilder-Auflösung + HTML-Sanitierung. _read_mail() nutzt IMAP als 3. Fallback nach EML und kunden.db. Getestet via Playwright: LinkedIn (Logo+Badges), Finom (Logo+Layout), business-wissen.de (Logo+Formatierung), rauMKult Formulare (Dark-Theme) — alle korrekt wie in Outlook."
   ],
-  "next_step": "Server-Neustart + Live-Tests: Kira-Chat Kontext (Frage stellen, Antwort abwarten, Folgefrage mit 'Ja bitte' → Kontext muss erhalten bleiben).",
+  "next_step": "Kai testet Postfach live — E-Mails sollten jetzt wie in Outlook aussehen (IMAP-Direktabruf). Ältere Mails MIT Archiv nutzen weiterhin EML-Dateien. Weitere Optimierung möglich: IMAP-HTML cachen um wiederholte Abrufe zu vermeiden.",
   "critical_notes": [
     "kiraSendBtn muss <button> bleiben (nicht <div>) — .disabled funktioniert sonst nicht (ADR-004)",
     "secrets.json niemals committen",
