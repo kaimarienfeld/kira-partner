@@ -2204,6 +2204,7 @@ def build_postfach():
           <button class="pf-ha-icon" id="pf-tb-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
           <button class="pf-ha-icon del-btn" id="pf-tb-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
           <button class="pf-ha-icon" id="pf-tb-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+          <button class="pf-ha-icon" id="pf-tb-expand" title="Vollbild" onclick="pfReadModalOpen()" style="font-size:16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
           <div class="pf-ha-sep"></div>
           <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
           <button class="pf-ha-btn pf-360-btn" id="pf-tb-360" title="Kunden-360 Profil" onclick="pfOpenKunden360()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></svg>360\u00b0</button>
@@ -2378,6 +2379,44 @@ def build_postfach():
       </div>
     </div>
   </div>
+  <!-- ── VOLLBILD LESE-MODAL ─────────────────────────────── -->
+  <div id="pf-read-modal-overlay" class="pf-read-modal-overlay" style="display:none" onclick="if(event.target===this)pfReadModalClose()">
+    <div class="pf-read-modal" id="pf-read-modal">
+      <div class="pf-rm-titlebar">
+        <div class="pf-rm-subject" id="pf-rm-subject"></div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+          <button class="pf-cm-btn" onclick="pfReadModalClose()" title="Schlie\u00dfen">&#x2715;</button>
+        </div>
+      </div>
+      <div class="pf-rm-meta-bar">
+        <div class="pf-rm-sender">
+          <div class="pf-avatar" id="pf-rm-avatar" style="width:36px;height:36px;font-size:13px">?</div>
+          <div>
+            <div class="pf-from-line" id="pf-rm-from"></div>
+            <div class="pf-to-line" id="pf-rm-to" style="font-size:11px;color:var(--text-muted)"></div>
+          </div>
+          <div style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="pf-rm-date"></div>
+        </div>
+        <div class="pf-rm-actions">
+          <button class="pf-ha-btn" id="pf-rm-reply" title="Antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Antworten</button>
+          <button class="pf-ha-btn" id="pf-rm-replyall" title="Allen antworten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Allen</button>
+          <button class="pf-ha-btn" id="pf-rm-forward" title="Weiterleiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Weiterleiten</button>
+          <div class="pf-ha-sep"></div>
+          <button class="pf-ha-icon" id="pf-rm-read" title="Gelesen/Ungelesen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6L16.55 5.11A2 2 0 0 0 14.76 4H9.24A2 2 0 0 0 5.45 5.11z"/></svg></button>
+          <button class="pf-ha-icon" id="pf-rm-flag" title="Kennzeichnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></button>
+          <button class="pf-ha-icon" id="pf-rm-pin" title="Anheften"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg></button>
+          <button class="pf-ha-icon del-btn" id="pf-rm-delete" title="L\u00f6schen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+          <button class="pf-ha-icon" id="pf-rm-move" title="Verschieben" onclick="pfOpenVerschiebenMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+          <div class="pf-ha-sep"></div>
+          <button class="pf-ha-btn pf-kira-btn" id="pf-rm-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
+          <button class="pf-ha-btn pf-360-btn" id="pf-rm-360" title="Kunden-360 Profil" onclick="pfOpenKunden360()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></svg>360\u00b0</button>
+        </div>
+      </div>
+      <div class="pf-rm-att-bar" id="pf-rm-att-bar" style="display:none"></div>
+      <div class="pf-rm-body" id="pf-rm-body"></div>
+    </div>
+  </div>
+
   <!-- ── KUNDEN-360 DRAWER ────────────────────────────────── -->
   <div id="k360-drawer" class="k360-drawer" style="display:none">
     <div class="k360-hdr">
@@ -2500,7 +2539,8 @@ def build_postfach():
 .pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
 .pf-att-chip:hover{border-color:#3b82f6;color:#3b82f6}
 .pf-prev-body{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;max-width:100%;box-sizing:border-box}
-.pf-prev-body.iframe-mode{overflow:hidden;padding:0;display:flex;flex-direction:column}
+.pf-prev-body.iframe-mode{overflow:hidden;padding:0;position:relative}
+.pf-prev-body.iframe-mode iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff}
 .pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
 .pf-thread-cnt{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px}
 .pf-thread-msg{padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px}
@@ -2548,6 +2588,19 @@ def build_postfach():
 .pf-compose-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
 .pf-compose-modal{background:var(--bg-card,var(--bg));border-radius:14px;width:820px;max-width:96vw;height:82vh;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.5);border:1px solid var(--border);overflow:hidden}
 [data-theme="light"] .pf-compose-modal{box-shadow:0 24px 80px rgba(0,0,0,.22)}
+/* READ MODAL (Vollbild-Lesemodus) */
+.pf-read-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
+.pf-read-modal{background:var(--bg-card,var(--bg));border-radius:14px;width:960px;max-width:96vw;height:88vh;max-height:96vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.5);border:1px solid var(--border);overflow:hidden}
+[data-theme="light"] .pf-read-modal{box-shadow:0 24px 80px rgba(0,0,0,.22)}
+.pf-rm-titlebar{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px 10px;border-bottom:1px solid var(--border);gap:16px}
+.pf-rm-subject{font-size:17px;font-weight:700;color:var(--text);line-height:1.3;flex:1;min-width:0}
+.pf-rm-meta-bar{padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pf-rm-sender{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pf-rm-actions{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.pf-rm-att-bar{padding:8px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;font-size:12px}
+.pf-rm-body{flex:1;min-height:0;position:relative;overflow:hidden}
+.pf-rm-body iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff}
+.pf-rm-body.text-mode{overflow-y:auto;padding:20px;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.7;color:var(--text)}
 .pf-cm-titlebar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border)}
 .pf-cm-title{font-weight:700;font-size:15px;color:var(--text)}
 .pf-cm-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .12s}
@@ -4843,7 +4896,6 @@ window.pfOpenMail = function(m, el) {
       body.style.cssText = '';
       const iframe = document.createElement('iframe');
       iframe.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
-      iframe.style.cssText = 'flex:1;width:100%;height:100%;border:none;background:#fff;display:block;min-height:0';
       // HTML vorbereiten: Links in neuem Tab, Bilder responsive
       let mailHtml = hasHtml ? d.html : rawText;
       // <base target=_blank> für Links in neuem Tab
@@ -5114,6 +5166,67 @@ window.pfCloseCompose=function(){
   document.getElementById('pf-preview-empty').style.display='flex';
   window._pfReplyMsgId=null;
   _pfComposeAttachments=[];
+};
+
+// ── Vollbild-Lese-Modal ─────────────────────────────
+window.pfReadModalOpen=function(){
+  if(!_pfCurrentMail) return;
+  const m = _pfCurrentMail;
+  const ov = document.getElementById('pf-read-modal-overlay');
+  ov.style.display='flex';
+  // Meta kopieren
+  document.getElementById('pf-rm-subject').textContent = document.getElementById('pf-prev-betreff').textContent;
+  document.getElementById('pf-rm-from').textContent = document.getElementById('pf-prev-absender').textContent;
+  document.getElementById('pf-rm-to').textContent = document.getElementById('pf-prev-to').textContent;
+  document.getElementById('pf-rm-date').textContent = document.getElementById('pf-prev-datum').textContent;
+  const av = document.getElementById('pf-rm-avatar');
+  const srcAv = document.getElementById('pf-avatar');
+  av.textContent = srcAv.textContent;
+  av.style.background = srcAv.style.background;
+  av.style.color = srcAv.style.color;
+  // Body: iframe oder text aus pf-prev-body klonen
+  const rmBody = document.getElementById('pf-rm-body');
+  rmBody.innerHTML='';
+  rmBody.className='pf-rm-body';
+  const srcBody = document.getElementById('pf-prev-body');
+  const srcIframe = srcBody.querySelector('iframe');
+  if(srcIframe && srcIframe.srcdoc) {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox','allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+    iframe.srcdoc = srcIframe.srcdoc;
+    rmBody.appendChild(iframe);
+  } else {
+    rmBody.classList.add('text-mode');
+    rmBody.textContent = srcBody.textContent;
+  }
+  // Anhänge
+  const attBar = document.getElementById('pf-rm-att-bar');
+  const srcAtt = document.getElementById('pf-att-collapsed');
+  if(srcAtt && document.getElementById('pf-attachment-section').style.display!=='none') {
+    attBar.style.display='flex';
+    attBar.innerHTML = document.getElementById('pf-attachment-list').innerHTML || srcAtt.innerHTML;
+  } else {
+    attBar.style.display='none';
+  }
+  // Action-Buttons verdrahten (gleiche Funktionen wie Panel-Toolbar)
+  document.getElementById('pf-rm-reply').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-reply').click()};
+  document.getElementById('pf-rm-replyall').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-replyall').click()};
+  document.getElementById('pf-rm-forward').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-forward').click()};
+  document.getElementById('pf-rm-read').onclick=function(){document.getElementById('pf-tb-read').click()};
+  document.getElementById('pf-rm-flag').onclick=function(){document.getElementById('pf-tb-flag').click()};
+  document.getElementById('pf-rm-pin').onclick=function(){document.getElementById('pf-tb-pin').click()};
+  document.getElementById('pf-rm-delete').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-delete').click()};
+  document.getElementById('pf-rm-kira').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-kira').click()};
+  document.getElementById('pf-rm-360').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-360').click()};
+  // ESC schließen
+  ov._escHandler=function(e){if(e.key==='Escape'){pfReadModalClose();document.removeEventListener('keydown',ov._escHandler)}};
+  document.addEventListener('keydown',ov._escHandler);
+};
+window.pfReadModalClose=function(){
+  const ov=document.getElementById('pf-read-modal-overlay');
+  ov.style.display='none';
+  document.getElementById('pf-rm-body').innerHTML='';
+  if(ov._escHandler) document.removeEventListener('keydown',ov._escHandler);
 };
 
 // ── Popout → Modal ──────────────────────────────────
