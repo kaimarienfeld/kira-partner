@@ -126,9 +126,9 @@ def _push(title: str, msg: str, priority: str = "default"):
 
 # ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 def _task_exists(db, key: str) -> bool:
-    """Prüft ob ein auto-generierter Task mit diesem Key schon existiert."""
+    """Prüft ob ein auto-generierter Task mit diesem Key schon existiert (alle Status)."""
     row = db.execute(
-        "SELECT id FROM tasks WHERE message_id=? AND status NOT IN ('erledigt','ignorieren')",
+        "SELECT id FROM tasks WHERE message_id=?",
         (key,)
     ).fetchone()
     return row is not None

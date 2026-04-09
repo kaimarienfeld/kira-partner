@@ -32067,6 +32067,35 @@ Regeln:
                     db.close()
                 except Exception:
                     pass
+
+            # Kaskade: Proaktiv-Erinnerung → Original-Task auch schließen
+            if ok and status in ('erledigt', 'zur_kenntnis', 'ignorieren'):
+                try:
+                    _cdb = get_db()
+                    _task_row = _cdb.execute(
+                        "SELECT message_id, kategorie FROM tasks WHERE id=?", (task_id,)
+                    ).fetchone()
+                    if _task_row:
+                        _msg_id = _task_row[0] or ""
+                        _tkat = _task_row[1] or ""
+                        # lead-erinnerung-{original_id} → Original-Task ebenfalls als beantwortet markieren
+                        if _tkat == "Kira-Proaktiv" and _msg_id.startswith("lead-erinnerung-"):
+                            try:
+                                _orig_id = int(_msg_id.split("-")[-1])
+                                _cdb.execute(
+                                    "UPDATE tasks SET beantwortet=1, status=?, "
+                                    "notiz=COALESCE(notiz,'')||? WHERE id=? AND status='offen'",
+                                    (status,
+                                     f" [Kaskade: Erinnerung #{task_id} als {status} markiert]",
+                                     _orig_id))
+                                _cdb.commit()
+                            except (ValueError, Exception):
+                                pass
+                        # re-faellig-{re_nummer}-{stufe} → kein Kaskade (Rechnung bleibt offen bis bezahlt)
+                    _cdb.close()
+                except Exception:
+                    pass
+
             self._json({'ok': ok})
 
         elif action == 'korrektur':
