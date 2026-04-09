@@ -223,6 +223,8 @@ def _ensure_mail_columns():
     _ensure_mail_signaturen_table()
     # Vorlagen-Tabelle sicherstellen
     _ensure_mail_vorlagen_table()
+    # Entwürfe-Tabelle sicherstellen
+    _ensure_mail_drafts_table()
     # Activity-Feed Dismissed-Tabelle sicherstellen
     _ensure_activity_dismissed_table()
 
@@ -261,6 +263,30 @@ def _ensure_mail_signaturen_table():
             )
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_sig_konto ON mail_signaturen(konto)")
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+def _ensure_mail_drafts_table():
+    """Erstellt mail_drafts-Tabelle in tasks.db (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS mail_drafts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_email  TEXT NOT NULL DEFAULT '',
+                to_email    TEXT NOT NULL DEFAULT '',
+                cc          TEXT NOT NULL DEFAULT '',
+                bcc         TEXT NOT NULL DEFAULT '',
+                subject     TEXT NOT NULL DEFAULT '',
+                body_html   TEXT NOT NULL DEFAULT '',
+                body_plain  TEXT NOT NULL DEFAULT '',
+                in_reply_to TEXT NOT NULL DEFAULT '',
+                erstellt    TEXT NOT NULL DEFAULT (datetime('now')),
+                geaendert   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         db.commit()
         db.close()
     except Exception:
@@ -2189,16 +2215,19 @@ def build_postfach():
     </div>
 
   </div>
-  <!-- Compose -->
+  <!-- Compose (Inline-Modus im rechten Panel) -->
   <div id="pf-compose" style="display:none">
     <div class="pf-comp-hdr">
       <span id="pf-comp-title">Neue Mail</span>
-      <button class="pf-act-btn" onclick="pfCloseCompose()">&#x2715;</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="pf-act-btn" onclick="pfComposePopout()" title="In eigenem Fenster &ouml;ffnen" style="font-size:16px">&#x2922;</button>
+        <button class="pf-act-btn" onclick="pfCloseCompose()">&#x2715;</button>
+      </div>
     </div>
     <div class="pf-comp-fields">
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">Von</label>
-        <select class="pf-comp-sel" id="pf-comp-from"></select>
+        <select class="pf-comp-sel" id="pf-comp-from" onchange="pfComposeLoadSignatur()"></select>
       </div>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">An</label>
@@ -2214,14 +2243,93 @@ def build_postfach():
       </div>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">Betreff</label>
-        <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff">
+        <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff hinzuf&uuml;gen">
       </div>
     </div>
-    <textarea class="pf-comp-body" id="pf-comp-body" placeholder="Nachricht eingeben..."></textarea>
+    <div id="pf-comp-quill-wrap" class="pf-comp-quill-wrap">
+      <div id="pf-comp-quill-editor"></div>
+    </div>
+    <div class="pf-comp-toolbar-extra">
+      <label class="pf-comp-attach-btn" title="Datei anf&uuml;gen">
+        <input type="file" id="pf-comp-files" multiple style="display:none" onchange="pfComposeFileChanged()">
+        &#x1F4CE; Datei anf&uuml;gen
+      </label>
+      <button class="pf-comp-tb-btn" onclick="pfComposeInsertEmoji()" title="Emoji einf&uuml;gen">&#x1F600;</button>
+      <button class="pf-comp-tb-btn" onclick="pfComposeChangeSig()" title="Signatur &auml;ndern">&#x270D; Signatur</button>
+      <button class="pf-comp-tb-btn" onclick="pfKiraDraft()" title="Kira formuliert">&#x1F916; Kira</button>
+    </div>
+    <div id="pf-comp-attachments" class="pf-comp-attachments" style="display:none"></div>
     <div class="pf-comp-acts">
-      <button class="btn btn-primary btn-sm" onclick="pfSend()" id="pf-send-btn">&#x27A4; Senden</button>
-      <button class="btn btn-sec btn-sm" onclick="pfSaveDraft()">&#x1F4BE; Entwurf</button>
-      <button class="btn btn-sec btn-sm" onclick="pfKiraDraft()">&#x1F916; Kira formuliert</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="pf-comp-send-btn" onclick="pfSend()" id="pf-send-btn">&#x27A4; Senden</button>
+        <button class="pf-comp-sec-btn" onclick="pfSaveDraft()">&#x1F4BE; Entwurf speichern</button>
+      </div>
+      <button class="pf-comp-discard-btn" onclick="pfDiscardDraft()">&#x1F5D1; Verwerfen</button>
+    </div>
+  </div>
+
+  <!-- Compose MODAL (Fenster-Modus / Popout) -->
+  <div id="pf-compose-modal-overlay" class="pf-compose-modal-overlay" style="display:none" onclick="if(event.target===this)pfComposeModalMinimize()">
+    <div class="pf-compose-modal" id="pf-compose-modal">
+      <div class="pf-cm-titlebar">
+        <span class="pf-cm-title" id="pf-cm-title">Neue Mail</span>
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="pf-cm-btn" onclick="pfComposeModalMinimize()" title="Zur&uuml;ck ins Vorschaufenster">&#x2913;</button>
+          <button class="pf-cm-btn" onclick="pfComposeModalClose()" title="Schlie&szlig;en">&#x2715;</button>
+        </div>
+      </div>
+      <div class="pf-cm-fields">
+        <div class="pf-cm-row">
+          <label class="pf-cm-lbl">Von</label>
+          <select class="pf-cm-sel" id="pf-cm-from" onchange="pfCmLoadSignatur()"></select>
+        </div>
+        <div class="pf-cm-row">
+          <label class="pf-cm-lbl">An</label>
+          <input class="pf-cm-inp" id="pf-cm-to" placeholder="empfaenger@example.com">
+        </div>
+        <div class="pf-cm-row" id="pf-cm-cc-row" style="display:none">
+          <label class="pf-cm-lbl">CC</label>
+          <input class="pf-cm-inp" id="pf-cm-cc" placeholder="(optional)">
+        </div>
+        <div class="pf-cm-row" id="pf-cm-bcc-row" style="display:none">
+          <label class="pf-cm-lbl">BCC</label>
+          <input class="pf-cm-inp" id="pf-cm-bcc" placeholder="(optional)">
+        </div>
+        <div style="display:flex;gap:6px;padding:0 20px 6px">
+          <button class="pf-cm-toggle-btn" onclick="document.getElementById('pf-cm-cc-row').style.display=this.classList.toggle('act')?'flex':'none'">CC</button>
+          <button class="pf-cm-toggle-btn" onclick="document.getElementById('pf-cm-bcc-row').style.display=this.classList.toggle('act')?'flex':'none'">BCC</button>
+        </div>
+        <div class="pf-cm-row" style="border-bottom:none">
+          <label class="pf-cm-lbl">Betreff</label>
+          <input class="pf-cm-inp" id="pf-cm-subj" placeholder="Betreff hinzuf&uuml;gen" style="font-weight:600;font-size:15px">
+        </div>
+      </div>
+      <div class="pf-cm-editor-wrap">
+        <div id="pf-cm-quill-wrap">
+          <div id="pf-cm-quill-editor"></div>
+        </div>
+      </div>
+      <div id="pf-cm-attachments" class="pf-comp-attachments" style="display:none"></div>
+      <div class="pf-cm-footer">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="pf-comp-send-btn" onclick="pfSendModal()" id="pf-cm-send-btn">&#x27A4; Senden</button>
+          <select id="pf-cm-send-opts" class="pf-cm-send-opts" title="Sende-Optionen">
+            <option value="send">Jetzt senden</option>
+            <option value="draft">Als Entwurf speichern</option>
+          </select>
+        </div>
+        <div class="pf-cm-footer-tools">
+          <label class="pf-cm-tool-btn" title="Datei anf&uuml;gen">
+            <input type="file" id="pf-cm-files" multiple style="display:none" onchange="pfCmFileChanged()">
+            &#x1F4CE;
+          </label>
+          <button class="pf-cm-tool-btn" onclick="pfCmInsertEmoji()" title="Emoji einf&uuml;gen">&#x1F600;</button>
+          <button class="pf-cm-tool-btn" onclick="pfCmChangeSig()" title="Signatur &auml;ndern">&#x270D;</button>
+          <button class="pf-cm-tool-btn" onclick="pfKiraDraftModal()" title="Kira formuliert">&#x1F916;</button>
+          <span style="flex:1"></span>
+          <button class="pf-cm-tool-btn" onclick="pfDiscardDraftModal()" title="Verwerfen" style="color:#ef4444">&#x1F5D1;</button>
+        </div>
+      </div>
     </div>
   </div>
   <!-- ── KUNDEN-360 DRAWER ────────────────────────────────── -->
@@ -2354,16 +2462,63 @@ def build_postfach():
 .pf-thread-msg-sender{font-weight:600;color:var(--text)}
 .pf-thread-msg-date{color:var(--text-muted)}
 .pf-thread-msg-body{color:var(--text-muted);white-space:pre-wrap;max-height:120px;overflow:hidden}
-/* COMPOSE */
+/* COMPOSE INLINE */
 .pf-comp-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px;border-bottom:1px solid var(--border)}
 .pf-comp-hdr span{font-weight:700;font-size:15px}
-.pf-comp-fields{padding:12px 20px 0;border-bottom:1px solid var(--border)}
-.pf-comp-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+.pf-comp-fields{padding:8px 20px 0;border-bottom:1px solid var(--border)}
+.pf-comp-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.12)}
 .pf-comp-lbl{font-size:12px;color:var(--text-muted);width:45px;flex-shrink:0}
 .pf-comp-inp{flex:1;border:none;background:transparent;color:var(--text);font-size:13px;outline:none;padding:2px 0}
 .pf-comp-sel{flex:1;border:none;background:transparent;color:var(--text);font-size:13px;outline:none}
-.pf-comp-body{flex:1;border:none;resize:none;background:transparent;color:var(--text);font-size:13px;padding:14px 20px;outline:none;min-height:200px;font-family:inherit;line-height:1.6}
-.pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+.pf-comp-quill-wrap{flex:1;overflow-y:auto;min-height:180px}
+.pf-comp-quill-wrap .ql-toolbar{background:var(--bg-raised);border-color:var(--border);border-left:none;border-right:none;padding:4px 8px}
+.pf-comp-quill-wrap .ql-container{border:none;font-size:13px;color:var(--text);font-family:inherit}
+.pf-comp-quill-wrap .ql-editor{min-height:160px;padding:14px 20px;line-height:1.65}
+.pf-comp-quill-wrap .ql-editor.ql-blank::before{color:var(--text-muted);font-style:normal}
+.pf-comp-toolbar-extra{display:flex;align-items:center;gap:4px;padding:6px 16px;border-top:1px solid var(--border);flex-wrap:wrap}
+.pf-comp-attach-btn{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text-muted);cursor:pointer;padding:4px 8px;border-radius:5px;transition:background .12s}
+.pf-comp-attach-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-comp-tb-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:4px 8px;border-radius:5px;color:var(--text-muted);transition:background .12s}
+.pf-comp-tb-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-comp-attachments{display:flex;flex-wrap:wrap;gap:6px;padding:6px 16px}
+.pf-comp-att-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)}
+.pf-comp-att-chip .pf-att-rm{cursor:pointer;opacity:.5;font-size:14px}
+.pf-comp-att-chip .pf-att-rm:hover{opacity:1;color:#ef4444}
+.pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center}
+.pf-comp-send-btn{background:#1e1e24;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;transition:background .14s}
+.pf-comp-send-btn:hover{background:#333}
+[data-theme="light"] .pf-comp-send-btn{background:#18181c;color:#fff}
+.pf-comp-sec-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--text);transition:border-color .14s}
+.pf-comp-sec-btn:hover{border-color:var(--accent)}
+.pf-comp-discard-btn{background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;padding:6px 10px;border-radius:6px}
+.pf-comp-discard-btn:hover{color:#ef4444;background:rgba(239,68,68,.08)}
+/* COMPOSE MODAL (Fenster-Modus) */
+.pf-compose-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
+.pf-compose-modal{background:var(--bg-card,var(--bg));border-radius:14px;width:820px;max-width:96vw;height:82vh;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.5);border:1px solid var(--border);overflow:hidden}
+[data-theme="light"] .pf-compose-modal{box-shadow:0 24px 80px rgba(0,0,0,.22)}
+.pf-cm-titlebar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border)}
+.pf-cm-title{font-weight:700;font-size:15px;color:var(--text)}
+.pf-cm-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .12s}
+.pf-cm-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-cm-fields{padding:8px 20px 0}
+.pf-cm-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(128,128,128,.12)}
+.pf-cm-lbl{font-size:12px;color:var(--text-muted);width:48px;flex-shrink:0}
+.pf-cm-inp{flex:1;border:none;background:transparent;color:var(--text);font-size:14px;outline:none;padding:3px 0}
+.pf-cm-sel{flex:1;border:none;background:transparent;color:var(--text);font-size:14px;outline:none}
+.pf-cm-toggle-btn{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .14s}
+.pf-cm-toggle-btn.act{background:rgba(79,125,249,.12);border-color:var(--accent);color:var(--accent)}
+.pf-cm-editor-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#pf-cm-quill-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#pf-cm-quill-wrap .ql-toolbar{background:var(--bg-raised);border-color:var(--border);border-left:none;border-right:none;padding:6px 12px}
+#pf-cm-quill-wrap .ql-container{flex:1;border:none;font-size:14px;color:var(--text);font-family:inherit;overflow-y:auto}
+#pf-cm-quill-wrap .ql-editor{min-height:200px;padding:18px 24px;line-height:1.7}
+#pf-cm-quill-wrap .ql-editor.ql-blank::before{color:var(--text-muted);font-style:normal}
+.pf-cm-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);background:var(--bg-raised);gap:8px}
+.pf-cm-send-opts{background:var(--bg-input,var(--bg-raised));border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer}
+.pf-cm-footer-tools{display:flex;align-items:center;gap:2px}
+.pf-cm-tool-btn{background:none;border:none;cursor:pointer;font-size:16px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:7px;color:var(--text-muted);transition:background .12s}
+.pf-cm-tool-btn:hover{background:var(--bg-hover);color:var(--text)}
+.pf-cm-tool-btn label{cursor:pointer;display:flex;align-items:center;justify-content:center;width:100%;height:100%}
 @media(max-width:900px){.pf-left{width:52px}.pf-left-title,.pf-folder-konto,.pf-fav-section,.pf-fav-item span:not(.pf-fav-badge),.pf-folder-item span:not(.pf-folder-badge){display:none}.pf-mid{width:260px}}
 /* Resize handles */
 .pf-resize-h{width:4px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background .15s;position:relative;z-index:2}
@@ -4598,8 +4753,78 @@ window.pfToggleThread=function(){
   document.getElementById('pf-thread-toggle').textContent=_pfThreadOpen?'&#x25B2;':'&#x25BC;';
 };
 
-// ── Compose ──────────────────────────────────────────────
+// ── Compose (Quill-basiert, Inline + Modal) ────────────────
+window._pfComposeQuill = null;
+window._pfComposeModalQuill = null;
+window._pfComposeMode = 'inline'; // 'inline' oder 'modal'
+window._pfComposeAttachments = []; // {name, size, file}
+window._pfSignaturesCache = null;
+window._pfComposeSignaturHtml = '';
+
+// Quill laden (einmalig, shared)
+window._pfEnsureQuillLoaded = function(cb) {
+  if (window.Quill) { cb(); return; }
+  const css = document.createElement('link'); css.rel='stylesheet'; css.href='/static/quill.snow.css';
+  document.head.appendChild(css);
+  const scr = document.createElement('script'); scr.src='/static/quill.min.js';
+  scr.onload = cb; document.head.appendChild(scr);
+};
+
+// Quill in einem Container initialisieren
+window._pfInitQuill = function(containerId, placeholder) {
+  return new Quill('#'+containerId, {
+    theme: 'snow',
+    placeholder: placeholder || 'Nachricht eingeben...',
+    modules: {
+      toolbar: [
+        [{'font':[]},{'size':['small',false,'large','huge']}],
+        ['bold','italic','underline','strike'],
+        [{'color':[]},{'background':[]}],
+        [{'list':'ordered'},{'list':'bullet'}],
+        [{'align':[]}],
+        ['link','image','blockquote','code-block'],
+        ['clean']
+      ]
+    }
+  });
+};
+
+// Signaturen laden + cachen
+window._pfLoadSignatures = function(cb) {
+  if (_pfSignaturesCache) { cb(_pfSignaturesCache); return; }
+  fetch('/api/mail/signaturen').then(r=>r.json()).then(d=>{
+    _pfSignaturesCache = d.signaturen || [];
+    cb(_pfSignaturesCache);
+  }).catch(()=>cb([]));
+};
+
+// Standard-Signatur für Konto finden + einfügen
+// Marker: 3x Zero-Width Space (\u200B\u200B\u200B) — Quill bewahrt Unicode-Zeichen
+window._PF_SIG_MARKER = '\\u200B\\u200B\\u200B';
+window._pfInsertSignatur = function(quill, konto) {
+  _pfLoadSignatures(function(sigs) {
+    const sig = sigs.find(s => s.konto === konto && s.ist_default) || sigs.find(s => s.konto === konto);
+    _pfComposeSignaturHtml = sig ? sig.html : '';
+    if (quill) {
+      const text = quill.getText();
+      const markerIdx = text.indexOf(_PF_SIG_MARKER);
+      if (markerIdx >= 0) {
+        // Alles ab Marker löschen
+        quill.deleteText(markerIdx, quill.getLength() - markerIdx);
+      }
+      if (_pfComposeSignaturHtml) {
+        // Marker + Signatur am Ende einfügen via innerHTML (behält Formatierung)
+        const beforeHtml = quill.root.innerHTML;
+        quill.root.innerHTML = beforeHtml + '<p>' + _PF_SIG_MARKER + '</p>' + _pfComposeSignaturHtml;
+      }
+    }
+  });
+};
+
+// ── Inline Compose ──────────────────────────────────
 window.pfOpenCompose=function(replyTo){
+  _pfComposeMode = 'inline';
+  _pfComposeAttachments = [];
   document.getElementById('pf-preview-empty').style.display='none';
   document.getElementById('pf-preview').style.display='none';
   document.getElementById('pf-compose').style.display='flex';
@@ -4608,16 +4833,109 @@ window.pfOpenCompose=function(replyTo){
   if(!replyTo){
     document.getElementById('pf-comp-to').value='';
     document.getElementById('pf-comp-subj').value='';
-    document.getElementById('pf-comp-body').value='';
     document.getElementById('pf-comp-cc').value='';
+    document.getElementById('pf-comp-bcc').value='';
   }
+  document.getElementById('pf-comp-attachments').style.display='none';
+  document.getElementById('pf-comp-attachments').innerHTML='';
+  _pfEnsureQuillLoaded(function(){
+    if(!_pfComposeQuill){
+      _pfComposeQuill = _pfInitQuill('pf-comp-quill-editor','Nachricht eingeben...');
+    }
+    if(!replyTo){
+      _pfComposeQuill.setText('');
+      pfComposeLoadSignatur();
+    }
+  });
 };
+
+window.pfComposeLoadSignatur=function(){
+  const konto = document.getElementById('pf-comp-from').value;
+  if(_pfComposeQuill && konto) _pfInsertSignatur(_pfComposeQuill, konto);
+};
+
 window.pfCloseCompose=function(){
   document.getElementById('pf-compose').style.display='none';
   document.getElementById('pf-preview-empty').style.display='flex';
   window._pfReplyMsgId=null;
+  _pfComposeAttachments=[];
 };
 
+// ── Popout → Modal ──────────────────────────────────
+window.pfComposePopout=function(){
+  const ov = document.getElementById('pf-compose-modal-overlay');
+  ov.style.display='flex';
+  document.getElementById('pf-cm-title').textContent = document.getElementById('pf-comp-title').textContent;
+  // Felder kopieren
+  _pfSyncFields('pf-comp','pf-cm');
+  // CC/BCC sichtbar wenn gefüllt
+  if(document.getElementById('pf-cm-cc').value) { document.getElementById('pf-cm-cc-row').style.display='flex'; }
+  if(document.getElementById('pf-cm-bcc').value) { document.getElementById('pf-cm-bcc-row').style.display='flex'; }
+  _pfComposeMode = 'modal';
+  document.getElementById('pf-compose').style.display='none';
+  document.getElementById('pf-preview-empty').style.display='flex';
+  // Quill im Modal initialisieren
+  _pfEnsureQuillLoaded(function(){
+    if(!_pfComposeModalQuill){
+      _pfComposeModalQuill = _pfInitQuill('pf-cm-quill-editor','Nachricht eingeben...');
+    }
+    // Inhalt vom Inline-Quill übernehmen
+    if(_pfComposeQuill){
+      _pfComposeModalQuill.root.innerHTML = _pfComposeQuill.root.innerHTML;
+    }
+    _pfComposeModalQuill.focus();
+  });
+  // Attachments übernehmen
+  _pfRenderAttachments('pf-cm-attachments');
+};
+
+window.pfComposeModalMinimize=function(){
+  // Zurück ins Inline-Panel
+  document.getElementById('pf-compose-modal-overlay').style.display='none';
+  _pfComposeMode='inline';
+  // Felder zurück kopieren
+  _pfSyncFields('pf-cm','pf-comp');
+  // Quill-Inhalt zurück
+  if(_pfComposeModalQuill && _pfComposeQuill){
+    _pfComposeQuill.root.innerHTML = _pfComposeModalQuill.root.innerHTML;
+  }
+  document.getElementById('pf-preview-empty').style.display='none';
+  document.getElementById('pf-preview').style.display='none';
+  document.getElementById('pf-compose').style.display='flex';
+  document.getElementById('pf-compose').style.flexDirection='column';
+  _pfRenderAttachments('pf-comp-attachments');
+};
+
+window.pfComposeModalClose=function(){
+  const q = _pfComposeModalQuill;
+  const hasContent = q && q.getText().trim().length > 0;
+  if(hasContent && !confirm('Nachricht verwerfen?')) return;
+  document.getElementById('pf-compose-modal-overlay').style.display='none';
+  _pfComposeMode='inline';
+  window._pfReplyMsgId=null;
+  _pfComposeAttachments=[];
+};
+
+// Felder zwischen Inline und Modal synchronisieren
+window._pfSyncFields=function(srcPfx, dstPfx){
+  ['from','to','cc','bcc','subj'].forEach(function(f){
+    const src=document.getElementById(srcPfx+'-'+f);
+    const dst=document.getElementById(dstPfx+'-'+f);
+    if(src&&dst){
+      if(src.tagName==='SELECT'){
+        // Select: Optionen klonen falls nötig
+        if(dst.options.length!==src.options.length){
+          dst.innerHTML=src.innerHTML;
+        }
+        dst.value=src.value;
+      } else {
+        dst.value=src.value;
+      }
+    }
+  });
+};
+
+// ── Reply / Forward ──────────────────────────────────
 window.pfReply=function(){
   const betreff=document.getElementById('pf-prev-betreff').textContent;
   const absender=document.getElementById('pf-prev-absender').textContent.replace('Von: ','');
@@ -4626,12 +4944,22 @@ window.pfReply=function(){
   window._pfReplyMsgId=_pfCurrentMail&&_pfCurrentMail.message_id?_pfCurrentMail.message_id:null;
   const origBody=(_pfCurrentMail&&_pfCurrentMail._text_plain)||document.getElementById('pf-prev-body').textContent||'';
   const datum=_pfCurrentMail&&_pfCurrentMail.datum?_pfCurrentMail.datum:'';
-  const quoted=origBody.slice(0,1500).split('\\n').map(l=>'> '+l).join('\\n');
+  const quoted=origBody.slice(0,1500).split('\\n').map(function(l){return '> '+l;}).join('\\n');
   pfOpenCompose(true);
   document.getElementById('pf-comp-to').value=replyAddr;
   document.getElementById('pf-comp-subj').value=(betreff.startsWith('Re:')?betreff:'Re: '+betreff);
-  document.getElementById('pf-comp-body').value='\\n\\n--- Am '+datum+' schrieb '+absender.trim()+': ---\\n'+quoted;
-  const bd=document.getElementById('pf-comp-body');bd.focus();bd.setSelectionRange(0,0);bd.scrollTop=0;
+  _pfEnsureQuillLoaded(function(){
+    if(_pfComposeQuill){
+      const konto = document.getElementById('pf-comp-from').value;
+      let sigHtml = '';
+      _pfLoadSignatures(function(sigs){
+        const sig = sigs.find(function(s){return s.konto===konto && s.ist_default;}) || sigs.find(function(s){return s.konto===konto;});
+        sigHtml = sig ? '<p>'+_PF_SIG_MARKER+'</p>'+sig.html : '';
+        _pfComposeQuill.root.innerHTML = '<br>'+sigHtml+'<br><br><div style="border-left:3px solid #ccc;padding-left:12px;color:#666;margin-top:12px"><p style="font-size:12px;color:#888">Am '+datum+' schrieb '+absender.trim()+':</p><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px">'+quoted.replace(/</g,'&lt;')+'</pre></div>';
+        _pfComposeQuill.setSelection(0,0);
+      });
+    }
+  });
 };
 window.pfForward=function(){
   const betreff=document.getElementById('pf-prev-betreff').textContent;
@@ -4639,40 +4967,194 @@ window.pfForward=function(){
   window._pfReplyMsgId=null;
   pfOpenCompose(true);
   document.getElementById('pf-comp-subj').value=(betreff.startsWith('Fwd:')?betreff:'Fwd: '+betreff);
-  document.getElementById('pf-comp-body').value='\\n\\n--- Weitergeleitet ---\\n'+body.slice(0,2000);
+  _pfEnsureQuillLoaded(function(){
+    if(_pfComposeQuill){
+      _pfComposeQuill.root.innerHTML = '<br><br><div style="border-top:1px solid #ccc;padding-top:12px;margin-top:12px;color:#666"><p style="font-size:12px;font-weight:600">--- Weitergeleitet ---</p><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px">'+body.slice(0,2000).replace(/</g,'&lt;')+'</pre></div>';
+      _pfComposeQuill.setSelection(0,0);
+    }
+  });
 };
 
+// ── Senden (Inline) ──────────────────────────────────
 window.pfSend=function(){
   const from=document.getElementById('pf-comp-from').value;
   const to=document.getElementById('pf-comp-to').value.trim();
   const cc=document.getElementById('pf-comp-cc').value.trim();
   const subj=document.getElementById('pf-comp-subj').value.trim();
-  const body=document.getElementById('pf-comp-body').value;
-  if(!to||!subj){showToast('Empfänger und Betreff erforderlich','warnung');return;}
-  const btn=document.getElementById('pf-send-btn');
-  btn.disabled=true;btn.textContent='Wird gesendet...';
-  const bcc=document.getElementById('pf-comp-bcc')?.value.trim()||'';
-  const pl={from_email:from,to,cc,bcc,subject:subj,body_plain:body};
+  const bodyHtml=_pfComposeQuill?_pfComposeQuill.root.innerHTML:'';
+  const bodyPlain=_pfComposeQuill?_pfComposeQuill.getText():'';
+  if(!to||!subj){showToast('Empf\\u00e4nger und Betreff erforderlich','warnung');return;}
+  _pfDoSend(from,to,cc,document.getElementById('pf-comp-bcc')?.value.trim()||'',subj,bodyPlain,bodyHtml,document.getElementById('pf-send-btn'),function(){pfCloseCompose();});
+};
+
+// ── Senden (Modal) ──────────────────────────────────
+window.pfSendModal=function(){
+  const opt=document.getElementById('pf-cm-send-opts').value;
+  if(opt==='draft'){pfSaveDraftModal();return;}
+  const from=document.getElementById('pf-cm-from').value;
+  const to=document.getElementById('pf-cm-to').value.trim();
+  const cc=document.getElementById('pf-cm-cc').value.trim();
+  const bcc=document.getElementById('pf-cm-bcc').value.trim();
+  const subj=document.getElementById('pf-cm-subj').value.trim();
+  const bodyHtml=_pfComposeModalQuill?_pfComposeModalQuill.root.innerHTML:'';
+  const bodyPlain=_pfComposeModalQuill?_pfComposeModalQuill.getText():'';
+  if(!to||!subj){showToast('Empf\\u00e4nger und Betreff erforderlich','warnung');return;}
+  _pfDoSend(from,to,cc,bcc,subj,bodyPlain,bodyHtml,document.getElementById('pf-cm-send-btn'),function(){
+    document.getElementById('pf-compose-modal-overlay').style.display='none';
+    _pfComposeAttachments=[];
+  });
+};
+
+// Gemeinsame Sende-Logik
+window._pfDoSend=function(from,to,cc,bcc,subj,bodyPlain,bodyHtml,btn,onSuccess){
+  btn.disabled=true; const origText=btn.innerHTML; btn.textContent='Wird gesendet...';
+  const pl={from_email:from,to:to,cc:cc,bcc:bcc,subject:subj,body_plain:bodyPlain,body_html:bodyHtml};
   if(window._pfReplyMsgId)pl.in_reply_to=window._pfReplyMsgId;
   fetch('/api/mail/send',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(pl)
-  }).then(r=>r.json()).then(d=>{
-    btn.disabled=false;btn.textContent='&#x27A4; Senden';
-    if(d.ok){showToast('Mail gesendet ✓','ok');pfCloseCompose();window._pfReplyMsgId=null;}
+  }).then(function(r){return r.json();}).then(function(d){
+    btn.disabled=false;btn.innerHTML=origText;
+    if(d.ok){showToast('Mail gesendet \\u2713','ok');window._pfReplyMsgId=null;if(onSuccess)onSuccess();}
     else showToast('Fehler: '+(d.error||'?'),'fehler');
-  }).catch(()=>{btn.disabled=false;btn.textContent='&#x27A4; Senden';showToast('Netzwerkfehler','fehler');});
+  }).catch(function(){btn.disabled=false;btn.innerHTML=origText;showToast('Netzwerkfehler','fehler');});
 };
-window.pfSaveDraft=function(){showToast('Entwurf gespeichert (noch nicht implementiert)','info');};
+
+// ── Entwurf speichern ──────────────────────────────────
+window.pfSaveDraft=function(){
+  const from=document.getElementById('pf-comp-from').value;
+  const to=document.getElementById('pf-comp-to').value.trim();
+  const subj=document.getElementById('pf-comp-subj').value.trim();
+  const bodyHtml=_pfComposeQuill?_pfComposeQuill.root.innerHTML:'';
+  _pfDoSaveDraft(from,to,subj,bodyHtml);
+};
+window.pfSaveDraftModal=function(){
+  const from=document.getElementById('pf-cm-from').value;
+  const to=document.getElementById('pf-cm-to').value.trim();
+  const subj=document.getElementById('pf-cm-subj').value.trim();
+  const bodyHtml=_pfComposeModalQuill?_pfComposeModalQuill.root.innerHTML:'';
+  _pfDoSaveDraft(from,to,subj,bodyHtml);
+};
+window._pfDoSaveDraft=function(from,to,subj,bodyHtml){
+  fetch('/api/mail/draft/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({from_email:from,to:to,subject:subj,body_html:bodyHtml})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) showToast('Entwurf gespeichert \\u2713','ok');
+    else showToast('Fehler: '+(d.error||'?'),'fehler');
+  }).catch(function(){showToast('Netzwerkfehler','fehler');});
+};
+
+// ── Verwerfen ──────────────────────────────────
+window.pfDiscardDraft=function(){
+  if(!confirm('Nachricht verwerfen?')) return;
+  if(_pfComposeQuill) _pfComposeQuill.setText('');
+  _pfComposeAttachments=[];
+  pfCloseCompose();
+};
+window.pfDiscardDraftModal=function(){
+  if(!confirm('Nachricht verwerfen?')) return;
+  if(_pfComposeModalQuill) _pfComposeModalQuill.setText('');
+  _pfComposeAttachments=[];
+  document.getElementById('pf-compose-modal-overlay').style.display='none';
+};
+
+// ── Dateianhänge ──────────────────────────────────
+window.pfComposeFileChanged=function(){
+  const inp=document.getElementById('pf-comp-files');
+  Array.from(inp.files).forEach(function(f){_pfComposeAttachments.push({name:f.name,size:f.size,file:f});});
+  inp.value='';
+  _pfRenderAttachments('pf-comp-attachments');
+};
+window.pfCmFileChanged=function(){
+  const inp=document.getElementById('pf-cm-files');
+  Array.from(inp.files).forEach(function(f){_pfComposeAttachments.push({name:f.name,size:f.size,file:f});});
+  inp.value='';
+  _pfRenderAttachments('pf-cm-attachments');
+};
+window._pfRenderAttachments=function(containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return;
+  if(_pfComposeAttachments.length===0){c.style.display='none';c.innerHTML='';return;}
+  c.style.display='flex';
+  c.innerHTML=_pfComposeAttachments.map(function(a,i){
+    const sz=a.size<1024?(a.size+'B'):a.size<1048576?((a.size/1024).toFixed(1)+'KB'):((a.size/1048576).toFixed(1)+'MB');
+    return '<div class="pf-comp-att-chip">\\u{1F4CE} '+a.name+' <span style="color:var(--text-muted);font-size:11px">('+sz+')</span> <span class="pf-att-rm" onclick="_pfRemoveAttachment('+i+',&apos;'+containerId+'&apos;)">\\u2715</span></div>';
+  }).join('');
+};
+window._pfRemoveAttachment=function(idx,containerId){
+  _pfComposeAttachments.splice(idx,1);
+  _pfRenderAttachments(containerId);
+};
+
+// ── Emoji-Einfügen (einfache Auswahl) ──────────────────
+window.pfComposeInsertEmoji=function(){ _pfInsertEmojiInto(_pfComposeQuill); };
+window.pfCmInsertEmoji=function(){ _pfInsertEmojiInto(_pfComposeModalQuill); };
+window._pfInsertEmojiInto=function(quill){
+  if(!quill)return;
+  const emojis=['\\u{1F44D}','\\u{1F44B}','\\u{1F600}','\\u{1F389}','\\u{2705}','\\u{274C}','\\u{1F4E7}','\\u{1F4C5}','\\u{2B50}','\\u{1F525}','\\u{1F4A1}','\\u{1F64F}','\\u{1F3AF}','\\u{26A0}','\\u{2764}','\\u{1F44F}','\\u{1F680}','\\u{1F4DD}','\\u{1F50D}','\\u{1F4B0}'];
+  const sel=prompt('Emoji w\\u00e4hlen:\\n'+emojis.join(' ')+'\\n\\nOder eigenes Emoji eingeben:');
+  if(sel){
+    const range=quill.getSelection(true);
+    quill.insertText(range?range.index:quill.getLength()-1,sel);
+  }
+};
+
+// ── Signatur wechseln ──────────────────────────────────
+window.pfComposeChangeSig=function(){ _pfChangeSigFor(_pfComposeQuill,'pf-comp-from'); };
+window.pfCmChangeSig=function(){ _pfChangeSigFor(_pfComposeModalQuill,'pf-cm-from'); };
+window._pfChangeSigFor=function(quill,fromId){
+  if(!quill)return;
+  _pfLoadSignatures(function(sigs){
+    const konto=document.getElementById(fromId).value;
+    const kontoSigs=sigs.filter(function(s){return s.konto===konto;});
+    if(kontoSigs.length===0){showToast('Keine Signaturen f\\u00fcr dieses Konto. Erstelle eine unter Einstellungen > Mail > Signaturen.','info');return;}
+    let msg='Signatur w\\u00e4hlen:\\n';
+    kontoSigs.forEach(function(s,i){msg+=(i+1)+'. '+s.name+(s.ist_default?' (Standard)':'')+'\\n';});
+    msg+='0. Keine Signatur\\n';
+    const choice=prompt(msg);
+    if(choice===null)return;
+    const idx=parseInt(choice);
+    const text=quill.getText();
+    const mi=text.indexOf(_PF_SIG_MARKER);
+    if(mi>=0) quill.deleteText(mi, quill.getLength()-mi);
+    if(idx>=1&&idx<=kontoSigs.length){
+      const bh=quill.root.innerHTML;
+      quill.root.innerHTML=bh+'<p>'+_PF_SIG_MARKER+'</p>'+kontoSigs[idx-1].html;
+    }
+  });
+};
+
+// ── Modal Signatur laden ──────────────────────────────
+window.pfCmLoadSignatur=function(){
+  const konto=document.getElementById('pf-cm-from').value;
+  if(_pfComposeModalQuill&&konto) _pfInsertSignatur(_pfComposeModalQuill,konto);
+};
+
+// ── Kira formuliert ──────────────────────────────────
 window.pfKiraDraft=function(){
   const to=document.getElementById('pf-comp-to').value;
   const subj=document.getElementById('pf-comp-subj').value;
   if(!subj){showToast('Bitte zuerst Betreff eingeben','warnung');return;}
-  document.getElementById('pf-comp-body').value='Kira formuliert...';
+  if(_pfComposeQuill) _pfComposeQuill.setText('Kira formuliert...');
   fetch('/api/kira/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({message:'Bitte formuliere eine professionelle Mail an '+to+' zum Thema: '+subj+'. Im Stil von rauMKult Sichtbeton.'})
-  }).then(r=>r.json()).then(d=>{
-    document.getElementById('pf-comp-body').value=d.response||d.text||'(keine Antwort)';
-  }).catch(()=>document.getElementById('pf-comp-body').value='Fehler');
+    body:JSON.stringify({message:'Bitte formuliere eine professionelle Mail an '+to+' zum Thema: '+subj+'. Im Stil von rauMKult Sichtbeton. Antworte NUR mit dem Mail-Text, keine Erklärungen.'})
+  }).then(function(r){return r.json();}).then(function(d){
+    const text=d.response||d.text||'(keine Antwort)';
+    if(_pfComposeQuill) _pfComposeQuill.root.innerHTML='<p>'+text.replace(/\\n/g,'</p><p>')+'</p>';
+    pfComposeLoadSignatur();
+  }).catch(function(){if(_pfComposeQuill)_pfComposeQuill.setText('Fehler');});
+};
+window.pfKiraDraftModal=function(){
+  const to=document.getElementById('pf-cm-to').value;
+  const subj=document.getElementById('pf-cm-subj').value;
+  if(!subj){showToast('Bitte zuerst Betreff eingeben','warnung');return;}
+  if(_pfComposeModalQuill) _pfComposeModalQuill.setText('Kira formuliert...');
+  fetch('/api/kira/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:'Bitte formuliere eine professionelle Mail an '+to+' zum Thema: '+subj+'. Im Stil von rauMKult Sichtbeton. Antworte NUR mit dem Mail-Text, keine Erklärungen.'})
+  }).then(function(r){return r.json();}).then(function(d){
+    const text=d.response||d.text||'(keine Antwort)';
+    if(_pfComposeModalQuill) _pfComposeModalQuill.root.innerHTML='<p>'+text.replace(/\\n/g,'</p><p>')+'</p>';
+    pfCmLoadSignatur();
+  }).catch(function(){if(_pfComposeModalQuill)_pfComposeModalQuill.setText('Fehler');});
 };
 window.pfKiraContext=function(){ pfKiraMailContext(); }; // Compat
 
@@ -27943,6 +28425,45 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     # ── Ende Signaturen ────────────────────────────────────────────────────────
 
+    # ── Entwürfe (Drafts) ──────────────────────────────────────────────────────
+
+    def _api_mail_draft_save(self, body):
+        """POST /api/mail/draft/save — Entwurf speichern (neu oder aktualisieren)."""
+        _ensure_mail_drafts_table()
+        try:
+            draft_id   = int(body.get('id', 0))
+            from_email = body.get('from_email', '').strip()
+            to_email   = body.get('to', '').strip()
+            cc         = body.get('cc', '').strip()
+            bcc        = body.get('bcc', '').strip()
+            subject    = body.get('subject', '').strip()
+            body_html  = body.get('body_html', '')
+            body_plain = body.get('body_plain', '')
+            in_reply   = body.get('in_reply_to', '')
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            db = get_db()
+            if draft_id:
+                db.execute("""UPDATE mail_drafts SET from_email=?, to_email=?, cc=?, bcc=?,
+                    subject=?, body_html=?, body_plain=?, in_reply_to=?, geaendert=?
+                    WHERE id=?""",
+                    (from_email, to_email, cc, bcc, subject, body_html, body_plain, in_reply, now, draft_id))
+            else:
+                cur = db.execute("""INSERT INTO mail_drafts
+                    (from_email, to_email, cc, bcc, subject, body_html, body_plain, in_reply_to, erstellt, geaendert)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (from_email, to_email, cc, bcc, subject, body_html, body_plain, in_reply, now, now))
+                draft_id = cur.lastrowid
+            db.commit()
+            db.close()
+            rlog('server', 'entwurf_gespeichert',
+                 f'Entwurf #{draft_id} gespeichert | An: {to_email[:40]} | Betreff: {subject[:50]}',
+                 modul='server', source='postfach_compose', status='ok')
+            self._json({'ok': True, 'id': draft_id})
+        except Exception as e:
+            self._json({'ok': False, 'error': str(e)})
+
+    # ── Ende Entwürfe ──────────────────────────────────────────────────────────
+
     # ── Vorlagen ───────────────────────────────────────────────────────────────
 
     def _api_mail_vorlagen_get(self):
@@ -29365,6 +29886,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/signaturen/default':
             self._api_mail_signaturen_default(body)
+            return
+
+        if self.path == '/api/mail/draft/save':
+            self._api_mail_draft_save(body)
             return
 
         if self.path == '/api/mail/vorlagen/save':
