@@ -3560,6 +3560,10 @@ function pfRenderFolders(data, onReady) {
   _pfFolderData = data; // cache for re-render after star toggle
   const tree = document.getElementById('pf-folder-tree');
   const fromSel = document.getElementById('pf-comp-from');
+  // Scroll-Positionen merken vor Rebuild
+  const _savedTreeScroll = tree ? tree.scrollTop : 0;
+  const _listEl = document.getElementById('pf-list');
+  const _savedListScroll = _listEl ? _listEl.scrollTop : 0;
   if(fromSel) fromSel.innerHTML='';
   tree.innerHTML = '';
   _pfTotalUnread = 0;
@@ -3750,6 +3754,17 @@ function pfRenderFolders(data, onReady) {
     });
 
     _pfUpdateSidebarBadge();
+    // Scroll-Positionen wiederherstellen (Ordnerbaum + Mail-Liste)
+    if(_savedTreeScroll > 0) requestAnimationFrame(()=>{ tree.scrollTop = _savedTreeScroll; });
+    if(_savedListScroll > 0 && _listEl) requestAnimationFrame(()=>{ _listEl.scrollTop = _savedListScroll; });
+    // Aktiven Ordner wieder markieren
+    if(_pfCurrentKonto && _pfCurrentFolder) {
+      const _aId='pf-fi-'+_pfCurrentKonto.replace(/[@.]/g,'_')+'_'+_pfCurrentFolder.replace(/[^a-z0-9]/gi,'_');
+      const _aEl=document.getElementById(_aId);
+      if(_aEl) _aEl.classList.add('active');
+      // Zugehörigen Favoriten markieren
+      document.querySelectorAll('.pf-fav-item[data-konto="'+_pfCurrentKonto+'"][data-folder="'+_pfCurrentFolder+'"]').forEach(f=>f.classList.add('active'));
+    }
     if(onReady) onReady();
   });
 }
@@ -3825,8 +3840,11 @@ function pfLoadList(reset) {
   }
   if(_pfUnreadOnly) url+='&unread=1';
   if(_pfSearch) url+='&q='+encodeURIComponent(_pfSearch);
+  // Banner entfernen wenn Liste explizit geladen wird
+  const _oldBanner=document.getElementById('pf-new-mail-banner'); if(_oldBanner) _oldBanner.remove();
   fetch(url).then(r=>r.json()).then(data=>{
     _pfTotal=data.total||0;
+    _pfLastKnownTotal=_pfTotal; // Referenz-Zähler für Auto-Refresh-Vergleich
     document.getElementById('pf-mid-meta').textContent=_pfTotal+' Mails';
     const list=document.getElementById('pf-list');
     if(reset) list.innerHTML='';
@@ -5524,32 +5542,73 @@ window.pfSearchDebounce=function(){
 };
 window.pfLoadMore=function(){pfLoadList(false);};
 
-// Auto-Refresh: Ordner-Counts alle 60s aktualisieren, bei neuen Mails Banner zeigen
+// Auto-Refresh: Ordner-Counts alle 60s aktualisieren, bei neuen Mails Banner zeigen (kein harter Reload)
 let _pfAutoRefreshTimer = null;
+let _pfLastKnownTotal = 0; // letzte bekannte Gesamtzahl im aktuellen Ordner
 function pfStartAutoRefresh() {
   if(_pfAutoRefreshTimer) clearInterval(_pfAutoRefreshTimer);
   _pfAutoRefreshTimer = setInterval(()=>{
     if(!document.getElementById('panel-postfach')?.classList.contains('active')) return;
     fetch('/api/mail/folders').then(r=>r.json()).then(data=>{
-      let totalUnread=0;
+      _pfTotalUnread=0;
       (data.konten||[]).forEach(k=>{
+        const safe=k.email.replace(/[@.]/g,'_');
         (k.ordner||[]).forEach(o=>{
-          totalUnread+=o.unread||0;
-          // Badge aktualisieren
-          const badge=document.querySelector('#pf-fi-'+k.email.replace(/[@.]/g,'_')+'_'+o.name.replace(/[^a-z0-9]/gi,'_')+' .pf-folder-badge');
-          if(o.unread>0){
-            if(badge) badge.textContent=o.unread;
-            else{
-              const fi=document.getElementById('pf-fi-'+k.email.replace(/[@.]/g,'_')+'_'+o.name.replace(/[^a-z0-9]/gi,'_'));
-              if(fi){const b=document.createElement('span');b.className='pf-folder-badge';b.textContent=o.unread;fi.appendChild(b);}
-            }
-          } else if(badge) badge.remove();
+          if(/inbox|posteingang/i.test(o.name)) _pfTotalUnread+=(o.unread||0);
+          // Badges in-place aktualisieren (kein DOM-Rebuild)
+          const fid='pf-fi-'+safe+'_'+o.name.replace(/[^a-z0-9]/gi,'_');
+          const fi=document.getElementById(fid);
+          if(fi){
+            const b=fi.querySelector('.pf-folder-badge,.pf-folder-badge-inbox');
+            if(o.unread>0){
+              if(b) b.textContent=o.unread;
+              else{const s=document.createElement('span');s.className='pf-folder-badge';s.textContent=o.unread;fi.appendChild(s);}
+            } else if(b) b.remove();
+          }
+          // Favoriten-Badges aktualisieren
+          document.querySelectorAll('.pf-fav-item[data-konto="'+k.email+'"][data-folder="'+o.name+'"]').forEach(fav=>{
+            let fb=fav.querySelector('.pf-fav-badge');
+            if(o.unread>0){
+              if(fb) fb.textContent=o.unread;
+              else{const s=document.createElement('span');s.className='pf-fav-badge';s.textContent=o.unread;fav.appendChild(s);}
+            } else if(fb) fb.textContent='0';
+          });
         });
       });
-      // Wenn aktiver Ordner neue Mails hat → Liste neu laden
-      if(totalUnread>0 && _pfCurrentKonto && _pfCurrentFolder) pfLoadList(true);
+      _pfUpdateSidebarBadge();
+      // Prüfe ob im aktuellen Ordner neue Mails dazugekommen sind
+      if(_pfCurrentKonto && _pfCurrentFolder && _pfCurrentKonto!=='_kira_' && _pfCurrentKonto!=='_combined_') {
+        let url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset=0&limit=1';
+        if(_pfUnreadOnly) url+='&unread=1';
+        if(_pfSearch) url+='&q='+encodeURIComponent(_pfSearch);
+        fetch(url).then(r=>r.json()).then(d=>{
+          const serverTotal=d.total||0;
+          if(serverTotal>_pfLastKnownTotal && _pfLastKnownTotal>0) {
+            const diff=serverTotal-_pfLastKnownTotal;
+            _pfShowNewMailBanner(diff);
+          }
+          // Meta-Zähler aktualisieren (ohne Liste zu zerstören)
+          document.getElementById('pf-mid-meta').textContent=serverTotal+' Mails';
+        }).catch(()=>{});
+      }
     }).catch(()=>{});
   }, 60000);
+}
+// Banner "N neue Mails" anzeigen statt Liste zu zerstören
+function _pfShowNewMailBanner(count) {
+  let banner=document.getElementById('pf-new-mail-banner');
+  if(!banner) {
+    banner=document.createElement('div');
+    banner.id='pf-new-mail-banner';
+    banner.style.cssText='padding:8px 14px;background:rgba(59,130,246,.12);color:#3b82f6;font-size:13px;font-weight:600;cursor:pointer;text-align:center;border-bottom:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;gap:8px';
+    banner.onclick=()=>{
+      banner.remove();
+      pfLoadList(true);
+    };
+    const list=document.getElementById('pf-list');
+    if(list) list.parentElement.insertBefore(banner, list);
+  }
+  banner.innerHTML='&#x2709; '+count+' neue Mail'+(count>1?'s':'')+' \u2014 <span style="text-decoration:underline">Jetzt laden</span>';
 }
 pfStartAutoRefresh();
 
