@@ -1758,22 +1758,51 @@ async function pushToGitHub() {
     try { fetch('http://localhost:8765/api/partner/save-token',{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ghToken})}); } catch(_){}
     fillAdminForm();showToast('Erfolgreich gepusht!','🚀');
-    if (s.ntfy_leni_auto==='1'&&s.ntfy_leni){
+    // Feature-Erkennung: Vergleiche aktuelle Tiles mit letztem Push-Stand
+    const currentTiles=document.querySelectorAll('.tile[data-id]');
+    const currentFeatures={};
+    currentTiles.forEach(t=>{const id=t.dataset.id;if(id)currentFeatures[id]={name:t.querySelector('.tile-title')?.textContent||id,status:t.dataset.status||''}});
+    const prevFeatures=JSON.parse(localStorage.getItem('kira_pv_last_push_features')||'{}');
+    // Neue oder geänderte Features erkennen
+    const newFeatures=[];
+    for(const[id,f]of Object.entries(currentFeatures)){
+      const prev=prevFeatures[id];
+      if(!prev) newFeatures.push(f.name+' (neu)');
+      else if(prev.status!==f.status) newFeatures.push(f.name+' ('+f.status+')');
+    }
+    localStorage.setItem('kira_pv_last_push_features',JSON.stringify(currentFeatures));
+    const hasFeatureChanges=newFeatures.length>0;
+    // Max 1x/Tag Limit prüfen
+    const today=new Date().toISOString().slice(0,10);
+    const lastMailDate=localStorage.getItem('kira_pv_last_mail_date')||'';
+    const mailAllowedToday=lastMailDate!==today;
+    syncLog(hasFeatureChanges?'Feature-Änderungen erkannt: '+newFeatures.join(', '):'Nur technische Änderungen (keine neuen Features)','info');
+    if (s.ntfy_leni_auto==='1'&&s.ntfy_leni&&hasFeatureChanges){
       syncLog('Sende Push an Leni...','info');
       await sendNtfy(s.ntfy_leni,'✨ KIRA Partner wurde aktualisiert',s.ntfy_leni_msg||'Kai hat die Liste aktualisiert!',3);
       syncLog('OK Leni benachrichtigt (Push)','ok');
     }
     const leniMail=document.getElementById('cfg-leni-email')?.value.trim()||s.leni_email;
-    if (leniMail) {
-      syncLog('Sende Update-Mail an Leni...','info');
+    const bccMail=document.getElementById('cfg-leni-bcc')?.value.trim()||s.leni_bcc||'';
+    if (leniMail&&hasFeatureChanges&&mailAllowedToday) {
+      syncLog('Sende Update-Mail an Leni'+(bccMail?' + BCC: '+bccMail:'')+'...','info');
       try {
         const mr=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({type:'update',to:leniMail,link:`https://${owner}.github.io/${repo}`})
+          body:JSON.stringify({type:'update',to:leniMail,bcc:bccMail,
+            link:`https://${owner}.github.io/${repo}`,
+            features:newFeatures.join('\n')})
         });
-        if (mr.ok) syncLog('OK Leni per Mail benachrichtigt','ok');
-        else syncLog('Mail-Versand: Kira-App aktiv? (SMTP prüfen)','warn');
+        const md=await mr.json().catch(()=>({}));
+        if(mr.ok){
+          syncLog('OK Mail gesendet'+(md.via?' via '+md.via:''),'ok');
+          localStorage.setItem('kira_pv_last_mail_date',today);
+        } else syncLog('Mail-Fehler: '+(md.error||'Kira-App prüfen'),'warn');
       } catch(_){syncLog('Mail-Versand übersprungen (Kira-App nicht erreichbar)','warn');}
+    } else if(leniMail&&hasFeatureChanges&&!mailAllowedToday){
+      syncLog('Mail übersprungen — heute wurde bereits eine Mail gesendet (max 1x/Tag)','info');
+    } else if(leniMail&&!hasFeatureChanges){
+      syncLog('Mail übersprungen — nur technische Änderungen, keine neuen Features','info');
     }
   } catch(e) {
     syncLog(`FEHLER: ${e.message}`,'err');

@@ -31918,13 +31918,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'error': str(e)})
             return
 
-        # Partner-View: Mail an Leni senden (Willkommen oder Passwort) — über OAuth2-Konto
+        # Partner-View: Mail an Leni senden (Willkommen, Passwort, Update) — über OAuth2-Konto + HTML-Templates
         if self.path == '/api/partner/send-leni-mail':
             try:
                 import sys as _sys
                 if str(SCRIPTS_DIR) not in _sys.path:
                     _sys.path.insert(0, str(SCRIPTS_DIR))
                 import mail_monitor as _mm
+                from datetime import datetime as _dt
                 mail_type = body.get('type', 'welcome')
                 to_addr = (body.get('to') or '').strip()
                 link = body.get('link') or ''
@@ -31932,6 +31933,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail — bitte im Partner-View Admin eintragen'})
                     return
                 bcc_addr = (body.get('bcc') or '').strip()
+                features_text = body.get('features', '')  # Feature-Liste für Update-Mail
+
+                # HTML-Templates laden
+                _tpl_dir = SCRIPTS_DIR.parent / 'knowledge' / 'mail_templates'
+                def _load_tpl(name):
+                    p = _tpl_dir / name
+                    return p.read_text('utf-8') if p.exists() else ''
+
                 if mail_type == 'welcome':
                     subject = 'Du bist dabei! Kira wartet auf dich'
                     text = (
@@ -31944,16 +31953,44 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         f"Freue mich auf dein Feedback!\n"
                         f"Kai"
                     )
+                    html = _load_tpl('einladung.html').replace('{{LINK}}', link)
+
                 elif mail_type == 'update':
-                    subject = '✨ Neuigkeiten bei KIRA Partner!'
+                    subject = 'Neuigkeiten bei KIRA Partner!'
                     text = (
                         f"Hallo Leni,\n\n"
                         f"Kai hat die KIRA Partner-Seite aktualisiert — "
                         f"es gibt neue Funktionen oder Neuigkeiten zu entdecken!\n\n"
-                        f"Schau einfach kurz rein:\n{link}\n\n"
-                        f"Freue mich auf dein Feedback!\n"
-                        f"Kai"
                     )
+                    if features_text:
+                        text += f"Was neu ist:\n{features_text}\n\n"
+                    text += f"Schau einfach kurz rein:\n{link}\n\nFreue mich auf dein Feedback!\nKai"
+                    html_tpl = _load_tpl('benachrichtigung.html')
+                    if html_tpl:
+                        datum_str = _dt.now().strftime('%d.%m.%Y')
+                        intro = 'Kai hat die KIRA Partner-Seite aktualisiert — es gibt neue Funktionen oder Neuigkeiten zu entdecken!'
+                        # Features als HTML-Blöcke
+                        feat_html = ''
+                        if features_text:
+                            for line in features_text.strip().split('\n'):
+                                line = line.strip().lstrip('- ').lstrip('* ')
+                                if line:
+                                    feat_html += (
+                                        f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px">'
+                                        f'<tr><td style="background:#f8f5ff;border-radius:8px;padding:10px 14px">'
+                                        f'<span style="color:#7c4dff;font-weight:600;margin-right:6px">&#10024;</span>'
+                                        f'<span style="color:#1e1e2e;font-size:14px">{line}</span>'
+                                        f'</td></tr></table>'
+                                    )
+                        html = (html_tpl
+                            .replace('{{TITEL}}', 'Neuigkeiten bei KIRA Partner!')
+                            .replace('{{DATUM}}', datum_str)
+                            .replace('{{INTRO_TEXT}}', intro)
+                            .replace('{{FEATURES_BLOCK}}', feat_html)
+                            .replace('{{LINK}}', link))
+                    else:
+                        html = ''
+
                 else:  # password
                     pw = body.get('password', '')
                     subject = 'Dein Zugang zu KIRA Partner'
@@ -31965,8 +32002,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         f"Bitte nicht weiterleiten!\n"
                         f"Kai"
                     )
+                    html = (_load_tpl('passwort.html')
+                        .replace('{{PASSWORT}}', pw)
+                        .replace('{{LINK}}', link))
+
                 result = _mm.send_system_mail(
                     to=to_addr, subject=subject, body_text=text,
+                    body_html=html,
                     bcc=bcc_addr if bcc_addr and bcc_addr != to_addr else ''
                 )
                 if result['ok']:
