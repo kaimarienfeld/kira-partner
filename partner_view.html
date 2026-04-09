@@ -819,7 +819,7 @@ body{
             🔑 Passwort-Mail senden
           </button>
           <button class="btn-export" onclick="sendTestUpdateMail()" style="border-color:#22c55e;color:#22c55e">
-            🧪 Test-Benachrichtigung senden
+            🧪 Test-Mail an BCC senden
           </button>
         </div>
         <div id="pv-mail-test-result" style="font-size:12px;margin-top:6px;font-weight:600;min-height:18px"></div>
@@ -1648,15 +1648,14 @@ async function _sendLeniMail(type) {
 function sendWelcomeMail(){_sendLeniMail('welcome');}
 function sendPasswordMail(){_sendLeniMail('password');}
 async function sendTestUpdateMail(){
-  // Sendet eine Test-Update-Benachrichtigung an BCC (oder Leni falls kein BCC)
+  // Sendet eine Test-Update-Mail NUR an die BCC-Adresse (Kai), NICHT an Leni
   const s=loadAdminSettings();
   const bcc=document.getElementById('cfg-leni-bcc').value.trim()||s.leni_bcc||'';
-  const leni=document.getElementById('cfg-leni-email').value.trim()||s.leni_email||'';
-  const testTo=bcc||leni;
-  if(!testTo){showToast('Bitte BCC oder Leni-E-Mail eintragen','\u26a0\ufe0f');return;}
+  if(!bcc){showToast('Bitte erst eine BCC-Adresse eintragen (deine E-Mail)','\u26a0\ufe0f');return;}
   const resEl=document.getElementById('pv-mail-test-result');
-  if(resEl){resEl.textContent='\u23f3 Sende Test-Mail an '+testTo+'...';resEl.style.color='var(--text-muted)';}
-  const payload={type:'update',to:testTo,bcc:'',link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`};
+  if(resEl){resEl.textContent='\u23f3 Sende Test-Mail an '+bcc+'...';resEl.style.color='var(--text-muted)';}
+  const testFeatures='Neues Dashboard-Layout (neu)\nKira Sprachassistent (geplant)\nPostfach-Redesign (done)';
+  const payload={type:'update',to:bcc,bcc:'',link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`,features:testFeatures};
   try{
     const r=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
@@ -1664,8 +1663,8 @@ async function sendTestUpdateMail(){
     const d=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.error||`HTTP ${r.status}`);
     const via=d.via?' (via '+d.via+')':'';
-    if(resEl){resEl.textContent='\u2705 Test-Mail gesendet an '+testTo+via;resEl.style.color='#22c55e';}
-    showToast('Test-Benachrichtigung gesendet!'+via,'\u{1f9ea}');
+    if(resEl){resEl.textContent='\u2705 Test-Mail gesendet an '+bcc+via+' (mit 3 Beispiel-Features)';resEl.style.color='#22c55e';}
+    showToast('Test-Mail an '+bcc+' gesendet!'+via,'\u{1f9ea}');
   }catch(e){
     if(resEl){resEl.textContent='\u274c Fehler: '+e.message;resEl.style.color='#ef4444';}
     showToast('Fehler: '+e.message+' \u2014 Kira-App aktiv?','\u2717');
