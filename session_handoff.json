@@ -1,6 +1,6 @@
 {
-  "last_session": "session-qq-cont11",
-  "date": "2026-04-09 21:30",
+  "last_session": "session-qq-cont13",
+  "date": "2026-04-09 22:05",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -69,7 +69,9 @@
     "session-pp (2026-04-08): Leistungskatalog + Dynamische Kategorien + Kira-Kontext Auto-Send. (1) Leistungskatalog im Profil: get_active_profile() um leistungen erweitert, 4 rauMKult-Leistungen + 6 Ausschluesse initial befuellt, LEISTUNGSSPEKTRUM-Block im Classifier-Prompt + Kira System-Prompt, GET/POST /api/leistungen. (2) Dynamische Kategorien: kategorien-Tabelle in tasks.db (9 Standard + dynamische Lernphase), get_kategorien() + add_dynamische_kategorie() in task_manager.py, Classifier VORSCHLAG:-Prefix fuer neue Kategorien, Promotion nach 5 Zuweisungen, Korrektur-Modal dynamisch + Freitext-Eingabe. (3) Kira-Kontext Auto-Send: openKira() und kiraOpenWithContext() senden automatisch, alle prompt_vorschlag proaktiv umformuliert, kiraSessionId=null bei Kontext-Aufruf.",
     "session-qq+cont (2026-04-09): Postfach Compose + 3 Bugfixes. (1) Outlook-Style Compose mit Quill Rich-Text-Editor, Modal-Modus, Signatur-Integration (ZWS-Marker), Dateianhänge-Upload (multipart→MIME), Custom Autocomplete (2+ Zeichen, Dropdown statt datalist), Empfänger-Speicherung, Betreff-Warnung, Anhang-Vergessen-Check. (2) CSS-Overflow-Fix: min-width:0 auf pf-right/pf-detail-frame/pf-content-section (Flexbox min-width:auto Bug), overflow-x:hidden auf pf-prev-body, JS overflow:auto→overflowY:auto+overflowX:hidden. (3) sqlite3.Row-Bug: row.get()→row['key'] an 2 Stellen (Kira-Entwurf Ablehnung/Freigabe). (4) Nachfass-Intelligenz: angebote_tracker prüft jetzt Rechnungen+erledigte Tasks vor Nachfass-Vorschlag, NameError log.debug→pass. Commits: 27cc408, eb31dca, 061ba05, bc678ca.",
     "session-qq-cont8+9 (2026-04-09): E-Mail-Rendering Outlook-Qualität + Vollbild-Lesemodus. (1) IMAP-Direktabruf: _fetch_mail_html_from_imap() holt RFC822 direkt vom IMAP-Server per Message-ID (OAuth2+Password), cid:-Auflösung, HTML-Sanitisierung — behebt fehlendes HTML bei 12.500+ Mails ohne lokales Archiv. Commit 76c0fb0. (2) iframe füllt Preview: position:absolute auf iframe + position:relative auf Container. (3) grid-row:4 Fix auf pf-content-section — behebt 0px-Höhe wenn display:none-Geschwister Grid-Rows verschieben. (4) Vollbild-Lesemodus: pf-read-modal-overlay + pf-read-modal (960px/88vh), alle Action-Buttons (Antworten/Allen/Weiterleiten/Gelesen/Flag/Pin/Löschen/Kira/360°), Maximize/Restore (□/▭) Button. (5) Reply aus Modal: pfReply()/pfReplyAll()/pfForward() direkt statt Button-Click (kein JS-Fehler mehr). Commits: 76c0fb0, eca617b, 8cb7234.",
-    "session-qq-cont10+11 (2026-04-09): SMTP OAuth2 Refactor + Admin E-Mail-Versand + Partner-View Sync. (1) Legacy SMTP durch OAuth2 via bestehende Mail-Konten ersetzt: send_system_mail() in mail_monitor.py, alle 4 SMTP-Stellen in server.py umgestellt. (2) Admin E-Mail-Versand: Absender-Dropdown (alle Konten), Systemempfänger, Partner-Mails (To/BCC/URL) — Entwickler-Einstellungen markiert. (3) Partner-View ↔ KIRA Admin Sync: GET+POST /api/partner/settings Endpoints, fillAdminForm() holt Werte aus config.json, saveAdminSettings() schreibt zurück — config.json als Single Source of Truth. (4) Port 465 SMTP_SSL Support an 5 Stellen. Commits: 3ad3c20, 10c4f51."
+    "session-qq-cont10+11 (2026-04-09): SMTP OAuth2 Refactor + Admin E-Mail-Versand + Partner-View Sync. (1) Legacy SMTP durch OAuth2 via bestehende Mail-Konten ersetzt: send_system_mail() in mail_monitor.py, alle 4 SMTP-Stellen in server.py umgestellt. (2) Admin E-Mail-Versand: Absender-Dropdown (alle Konten), Systemempfänger, Partner-Mails (To/BCC/URL) — Entwickler-Einstellungen markiert. (3) Partner-View ↔ KIRA Admin Sync: GET+POST /api/partner/settings Endpoints, fillAdminForm() holt Werte aus config.json, saveAdminSettings() schreibt zurück — config.json als Single Source of Truth. (4) Port 465 SMTP_SSL Support an 5 Stellen. Commits: 3ad3c20, 10c4f51.",
+    "session-qq-cont12 (2026-04-09): Partner-View Architektur-Korrektur + BCC Test-Mail + HTML-Templates + Feature-Auffüllung. (1) Alle Partner-View-Einstellungen aus KIRA Admin entfernt (Sync-Endpoints, JS, HTML) — Partner-View ist separates System. (2) BCC-Feld + sendTestUpdateMail() in partner_view.html Admin-Panel. (3) HTML-Mail-Templates in /api/partner/send-leni-mail integriert. (4) generate_partner_view.py: 45→68 Features aufgefüllt. (5) pushToGitHub() Feature-Erkennung + 1x/Tag Mail-Limit.",
+    "session-qq-cont13 (2026-04-09): generate_partner_view.py --auto Modus komplett. GitHub API Push (REST, kein lokaler Clone), Feature-Change-Erkennung (Snapshot vs. aktuell), HTML-Mail via send_system_mail() mit benachrichtigung.html Template, ntfy Push, 1x/Tag-Limit. Verifiziert: Push ✓, Mail ✓, ntfy ✓, 2. Lauf keine Duplikate ✓."
   ],
   "completed_features": [
     "kira-workspace-ui-rebuild",
@@ -200,7 +202,7 @@
     "lexware-belege-ui-deutsch-format-sticky",
     "kira-ablehnung-nachklassifizierung-task-update",
     "postfach-thread-gruppierung-collapse",
-    "partner-view-admin-config-sync",
+    "partner-view-auto-pipeline-generate-push-mail-ntfy",
     "lexware-betrag-totalAmount-fix",
     "lexware-kontaktname-contactName-fix",
     "lexware-status-uebersetzung-accepted-rejected-paidoff-sepadebit",

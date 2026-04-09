@@ -1,0 +1,348 @@
+{
+  "last_features": {
+    "dashboard-ui": {
+      "name": "Das Cockpit — alles auf einen Blick",
+      "status": "done"
+    },
+    "feed-widgets-dashboard": {
+      "name": "Live-Feed — Wetter, Nachrichten & Newsletter",
+      "status": "done"
+    },
+    "kommunikation-panel": {
+      "name": "Posteingang & Kommunikation",
+      "status": "done"
+    },
+    "geschaeft-panel": {
+      "name": "Rechnungen, Angebote & Mahnungen",
+      "status": "done"
+    },
+    "wissen-panel": {
+      "name": "Kiras Gedächtnis & Wissensspeicher",
+      "status": "done"
+    },
+    "kira-workspace-ui": {
+      "name": "Chat mit Kira — dein persönlicher Assistent",
+      "status": "done"
+    },
+    "kira-multi-llm": {
+      "name": "Kira ist immer erreichbar",
+      "status": "done"
+    },
+    "kira-tools": {
+      "name": "Kira erledigt Dinge selbständig",
+      "status": "done"
+    },
+    "kira-launcher": {
+      "name": "Kira hat einen eigenen Charakter",
+      "status": "done"
+    },
+    "runtime-log": {
+      "name": "Kiras Aktivitätsprotokoll",
+      "status": "done"
+    },
+    "organisation-panel": {
+      "name": "Termine, Fristen & Rückrufe — alles im Blick",
+      "status": "done"
+    },
+    "antwort-generierung": {
+      "name": "Kira schreibt schon mal vor",
+      "status": "done"
+    },
+    "mail-monitor": {
+      "name": "E-Mails werden automatisch überwacht",
+      "status": "done"
+    },
+    "activity-window-multi-trigger": {
+      "name": "Intelligente Desktop-Benachrichtigungen",
+      "status": "done"
+    },
+    "einstellungen-panel": {
+      "name": "Einstellungen — die App nach deinem Geschmack",
+      "status": "done"
+    },
+    "direktmail-antwort": {
+      "name": "Direkt aus der App auf E-Mails antworten",
+      "status": "done"
+    },
+    "kira-tagesstart-briefing": {
+      "name": "Kiras Morgenbriefing",
+      "status": "done"
+    },
+    "kunden-360": {
+      "name": "Vollständiges Kundenprofil",
+      "status": "done"
+    },
+    "angebots-kalkulation": {
+      "name": "Kira hilft beim Angebot schreiben",
+      "status": "planned"
+    },
+    "cashflow-prognose": {
+      "name": "Geldfluss-Vorschau: Wann kommt was rein?",
+      "status": "done"
+    },
+    "kalender-integration": {
+      "name": "Termine automatisch in den Kalender",
+      "status": "partial"
+    },
+    "dokument-vorlagen": {
+      "name": "Angebote & Rechnungen direkt aus der App",
+      "status": "done"
+    },
+    "foto-analyse": {
+      "name": "Foto hochladen — Angebot rausbekommen",
+      "status": "done"
+    },
+    "whatsapp-integration": {
+      "name": "Kunden schreiben per WhatsApp — Kira ist dabei",
+      "status": "done"
+    },
+    "zeiterfassung": {
+      "name": "Wie lange braucht ein Projekt wirklich?",
+      "status": "done"
+    },
+    "sprachmodul": {
+      "name": "Zu Kira diktieren statt tippen",
+      "status": "done"
+    },
+    "dokument-export": {
+      "name": "Dokumente direkt in Kira erstellen & drucken",
+      "status": "done"
+    },
+    "urlaubsmodus-smart": {
+      "name": "Kira hält während des Urlaubs die Stellung",
+      "status": "done"
+    },
+    "crm-pipeline": {
+      "name": "Vom ersten Kontakt bis zur Rechnung",
+      "status": "done"
+    },
+    "partner-view": {
+      "name": "Deine persönliche Kira-Übersicht",
+      "status": "done"
+    },
+    "postfach-ui": {
+      "name": "Alle Mails direkt in der App lesen",
+      "status": "done"
+    },
+    "mail-sender-smtp": {
+      "name": "Mails direkt aus KIRA verschicken",
+      "status": "done"
+    },
+    "stats-zeile-filter-klick": {
+      "name": "Dashboard Schnellfilter",
+      "status": "done"
+    },
+    "eingangsrechnungen-auto-scan": {
+      "name": "Rechnungs-Erkennung",
+      "status": "done"
+    },
+    "mail-login-wizard": {
+      "name": "E-Mail-Konten einfach einrichten",
+      "status": "done"
+    },
+    "imap-folder-live-listing": {
+      "name": "Ordner direkt aus dem Postfach",
+      "status": "done"
+    },
+    "postfach-zusatz-ordner": {
+      "name": "Eigene Ordner im Postfach anzeigen",
+      "status": "done"
+    },
+    "sync-ordner-config-basiert": {
+      "name": "Kontrolle welche Ordner Kira überwacht",
+      "status": "done"
+    },
+    "mail-verschieben-imap": {
+      "name": "Mails in andere Ordner verschieben",
+      "status": "done"
+    },
+    "geloeschte-protokoll": {
+      "name": "Automatische Aufräumung + Protokoll",
+      "status": "done"
+    },
+    "mail-vorlagen-editor": {
+      "name": "Wiederverwendbare E-Mail-Vorlagen",
+      "status": "done"
+    },
+    "kalender-widget-dashboard": {
+      "name": "Kalender direkt im Cockpit",
+      "status": "partial"
+    },
+    "geschaeft-kira-signale": {
+      "name": "Kira-Hinweise im Geschaeft",
+      "status": "done"
+    },
+    "wissen-kira-badge": {
+      "name": "Was Kira selbst gelernt hat",
+      "status": "done"
+    },
+    "chat-kontext-menu": {
+      "name": "Kontext schnell in den Chat einfuegen",
+      "status": "done"
+    },
+    "capture-module": {
+      "name": "Schnellerfassung & Mobile Memos",
+      "status": "planned"
+    },
+    "capture-mobile-webapp": {
+      "name": "Kira auf dem Handy",
+      "status": "planned"
+    },
+    "guided-tours": {
+      "name": "Geführte Tour durch jeden Bereich",
+      "status": "done"
+    },
+    "dokumente-modul": {
+      "name": "Dokumente-Management",
+      "status": "done"
+    },
+    "kira-relevanz-wissen": {
+      "name": "Kira lernt intelligent",
+      "status": "done"
+    },
+    "korrektur-konsolidierung": {
+      "name": "Kira lernt aus Wiederholungen",
+      "status": "done"
+    },
+    "kira-doku": {
+      "name": "Wie Kira funktioniert",
+      "status": "planned"
+    },
+    "anhang-extraktion": {
+      "name": "Anhang-Analyse — KI liest PDFs, Bilder und Dokumente",
+      "status": "done"
+    },
+    "kira-universelle-handlungsfaehigkeit": {
+      "name": "Kira kann überall handeln",
+      "status": "done"
+    },
+    "thread-awareness": {
+      "name": "E-Mail-Verläufe verstehen",
+      "status": "done"
+    },
+    "projekt-vorgaenge": {
+      "name": "Projektmanagement",
+      "status": "done"
+    },
+    "leistungskatalog-ui": {
+      "name": "Leistungskatalog verwalten",
+      "status": "done"
+    },
+    "kira-website-urls": {
+      "name": "Kira verlinkt eure Website",
+      "status": "done"
+    },
+    "unternehmensprofile-ui": {
+      "name": "Unternehmensprofile — alles an einem Ort",
+      "status": "done"
+    },
+    "kira-artikel-preise-tools": {
+      "name": "Kira kennt eure Preise",
+      "status": "done"
+    },
+    "manuelle-artikel-verwaltung": {
+      "name": "Artikel selbst verwalten",
+      "status": "done"
+    },
+    "preisentwicklung-statistik": {
+      "name": "Preisentwicklung im Blick",
+      "status": "done"
+    },
+    "5-stufen-routing": {
+      "name": "Intelligentes Mail-Routing",
+      "status": "done"
+    },
+    "lexware-zahlungsabgleich": {
+      "name": "Automatischer Zahlungsabgleich",
+      "status": "done"
+    },
+    "wissen-schreibstil-lernen": {
+      "name": "Kira lernt deinen Stil",
+      "status": "done"
+    },
+    "activity-drawer-win11": {
+      "name": "Aktivitäten im Windows-11-Stil",
+      "status": "done"
+    },
+    "kira-chat-kontext": {
+      "name": "Kira merkt sich das Gespräch",
+      "status": "done"
+    },
+    "kira-chat-projekte": {
+      "name": "Chat-Projekte — Gespräche organisieren",
+      "status": "planned"
+    }
+  },
+  "last_push_date": "2026-04-09T22:04:07.576593",
+  "last_mail_date": "2026-04-09",
+  "last_mail_features": [
+    "Das Cockpit — alles auf einen Blick (neu)",
+    "Live-Feed — Wetter, Nachrichten & Newsletter (neu)",
+    "Posteingang & Kommunikation (neu)",
+    "Rechnungen, Angebote & Mahnungen (neu)",
+    "Kiras Gedächtnis & Wissensspeicher (neu)",
+    "Chat mit Kira — dein persönlicher Assistent (neu)",
+    "Kira ist immer erreichbar (neu)",
+    "Kira erledigt Dinge selbständig (neu)",
+    "Kira hat einen eigenen Charakter (neu)",
+    "Kiras Aktivitätsprotokoll (neu)",
+    "Termine, Fristen & Rückrufe — alles im Blick (neu)",
+    "Kira schreibt schon mal vor (neu)",
+    "E-Mails werden automatisch überwacht (neu)",
+    "Intelligente Desktop-Benachrichtigungen (neu)",
+    "Einstellungen — die App nach deinem Geschmack (neu)",
+    "Direkt aus der App auf E-Mails antworten (neu)",
+    "Kiras Morgenbriefing (neu)",
+    "Vollständiges Kundenprofil (neu)",
+    "Kira hilft beim Angebot schreiben (neu)",
+    "Geldfluss-Vorschau: Wann kommt was rein? (neu)",
+    "Termine automatisch in den Kalender (neu)",
+    "Angebote & Rechnungen direkt aus der App (neu)",
+    "Foto hochladen — Angebot rausbekommen (neu)",
+    "Kunden schreiben per WhatsApp — Kira ist dabei (neu)",
+    "Wie lange braucht ein Projekt wirklich? (neu)",
+    "Zu Kira diktieren statt tippen (neu)",
+    "Dokumente direkt in Kira erstellen & drucken (neu)",
+    "Kira hält während des Urlaubs die Stellung (neu)",
+    "Vom ersten Kontakt bis zur Rechnung (neu)",
+    "Deine persönliche Kira-Übersicht (neu)",
+    "Alle Mails direkt in der App lesen (neu)",
+    "Mails direkt aus KIRA verschicken (neu)",
+    "Dashboard Schnellfilter (neu)",
+    "Rechnungs-Erkennung (neu)",
+    "E-Mail-Konten einfach einrichten (neu)",
+    "Ordner direkt aus dem Postfach (neu)",
+    "Eigene Ordner im Postfach anzeigen (neu)",
+    "Kontrolle welche Ordner Kira überwacht (neu)",
+    "Mails in andere Ordner verschieben (neu)",
+    "Automatische Aufräumung + Protokoll (neu)",
+    "Wiederverwendbare E-Mail-Vorlagen (neu)",
+    "Kalender direkt im Cockpit (neu)",
+    "Kira-Hinweise im Geschaeft (neu)",
+    "Was Kira selbst gelernt hat (neu)",
+    "Kontext schnell in den Chat einfuegen (neu)",
+    "Schnellerfassung & Mobile Memos (neu)",
+    "Kira auf dem Handy (neu)",
+    "Geführte Tour durch jeden Bereich (neu)",
+    "Dokumente-Management (neu)",
+    "Kira lernt intelligent (neu)",
+    "Kira lernt aus Wiederholungen (neu)",
+    "Wie Kira funktioniert (neu)",
+    "Anhang-Analyse — KI liest PDFs, Bilder und Dokumente (neu)",
+    "Kira kann überall handeln (neu)",
+    "E-Mail-Verläufe verstehen (neu)",
+    "Projektmanagement (neu)",
+    "Leistungskatalog verwalten (neu)",
+    "Kira verlinkt eure Website (neu)",
+    "Unternehmensprofile — alles an einem Ort (neu)",
+    "Kira kennt eure Preise (neu)",
+    "Artikel selbst verwalten (neu)",
+    "Preisentwicklung im Blick (neu)",
+    "Intelligentes Mail-Routing (neu)",
+    "Automatischer Zahlungsabgleich (neu)",
+    "Kira lernt deinen Stil (neu)",
+    "Aktivitäten im Windows-11-Stil (neu)",
+    "Kira merkt sich das Gespräch (neu)",
+    "Chat-Projekte — Gespräche organisieren (neu)"
+  ]
+}

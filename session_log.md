@@ -411,3 +411,30 @@
 **Playwright-Test:** LinkedIn (Logo+rote Badges ✓), Finom (Logo+Layout ✓), business-wissen.de (Logo+Formatierung ✓), rauMKult Formulare/Akademie/Betonkosmetik (Dark-Theme ✓)
 **Git:** 76c0fb0
 **Status:** ✅ erledigt — alle Mails rendern jetzt wie in Outlook
+
+### 2026-04-09 16:00 — Postfach Preview-Height + Vollbild-Modal Bugfixes (session-qq-cont9)
+**Auftrag:** 3 Bugs aus cont8 fixen: (1) Preview bleibt weiß, (2) Maximize-Button im Modal fehlt, (3) JS-Fehler bei Antworten aus Modal
+**Root-Cause Preview-Bug:** display:none auf hint-section + attachment-section entfernt diese aus dem Grid-Flow → pf-content-section rutscht von Row 4 (1fr) auf Row 2 (auto=38px) → 0px Höhe für pf-prev-body
+**Fix:**
+1. grid-row:4 auf .pf-content-section — erzwingt korrekte Grid-Zeile unabhängig von display:none-Geschwistern
+2. Maximize/Restore Button im Modal-Titlebar — pfReadModalToggleMax() toggled .maximized CSS-Klasse (100vw/100vh)
+3. Reply aus Modal: pfReply()/pfReplyAll()/pfForward() direkt aufrufen statt Panel-Button-Click
+**Playwright-Test:** LinkedIn-Mail Preview ✓ (HTML mit Bildern), Vollbild-Modal ✓, Maximize/Restore ✓, Antworten ohne JS-Fehler ✓, 0 Console-Errors
+**Git:** 8cb7234
+**Status:** ✅ erledigt
+
+### 2026-04-09 22:00 — Partner-View --auto Modus (session-qq-cont13)
+**Auftrag:** generate_partner_view.py --auto Modus einbauen: vollautomatisch HTML regenerieren, GitHub API Push, Feature-Erkennung, Mail+ntfy an Leni (max 1x/Tag), technische Pushes ohne Mail
+**Änderungen:**
+1. `generate_partner_view.py`: --auto Modus komplett implementiert
+   - GitHub API Push via REST (GET SHA → PUT Content) — kein lokaler Clone nötig
+   - Feature-Change-Erkennung (Snapshot vs. aktuell, neue Features + Status-Wechsel)
+   - HTML-Template-Versand (benachrichtigung.html) via mail_monitor.send_system_mail()
+   - ntfy Push an Kai + Leni (wenn konfiguriert)
+   - 1x/Tag-Limit (persistent in partner_auto_state.json)
+   - Technische Pushes (ohne Feature-Änderungen) → kein Mail/ntfy
+2. `knowledge/partner_auto_state.json`: neuer persistenter State (Feature-Snapshot + last_mail_date)
+**End-to-End Test:**
+- Lauf 1: GitHub Push ✓ (Commit 52aef7f), 68 Features erkannt (erster Snapshot), Mail ✓ (info@raumkult.eu → marlenabraham@gmail.com, BCC info@), ntfy ✓
+- Lauf 2: HTML identisch → kein Push, keine Änderungen → keine Mail (korrekt)
+**Status:** ✅ erledigt
