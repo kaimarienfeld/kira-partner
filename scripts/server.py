@@ -2231,16 +2231,17 @@ def build_postfach():
       </div>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">An</label>
-        <input class="pf-comp-inp" id="pf-comp-to" placeholder="empfaenger@example.com">
+        <input class="pf-comp-inp" id="pf-comp-to" placeholder="empfaenger@example.com" list="pf-kontakte-list" autocomplete="off">
       </div>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">CC</label>
-        <input class="pf-comp-inp" id="pf-comp-cc" placeholder="(optional)">
+        <input class="pf-comp-inp" id="pf-comp-cc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
       </div>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">BCC</label>
-        <input class="pf-comp-inp" id="pf-comp-bcc" placeholder="(optional)">
+        <input class="pf-comp-inp" id="pf-comp-bcc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
       </div>
+      <datalist id="pf-kontakte-list"></datalist>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">Betreff</label>
         <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff hinzuf&uuml;gen">
@@ -2285,15 +2286,15 @@ def build_postfach():
         </div>
         <div class="pf-cm-row">
           <label class="pf-cm-lbl">An</label>
-          <input class="pf-cm-inp" id="pf-cm-to" placeholder="empfaenger@example.com">
+          <input class="pf-cm-inp" id="pf-cm-to" placeholder="empfaenger@example.com" list="pf-kontakte-list" autocomplete="off">
         </div>
         <div class="pf-cm-row" id="pf-cm-cc-row" style="display:none">
           <label class="pf-cm-lbl">CC</label>
-          <input class="pf-cm-inp" id="pf-cm-cc" placeholder="(optional)">
+          <input class="pf-cm-inp" id="pf-cm-cc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
         </div>
         <div class="pf-cm-row" id="pf-cm-bcc-row" style="display:none">
           <label class="pf-cm-lbl">BCC</label>
-          <input class="pf-cm-inp" id="pf-cm-bcc" placeholder="(optional)">
+          <input class="pf-cm-inp" id="pf-cm-bcc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
         </div>
         <div style="display:flex;gap:6px;padding:0 20px 6px">
           <button class="pf-cm-toggle-btn" onclick="document.getElementById('pf-cm-cc-row').style.display=this.classList.toggle('act')?'flex':'none'">CC</button>
@@ -4821,8 +4822,28 @@ window._pfInsertSignatur = function(quill, konto) {
   });
 };
 
+// ── Kontakte-Autovervollständigung ──────────────────
+window._pfKontakteLoaded = false;
+window._pfLoadKontakte = function() {
+  if (_pfKontakteLoaded) return;
+  _pfKontakteLoaded = true;
+  fetch('/api/mail/kontakte').then(function(r){return r.json();}).then(function(d){
+    if (!d.ok) return;
+    const dl = document.getElementById('pf-kontakte-list');
+    if (!dl) return;
+    dl.innerHTML = '';
+    d.kontakte.forEach(function(k) {
+      const opt = document.createElement('option');
+      opt.value = k.email;
+      if (k.name) opt.label = k.name + ' (' + k.email + ')';
+      dl.appendChild(opt);
+    });
+  }).catch(function(){});
+};
+
 // ── Inline Compose ──────────────────────────────────
 window.pfOpenCompose=function(replyTo){
+  _pfLoadKontakte();
   _pfComposeMode = 'inline';
   _pfComposeAttachments = [];
   document.getElementById('pf-preview-empty').style.display='none';
@@ -5005,18 +5026,38 @@ window.pfSendModal=function(){
   });
 };
 
-// Gemeinsame Sende-Logik
+// Gemeinsame Sende-Logik (mit Dateianhänge-Upload)
 window._pfDoSend=function(from,to,cc,bcc,subj,bodyPlain,bodyHtml,btn,onSuccess){
   btn.disabled=true; const origText=btn.innerHTML; btn.textContent='Wird gesendet...';
-  const pl={from_email:from,to:to,cc:cc,bcc:bcc,subject:subj,body_plain:bodyPlain,body_html:bodyHtml};
-  if(window._pfReplyMsgId)pl.in_reply_to=window._pfReplyMsgId;
-  fetch('/api/mail/send',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(pl)
-  }).then(function(r){return r.json();}).then(function(d){
-    btn.disabled=false;btn.innerHTML=origText;
-    if(d.ok){showToast('Mail gesendet \\u2713','ok');window._pfReplyMsgId=null;if(onSuccess)onSuccess();}
-    else showToast('Fehler: '+(d.error||'?'),'fehler');
-  }).catch(function(){btn.disabled=false;btn.innerHTML=origText;showToast('Netzwerkfehler','fehler');});
+  const files=_pfComposeAttachments.filter(function(a){return a.file;});
+  function doSend(attIds){
+    const pl={from_email:from,to:to,cc:cc,bcc:bcc,subject:subj,body_plain:bodyPlain,body_html:bodyHtml,attachment_ids:attIds};
+    if(window._pfReplyMsgId)pl.in_reply_to=window._pfReplyMsgId;
+    fetch('/api/mail/send',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(pl)
+    }).then(function(r){return r.json();}).then(function(d){
+      btn.disabled=false;btn.innerHTML=origText;
+      if(d.ok){showToast('Mail gesendet \\u2713','ok');window._pfReplyMsgId=null;_pfComposeAttachments=[];if(onSuccess)onSuccess();}
+      else showToast('Fehler: '+(d.error||'?'),'fehler');
+    }).catch(function(){btn.disabled=false;btn.innerHTML=origText;showToast('Netzwerkfehler','fehler');});
+  }
+  if(files.length>0){
+    btn.textContent='Anh\\u00e4nge hochladen...';
+    const fd=new FormData();
+    files.forEach(function(a){fd.append('files',a.file,a.name);});
+    fetch('/api/mail/upload-attachments',{method:'POST',body:fd})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){
+        btn.textContent='Wird gesendet...';
+        doSend(d.attachments.map(function(a){return a.id;}));
+      } else {
+        btn.disabled=false;btn.innerHTML=origText;
+        showToast('Upload-Fehler: '+(d.error||'?'),'fehler');
+      }
+    }).catch(function(){btn.disabled=false;btn.innerHTML=origText;showToast('Upload fehlgeschlagen','fehler');});
+  } else {
+    doSend([]);
+  }
 };
 
 // ── Entwurf speichern ──────────────────────────────────
@@ -25249,6 +25290,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/mail/signaturen':
             self._api_mail_signaturen_get()
 
+        elif self.path == '/api/mail/kontakte':
+            self._api_mail_kontakte()
+
         elif self.path == '/api/mail/vorlagen':
             self._api_mail_vorlagen_get()
 
@@ -26842,25 +26886,139 @@ class DashboardHandler(BaseHTTPRequestHandler):
         body_html   = body.get('body_html', '')
         in_reply_to = body.get('in_reply_to', '')
         refs        = body.get('references', '')
+        att_ids     = body.get('attachment_ids', [])  # Temp-Datei-IDs vom Upload
 
         if not to or not subject:
             self._json({'ok': False, 'error': 'to und subject erforderlich'})
             return
         try:
+            # Attachment-Pfade aus Temp-Upload auflösen
+            import tempfile
+            att_paths = []
+            for aid in att_ids:
+                p = Path(tempfile.gettempdir()) / f"kira_att_{aid}"
+                if p.exists():
+                    att_paths.append(p)
+
             from mail_sender import send_mail
             result = send_mail(
                 from_email=from_email, to=to, cc=cc, bcc=bcc,
                 subject=subject, body_plain=body_plain, body_html=body_html,
                 in_reply_to=in_reply_to, references=refs,
+                attachments=att_paths if att_paths else None,
             )
             if result.get('ok'):
+                att_info = f' + {len(att_paths)} Anhänge' if att_paths else ''
                 rlog('server', 'mail_gesendet',
-                     f'Mail an {to[:60]} | Betreff: {subject[:60]} | Von: {from_email}',
+                     f'Mail an {to[:60]} | Betreff: {subject[:60]} | Von: {from_email}{att_info}',
                      modul='server', source='postfach_compose',
                      actor_type='user', status='ok')
+            # Temp-Dateien aufräumen
+            for p in att_paths:
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
             self._json(result)
         except Exception as e:
             self._json({'ok': False, 'error': str(e)})
+
+    def _api_mail_upload_attachments(self, raw_body):
+        """POST /api/mail/upload-attachments — Multipart Datei-Upload für Mail-Anhänge.
+        Speichert Dateien temporär, gibt IDs + Metadaten zurück."""
+        try:
+            content_type = self.headers.get("Content-Type", "")
+            if "multipart/form-data" not in content_type:
+                self._json({"ok": False, "error": "multipart/form-data erwartet"})
+                return
+            boundary = content_type.split("boundary=")[-1].strip()
+            parts = raw_body.split(f"--{boundary}".encode())
+            import tempfile, uuid, re as _re
+            uploaded = []
+            for part in parts:
+                if b"filename=" not in part:
+                    continue
+                header_end = part.find(b"\r\n\r\n")
+                if header_end == -1:
+                    header_end = part.find(b"\\r\\n\\r\\n")
+                if header_end == -1:
+                    continue
+                headers_raw = part[:header_end].decode("utf-8", errors="replace")
+                file_data = part[header_end + 4:]
+                if file_data.endswith(b"\r\n"):
+                    file_data = file_data[:-2]
+                elif file_data.endswith(b"\\r\\n"):
+                    file_data = file_data[:-2]
+                # Trailing boundary cleanup
+                if file_data.endswith(b"--"):
+                    file_data = file_data[:-2]
+                fn_match = _re.search(r'filename="([^"]+)"', headers_raw)
+                if not fn_match:
+                    continue
+                filename = fn_match.group(1)
+                # Unique ID + temp speichern
+                att_id = f"{uuid.uuid4().hex[:12]}_{filename}"
+                tmp_path = Path(tempfile.gettempdir()) / f"kira_att_{att_id}"
+                tmp_path.write_bytes(file_data)
+                uploaded.append({
+                    "id": att_id,
+                    "name": filename,
+                    "size": len(file_data),
+                })
+            self._json({"ok": True, "attachments": uploaded})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_mail_kontakte(self):
+        """GET /api/mail/kontakte — Bekannte E-Mail-Adressen für Autovervollständigung."""
+        try:
+            kontakte = []
+            seen = set()
+            # Aus mail_index.db: Absender + Empfänger
+            db = sqlite3.connect(str(MAIL_INDEX_DB))
+            db.row_factory = sqlite3.Row
+            rows = db.execute("""
+                SELECT DISTINCT absender AS addr FROM mails WHERE absender != '' AND absender IS NOT NULL
+                UNION
+                SELECT DISTINCT an AS addr FROM mails WHERE an != '' AND an IS NOT NULL
+                UNION
+                SELECT DISTINCT cc AS addr FROM mails WHERE cc != '' AND cc IS NOT NULL
+                LIMIT 3000
+            """).fetchall()
+            db.close()
+            import re as _re
+            for r in rows:
+                raw = (r['addr'] or '').strip()
+                if not raw:
+                    continue
+                # Mehrere Adressen (komma-getrennt) aufteilen
+                for part in raw.split(','):
+                    part = part.strip()
+                    if not part:
+                        continue
+                    # E-Mail extrahieren
+                    m = _re.search(r'[\w.+-]+@[\w.-]+\.\w+', part)
+                    if m:
+                        email_addr = m.group(0).lower()
+                        if email_addr not in seen:
+                            seen.add(email_addr)
+                            # Name extrahieren falls vorhanden (z.B. "Max Mustermann <max@test.de>")
+                            name = part.replace(f'<{m.group(0)}>', '').replace(f'{m.group(0)}', '').strip(' "<>')
+                            kontakte.append({"email": email_addr, "name": name})
+            # Eigene Konten ausfiltern
+            own = set()
+            try:
+                cfg = json.loads(Path(SCRIPT_DIR / 'config.json').read_text(encoding='utf-8'))
+                for k in cfg.get('mail_konten', []):
+                    own.add(k.get('email', '').lower())
+            except Exception:
+                pass
+            kontakte = [k for k in kontakte if k['email'] not in own]
+            # Nach Häufigkeit sortieren (häufigste zuerst) — vereinfacht: alphabetisch
+            kontakte.sort(key=lambda k: k['email'])
+            self._json({"ok": True, "kontakte": kontakte[:500]})
+        except Exception as e:
+            self._json({"ok": True, "kontakte": [], "error": str(e)})
 
     # ── Kira-Feedback (Paket 6, session-oo) ──────────────────────────────────
 
@@ -29659,6 +29817,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # Dokumente Datei-Upload: multipart/form-data VOR json.loads abfangen (session-eeee)
         if self.path == '/api/dokumente/upload':
             self._api_dokument_upload(raw_body)
+            return
+        # Mail-Anhänge Upload: multipart/form-data (session-qq)
+        if self.path == '/api/mail/upload-attachments':
+            self._api_mail_upload_attachments(raw_body)
             return
         # Capture Datei-Upload: multipart/form-data VOR json.loads abfangen (session-hhh)
         if self.path == '/api/capture/upload':
