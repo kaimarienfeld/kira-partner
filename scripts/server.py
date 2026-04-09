@@ -15971,8 +15971,11 @@ function capAcceptMatch(capId, matchId) {{
 }}
 
 function capMarkErledigt(id) {{
+  const kommentar = prompt('Kira lernt: Was hast du getan, um diesen Eintrag zu erledigen?\\n(z.B. \"Rechnung gepr\u00fcft und freigegeben\", \"Kunde per Mail geantwortet\")');
+  if(kommentar === null) return;
+  const notiz = kommentar ? 'Erledigt: '+kommentar : 'Erledigt (ohne Kommentar)';
   fetch('/api/capture/action',{{method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{capture_id:id,action:'erledigt'}})
+    body:JSON.stringify({{capture_id:id,action:'erledigt',notiz}})
   }}).then(r=>r.json()).then(d=>{{
     if(d.ok){{showToast('Als erledigt markiert','ok');capOpenDetail(id);capLoadStats();}}
     else showToast('Fehler','fehler');
@@ -15980,8 +15983,11 @@ function capMarkErledigt(id) {{
 }}
 
 function capArchivieren(id) {{
+  const kommentar = prompt('Kira lernt: Warum wird dieser Eintrag archiviert?\\n(z.B. \"Nicht relevant\", \"Duplikat\", \"Bereits anderweitig bearbeitet\")');
+  if(kommentar === null) return;
+  const notiz = kommentar ? 'Archiviert: '+kommentar : 'Archiviert (ohne Kommentar)';
   fetch('/api/capture/action',{{method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{capture_id:id,action:'archivieren'}})
+    body:JSON.stringify({{capture_id:id,action:'archivieren',notiz}})
   }}).then(r=>r.json()).then(d=>{{
     if(d.ok){{showToast('Archiviert','ok');capShowView('eingang');capLoadStats();}}
     else showToast('Fehler','fehler');
@@ -19002,13 +19008,19 @@ function _loadZusagenPanel() {{
   }}).catch(()=>{{box.innerHTML='<div style="color:var(--muted);padding:20px">Fehler beim Laden</div>';}});
 }}
 function _zusageErledigt(id) {{
-  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'erledigt'}})}})
+  const kommentar = prompt('Kira lernt: Wie wurde diese Zusage erf\u00fcllt?\\n(z.B. \"Angebot verschickt\", \"R\u00fcckruf erledigt\", \"Dokument gesendet\")');
+  if(kommentar === null) return;
+  const notiz = kommentar ? 'Erledigt: '+kommentar : 'Erledigt (ohne Kommentar)';
+  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'erledigt',notiz}})}})
     .then(r=>r.json()).then(d=>{{ if(d.ok){{ showToast('Zusage erledigt'); _loadZusagenPanel(); }} else showToast(d.error||'Fehler'); }});
 }}
 function _zusageVerschieben(id) {{
   const datum = prompt('Neues F\u00e4lligkeitsdatum (YYYY-MM-DD):');
   if(!datum) return;
-  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'verschieben',datum}})}})
+  const grund = prompt('Kira lernt: Warum wird verschoben?\\n(z.B. \"Kunde nicht erreichbar\", \"Warte auf R\u00fcckmeldung\")');
+  if(grund === null) return;
+  const notiz = grund ? 'Verschoben: '+grund : 'Verschoben (ohne Grund)';
+  fetch('/api/zusagen/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id,status:'verschieben',datum,notiz}})}})
     .then(r=>r.json()).then(d=>{{ if(d.ok){{ showToast('Zusage verschoben'); _loadZusagenPanel(); }} else showToast(d.error||'Fehler'); }});
 }}
 // Keep old filterKommView alias for Organisation panel tabs (uses .komm-view-tab)
@@ -19299,16 +19311,18 @@ function setStatusLernen(id, status, kat) {{
   _doStatusChange(id, status, kat);
 }}
 function _doStatusChange(id, status, kat, kommentar, einstufungOk) {{
+  const einstufung = einstufungOk !== false ? 'korrekt' : 'falsch';
+  // Notiz für CRM/Kundenhistorie: Kommentar + Einstufung zusammen am Task speichern
+  const notiz = kommentar ? (status==='erledigt'?'Erledigt: ':'Aktion: ')+kommentar+(einstufungOk===false?' [Einstufung: falsch]':'') : '';
   fetch('/api/task/'+id+'/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{status, kat}})}}).then(r=>r.json()).then(d=>{{
+    body:JSON.stringify({{status, kat, notiz, einstufung}})}}).then(r=>r.json()).then(d=>{{
     if(d.ok){{
       const el = document.getElementById('task-'+id);
       if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),320);}}
-      const label = {{erledigt:'Erledigt \u2714',zur_kenntnis:'Zur Kenntnis \u2714'}}[status]||'Gespeichert';
+      const label = {{erledigt:'Erledigt \u2714',zur_kenntnis:'Zur Kenntnis \u2714',ignorieren:'Ignoriert \u2714'}}[status]||'Gespeichert';
       showToast(label+' \u2014 KI lernt');
       // Lernregel speichern wenn Kommentar vorhanden
       if(kommentar) {{
-        const einstufung = einstufungOk !== false ? 'korrekt' : 'falsch';
         fetch('/api/wissen/neu', {{method:'POST', headers:{{'Content-Type':'application/json'}},
           body: JSON.stringify({{kategorie:'gelernt',
             titel: (status==='erledigt'?'Erledigt: ':'Zur Kenntnis: ')+kommentar.slice(0,60),
@@ -19344,7 +19358,7 @@ function quickErledigt() {{
   const tid = document.getElementById('em-tid').value;
   const kat = document.getElementById('em-kat').value;
   closeErledigtModal();
-  _doStatusChange(parseInt(tid), 'erledigt', kat);
+  _doStatusChange(parseInt(tid), 'erledigt', kat, 'Schnell-Erledigt (ohne Details)');
 }}
 async function saveErledigt() {{
   const tid    = document.getElementById('em-tid').value;
@@ -19380,7 +19394,7 @@ function quickKenntnis() {{
   const tid = document.getElementById('km-m-tid').value;
   const kat = document.getElementById('km-m-kat').value;
   closeKenntnisModal();
-  _doStatusChange(parseInt(tid), 'zur_kenntnis', kat);
+  _doStatusChange(parseInt(tid), 'zur_kenntnis', kat, 'Zur Kenntnis genommen (ohne Kommentar)');
 }}
 async function saveKenntnis() {{
   const tid       = document.getElementById('km-m-tid').value;
@@ -19419,7 +19433,7 @@ async function saveIgnorieren() {{
   try {{
     const r = await fetch('/api/task/'+tid+'/status', {{
       method:'POST', headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{status:'ignorieren', kat}})
+      body: JSON.stringify({{status:'ignorieren', kat, notiz:'Ignoriert: '+grund}})
     }});
     const d = await r.json();
     if(d.ok) {{
@@ -19471,6 +19485,13 @@ function clearSelection() {{
 async function multiAction(status) {{
   const ids = [..._selectedIds];
   if(!ids.length) return;
+  // Sammel-Kommentar abfragen (Kira lernt aus dem Kontext)
+  const statusLabel = {{erledigt:'erledigt',zur_kenntnis:'zur Kenntnis genommen',ignorieren:'ignoriert',spaeter:'auf sp\u00e4ter verschoben'}}[status]||status;
+  const kommentar = prompt('Kira lernt: Was war der Grund f\u00fcr diese Sammelaktion? ('+ids.length+' Mails als '+statusLabel+')'
+    + '\\n\\nBeispiel: "Alles schon bearbeitet" oder "Newsletter, kein Handlungsbedarf"'
+    + '\\n\\n(Leer lassen f\u00fcr ohne Kommentar)');
+  if(kommentar === null) return; // Abbrechen
+  const notiz = kommentar ? 'Sammelaktion: '+kommentar : '';
   let done=0;
   for(const id of ids) {{
     const card = document.getElementById('task-'+id);
@@ -19478,7 +19499,7 @@ async function multiAction(status) {{
     try {{
       const r = await fetch('/api/task/'+id+'/status',{{method:'POST',
         headers:{{'Content-Type':'application/json'}},
-        body:JSON.stringify({{status, kat}})}});
+        body:JSON.stringify({{status, kat, notiz}})}});
       const d = await r.json();
       if(d.ok) {{
         if(card){{card.style.opacity='0.2';setTimeout(()=>card.remove(),300);}}
@@ -23251,6 +23272,12 @@ function mailApproveAction(id, action) {{
   var payload = {{action: action}};
   if(action === 'edit' && bodyEl) payload.body = bodyEl.value;
   if(kontoEl && kontoEl.value) payload.from_email = kontoEl.value;
+  // Bei Ablehnung: Grund abfragen f\u00fcr Kira-Learning
+  if(action === 'reject') {{
+    var grund = prompt('Kira lernt: Warum wird diese Mail nicht gesendet?\\n(z.B. \"Falscher Ton\", \"Falscher Empf\u00e4nger\", \"Nicht relevant\")');
+    if(grund === null) return;
+    payload.reject_reason = grund || 'Abgelehnt (ohne Grund)';
+  }}
   fetch('/api/mail/approve/' + id, {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
@@ -31104,18 +31131,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 zid = body.get("id")
                 new_status = body.get("status", "erledigt")
+                notiz = body.get("notiz", "")
                 if not zid:
                     self._json({"ok": False, "error": "id fehlt"})
                     return
                 db = sqlite3.connect(str(TASKS_DB))
+                # notiz-Spalte sicherstellen (idempotent)
+                try:
+                    db.execute("ALTER TABLE mail_commitments ADD COLUMN notiz TEXT DEFAULT ''")
+                    db.commit()
+                except Exception:
+                    pass  # Spalte existiert bereits
                 now = datetime.now().isoformat()
                 if new_status == "erledigt":
-                    db.execute("UPDATE mail_commitments SET status='erledigt', erledigt_am=? WHERE id=?", (now, zid))
+                    db.execute("UPDATE mail_commitments SET status='erledigt', erledigt_am=?, notiz=COALESCE(notiz,'')||? WHERE id=?",
+                               (now, (' | ' + notiz if notiz else ''), zid))
                 elif new_status == "verschieben":
                     neues_datum = body.get("datum")
                     if neues_datum:
-                        db.execute("UPDATE mail_commitments SET datum_faellig=?, datum_erinnerung=? WHERE id=?",
-                                   (neues_datum, neues_datum, zid))
+                        db.execute("UPDATE mail_commitments SET datum_faellig=?, datum_erinnerung=?, notiz=COALESCE(notiz,'')||? WHERE id=?",
+                                   (neues_datum, neues_datum, (' | ' + notiz if notiz else ''), zid))
                 db.commit()
                 db.close()
                 self._json({"ok": True})
@@ -33488,6 +33523,7 @@ Regeln:
         elif path == '/api/capture/action':
             cap_id = int(body.get('capture_id', 0))
             action = body.get('action', '')
+            notiz = body.get('notiz', '')
             if not cap_id or not action:
                 self._json({"ok": False, "error": "capture_id oder action fehlt"})
                 return
@@ -33497,8 +33533,10 @@ Regeln:
                     db.execute("UPDATE capture_items SET status='erledigt', updated_at=datetime('now') WHERE id=?", (cap_id,))
                 elif action == 'archivieren':
                     db.execute("UPDATE capture_items SET archived=1, updated_at=datetime('now') WHERE id=?", (cap_id,))
-                db.execute("INSERT INTO capture_actions (capture_id, actor_type, action) VALUES (?,?,?)",
-                           (cap_id, 'user', action))
+                # Aktion + Notiz für CRM/Kundenhistorie speichern
+                payload = json.dumps({"notiz": notiz}, ensure_ascii=False) if notiz else None
+                db.execute("INSERT INTO capture_actions (capture_id, actor_type, action, payload_json) VALUES (?,?,?,?)",
+                           (cap_id, 'user', action, payload))
                 db.commit()
                 db.close()
                 self._json({"ok": True})
