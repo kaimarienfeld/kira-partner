@@ -13329,7 +13329,7 @@ def build_admin():
       <div class="adm-nav-item act" id="adm-nav-api" onclick="admShowSec('api')">
         <span class="adm-nav-ico">&#x1F511;</span>API-Schlüssel</div>
       <div class="adm-nav-item" id="adm-nav-smtp" onclick="admShowSec('smtp')">
-        <span class="adm-nav-ico">&#x2709;</span>E-Mail SMTP</div>
+        <span class="adm-nav-ico">&#x2709;</span>E-Mail-Versand</div>
       <div class="adm-nav-item" id="adm-nav-passwoerter" onclick="admShowSec('passwoerter')">
         <span class="adm-nav-ico">&#x1F510;</span>Passwörter</div>
 
@@ -13408,85 +13408,34 @@ def build_admin():
         </div>
       </div>
 
-      <!-- ══ E-MAIL SMTP ══ -->
+      <!-- ══ E-MAIL VERSAND (OAuth2) ══ -->
       <div class="adm-sec" id="adm-sec-smtp">
-        <div class="es-grp-h" style="margin-bottom:4px">E-Mail SMTP</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">Ausgehende Mails für Benachrichtigungen &amp; Partnereinladungen. In <code>config.json &rarr; email_notification</code>.</div>
+        <div class="es-grp-h" style="margin-bottom:4px">E-Mail-Versand</div>
+        <div class="es-grp-sub" style="margin-bottom:16px">System-Mails (Benachrichtigungen, Partnereinladungen) werden über ein bestehendes Mail-Konto mit OAuth2 gesendet — kein separates SMTP-Passwort nötig.</div>
         <div class="es-grp">
-          <!-- Preset-Auswahl -->
-          <div class="adm-preset-bar">
-            <span class="adm-preset-lbl">&#x26A1; Anbieter-Voreinstellung:</span>
-            <select class="adm-preset-sel" onchange="admSmtpPreset(this.value)">
-              <option value="">&#x2014; Anbieter waehlen und Felder automatisch ausfullen &#x2014;</option>
-              <optgroup label="Privat (Deutschland)">
-                <option value="gmail">Gmail (Google)</option>
-                <option value="gmx">GMX</option>
-                <option value="webde">web.de</option>
-                <option value="tonline">T-Online</option>
-                <option value="freenet">Freenet</option>
-              </optgroup>
-              <optgroup label="Business / Hosting">
-                <option value="ionos">IONOS / 1&amp;1</option>
-                <option value="strato">Strato</option>
-                <option value="allinkl">All-Inkl.com</option>
-                <option value="hetzner">Hetzner</option>
-              </optgroup>
-              <optgroup label="Microsoft">
-                <option value="outlook">Outlook.com / Hotmail / Live</option>
-                <option value="office365">Microsoft 365 (Exchange Online)</option>
-              </optgroup>
-              <optgroup label="Transaktional">
-                <option value="postmark">Postmark</option>
-                <option value="sendgrid">SendGrid</option>
-                <option value="mailgun">Mailgun</option>
-              </optgroup>
-              <optgroup label="Sonstige">
-                <option value="yahoo">Yahoo Mail</option>
-                <option value="fastmail">Fastmail</option>
-                <option value="custom">Benutzerdefiniert</option>
-              </optgroup>
+          <div class="adm-field">
+            <div class="adm-field-lbl">
+              <div class="adm-field-key">Absender-Konto</div>
+              <div class="adm-field-hint">Über welches Konto sollen System-Mails gesendet werden? (Standard: info@)</div>
+            </div>
+            <select id="adm-f-smtp-email" class="adm-inp adm-inp-wide" style="max-width:380px">
+              <option value="">Automatisch (info@ bevorzugt)</option>
             </select>
           </div>
           <div class="adm-field">
             <div class="adm-field-lbl">
-              <div class="adm-field-key">SMTP-Server</div>
-              <div class="adm-field-hint" id="adm-smtp-hint-srv">z.B. smtp.gmail.com oder smtp.ionos.de</div>
-            </div>
-            <input id="adm-f-smtp-server" type="text" class="adm-inp adm-inp-wide" placeholder="smtp.gmail.com">
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Port</div>
-              <div class="adm-field-hint">587 (STARTTLS) oder 465 (SSL/TLS)</div>
-            </div>
-            <input id="adm-f-smtp-port" type="number" class="adm-inp" placeholder="587" style="width:100px">
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Absender E-Mail</div>
-              <div class="adm-field-hint">Von-Adresse für ausgehende Mails</div>
-            </div>
-            <input id="adm-f-smtp-email" type="email" class="adm-inp adm-inp-wide" placeholder="kira@raumkult.eu">
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">SMTP-Passwort / App-Passwort</div>
-              <div class="adm-field-hint" id="adm-smtp-hint-pw">Bei Gmail: App-Passwort erstellen (Google-Konto &rarr; Sicherheit &rarr; 2FA)</div>
-            </div>
-            <input id="adm-f-smtp-passwort" type="password" class="adm-inp adm-inp-wide" placeholder="...">
-            <button class="adm-show-btn" onclick="admToggle('adm-f-smtp-passwort')">&#x1F441;</button>
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Empfaenger E-Mail</div>
-              <div class="adm-field-hint">Wohin gehen System-Benachrichtigungen</div>
+              <div class="adm-field-key">Empfänger für System-Benachrichtigungen</div>
+              <div class="adm-field-hint">Wohin gehen Test-Mails und Benachrichtigungen</div>
             </div>
             <input id="adm-f-smtp-empf" type="email" class="adm-inp adm-inp-wide" placeholder="kai@raumkult.eu">
           </div>
         </div>
+        <div style="background:var(--bg-overlay);border-radius:10px;padding:12px 16px;margin:12px 0;font-size:12.5px;color:var(--muted);line-height:1.6">
+          <strong style="color:var(--text)">&#x1F512; Sicher via OAuth2</strong> — Kein Passwort gespeichert. Die Authentifizierung läuft über das bestehende Microsoft/Google OAuth2-Token des gewählten Mail-Kontos.
+        </div>
         <div class="es-save-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="admSaveSection('smtp')">&#x1F4BE; Speichern</button>
-          <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an Empfaenger-Adresse senden">&#x2709; SMTP testen</button>
+          <button class="btn btn-sec btn-xs" id="adm-smtp-test-btn" onclick="admSmtpTest()" title="Testmail an Empfänger senden">&#x2709; Testmail senden</button>
           <span id="adm-smtp-test-res" style="font-size:12px;font-weight:600;margin-left:4px"></span>
           <span id="adm-save-smtp-msg" style="font-size:12px;color:var(--success,#1D9E75);margin-left:8px"></span>
           <span id="adm-smtp-status-badge" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600"></span>
@@ -13821,28 +13770,24 @@ function admCfCopyCmd() {
 function admSmtpTest() {
   var btn = document.getElementById('adm-smtp-test-btn');
   var res = document.getElementById('adm-smtp-test-res');
-  if(btn) { btn.disabled = true; btn.textContent = '...'; }
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Sende...'; }
   if(res) res.innerHTML = '';
-  var server  = document.getElementById('adm-f-smtp-server')?.value || '';
-  var port    = parseInt(document.getElementById('adm-f-smtp-port')?.value || '587');
-  var email   = document.getElementById('adm-f-smtp-email')?.value || '';
-  var pw      = document.getElementById('adm-f-smtp-pw')?.value || '';
-  var empf    = document.getElementById('adm-f-smtp-empf')?.value || email;
+  var from_email = document.getElementById('adm-f-smtp-email')?.value || '';
+  var empf = document.getElementById('adm-f-smtp-empf')?.value || from_email;
   fetch('/api/ntfy/test', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({smtp_server:server, smtp_port:port, smtp_email:email, smtp_password:pw, to:empf, _type:'smtp'})
+    body: JSON.stringify({from_email: from_email, to: empf, _type:'smtp'})
   }).then(r=>r.json()).then(d=>{
-    if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
+    if(btn) { btn.disabled=false; btn.textContent='\u2709 Testmail senden'; }
     const badge = document.getElementById('adm-smtp-status-badge');
     if(res) res.innerHTML = d.ok
-      ? '<span style="color:#22c55e">\u2713 Testmail gesendet an '+escH(empf||email)+'</span>'
+      ? '<span style="color:#22c55e">\u2713 '+escH(d.info||'Testmail gesendet')+'</span>'
       : '<span style="color:#dc2626">\u2717 '+escH(d.error||'Fehler')+'</span>';
     if(badge) {
       if(d.ok) {
-        badge.textContent='\u2713 Verbunden';
+        badge.textContent='\u2713 OAuth2 aktiv';
         badge.style.cssText='margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#e8f9f3;color:#1D9E75;border:0.5px solid #1D9E75';
-        // letzter_test_ok in config.json via SMTP-Save-Endpoint persistieren
         fetch('/api/admin/save',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({section:'smtp_test_ok',server:server,port:port,email:email})
+          body:JSON.stringify({section:'smtp_test_ok',server:'oauth2',port:0,email:from_email})
         }).catch(()=>{});
       } else {
         badge.textContent='\u2717 Test fehlgeschlagen';
@@ -13850,7 +13795,7 @@ function admSmtpTest() {
       }
     }
   }).catch(e=>{
-    if(btn) { btn.disabled=false; btn.textContent='\u2709 SMTP testen'; }
+    if(btn) { btn.disabled=false; btn.textContent='\u2709 Testmail senden'; }
     if(res) res.innerHTML = '<span style="color:#dc2626">\u2717 Netzwerkfehler: '+escH(String(e))+'</span>';
   });
 }
@@ -13912,24 +13857,31 @@ function admLoadData() {
     setVal('adm-f-lex-key', lx.api_key);
     setVal('adm-f-lex-url', lx.api_base_url);
     var smtp = c.email_notification || {};
-    setVal('adm-f-smtp-server', smtp.smtp_server);
-    setVal('adm-f-smtp-port', smtp.smtp_port);
-    setVal('adm-f-smtp-email', smtp.absender_email);
-    setVal('adm-f-smtp-passwort', smtp.absender_passwort);
+    // Mail-Konten in Dropdown laden
+    var smtpSel = document.getElementById('adm-f-smtp-email');
+    if (smtpSel) {
+      var konten = (c.mail_konten || {}).konten || [];
+      smtpSel.innerHTML = '<option value="">Automatisch (info@ bevorzugt)</option>';
+      konten.forEach(function(k) {
+        var email = typeof k === 'string' ? k : (k.email || '');
+        if (email) {
+          var opt = document.createElement('option');
+          opt.value = email; opt.textContent = email;
+          smtpSel.appendChild(opt);
+        }
+      });
+      if (smtp.system_mail_konto) smtpSel.value = smtp.system_mail_konto;
+    }
     setVal('adm-f-smtp-empf', smtp.empfaenger_email);
     // SMTP Status-Badge
     var smtpBadge = document.getElementById('adm-smtp-status-badge');
     if (smtpBadge) {
-      var hasSmtp = smtp.smtp_server && smtp.absender_email && smtp.absender_passwort;
       var lastOk = smtp.letzter_test_ok;
-      if (hasSmtp && lastOk) {
-        smtpBadge.textContent = '\u2713 Verbunden';
+      if (lastOk) {
+        smtpBadge.textContent = '\u2713 OAuth2 aktiv';
         smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#e8f9f3;color:#1D9E75;border:0.5px solid #1D9E75';
-      } else if (hasSmtp) {
-        smtpBadge.textContent = '\u26A0 Konfiguriert, ungetestet';
-        smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:#fef3c7;color:#92400e;border:0.5px solid #fcd34d';
       } else {
-        smtpBadge.textContent = '\u25CB Nicht konfiguriert';
+        smtpBadge.textContent = '\u25CB Noch nicht getestet';
         smtpBadge.style.cssText = 'margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:var(--bg-overlay);color:var(--muted);border:0.5px solid var(--border)';
       }
     }
@@ -14005,8 +13957,7 @@ function admSaveSection(section) {
     payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'),
       provider_keys: provKeys, lex_api_key: g('adm-f-lex-key'), lex_api_base_url: g('adm-f-lex-url')};
   } else if (section === 'smtp') {
-    payload.data = {smtp_server: g('adm-f-smtp-server'), smtp_port: parseInt(g('adm-f-smtp-port'))||587,
-      absender_email: g('adm-f-smtp-email'), absender_passwort: g('adm-f-smtp-passwort'), empfaenger_email: g('adm-f-smtp-empf')};
+    payload.data = {system_mail_konto: g('adm-f-smtp-email'), empfaenger_email: g('adm-f-smtp-empf')};
   } else if (section === 'passwoerter') {
     var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
     if (pw1 && pw1 !== pw2) { showToast('Passwörter stimmen nicht überein', 'fehler'); return; }
@@ -29909,9 +29860,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             msg['Subject'] = 'KIRA SMTP-Test'
             msg['From'] = email
             msg['To'] = email
-            smtp = smtplib.SMTP(smtp_cfg['server'], smtp_cfg['port'], timeout=15)
-            smtp.ehlo()
-            smtp.starttls()
+            _smtp_port = smtp_cfg['port']
+            if _smtp_port == 465:
+                smtp = smtplib.SMTP_SSL(smtp_cfg['server'], _smtp_port, timeout=15)
+            else:
+                smtp = smtplib.SMTP(smtp_cfg['server'], _smtp_port, timeout=15)
+                smtp.ehlo()
+                smtp.starttls()
             smtp.ehlo()
             if use_password:
                 import base64 as _b64
@@ -31796,26 +31751,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         # ntfy Test-Push
         if self.path == '/api/ntfy/test':
-            # SMTP-Direkttest vom Admin-Bereich
+            # SMTP-Direkttest vom Admin-Bereich — nutzt OAuth2-Konto
             if body.get('_type') == 'smtp':
                 try:
-                    import smtplib, ssl
-                    smtp_server = body.get('smtp_server','').strip()
-                    smtp_port   = int(body.get('smtp_port', 587))
-                    smtp_email  = body.get('smtp_email','').strip()
-                    smtp_pw     = body.get('smtp_password','').strip()
-                    to_addr     = (body.get('to') or smtp_email).strip()
-                    if not smtp_server or not smtp_email:
-                        self._json({'ok': False, 'error': 'SMTP-Server und Absender-E-Mail benoetigt'})
-                        return
-                    ctx = ssl.create_default_context()
-                    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as srv:
-                        srv.starttls(context=ctx)
-                        if smtp_pw:
-                            srv.login(smtp_email, smtp_pw)
-                        msg = f"From: {smtp_email}\r\nTo: {to_addr}\r\nSubject: KIRA SMTP-Test\r\n\r\nTestmail von KIRA - Verbindung erfolgreich!"
-                        srv.sendmail(smtp_email, [to_addr], msg.encode('utf-8'))
-                    self._json({'ok': True, 'info': f'Testmail an {to_addr} gesendet'})
+                    import sys as _sys
+                    if str(SCRIPTS_DIR) not in _sys.path:
+                        _sys.path.insert(0, str(SCRIPTS_DIR))
+                    import mail_monitor as _mm
+                    to_addr = (body.get('to') or '').strip()
+                    from_email = (body.get('from_email') or body.get('smtp_email') or '').strip()
+                    result = _mm.send_system_mail(
+                        to=to_addr or from_email,
+                        subject='KIRA SMTP-Test',
+                        body_text='Testmail von KIRA — Verbindung über OAuth2 erfolgreich!',
+                        from_email=from_email
+                    )
+                    if result['ok']:
+                        self._json({'ok': True, 'info': f"Testmail an {result['to']} gesendet (via {result['from']})"})
+                    else:
+                        self._json({'ok': False, 'error': result.get('error', 'Unbekannter Fehler')})
                 except Exception as e:
                     self._json({'ok': False, 'error': str(e)})
                 return
@@ -31904,34 +31858,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     result = json.loads(resp.read())
                 issue_url = result.get('html_url', '')
                 issue_nr  = result.get('number', '')
-                # E-Mail an Kai senden
+                # E-Mail an Kai senden — über OAuth2-Konto
                 try:
-                    import smtplib, ssl as _ssl2
-                    from email.mime.text import MIMEText as _MIMEText
-                    mail_cfg2  = CFG.get('email_notification', {})
-                    smtp_srv   = mail_cfg2.get('smtp_server', '')
-                    smtp_prt   = int(mail_cfg2.get('smtp_port', 587))
-                    kai_addr   = mail_cfg2.get('absender_email', '')
-                    kai_pw     = mail_cfg2.get('absender_passwort', '')
-                    if smtp_srv and kai_addr:
-                        issues_url = f'https://github.com/{gh_owner}/{gh_repo}/issues'
-                        mail_text = (
-                            f"Leni hat Feedback gegeben!\n\n"
-                            f"Funktion:  {feature}\n"
-                            f"Reaktion:  {react or '(keine)'}\n"
-                            f"Feedback:  {text or '(kein Text)'}\n"
-                            f"Datum:     {date}\n\n"
-                            f"Direkt zum Issue #{issue_nr}:\n{issue_url}\n\n"
-                            f"Alle Feedbacks:\n{issues_url}?q=label%3Aleni-feedback\n"
-                        )
-                        m2 = _MIMEText(mail_text, 'plain', 'utf-8')
-                        m2['From']    = kai_addr
-                        m2['To']      = kai_addr
-                        m2['Subject'] = f'📬 Leni: {feature}' + (f' — {react}' if react else '')
-                        ctx2 = _ssl2.create_default_context()
-                        with smtplib.SMTP(smtp_srv, smtp_prt, timeout=15) as sv:
-                            sv.ehlo(); sv.starttls(context=ctx2); sv.login(kai_addr, kai_pw)
-                            sv.sendmail(kai_addr, kai_addr, m2.as_string())
+                    import sys as _sys3
+                    if str(SCRIPTS_DIR) not in _sys3.path:
+                        _sys3.path.insert(0, str(SCRIPTS_DIR))
+                    import mail_monitor as _mm3
+                    issues_url = f'https://github.com/{gh_owner}/{gh_repo}/issues'
+                    mail_text = (
+                        f"Leni hat Feedback gegeben!\n\n"
+                        f"Funktion:  {feature}\n"
+                        f"Reaktion:  {react or '(keine)'}\n"
+                        f"Feedback:  {text or '(kein Text)'}\n"
+                        f"Datum:     {date}\n\n"
+                        f"Direkt zum Issue #{issue_nr}:\n{issue_url}\n\n"
+                        f"Alle Feedbacks:\n{issues_url}?q=label%3Aleni-feedback\n"
+                    )
+                    _mm3.send_system_mail(
+                        to='info@raumkult.eu',
+                        subject=f'📬 Leni: {feature}' + (f' — {react}' if react else ''),
+                        body_text=mail_text
+                    )
                 except Exception:
                     pass  # Mail-Fehler darf Issue-Erfolg nicht blockieren
                 self._json({'ok': True, 'issue_url': issue_url})
@@ -31967,50 +31914,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({'error': str(e)})
             return
 
-        # Partner-View: Mail an Leni senden (Willkommen oder Passwort)
+        # Partner-View: Mail an Leni senden (Willkommen oder Passwort) — über OAuth2-Konto
         if self.path == '/api/partner/send-leni-mail':
             try:
-                import smtplib, ssl as _ssl
-                from email.mime.text import MIMEText
-                from email.mime.multipart import MIMEMultipart
-                mail_cfg = CFG.get('email_notification', {})
-                smtp_server  = mail_cfg.get('smtp_server', '')
-                smtp_port    = int(mail_cfg.get('smtp_port', 587))
-                absender     = mail_cfg.get('absender_email', '')
-                pw_smtp      = mail_cfg.get('absender_passwort', '')
-                if not smtp_server or not absender:
-                    self._json({'ok': False, 'error': 'SMTP nicht konfiguriert (Einstellungen > Mail)'})
-                    return
+                import sys as _sys
+                if str(SCRIPTS_DIR) not in _sys.path:
+                    _sys.path.insert(0, str(SCRIPTS_DIR))
+                import mail_monitor as _mm
                 mail_type = body.get('type', 'welcome')
                 to_addr   = body.get('to', '').strip()
                 link      = body.get('link', '')
                 if not to_addr:
-                    self._json({'ok': False, 'error': 'Keine Empfaenger-E-Mail angegeben'})
+                    self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail angegeben'})
                     return
-                msg = MIMEMultipart('alternative')
                 bcc_addr = (
                     body.get('bcc')
                     or CFG.get('partner_view', {}).get('leni_mail_bcc')
-                    or absender
+                    or ''
                 )
-                msg['From'] = absender
-                msg['To']   = to_addr
-                if bcc_addr and bcc_addr != to_addr:
-                    msg['Bcc'] = bcc_addr
                 if mail_type == 'welcome':
-                    msg['Subject'] = 'Du bist dabei! Kira wartet auf dich'
+                    subject = 'Du bist dabei! Kira wartet auf dich'
                     text = (
                         f"Hallo Leni,\n\n"
-                        f"Kai und Kira sind bereit! Dein persoenlicher Blick auf die neue rauMKult-App wartet auf dich.\n\n"
+                        f"Kai und Kira sind bereit! Dein persönlicher Blick auf die neue rauMKult-App wartet auf dich.\n\n"
                         f"Hier ist dein Link:\n{link}\n\n"
                         f"Dein Passwort kommt in einer separaten Mail.\n\n"
-                        f"Auf der Seite kannst du direkt einstellen, wie und wie oft du ueber Neuigkeiten informiert werden moechtest.\n"
+                        f"Auf der Seite kannst du direkt einstellen, wie und wie oft du über Neuigkeiten informiert werden möchtest.\n"
                         f"Einfach nach dem Einloggen oben auf Einstellungen klicken.\n\n"
                         f"Freue mich auf dein Feedback!\n"
                         f"Kai"
                     )
                 elif mail_type == 'update':
-                    msg['Subject'] = '✨ Neuigkeiten bei KIRA Partner!'
+                    subject = '✨ Neuigkeiten bei KIRA Partner!'
                     text = (
                         f"Hallo Leni,\n\n"
                         f"Kai hat die KIRA Partner-Seite aktualisiert — "
@@ -32021,55 +31956,49 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     )
                 else:  # password
                     pw = body.get('password', '')
-                    msg['Subject'] = 'Dein Zugang zu KIRA Partner'
+                    subject = 'Dein Zugang zu KIRA Partner'
                     text = (
                         f"Hallo Leni,\n\n"
-                        f"hier ist dein persoenliches Passwort fuer die KIRA Partner-Seite:\n\n"
+                        f"hier ist dein persönliches Passwort für die KIRA Partner-Seite:\n\n"
                         f"    {pw}\n\n"
                         f"Link zur Seite: {link}\n\n"
                         f"Bitte nicht weiterleiten!\n"
                         f"Kai"
                     )
-                msg.attach(MIMEText(text, 'plain', 'utf-8'))
-                ctx = _ssl.create_default_context()
-                with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as s:
-                    s.ehlo()
-                    s.starttls(context=ctx)
-                    s.login(absender, pw_smtp)
-                    s.sendmail(absender, to_addr, msg.as_string())
-                self._json({'ok': True, 'type': mail_type, 'to': to_addr})
+                result = _mm.send_system_mail(
+                    to=to_addr, subject=subject, body_text=text,
+                    bcc=bcc_addr if bcc_addr and bcc_addr != to_addr else ''
+                )
+                if result['ok']:
+                    self._json({'ok': True, 'type': mail_type, 'to': to_addr, 'via': result['from']})
+                else:
+                    self._json({'ok': False, 'error': result.get('error', 'Unbekannter Fehler')})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return
 
-        # SMTP Test-E-Mail
+        # SMTP Test-E-Mail (Einstellungen) — nutzt OAuth2-Konto
         if self.path == '/api/email-notification/test':
             try:
-                import smtplib, ssl
-                from email.mime.text import MIMEText
-                srv  = body.get('smtp_server', '').strip()
-                port = int(body.get('smtp_port', 587))
-                frm  = body.get('absender_email', '').strip()
-                pw   = body.get('absender_passwort', '')
-                to   = body.get('empfaenger_email', '').strip()
-                if not srv or not frm or not to:
-                    self._json({'ok': False, 'error': 'SMTP-Server, Absender und Empfänger sind erforderlich'})
+                import sys as _sys
+                if str(SCRIPTS_DIR) not in _sys.path:
+                    _sys.path.insert(0, str(SCRIPTS_DIR))
+                import mail_monitor as _mm
+                to = body.get('empfaenger_email', '').strip()
+                frm = body.get('absender_email', '').strip()
+                if not to:
+                    self._json({'ok': False, 'error': 'Empfänger-E-Mail erforderlich'})
                     return
-                msg = MIMEText('Diese Test-E-Mail wurde von KIRA gesendet um die SMTP-Konfiguration zu prüfen.', 'plain', 'utf-8')
-                msg['Subject'] = 'KIRA — SMTP-Test erfolgreich'
-                msg['From']    = frm
-                msg['To']      = to
-                ctx = ssl.create_default_context()
-                with smtplib.SMTP(srv, port, timeout=15) as server:
-                    server.ehlo()
-                    if port != 465:
-                        server.starttls(context=ctx)
-                    if pw:
-                        server.login(frm, pw)
-                    server.sendmail(frm, [to], msg.as_string())
-                rlog('settings', 'smtp_test_ok', f'Test-E-Mail an {to} gesendet',
-                     source='server', modul='einstellungen', actor_type='user', status='ok')
-                self._json({'ok': True})
+                result = _mm.send_system_mail(
+                    to=to,
+                    subject='KIRA — SMTP-Test erfolgreich',
+                    body_text='Diese Test-E-Mail wurde von KIRA gesendet um die SMTP-Konfiguration zu prüfen.',
+                    from_email=frm
+                )
+                if result['ok']:
+                    rlog('settings', 'smtp_test_ok', f"Test-E-Mail an {to} gesendet (via {result['from']})",
+                         source='server', modul='einstellungen', actor_type='user', status='ok')
+                self._json({'ok': result['ok'], 'error': result.get('error', '')})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
             return

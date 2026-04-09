@@ -730,6 +730,91 @@ def run_full_connection_test(email_addr: str) -> dict:
     return result
 
 
+def send_system_mail(to: str, subject: str, body_text: str, body_html: str = "",
+                     from_email: str = "", cc: str = "", bcc: str = "") -> dict:
+    """Sendet eine System-Mail über ein konfiguriertes OAuth2-Konto.
+
+    Wählt automatisch ein geeignetes Konto (bevorzugt info@, dann erstes aktives).
+    Unterstützt OAuth2 XOAUTH2 und Passwort-Auth.
+
+    Returns: {"ok": True/False, "error": "...", "from": "...", "to": "..."}
+    """
+    import smtplib, ssl, base64
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    konten = _load_accounts()
+    if not konten:
+        return {"ok": False, "error": "Keine Mail-Konten konfiguriert"}
+
+    # Konto auswählen: from_email > info@ > erstes aktives
+    konto = None
+    if from_email:
+        konto = next((k for k in konten if k["email"].lower() == from_email.lower()), None)
+    if not konto:
+        konto = next((k for k in konten if "info@" in k["email"].lower()), None)
+    if not konto:
+        konto = konten[0]
+
+    email_addr = konto["email"]
+    smtp_cfg = get_smtp_settings(konto)
+    auth_methode = konto.get("auth_methode", "oauth2")
+    use_password = auth_methode in ("imap_password", "imap", "password") or \
+                   "password" in auth_methode or smtp_cfg.get("auth") == "password"
+
+    # Mail zusammenbauen
+    if body_html:
+        msg = MIMEMultipart("alternative")
+        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
+    else:
+        msg = MIMEText(body_text, "plain", "utf-8")
+
+    msg["From"] = email_addr
+    msg["To"] = to
+    msg["Subject"] = subject
+    if cc:
+        msg["Cc"] = cc
+    if bcc:
+        msg["Bcc"] = bcc
+
+    recipients = [to]
+    if cc:
+        recipients.extend([a.strip() for a in cc.split(",") if a.strip()])
+    if bcc:
+        recipients.extend([a.strip() for a in bcc.split(",") if a.strip()])
+
+    try:
+        ctx = ssl.create_default_context()
+        smtp_port = smtp_cfg.get("port", 587)
+        if smtp_port == 465:
+            srv = smtplib.SMTP_SSL(smtp_cfg["server"], smtp_port, timeout=15, context=ctx)
+        else:
+            srv = smtplib.SMTP(smtp_cfg["server"], smtp_port, timeout=15)
+            srv.ehlo()
+            srv.starttls(context=ctx)
+        srv.ehlo()
+
+        if use_password:
+            passwort = konto.get("passwort", "") or konto.get("password", "")
+            if passwort.startswith("enc:"):
+                passwort = base64.b64decode(passwort[4:]).decode("utf-8", errors="ignore")
+            srv.login(konto.get("login", email_addr), passwort)
+        else:
+            # OAuth2 XOAUTH2
+            token = get_oauth2_token(konto)
+            auth_string = f"user={email_addr}\x01auth=Bearer {token}\x01\x01"
+            srv.docmd("AUTH", f"XOAUTH2 {base64.b64encode(auth_string.encode()).decode()}")
+
+        srv.sendmail(email_addr, recipients, msg.as_string())
+        srv.quit()
+        log.info(f"System-Mail gesendet: {subject} → {to} (via {email_addr})")
+        return {"ok": True, "from": email_addr, "to": to}
+    except Exception as e:
+        log.error(f"System-Mail Fehler: {e}")
+        return {"ok": False, "error": str(e)[:300], "from": email_addr, "to": to}
+
+
 # Job-System für async Volltest
 _volltest_jobs: dict = {}
 _volltest_lock = threading.Lock()
