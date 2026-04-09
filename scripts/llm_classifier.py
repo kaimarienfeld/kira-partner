@@ -229,7 +229,7 @@ KATEGORIEN (wähle GENAU eine):
 1. "Antwort erforderlich" — Kunde/Partner erwartet eine Antwort, offene Fragen
 2. "Neue Lead-Anfrage" — Erstanfrage von Interessenten (NUR wenn Leistung zum Spektrum passt!)
 3. "Angebotsrueckmeldung" — Reaktion auf ein gesendetes Angebot (Zusage, Absage, Rückfragen)
-4. "Rechnung / Beleg" — Rechnungen, Belege, Zahlungsbestätigungen, Mahnungen
+4. "Rechnung / Beleg" — Echte Rechnungen, Belege, Zahlungsbestätigungen, echte Mahnungen (mit konkreter Rechnungsnummer + Betrag)
 5. "Shop / System" — Shop-Bestellungen, Systembenachrichtigungen
 6. "Newsletter / Werbung" — Newsletter, Werbung, Marketing-Mails
 7. "Zur Kenntnis" — Informativ, kein Handlungsbedarf
@@ -256,7 +256,9 @@ KRITISCH — MAIL-VERLAUF PRÜFEN (häufigster Fehler!):
   → Setze "beantwortet": true
 - Wenn der Betreff RE:/AW: enthält UND der Verlauf eine gesendete Antwort zeigt → Mail ist Teil einer laufenden Konversation, KEIN neuer Lead!
 - "Neue Lead-Anfrage" NUR wenn es die ERSTE Mail dieses Kontakts ist ODER wenn das Thema komplett neu ist (anderes Projekt, andere Frage).
-- Werbemails/Newsletter von Softwareanbietern (Lexware, shipcloud, etc.) mit Worten wie "Angebot", "Erweiterung", "Highlights" → "Newsletter / Werbung", NICHT "Rechnung" oder "Mahnung".
+- Werbemails/Newsletter von Softwareanbietern (Lexware, shipcloud, etc.) mit Worten wie "Angebot", "Erweiterung", "Highlights", "Partnerlösungen" → "Newsletter / Werbung", NICHT "Rechnung" oder "Mahnung".
+- MAHNUNG vs NEWSLETTER: Eine ECHTE Mahnung nennt immer eine konkrete Rechnungsnummer, einen konkreten Betrag und ein Fälligkeitsdatum. Mails die allgemein über Mahnungs-FUNKTIONEN, Mahnungs-MODULE oder Zahlungsprozesse INFORMIEREN sind Newsletter — KEINE Mahnungen! Betreff mit "Erweiterungen", "Highlights", "Partnerlösungen", "exklusive Angebote" ist IMMER Newsletter, egal ob das Wort "Mahnung" vorkommt.
+- noreply@, notification@, info@, newsletter@ Absender-Adressen von Software-Anbietern senden fast nie echte Mahnungen — kritisch prüfen ob es wirklich eine Zahlungsaufforderung mit konkretem Betrag ist.
 
 ROUTING-ENTSCHEIDUNG (PFLICHT — vor der Klassifizierung überlegen!):
 Muss der Benutzer PERSÖNLICH handeln? Oder kann das System die Mail automatisch verarbeiten?
