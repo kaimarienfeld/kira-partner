@@ -13411,7 +13411,7 @@ def build_admin():
       <!-- ══ E-MAIL VERSAND (OAuth2) ══ -->
       <div class="adm-sec" id="adm-sec-smtp">
         <div class="es-grp-h" style="margin-bottom:4px">E-Mail-Versand</div>
-        <div class="es-grp-sub" style="margin-bottom:16px">System-Mails werden über ein bestehendes Mail-Konto mit OAuth2 gesendet — kein separates SMTP-Passwort nötig. <em>Entwickler-Einstellung — nicht in Verkaufsversion sichtbar.</em></div>
+        <div class="es-grp-sub" style="margin-bottom:16px">System-Mails werden über ein bestehendes Mail-Konto mit OAuth2 gesendet — kein separates SMTP-Passwort nötig.</div>
 
         <!-- Absender & System-Empfänger -->
         <div class="es-grp" style="margin-bottom:18px">
@@ -13431,32 +13431,6 @@ def build_admin():
               <div class="adm-field-hint">Wer bekommt System-Benachrichtigungen, Fehler-Reports und Test-Mails</div>
             </div>
             <input id="adm-f-smtp-empf" type="email" class="adm-inp adm-inp-wide" placeholder="kai@raumkult.eu">
-          </div>
-        </div>
-
-        <!-- Partner-View Mails -->
-        <div class="es-grp" style="margin-bottom:18px">
-          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Partner-View Mails</div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Partner-Empfänger (Leni)</div>
-              <div class="adm-field-hint">An wen gehen Einladungen, Passwörter und Update-Mails</div>
-            </div>
-            <input id="adm-f-partner-to" type="email" class="adm-inp adm-inp-wide" placeholder="leni@example.com">
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">BCC-Kopie an</div>
-              <div class="adm-field-hint">Du bekommst eine Blindkopie jeder Partner-Mail (leer = keine Kopie)</div>
-            </div>
-            <input id="adm-f-partner-bcc" type="email" class="adm-inp adm-inp-wide" placeholder="info@raumkult.eu">
-          </div>
-          <div class="adm-field">
-            <div class="adm-field-lbl">
-              <div class="adm-field-key">Partner-View URL</div>
-              <div class="adm-field-hint">Link der in Partner-Mails eingefügt wird</div>
-            </div>
-            <input id="adm-f-partner-url" type="text" class="adm-inp adm-inp-wide" placeholder="https://...">
           </div>
         </div>
 
@@ -13903,11 +13877,6 @@ function admLoadData() {
       if (smtp.system_mail_konto) smtpSel.value = smtp.system_mail_konto;
     }
     setVal('adm-f-smtp-empf', smtp.empfaenger_email);
-    // Partner-View Felder
-    var pv = c.partner_view || {};
-    setVal('adm-f-partner-to', pv.leni_email || '');
-    setVal('adm-f-partner-bcc', pv.leni_mail_bcc || '');
-    setVal('adm-f-partner-url', pv.partner_url || '');
     // SMTP Status-Badge
     var smtpBadge = document.getElementById('adm-smtp-status-badge');
     if (smtpBadge) {
@@ -13992,8 +13961,7 @@ function admSaveSection(section) {
     payload.data = {anthropic_api_key: g('adm-f-anthropic'), github_pat: g('adm-f-github'),
       provider_keys: provKeys, lex_api_key: g('adm-f-lex-key'), lex_api_base_url: g('adm-f-lex-url')};
   } else if (section === 'smtp') {
-    payload.data = {system_mail_konto: g('adm-f-smtp-email'), empfaenger_email: g('adm-f-smtp-empf'),
-      partner_to: g('adm-f-partner-to'), partner_bcc: g('adm-f-partner-bcc'), partner_url: g('adm-f-partner-url')};
+    payload.data = {system_mail_konto: g('adm-f-smtp-email'), empfaenger_email: g('adm-f-smtp-empf')};
   } else if (section === 'passwoerter') {
     var pw1 = g('adm-f-admin-pw'), pw2 = g('adm-f-admin-pw2');
     if (pw1 && pw1 !== pw2) { showToast('Passwörter stimmen nicht überein', 'fehler'); return; }
@@ -25510,21 +25478,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)})
 
-        elif self.path == '/api/partner/settings':
-            # Partner-View Settings aus config.json liefern (Sync mit KIRA Admin)
-            try:
-                pv = CFG.get('partner_view', {})
-                self._json({
-                    'ok': True,
-                    'leni_email': pv.get('leni_email', ''),
-                    'leni_mail_bcc': pv.get('leni_mail_bcc', ''),
-                    'partner_url': pv.get('partner_url', ''),
-                    'leni_notif_method': pv.get('leni_notif_method', 'ntfy'),
-                    'leni_notif_freq': pv.get('leni_notif_freq', 'sofort'),
-                })
-            except Exception as e:
-                self._json({'ok': False, 'error': str(e)})
-
         elif self.path == '/api/tasks/open':
             db = get_db()
             rows = db.execute("SELECT * FROM tasks WHERE status='offen' ORDER BY prioritaet DESC, datum_mail DESC").fetchall()
@@ -31866,30 +31819,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(e)})
             return
 
-        # Partner-View: Settings in config.json speichern (Sync mit KIRA Admin)
-        if self.path == '/api/partner/settings':
-            try:
-                cfg = json.loads((SCRIPTS_DIR / 'config.json').read_text('utf-8'))
-                pv = cfg.setdefault('partner_view', {})
-                if 'leni_email' in body:
-                    pv['leni_email'] = body['leni_email'].strip()
-                if 'leni_mail_bcc' in body:
-                    pv['leni_mail_bcc'] = body['leni_mail_bcc'].strip()
-                if 'partner_url' in body:
-                    pv['partner_url'] = body['partner_url'].strip()
-                if 'leni_notif_method' in body:
-                    pv['leni_notif_method'] = body['leni_notif_method']
-                if 'leni_notif_freq' in body:
-                    pv['leni_notif_freq'] = body['leni_notif_freq']
-                cfg['partner_view'] = pv
-                (SCRIPTS_DIR / 'config.json').write_text(
-                    json.dumps(cfg, ensure_ascii=False, indent=2), 'utf-8')
-                CFG.update(cfg)
-                self._json({'ok': True})
-            except Exception as e:
-                self._json({'ok': False, 'error': str(e)})
-            return
-
         # Partner-View: Leni-Feedback als GitHub-Issue anlegen
         if self.path == '/api/partner/feedback-issue':
             try:
@@ -31997,17 +31926,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     _sys.path.insert(0, str(SCRIPTS_DIR))
                 import mail_monitor as _mm
                 mail_type = body.get('type', 'welcome')
-                _pv_cfg = CFG.get('partner_view', {})
-                to_addr = (body.get('to') or _pv_cfg.get('leni_email') or '').strip()
-                link = body.get('link') or _pv_cfg.get('partner_url') or ''
+                to_addr = (body.get('to') or '').strip()
+                link = body.get('link') or ''
                 if not to_addr:
-                    self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail — bitte im Admin unter E-Mail-Versand eintragen'})
+                    self._json({'ok': False, 'error': 'Keine Empfänger-E-Mail — bitte im Partner-View Admin eintragen'})
                     return
-                bcc_addr = (
-                    body.get('bcc')
-                    or _pv_cfg.get('leni_mail_bcc')
-                    or ''
-                )
+                bcc_addr = (body.get('bcc') or '').strip()
                 if mail_type == 'welcome':
                     subject = 'Du bist dabei! Kira wartet auf dich'
                     text = (
@@ -34689,7 +34613,6 @@ def _method_api_admin_data_get(self):
             "mail_archiv": {"pfad": cfg.get("mail_archiv", {}).get("pfad", "")},
             "backup": cfg.get("backup", {}),
             "cloudflare_tunnel": {k: v for k, v in cfg.get("cloudflare_tunnel", {}).items() if not k.startswith("_")},
-            "partner_view": {k: v for k, v in cfg.get("partner_view", {}).items() if not k.startswith("_")},
             "mail_konten": cfg.get("mail_konten", {}),
         }
         # Aktive Mail-Konten aus Archiver-Config laden (für Absender-Dropdown)
@@ -34758,15 +34681,6 @@ def _method_api_admin_save(self, body):
             if "empfaenger_email" in data:
                 smtp["empfaenger_email"] = data["empfaenger_email"]
             cfg["email_notification"] = smtp
-            # Partner-View Felder
-            pv = cfg.get("partner_view", {})
-            if "partner_to" in data:
-                pv["leni_email"] = data["partner_to"]
-            if "partner_bcc" in data:
-                pv["leni_mail_bcc"] = data["partner_bcc"]
-            if "partner_url" in data:
-                pv["partner_url"] = data["partner_url"]
-            cfg["partner_view"] = pv
             cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
 
         elif section == "smtp_test_ok":

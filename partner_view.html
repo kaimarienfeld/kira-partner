@@ -790,6 +790,10 @@ body{
             <input type="email" class="settings-input" id="cfg-leni-email" placeholder="leni@beispiel.de">
           </div>
           <div class="settings-row">
+            <div class="settings-row-label"><strong>BCC-Kopie an</strong><span>Du bekommst eine Blindkopie jeder Partner-Mail (leer = keine)</span></div>
+            <input type="email" class="settings-input" id="cfg-leni-bcc" placeholder="info@raumkult.eu">
+          </div>
+          <div class="settings-row">
             <div class="settings-row-label"><strong>Benachrichtigung via</strong><span>Leni kann das selbst in ihren Einstellungen anpassen</span></div>
             <select class="settings-select" id="cfg-leni-notif-method">
               <option value="ntfy">ntfy (Push)</option>
@@ -814,10 +818,13 @@ body{
           <button class="btn-export" onclick="sendPasswordMail()" style="border-color:var(--orange);color:var(--orange)">
             🔑 Passwort-Mail senden
           </button>
+          <button class="btn-export" onclick="sendTestUpdateMail()" style="border-color:#22c55e;color:#22c55e">
+            🧪 Test-Benachrichtigung senden
+          </button>
         </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
-          Mail wird über dein lokales Kira-Dashboard gesendet (localhost:8765 muss laufen).<br>
-          E-Mail-Einstellungen werden automatisch mit dem KIRA Admin synchronisiert.
+        <div id="pv-mail-test-result" style="font-size:12px;margin-top:6px;font-weight:600;min-height:18px"></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+          Mail wird über dein lokales Kira-Dashboard gesendet (localhost:8765 muss laufen).
         </div>
       </div>
       <button class="btn-save-settings" onclick="saveAdminSettings()">💾 Einstellungen speichern</button>
@@ -1463,7 +1470,7 @@ function loadAdminSettings() {
     ntfy_leni:CFG.ntfy_leni,ntfy_leni_auto:'1',
     ntfy_leni_msg:'Neue Funktionen bei KIRA Partner! Schau mal rein 🌟',
     gh_token:'',last_push:'',last_push_ok:false,
-    leni_email:'',leni_notif_method:'ntfy',leni_notif_freq:'sofort'
+    leni_email:'',leni_bcc:'',leni_notif_method:'ntfy',leni_notif_freq:'sofort'
   };
   const stored=JSON.parse(localStorage.getItem('kira_pv_admin')||'{}');
   const result=Object.assign(defaults, stored);
@@ -1496,20 +1503,12 @@ function saveAdminSettings() {
     ntfy_leni_msg: document.getElementById('cfg-ntfy-leni-msg').value.trim(),
     gh_token:           document.getElementById('cfg-gh-token').value.trim()||s.gh_token||'',
     leni_email:         document.getElementById('cfg-leni-email').value.trim(),
+    leni_bcc:           document.getElementById('cfg-leni-bcc').value.trim(),
     leni_notif_method:  document.getElementById('cfg-leni-notif-method').value,
     leni_notif_freq:    document.getElementById('cfg-leni-notif-freq').value,
     last_push: s.last_push, last_push_ok: s.last_push_ok
   };
   localStorage.setItem('kira_pv_admin', JSON.stringify(upd));
-  // Sync relevante Felder nach config.json (KIRA Admin)
-  fetch('http://localhost:8765/api/partner/settings',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      leni_email: upd.leni_email,
-      leni_notif_method: upd.leni_notif_method,
-      leni_notif_freq: upd.leni_notif_freq
-    })
-  }).catch(()=>{});
   showToast('Einstellungen gespeichert! Jetzt im Tab "GitHub Sync" pushen.','✓');
 }
 function fillAdminForm() {
@@ -1523,15 +1522,9 @@ function fillAdminForm() {
   document.getElementById('cfg-ntfy-leni-msg').value  = s.ntfy_leni_msg;
   document.getElementById('cfg-gh-token').value           = s.gh_token;
   document.getElementById('cfg-leni-email').value         = s.leni_email;
+  document.getElementById('cfg-leni-bcc').value           = s.leni_bcc;
   document.getElementById('cfg-leni-notif-method').value  = s.leni_notif_method;
   document.getElementById('cfg-leni-notif-freq').value    = s.leni_notif_freq;
-  // Sync mit KIRA config.json — überschreibt localStorage-Werte mit Server-Stand
-  fetch('http://localhost:8765/api/partner/settings').then(r=>r.json()).then(d=>{
-    if(!d.ok) return;
-    if(d.leni_email) document.getElementById('cfg-leni-email').value=d.leni_email;
-    if(d.leni_notif_method) document.getElementById('cfg-leni-notif-method').value=d.leni_notif_method;
-    if(d.leni_notif_freq) document.getElementById('cfg-leni-notif-freq').value=d.leni_notif_freq;
-  }).catch(()=>{/* Kira-App offline — localStorage-Werte bleiben */});
   const dot=document.getElementById('sync-dot'),label=document.getElementById('sync-label'),sub=document.getElementById('sync-sub');
   if (s.last_push) {
     dot.className = s.last_push_ok ? 'sync-dot ok' : 'sync-dot warn';
@@ -1629,22 +1622,55 @@ async function _sendLeniMail(type) {
   const s=loadAdminSettings();
   const email=document.getElementById('cfg-leni-email').value.trim()||s.leni_email||'';
   if(!email){showToast('Bitte Lenis E-Mail eintragen','⚠️');return;}
-  const payload={type,to:email,link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`};
+  const bcc=document.getElementById('cfg-leni-bcc').value.trim()||s.leni_bcc||'';
+  const payload={type,to:email,bcc:bcc,link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`};
   if(type==='password'){
     const pw=s.pw_leni||CFG.pw_leni;
     if(!pw){showToast('Kein Leni-Passwort gesetzt','⚠️');return;}
     payload.password=pw;
   }
+  const resEl=document.getElementById('pv-mail-test-result');
   try{
     const r=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
     });
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`HTTP ${r.status}`);}
-    showToast(type==='welcome'?'Willkommens-Mail gesendet!':'Passwort-Mail gesendet!',type==='welcome'?'📧':'🔑');
-  }catch(e){showToast('Fehler: '+e.message+' — Kira-App aktiv?','✗');}
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error||`HTTP ${r.status}`);
+    const label=type==='welcome'?'Willkommens-Mail':type==='password'?'Passwort-Mail':'Update-Benachrichtigung';
+    const via=d.via?' (via '+d.via+')':'';
+    if(resEl){resEl.textContent='\u2705 '+label+' gesendet an '+email+(bcc?' + BCC: '+bcc:'')+via;resEl.style.color='#22c55e';}
+    showToast(label+' gesendet!'+via,type==='welcome'?'\u{1f4e7}':type==='password'?'\u{1f511}':'\u{1f9ea}');
+  }catch(e){
+    if(resEl){resEl.textContent='\u274c Fehler: '+e.message;resEl.style.color='#ef4444';}
+    showToast('Fehler: '+e.message+' \u2014 Kira-App aktiv?','\u2717');
+  }
 }
 function sendWelcomeMail(){_sendLeniMail('welcome');}
 function sendPasswordMail(){_sendLeniMail('password');}
+async function sendTestUpdateMail(){
+  // Sendet eine Test-Update-Benachrichtigung an BCC (oder Leni falls kein BCC)
+  const s=loadAdminSettings();
+  const bcc=document.getElementById('cfg-leni-bcc').value.trim()||s.leni_bcc||'';
+  const leni=document.getElementById('cfg-leni-email').value.trim()||s.leni_email||'';
+  const testTo=bcc||leni;
+  if(!testTo){showToast('Bitte BCC oder Leni-E-Mail eintragen','\u26a0\ufe0f');return;}
+  const resEl=document.getElementById('pv-mail-test-result');
+  if(resEl){resEl.textContent='\u23f3 Sende Test-Mail an '+testTo+'...';resEl.style.color='var(--text-muted)';}
+  const payload={type:'update',to:testTo,bcc:'',link:`https://${CFG.gh_owner}.github.io/${CFG.gh_repo}`};
+  try{
+    const r=await fetch('http://localhost:8765/api/partner/send-leni-mail',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error||`HTTP ${r.status}`);
+    const via=d.via?' (via '+d.via+')':'';
+    if(resEl){resEl.textContent='\u2705 Test-Mail gesendet an '+testTo+via;resEl.style.color='#22c55e';}
+    showToast('Test-Benachrichtigung gesendet!'+via,'\u{1f9ea}');
+  }catch(e){
+    if(resEl){resEl.textContent='\u274c Fehler: '+e.message;resEl.style.color='#ef4444';}
+    showToast('Fehler: '+e.message+' \u2014 Kira-App aktiv?','\u2717');
+  }
+}
 
 /* ─────────────────────────────────────────────────────────────
    GITHUB PUSH
