@@ -1767,21 +1767,28 @@ def build_kommunikation(tasks):
     # Stats basierend auf GRUPPIERTEN Konversationen (= sichtbare Items)
     n_offen = len(_grouped_pre)
     n_leads    = sum(1 for t in _grouped_pre if t.get("kategorie") == "Neue Lead-Anfrage")
-    n_angebote = sum(1 for t in _grouped_pre if t.get("kategorie") == "Angebotsrückmeldung" or t.get("kategorie") == "Angebotsrueckmeldung")
+    n_angebote = sum(1 for t in _grouped_pre if t.get("kategorie") in ("Angebotsrückmeldung", "Angebotsrueckmeldung"))
     n_dringend = sum(1 for t in _grouped_pre if (t.get("prioritaet","") or "").lower() == "hoch")
 
     # Segment counts — aus gruppierten Tasks
+    # Kategorie-Normalisierung: ASCII-Varianten auf Umlaut-Form mappen
+    _KAT_MAP = {"Angebotsrueckmeldung": "Angebotsrückmeldung"}
+    _KNOWN_KATS = {"Antwort erforderlich", "Neue Lead-Anfrage", "Angebotsrückmeldung", "Zur Kenntnis", "Shop / System"}
     seg_counts = {
         "Antwort erforderlich": 0,
         "Neue Lead-Anfrage":    0,
         "Angebotsrückmeldung":  0,
         "Zur Kenntnis":         0,
         "Shop / System":        0,
+        "Sonstiges":            0,
     }
     for t in _grouped_pre:
         kat = t.get("kategorie","")
-        if kat in seg_counts:
-            seg_counts[kat] += 1
+        mapped = _KAT_MAP.get(kat, kat)
+        if mapped in _KNOWN_KATS:
+            seg_counts[mapped] += 1
+        else:
+            seg_counts["Sonstiges"] += 1
 
     stats_parts = [f'<span class="km-stat km-stat-link" onclick="jumpToSeg(\'alle\')"><b>{n_offen}</b> offen</span>']
     if n_leads:    stats_parts.append(f'<span class="km-stat km-stat-link" onclick="jumpToSeg(\'Neue Lead-Anfrage\')"><b>{n_leads}</b> neue Leads</span>')
@@ -1808,6 +1815,7 @@ def build_kommunikation(tasks):
         ("Angebotsrückmeldung",   "Angebotsrückm.",       seg_counts["Angebotsrückmeldung"]),
         ("Zur Kenntnis",          "Zur Kenntnis",         seg_counts["Zur Kenntnis"]),
         ("Shop / System",         "Newsletter / System",  seg_counts["Shop / System"]),
+        ("sonstiges",             "Sonstiges",            seg_counts["Sonstiges"]),
         ("zusagen",               "Offene Zusagen",       n_zusagen),
     ]
     segs_html = '<div class="km-seg" id="km-seg-nav">'
@@ -18984,7 +18992,18 @@ function applyKommFilters2() {{
     const wtitle  = wi.querySelector('.wi-title')?.textContent||'';
     const wsum    = wi.querySelector('.wi-sum')?.textContent||'';
     let show = true;
-    if(tab && tab !== 'alle' && wkat !== tab) show = false;
+    if(tab && tab !== 'alle') {{
+      if(tab === 'sonstiges') {{
+        // Sonstiges: Items zeigen die NICHT in den Haupt-Kategorien sind
+        const _hauptKats = ['Antwort erforderlich','Neue Lead-Anfrage','Angebotsrückmeldung','Angebotsrueckmeldung','Zur Kenntnis','Shop / System'];
+        if(_hauptKats.includes(wkat)) show = false;
+      }} else if(tab === 'Angebotsrückmeldung') {{
+        // Auch ASCII-Variante matchen
+        if(wkat !== 'Angebotsrückmeldung' && wkat !== 'Angebotsrueckmeldung') show = false;
+      }} else {{
+        if(wkat !== tab) show = false;
+      }}
+    }}
     if(nurAntwort && !wantwort) show = false;
     if(nurFotos   && !wfotos)   show = false;
     if(nurAnhang  && !wanhang)  show = false;
@@ -19175,8 +19194,11 @@ function _kmUpdateBadgesAfterAction(kat, count) {{
     const isAlleTab = label === 'Alle';
     // Prüfe ob dieser Tab zur Kategorie passt
     const tabKatMap = {{'Antwort erforderlich':'Antwort erforderlich','Neue Leads':'Neue Lead-Anfrage','Angebotsrückm.':'Angebotsrückmeldung','Zur Kenntnis':'Zur Kenntnis','Newsletter / System':'Shop / System'}};
-    const matchesKat = tabKatMap[label] === kat;
-    if(isAlleTab || matchesKat) cnt.textContent = Math.max(0, cur - n);
+    const hauptKats = ['Antwort erforderlich','Neue Lead-Anfrage','Angebotsrückmeldung','Angebotsrueckmeldung','Zur Kenntnis','Shop / System'];
+    const matchesKat = tabKatMap[label] === kat || (tabKatMap[label] === 'Angebotsrückmeldung' && kat === 'Angebotsrueckmeldung');
+    const isSonstigesTab = label === 'Sonstiges';
+    const katIsSonstiges = !hauptKats.includes(kat);
+    if(isAlleTab || matchesKat || (isSonstigesTab && katIsSonstiges)) cnt.textContent = Math.max(0, cur - n);
   }});
   // 2. Header-Badge dekrementieren ("41 offen")
   const hdrBadge = document.getElementById('headerBadgeCount');
@@ -19194,19 +19216,20 @@ function _kmUpdateBadgesAfterAction(kat, count) {{
   }});
 }}
 function _kmClearOrNextPreview(removedId) {{
-  // Nach Aktion: nächsten Task selektieren oder leeren Zustand zeigen
+  // Nach Aktion: nächsten SICHTBAREN Task selektieren (nur im aktiven Tab-Filter)
   setTimeout(()=>{{
-    const remaining = document.querySelectorAll('#km-items .wi:not([style*="opacity"])');
-    if(remaining.length > 0) {{
-      // Nächsten Task selektieren
-      const nextId = remaining[0].id?.replace('task-','');
+    const all = document.querySelectorAll('#km-items .wi');
+    const visible = Array.from(all).filter(el =>
+      el.style.display !== 'none' && el.style.opacity !== '0.2' && el.id !== 'task-'+removedId
+    );
+    if(visible.length > 0) {{
+      const nextId = visible[0].id?.replace('task-','');
       if(nextId) selectKommItem(parseInt(nextId));
     }} else {{
-      // Leerer Zustand
       const el = document.getElementById('km-ctx-content');
       if(el) el.innerHTML = '<div class="km-ctx-empty"><span style="font-size:36px;opacity:.2">&#x2714;</span><span>Alle Aufgaben erledigt</span><span style="font-size:11px;opacity:.6">Keine weiteren Aufgaben in dieser Ansicht</span></div>';
     }}
-  }}, 400); // nach der fade-out Animation (320ms)
+  }}, 400);
 }}
 
 // Status setzen + KI-Lern-Eintrag speichern (einzeln, nicht bulk)
@@ -19336,8 +19359,17 @@ async function multiAction(status) {{
         const label = tab.textContent.replace(/\\d+$/,'').trim();
         if(label === 'Alle') {{ cnt.textContent = allItems.length; return; }}
         const tabKatMap = {{'Antwort erforderlich':'Antwort erforderlich','Neue Leads':'Neue Lead-Anfrage','Angebotsrückm.':'Angebotsrückmeldung','Zur Kenntnis':'Zur Kenntnis','Newsletter / System':'Shop / System'}};
+        if(label === 'Sonstiges') {{
+          const hauptKats = ['Antwort erforderlich','Neue Lead-Anfrage','Angebotsrückmeldung','Angebotsrueckmeldung','Zur Kenntnis','Shop / System'];
+          cnt.textContent = Array.from(allItems).filter(el=>!hauptKats.includes(el.dataset.kat||'')).length;
+          return;
+        }}
         const kat = tabKatMap[label];
-        if(kat) cnt.textContent = document.querySelectorAll('#km-items .wi[data-kat="'+kat+'"]').length;
+        if(kat) {{
+          let c = document.querySelectorAll('#km-items .wi[data-kat="'+kat+'"]').length;
+          if(kat==='Angebotsrückmeldung') c += document.querySelectorAll('#km-items .wi[data-kat="Angebotsrueckmeldung"]').length;
+          cnt.textContent = c;
+        }}
       }});
     }}, 400);
     _kmClearOrNextPreview(0);
