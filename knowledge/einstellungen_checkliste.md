@@ -150,6 +150,15 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Geschäfts-Kontext | `cfg-llm-geschaeft` / `llm.geschaeftsdaten_teilen` | session-t |
 | ✅ | Konversations-Kontext | `cfg-llm-konv` / `llm.konversationen_speichern` | session-t |
 
+### 6b-2. Chat-Gedächtnis (neu session-qq-cont6)
+| Status | Element | ID / Schlüssel | Anmerkung |
+|--------|---------|---------------|-----------|
+| ✅ | Verlauf speichern Toggle | `cfg-llm-konv` / `llm.konversationen_speichern` | Dimmt Detail-Bereich wenn deaktiviert |
+| ✅ | Nachrichten pro Gespräch | `cfg-llm-kontext-msgs` / `llm.kontext_nachrichten` | Slider 2–50, Default 20, Token-Kosten-Anzeige farbcodiert |
+| ✅ | Token-Kosten-Visualisierung | — | Gradient-Leiste + Erklärungs-Karte (2–10 kurz / 20 empfohlen / 30–50 lang) |
+| ✅ | History an LLM übergeben | `kira_llm.py:chat()` | conversation_history an _call_anthropic/_call_openai_compat, session-qq-cont6 |
+| 📋 | Chat-Projekte (wie OpenAI) | — | Chat-Liste, Ordner, Fortsetzen, Umbenennen, Archivieren |
+
 ### 6c. Mail-Klassifizierung / Budget-Modell (neu session-t)
 | Status | Element | ID / Schlüssel | Anmerkung |
 |--------|---------|---------------|-----------|
@@ -223,6 +232,12 @@ _session-t: Server-Einstellungen hierher verschoben (war: Aufgabenlogik). LLM-Ko
 | ✅ | Als gelesen markieren Einstellung | `cfg-lese-markierung` / `mail_postfach.lese_markierung` | sofort/5s/30s/manuell |
 | ✅ | Pane-Resize Persistenz | `localStorage pf_pane_w` | pfInitResize() fix |
 | ✅ | Sidebar-Badge (alle Posteingänge) | `_pfTotalUnread` | Alle Konten korrekt gezählt |
+| ✅ | Favoriten Ungelesen-Filter | `_pfUnreadOnly` / `&unread=1` | Favoriten-Ordner "Ungelesen" zeigt nur ungelesene Mails, session-qq-cont4 |
+| ✅ | Badge-Sofort-Update | `_pfAdjustUnreadBadge()` | Ordner+Favoriten+Sidebar Badges ohne Server-Roundtrip, session-qq-cont4 |
+| ✅ | Kein-Flackern Auto-Refresh | `pfStartAutoRefresh()` | Banner "N neue Mails" statt Liste zerstören, Scroll-Erhalt, session-qq-cont4 |
+| ✅ | Preview-Reset bei Ordnerwechsel | `_pfClearPreview()` | 4 Folder-Switch-Funktionen, session-qq-cont5 |
+| ✅ | Preview nach Entfernung | `_pfAfterItemRemoved()` | Nächste Mail oder leer, konfigurierbar, session-qq-cont5 |
+| ✅ | Einstellung: Nach Entfernung | `cfg-after-remove` / `mail_postfach.after_remove` | next/none Select, session-qq-cont5 |
 | 💡 | Kira markiert verwendete Mails | `kira_llm.py` | kira_verwendet in _build_data_context() |
 | 💡 | Sortierung (Datum/Absender/Betreff) | – | Sortier-Header in mid-hdr |
 | 💡 | Mail-Suche global | – | Aktuell nur in Ordner |

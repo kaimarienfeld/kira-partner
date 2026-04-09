@@ -324,3 +324,58 @@
 - **Kira-says:** Template-basiert pro Item-Typ (kein LLM nötig).
 - **Revival:** Rechnungen kommen nach config.activity_feed.revival_tage (Default 7) wieder wenn noch offen. Einstellbar.
 **Status:** erledigt
+
+---
+
+## 2026-04-09 08:30 — Session-qq-cont4: Universal Learning + CRM-Notizen
+**Auftrag:** Kais Anforderung: "Kein Button ohne Hinterlegen — jede Aktion muss für CRM/Kundenhistorie erfasst werden, damit Kira lernt und später im CRM steht was gemacht wurde, nicht nur Erledigt+Datum."
+
+### Fixes (3 Commits: 014f6fa, aab9f3d, 20cc368):
+1. **Task-Persistence-Bug** (014f6fa): kira_proaktiv.py _task_exists() Status-Filter entfernt + Kaskaden-Status-Änderung für Lead-Erinnerungen
+2. **Korrektur-Aktionsvorschlag** (aab9f3d): LLM generiert Aktionsvorschlag + Antwort-Entwurf statt nur "Korrektur gespeichert". In-Place Preview statt location.reload()
+3. **Universal Notiz/Learning** (20cc368):
+   - _doStatusChange: sendet notiz+einstufung → Task-Datensatz
+   - saveIgnorieren: Grund als notiz
+   - multiAction: prompt()-Dialog für Sammelkommentar
+   - capMarkErledigt/capArchivieren: prompt()-Dialog + payload_json
+   - _zusageErledigt/_zusageVerschieben: prompt()-Dialog + ALTER TABLE notiz
+   - quickErledigt/quickKenntnis: Default-Notiz statt leer
+   - mailApproveAction reject: prompt() für reject_reason
+**Status:** erledigt
+
+## 2026-04-09 09:10 — session-qq-cont5: Preview-Persistenz behoben
+**Auftrag:** Vorschaufenster bleibt nach Entfernung/Ordnerwechsel stehen — muss geleert werden + Einstellung next/none
+**Änderungen:**
+1. `_pfClearPreview()` bei jedem Ordnerwechsel (4 Funktionen)
+2. `_pfAfterItemRemoved()` zeigt nächste Mail oder leere Vorschau
+3. `pfBulkDelete` + `pfVerschiebenNach` nutzen `_pfAfterItemRemoved`
+4. Neue Einstellung "Nach Entfernung aus Liste" (next/none) unter Mail > Postfach
+5. Config `mail_postfach.after_remove` wird geladen + gespeichert
+**Git:** 8064d32
+**Status:** erledigt
+
+## 2026-04-09 09:30 — session-qq-cont6: Kira Chat-Kontext Fix
+**Auftrag:** Kira verliert nach jeder Antwort den Kontext — bei Folgefragen ("Ja, plane das bitte so ein") antwortet sie "Du musst mir schon etwas mehr Kontext geben"
+**Root-Cause:** `_call_anthropic()` + `_call_openai_compat()` starteten immer mit nur 1 Nachricht (aktuelle User-Message). Die in `kira_konversationen` gespeicherte History wurde nie an die LLM-API übergeben.
+**Fix:**
+1. `chat()` lädt bisherige Session-Messages aus DB nach `_save_message()`
+2. Max 20 Nachrichten (konfigurierbar via `llm.kontext_nachrichten`)
+3. Letzte User-Msg abgeschnitten (wird von `_call_*` selbst hinzugefügt)
+4. Anthropic: History vor aktuelle Nachricht im messages-Array
+5. OpenAI: History nach System-Prompt, vor aktuelle Nachricht
+**Git:** b026baf
+**Status:** erledigt
+
+### 2026-04-09 09:50 — Chat-Gedächtnis Einstellungen-UI + Checklisten
+**Auftrag:** Einstellung für kontext_nachrichten in Einstellungen-UI + auf Checklisten aufnehmen (Chat-Projekte wie OpenAI)
+**Änderungen:**
+1. Neue Gruppe "🧠 Chat-Gedächtnis" in Einstellungen > Kira/LLM mit:
+   - Verlauf speichern Toggle (dimmt Details wenn deaktiviert)
+   - Slider 2–50 Nachrichten mit Live-Token-Kosten-Anzeige (farbcodiert grün/gelb/rot)
+   - Gradient-Leiste + Erklärungs-Karte (2–10 kurz / 20 Standard / 30–50 lang)
+2. saveSettings() speichert `llm.kontext_nachrichten`
+3. feature_registry: `kira-chat-kontext` (done) + `kira-chat-projekte` (planned)
+4. Todo_checkliste §6b-2: 3× ✅ done, 3× 📋 planned (Projekte, Suche, Export)
+5. Weitere Todos: Chat-Projekte vorgemerkt
+**Git:** 2aee293
+**Status:** erledigt

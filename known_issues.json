@@ -1,5 +1,5 @@
 {
-  "_updated": "2026-04-08 23:45 session-pp-cont4 — Artikel-Preise, Routing, Klassifizierung",
+  "_updated": "2026-04-09 10:00 session-qq-cont6 — Postfach-Fixes, Kira Chat-Kontext",
   "_note": "Bekannte Probleme die noch nicht behoben sind. Vor Arbeit an betroffenem Modul lesen.",
   "issues": [
     {
@@ -540,6 +540,71 @@
       "discovered": "2026-04-08 23:30 MEZ",
       "session": "session-pp-cont4",
       "workaround": "Chrome komplett schließen und über Startmenü (ohne --no-sandbox) neu öffnen. Taskbar-Pin ggf. prüfen."
+    },
+    {
+      "id": "ISS-040",
+      "status": "fixed",
+      "priority": "high",
+      "module": "scripts/server.py",
+      "area": "postfach",
+      "title": "Postfach Favoriten Ungelesen-Filter zeigt alle Mails statt nur ungelesene",
+      "description": "Favoriten-Ordner 'Ungelesen info@raumkult' mit 4 ungelesenen Mails zeigte ALLE Mails. Gelesene Mails blieben sichtbar. Kein unread-Filter existierte auf API- oder Client-Seite.",
+      "discovered": "2026-04-09 06:00 MEZ",
+      "fixed": "2026-04-09 07:00 MEZ",
+      "session": "session-qq-cont4",
+      "fix_summary": "_pfUnreadOnly State + &unread=1 Query-Param + WHERE gelesen=0 Backend-Filter. Commit e1f3c46."
+    },
+    {
+      "id": "ISS-041",
+      "status": "fixed",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "postfach",
+      "title": "Ungelesene-Nachrichten-Badges aktualisieren sich nicht sofort",
+      "description": "Badge-Zahlen (Unread-Counts) auf Ordnern und Favoriten änderten sich erst nach Server-Refresh (Minuten) oder Page-Reload. Nicht sofort beim Lesen.",
+      "discovered": "2026-04-09 07:00 MEZ",
+      "fixed": "2026-04-09 07:30 MEZ",
+      "session": "session-qq-cont4",
+      "fix_summary": "_pfAdjustUnreadBadge() für Ordner-Tree + Favoriten + Sidebar-Gesamtzahl ohne Server-Roundtrip. Commit 389aa15."
+    },
+    {
+      "id": "ISS-042",
+      "status": "fixed",
+      "priority": "high",
+      "module": "scripts/server.py",
+      "area": "postfach",
+      "title": "Auto-Refresh alle 60s lässt Mail-Liste 2-3 Sekunden verschwinden",
+      "description": "Alle 60 Sekunden verschwanden alle Mails für 2-3 Sekunden während pfLoadList(true) die Liste neu aufbaute. Scrollbar sprang nach oben. Massiv störend beim Lesen.",
+      "discovered": "2026-04-09 07:30 MEZ",
+      "fixed": "2026-04-09 08:00 MEZ",
+      "session": "session-qq-cont4",
+      "fix_summary": "pfStartAutoRefresh() komplett neu: Badge-only Updates + 'N neue Mails'-Banner statt Liste zerstören. Scroll-Position-Wiederherstellung. Commit 992d492."
+    },
+    {
+      "id": "ISS-043",
+      "status": "fixed",
+      "priority": "medium",
+      "module": "scripts/server.py",
+      "area": "postfach",
+      "title": "Preview-Fenster bleibt nach Entfernung/Ordnerwechsel stehen",
+      "description": "Bei Ordnerwechsel oder nach Löschen/Verschieben/Gelesen-Markieren blieb die alte Mail-Vorschau stehen statt 'Keine E-Mail ausgewählt'. Verwirrend bei Kontowechsel.",
+      "discovered": "2026-04-09 08:00 MEZ",
+      "fixed": "2026-04-09 09:15 MEZ",
+      "session": "session-qq-cont5",
+      "fix_summary": "_pfClearPreview() bei Ordnerwechsel (4 Funktionen), _pfAfterItemRemoved() bei Entfernung, Einstellung after_remove (next/none). Commit 8064d32."
+    },
+    {
+      "id": "ISS-044",
+      "status": "fixed",
+      "priority": "critical",
+      "module": "scripts/kira_llm.py",
+      "area": "kira",
+      "title": "Kira verliert Kontext nach jeder Antwort — Chat-History wird nicht an LLM übergeben",
+      "description": "Kira konnte sich im Chat nichts merken. Bei Folgefragen wie 'Ja bitte' antwortete sie 'Du musst mir schon etwas mehr Kontext geben'. Root-Cause: _call_anthropic()/_call_openai_compat() starteten immer mit nur 1 Nachricht. kira_konversationen-History wurde nie geladen.",
+      "discovered": "2026-04-09 09:20 MEZ",
+      "fixed": "2026-04-09 09:35 MEZ",
+      "session": "session-qq-cont6",
+      "fix_summary": "chat() lädt Session-History aus DB (max 20, konfigurierbar llm.kontext_nachrichten) und übergibt als conversation_history. Commit b026baf."
     }
   ]
 }

@@ -38,22 +38,42 @@
 
 \### Organisation-Tab (Termine/Fristen/Rückrufe) — im Überblick beschrieben, aber kein eigenständiger UI-Rebuild dokumentiert
 
-
-### Im Postfach Empfänger Auto vervollständigung
-Wenn man Im Postfach eine neue E-Mail schreibt Oder auch bei Weiterleitungen Sollte wenn man schon einmal eine E-Mail Adresse eingegeben hat Diese dann beim nächsten Mal durch Autovervollständigung Vorgeschlagen werden Punkt bitte die dafür nötigen Funktionen Einbauen 
+ 
  
 
-### Postfach Favorit Ungelesen Gefiltert
+### ✅ ERLEDIGT Postfach Favorit Ungelesen Gefiltert
 Im Postfach Habe ich Bei dem Favoriten Mehrere Konten Angelegt mit den Posteingänge der ungelesenen Nachrichten. Aber Es werden Trotzdem Alle E-Mails angezeigt. Selbst wenn Eine E-Mail alles gelesen markiere Bleibt die Gelesene Nachricht trotzdem In diesen Eigentlich vorgefilterten Ordner stehen. Du siehst es am Screenshot Ausgewählt ist der Ordner ungelesenen Info Raumkult Mit 4 ungelesenen Nachrichten Aber es werden Alle Schon gelesenen angezeigt Punkt bitte das beheben
 
-### Postfach Ungelesene Nachrichten Batches
+### ✅ ERLEDIGT Postfach Ungelesene Nachrichten Batches
 In allen Postfächern Dauert es extrem lange Bis die Zahl der Patches Mit Ungelesene Nachrichten Sich verändert. Habe ich nun mehrere Nachrichten gelesen Verändert sich die Zahl nicht Komma oder Manchmal erst nach Aktualisierung. Das dauert Zu lange. Sobald ich eine Nachricht gelesen habe Muss sofort Die Zahl sich Um eine reduzieren, ansonsten ist das Verwirrend. Nur soll es nicht so sein dass ständig die Seite Aktualisiert wird Punkt durch das Aktualisieren Der Postfächer Verschwinden Immer für 2-3 Sekunden Alle E-Mails. Das ist kein Gutes Arbeiten Keine Gute User Experience Punkt dafür muss es eine andere Lösung geben Vielleicht Durch Anlegen einer Datenquelle die dann aktualisiert wird ohne dass jedes Mal das Postfach Die E-Mails Kurz für 2-3 Sekunden weg sind.
 
-### Aktualierung Der Postfäch Immer Mit Kurzem verschwinden Der E-Mails
+### ✅ ERLEDIGT (session-qq-cont4, commit 992d492) Aktualierung Der Postfäch Immer Mit Kurzem verschwinden Der E-Mails
 Es muss Lösung gefunden werden Dass man nicht bemerkt wenn sich das Postfach aktualisiert Man hat immer eine Lücke Von 2 Sekunden Wo dann auch das Krollbalken Im Posteingang wieder nach oben springt Komma wenn man gerade eine E Mail weiter unten bearbeitet hat Springt bei Aktualisierung Die Der Scrollbal Ganz nach oben Und man muss wieder nach unten scrollen zu der E-Mail wo man war. Keine gute Lösung bitte das beheben dass man nicht mitbekommen wenn aktualisiert wird Das muss irgendwie im Hintergrund laufen Ohne eine Veränderung in der UI.
 
-### Postfach Inhaltsfenster Bleibt von der Mail Die Entfernt wurde
-Das Inhaltsfenster von der E-Mail Die entfernt wurde Bleibt Offen Im Inhaltsfenster Es wird dann Kein Fenster angezeigt zulesen des Element auswählen wie das im Standortmodus sein sollte. beziehungsweise anpassbar Über das Einstellungsmenü Im Postfach, Ob das nächste Element angezeigt werden soll Oder keins In dem Vorschaufenster beziehungsweise in dem Inhaltsfenster der E-mail
+### ✅ ERLEDIGT (session-qq-cont5, commit 8064d32) Postfach Inhaltsfenster Bleibt von der Mail Die Entfernt wurde
+Das Inhaltsfenster von der E-Mail Die entfernt wurde Bleibt Offen Im Inhaltsfenster Es wird dann Kein Fenster angezeigt zulesen des Element auswählen wie das im Standortmodus sein sollte. beziehungsweise anpassbar Über das Einstellungsmenü Im Postfach, Ob das nächste Element angezeigt werden soll Oder keins In dem Vorschaufenster beziehungsweise in dem Inhaltsfenster der E-mail ### Außerdem angenommen ich habe in Anfrage Raumkult im Posteingang eine E-Mail ausgewählt Ob die dann gelesen im Vorschaufenster Und gehe dann auf einen anderen Ordner Also ein Ordnerwechsel Zur Rechnungen Sicht Beton Dort Posteingang , Dann bleibt trotzdem In der E Fensterseite die Nachricht noch stehen Die vorher bei Anfrage Raumkult ausgewählt war . Es sollte aber so sein, sobald ein Ordnerwechsel Stattfindet Dass dann die Nachricht Im Vorschaufenster beziehungsweise im E-Mail Fenster Nicht mehr angezeigt wird und dann dort steht Keine E-Mail ausgewählt , Weil das ist verwirrend wenn zum Beispiel noch die E-Mail aus Anfrage Raumkult Stet aber schon die E-Mails angezeigt werden Von Rechnung Sichtbeton Komma dann denkt man sofort Die E Mail wäre Von Rechnung sichtbeton Ist sie aber nicht  
+
+### Postfach keine E-Mail Darstellung gleicht der wirklichen Darstellung
+
+
+### Signaturen in e-mails
+
+
+### ✅ ERLEDIGT (session-qq-cont6, commit b026baf + 2aee293) Kira verliert nach jeder antwort im Chat den kontext
+Zum Beispiel wenn ich mit Kira chatte egal aus welcher Situation heraus ob es aus dem Postfach mit Kira sprechen oder ob es Mit Kira sprechen aus der Kommunikation ist ich stelle eine Frage sie antwortet Und sie fragt mich dann zum Beispiel soll ich das so einplanen Und ich schreibe dann in der nächsten Nachricht An sie ja planen das bitte so ein Komma Dann kommt von ihr direkt eine Meldung Du musst mir schon etwas mehr Kontext geben um was es geht Punkt also So in der Art Punkt also sie verliert von Nachricht zu Nachricht den Kontext und gespeichert den nicht. offensichtlich fehlt hier eine Datenbank Wo die Chats gespeichert werden. Das wäre Eigentlich Sinnvoll genauso wie es bei openai ist oder Bei Claude. -- In dem Zug wäre es vielleicht auch interessant wenn man Jet Speichert dass man wie bei Open AI Projekte anlegen kann Komma aber erst mal zu dem Vorrangig Bug  
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -225,7 +245,7 @@ Funktioniert?
 
 
 
-&#x20;### Die Anzahl der Ungelesene Nachrichten im Batch Symbol Der Haupt Sidebar Vom Postfach Stimmt nicht. bitte Alle Posteingänge Von allen Postfächern Einbeziehen "D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-30 050052.png"
+&#x20;### ✅ ERLEDIGT (session-qq-cont4, commit 389aa15) Die Anzahl der Ungelesene Nachrichten im Batch Symbol Der Haupt Sidebar Vom Postfach Stimmt nicht. bitte Alle Posteingänge Von allen Postfächern Einbeziehen "D:\\OneDrive - rauMKult Sichtbeton\\01\_BILDER\\Screenshots\\Screenshot 2026-03-30 050052.png"
 
 
 
@@ -288,7 +308,12 @@ Hierzu finde ich es sinnvoll Für Kira Im schon vorhandenen Postfach ein eigenes
 
 
 
-###### **### Kira-Konversations-Gedächtnis (3-Tier Memory)**
+###### **### ✅ TEILWEISE ERLEDIGT (session-qq-cont6) Kira-Konversations-Gedächtnis (3-Tier Memory)**
+
+✅ Chat-History an LLM übergeben (commit b026baf) — Kira merkt sich jetzt den Gesprächsverlauf
+✅ Einstellungen-UI "Chat-Gedächtnis" mit Slider + Token-Kosten-Anzeige (commit 2aee293)
+📋 Chat-Projekte (wie OpenAI) — vorgemerkt, DB vorbereitet
+📋 3-Tier Memory (Kurzzeit/Session/Langzeit) — noch offen
 
 unbedingt einstellungen dazu hinzufügen sinnvoll bei schon vorhandenen KIRA Tab oder wenn nicht, neu erstellen (Einzelseiten nicht überladen! sinvolle untermenüs oder fenster einbauen like Postfach OAuth verbindungsassistent). mit empfehlung vorausfüllen- beschreiben detaiert was es macht und wie sich änderungen auswirken, evtl als popup oder sprechblase durch info btn
 

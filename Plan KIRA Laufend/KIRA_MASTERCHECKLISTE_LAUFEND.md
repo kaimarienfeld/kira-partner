@@ -511,6 +511,9 @@
 | 2026-04-02 | session-ttt: C-08..C-14 eingetragen + behoben (ARCHIVER_DIR-Pfad, OAuth-Liste, Reconnect, SMTP-Migration, Case-Insensitive, Admin-Badge, Quill-CDN) |
 | 2026-04-02 | session-uuu: C-15 eingetragen + behoben (Lexware Belege-Sync HTTP-400 + fehler_details-Array) |
 | 2026-04-02 | session-zzz: D-01/D-02/D-11 als erledigt verifiziert. Alle open_tasks geprueft: 9 von 13 waren bereits implementiert. Statistik 43/47 (3 Kai-Aktionen, 1 langfristig) |
+| 2026-04-09 | session-qq-cont4: Universal Learning (jeder Button erfasst Kontext), Postfach Ungelesen-Filter, Badge-Sofort-Update, Auto-Refresh ohne Flackern (ISS-040/041/042) |
+| 2026-04-09 | session-qq-cont5: Postfach Preview-Reset bei Ordnerwechsel/Löschen/Verschieben + Einstellung next/none (ISS-043) |
+| 2026-04-09 | session-qq-cont6: KRITISCH — Kira Chat-Kontext Fix (History an LLM übergeben, ISS-044) + Chat-Gedächtnis Einstellungen-UI (Slider 2–50 Nachrichten, Token-Kosten) |
 
 ---
 
