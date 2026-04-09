@@ -1734,13 +1734,43 @@ def build_kommunikation(tasks):
         _zdb.close()
     except Exception:
         pass
-    # Stats (Gesamt-Mails, nicht gruppiert)
-    n_offen = len(tasks)
-    n_leads    = sum(1 for t in tasks if t.get("kategorie") == "Neue Lead-Anfrage")
-    n_angebote = sum(1 for t in tasks if t.get("kategorie") == "Angebotsrückmeldung" or t.get("kategorie") == "Angebotsrueckmeldung")
-    n_dringend = sum(1 for t in tasks if (t.get("prioritaet","") or "").lower() == "hoch")
 
-    # Segment counts
+    # ── Konversations-Gruppierung ZUERST, damit Badges die sichtbaren Items zählen ──
+    def _norm_betreff_pre(b):
+        b = (b or "").strip().lower()
+        for pfx in ("re: ","aw: ","fwd: ","wg: ","re:","aw:","fwd:","wg:"):
+            while b.startswith(pfx):
+                b = b[len(pfx):].strip()
+        return b
+
+    _conv_groups_pre = {}
+    for t in tasks:
+        tid_val = t.get("thread_id", "")
+        email_val = (t.get("kunden_email","") or "").lower().strip()
+        betr_n = _norm_betreff_pre(t.get("betreff","") or t.get("titel",""))
+        if tid_val:
+            key = f"T:{tid_val}"
+        elif email_val:
+            key = f"E:{email_val}:{betr_n[:40]}"
+        else:
+            key = f"ID:{t['id']}"
+        _conv_groups_pre.setdefault(key, []).append(t)
+
+    _grouped_pre = []
+    for key, group in _conv_groups_pre.items():
+        group.sort(key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
+        main_task = group[0]
+        main_task["_conv_count"] = len(group)
+        main_task["_conv_ids"] = [t["id"] for t in group]
+        _grouped_pre.append(main_task)
+
+    # Stats basierend auf GRUPPIERTEN Konversationen (= sichtbare Items)
+    n_offen = len(_grouped_pre)
+    n_leads    = sum(1 for t in _grouped_pre if t.get("kategorie") == "Neue Lead-Anfrage")
+    n_angebote = sum(1 for t in _grouped_pre if t.get("kategorie") == "Angebotsrückmeldung" or t.get("kategorie") == "Angebotsrueckmeldung")
+    n_dringend = sum(1 for t in _grouped_pre if (t.get("prioritaet","") or "").lower() == "hoch")
+
+    # Segment counts — aus gruppierten Tasks
     seg_counts = {
         "Antwort erforderlich": 0,
         "Neue Lead-Anfrage":    0,
@@ -1748,7 +1778,7 @@ def build_kommunikation(tasks):
         "Zur Kenntnis":         0,
         "Shop / System":        0,
     }
-    for t in tasks:
+    for t in _grouped_pre:
         kat = t.get("kategorie","")
         if kat in seg_counts:
             seg_counts[kat] += 1
@@ -1931,41 +1961,8 @@ def build_kommunikation(tasks):
   </div>
 </div>"""
 
-    # ── Konversations-Gruppierung: Thread-basiert + Kunden-E-Mail Fallback ──
-    def _norm_betreff(b):
-        b = (b or "").strip().lower()
-        for pfx in ("re: ","aw: ","fwd: ","wg: ","re:","aw:","fwd:","wg:"):
-            while b.startswith(pfx):
-                b = b[len(pfx):].strip()
-        return b
-
-    conv_groups = {}  # key → [tasks...]
-    for t in tasks:
-        tid_val = t.get("thread_id", "")
-        email_val = (t.get("kunden_email","") or "").lower().strip()
-        betr_n = _norm_betreff(t.get("betreff","") or t.get("titel",""))
-
-        # Gruppierungsschlüssel: thread_id bevorzugt, sonst email+betreff
-        if tid_val:
-            key = f"T:{tid_val}"
-        elif email_val:
-            key = f"E:{email_val}:{betr_n[:40]}"
-        else:
-            key = f"ID:{t['id']}"
-
-        conv_groups.setdefault(key, []).append(t)
-
-    # Pro Gruppe: neuester Task als Haupt-Karte, Rest als Zähler
-    grouped_tasks = []
-    for key, group in conv_groups.items():
-        group.sort(key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
-        main_task = group[0]
-        main_task["_conv_count"] = len(group)
-        main_task["_conv_ids"] = [t["id"] for t in group]
-        grouped_tasks.append(main_task)
-
-    # Sortierung: neueste zuerst
-    grouped_tasks.sort(key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
+    # Konversations-Gruppierung bereits oben erledigt → _grouped_pre verwenden
+    grouped_tasks = sorted(_grouped_pre, key=lambda x: x.get("datum_mail","") or x.get("datum_eingang","") or "", reverse=True)
 
     items_html = "".join(_wi_item(t) for t in grouped_tasks)
     if not items_html:
@@ -1987,7 +1984,7 @@ def build_kommunikation(tasks):
     <div class="km-wl-inner" id="km-items">{items_html}</div>
   </div>
   <div class="km-ctx" id="km-ctx">{ctx_placeholder}</div>
-</div>"""
+</div>""", n_offen
 
 # ── POSTFACH Panel ────────────────────────────────────────────────────────────
 def build_postfach():
@@ -16378,7 +16375,7 @@ def generate_html() -> str:
     prompts_json = {t["id"]:t.get("claude_prompt","") for t in tasks if t.get("claude_prompt")}
 
     dashboard_html = build_dashboard(tasks, db)
-    komm_html      = build_kommunikation(tasks)
+    komm_html, n_ges = build_kommunikation(tasks)
     postfach_html  = build_postfach()
     org_html       = build_organisation(db)
     gesch_html     = build_geschaeft(db)
