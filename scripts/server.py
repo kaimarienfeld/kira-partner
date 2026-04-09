@@ -225,6 +225,8 @@ def _ensure_mail_columns():
     _ensure_mail_vorlagen_table()
     # Entwürfe-Tabelle sicherstellen
     _ensure_mail_drafts_table()
+    # Kontakte-Tabelle (gesendete Empfänger)
+    _ensure_mail_kontakte_table()
     # Activity-Feed Dismissed-Tabelle sicherstellen
     _ensure_activity_dismissed_table()
 
@@ -285,6 +287,25 @@ def _ensure_mail_drafts_table():
                 in_reply_to TEXT NOT NULL DEFAULT '',
                 erstellt    TEXT NOT NULL DEFAULT (datetime('now')),
                 geaendert   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+def _ensure_mail_kontakte_table():
+    """Erstellt mail_kontakte-Tabelle für gesendete Empfänger (idempotent)."""
+    try:
+        db = sqlite3.connect(str(TASKS_DB))
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS mail_kontakte (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                email       TEXT NOT NULL UNIQUE,
+                name        TEXT NOT NULL DEFAULT '',
+                gesendet    INTEGER NOT NULL DEFAULT 1,
+                erstellt    TEXT NOT NULL DEFAULT (datetime('now')),
+                zuletzt     TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
         db.commit()
@@ -2229,19 +2250,19 @@ def build_postfach():
         <label class="pf-comp-lbl">Von</label>
         <select class="pf-comp-sel" id="pf-comp-from" onchange="pfComposeLoadSignatur()"></select>
       </div>
-      <div class="pf-comp-row">
+      <div class="pf-comp-row" style="position:relative">
         <label class="pf-comp-lbl">An</label>
-        <input class="pf-comp-inp" id="pf-comp-to" placeholder="empfaenger@example.com" list="pf-kontakte-list" autocomplete="off">
+        <input class="pf-comp-inp pf-ac-input" id="pf-comp-to" placeholder="empfaenger@example.com" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
+        <div class="pf-ac-dropdown" id="pf-ac-dd"></div>
       </div>
-      <div class="pf-comp-row">
+      <div class="pf-comp-row" style="position:relative">
         <label class="pf-comp-lbl">CC</label>
-        <input class="pf-comp-inp" id="pf-comp-cc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
+        <input class="pf-comp-inp pf-ac-input" id="pf-comp-cc" placeholder="(optional)" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
       </div>
-      <div class="pf-comp-row">
+      <div class="pf-comp-row" style="position:relative">
         <label class="pf-comp-lbl">BCC</label>
-        <input class="pf-comp-inp" id="pf-comp-bcc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
+        <input class="pf-comp-inp pf-ac-input" id="pf-comp-bcc" placeholder="(optional)" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
       </div>
-      <datalist id="pf-kontakte-list"></datalist>
       <div class="pf-comp-row">
         <label class="pf-comp-lbl">Betreff</label>
         <input class="pf-comp-inp" id="pf-comp-subj" placeholder="Betreff hinzuf&uuml;gen">
@@ -2284,17 +2305,17 @@ def build_postfach():
           <label class="pf-cm-lbl">Von</label>
           <select class="pf-cm-sel" id="pf-cm-from" onchange="pfCmLoadSignatur()"></select>
         </div>
-        <div class="pf-cm-row">
+        <div class="pf-cm-row" style="position:relative">
           <label class="pf-cm-lbl">An</label>
-          <input class="pf-cm-inp" id="pf-cm-to" placeholder="empfaenger@example.com" list="pf-kontakte-list" autocomplete="off">
+          <input class="pf-cm-inp pf-ac-input" id="pf-cm-to" placeholder="empfaenger@example.com" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
         </div>
-        <div class="pf-cm-row" id="pf-cm-cc-row" style="display:none">
+        <div class="pf-cm-row" id="pf-cm-cc-row" style="display:none;position:relative">
           <label class="pf-cm-lbl">CC</label>
-          <input class="pf-cm-inp" id="pf-cm-cc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
+          <input class="pf-cm-inp pf-ac-input" id="pf-cm-cc" placeholder="(optional)" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
         </div>
-        <div class="pf-cm-row" id="pf-cm-bcc-row" style="display:none">
+        <div class="pf-cm-row" id="pf-cm-bcc-row" style="display:none;position:relative">
           <label class="pf-cm-lbl">BCC</label>
-          <input class="pf-cm-inp" id="pf-cm-bcc" placeholder="(optional)" list="pf-kontakte-list" autocomplete="off">
+          <input class="pf-cm-inp pf-ac-input" id="pf-cm-bcc" placeholder="(optional)" autocomplete="off" oninput="_pfAcFilter(this)" onfocus="_pfAcFilter(this)" onblur="setTimeout(function(){_pfAcHide()},200)">
         </div>
         <div style="display:flex;gap:6px;padding:0 20px 6px">
           <button class="pf-cm-toggle-btn" onclick="document.getElementById('pf-cm-cc-row').style.display=this.classList.toggle('act')?'flex':'none'">CC</button>
@@ -2485,6 +2506,12 @@ def build_postfach():
 .pf-comp-att-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)}
 .pf-comp-att-chip .pf-att-rm{cursor:pointer;opacity:.5;font-size:14px}
 .pf-comp-att-chip .pf-att-rm:hover{opacity:1;color:#ef4444}
+.pf-ac-dropdown{display:none;position:absolute;top:100%;left:60px;right:10px;max-height:220px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:9999}
+.pf-ac-item{padding:8px 14px;cursor:pointer;font-size:13px;display:flex;flex-direction:column;gap:1px;border-bottom:1px solid var(--border-light,rgba(0,0,0,.06))}
+.pf-ac-item:last-child{border-bottom:none}
+.pf-ac-item:hover,.pf-ac-item.active{background:var(--bg-hover,rgba(79,125,249,.08))}
+.pf-ac-item .pf-ac-name{font-weight:600;color:var(--text)}
+.pf-ac-item .pf-ac-email{font-size:12px;color:var(--text-muted)}
 .pf-comp-acts{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center}
 .pf-comp-send-btn{background:#1e1e24;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;transition:background .14s}
 .pf-comp-send-btn:hover{background:#333}
@@ -4822,24 +4849,72 @@ window._pfInsertSignatur = function(quill, konto) {
   });
 };
 
-// ── Kontakte-Autovervollständigung ──────────────────
-window._pfKontakteLoaded = false;
-window._pfLoadKontakte = function() {
-  if (_pfKontakteLoaded) return;
-  _pfKontakteLoaded = true;
+// ── Kontakte-Autovervollständigung (eigenes Dropdown, erst ab 2 Zeichen) ──
+window._pfKontakteCache = null;
+window._pfAcActiveInput = null;
+window._pfAcSelectedIdx = -1;
+window._pfLoadKontakte = function(cb) {
+  if (_pfKontakteCache) { if(cb)cb(_pfKontakteCache); return; }
   fetch('/api/mail/kontakte').then(function(r){return r.json();}).then(function(d){
-    if (!d.ok) return;
-    const dl = document.getElementById('pf-kontakte-list');
-    if (!dl) return;
-    dl.innerHTML = '';
-    d.kontakte.forEach(function(k) {
-      const opt = document.createElement('option');
-      opt.value = k.email;
-      if (k.name) opt.label = k.name + ' (' + k.email + ')';
-      dl.appendChild(opt);
-    });
-  }).catch(function(){});
+    _pfKontakteCache = d.ok ? d.kontakte : [];
+    if(cb)cb(_pfKontakteCache);
+  }).catch(function(){_pfKontakteCache=[];if(cb)cb([]);});
 };
+window._pfAcFilter = function(inp) {
+  const val = inp.value.trim().toLowerCase();
+  if (val.length < 2) { _pfAcHide(); return; }
+  _pfAcActiveInput = inp;
+  _pfAcSelectedIdx = -1;
+  _pfLoadKontakte(function(kontakte) {
+    const matches = kontakte.filter(function(k) {
+      return k.email.toLowerCase().indexOf(val) >= 0 || (k.name && k.name.toLowerCase().indexOf(val) >= 0);
+    }).slice(0, 12);
+    const dd = document.getElementById('pf-ac-dd');
+    if (!dd || matches.length === 0) { _pfAcHide(); return; }
+    // Dropdown neben dem aktiven Input positionieren
+    const rect = inp.getBoundingClientRect();
+    const parent = inp.closest('.pf-comp-row,.pf-cm-row');
+    dd.style.display = 'block';
+    if (parent) { parent.appendChild(dd); }
+    dd.innerHTML = matches.map(function(k, i) {
+      const nameHtml = k.name ? '<span class="pf-ac-name">' + k.name.replace(/</g,'&lt;') + '</span>' : '';
+      return '<div class="pf-ac-item" data-email="' + k.email + '" onmousedown="_pfAcSelect(\\'' + k.email.replace(/'/g,"\\\\'") + '\\')">' + nameHtml + '<span class="pf-ac-email">' + k.email.replace(/</g,'&lt;') + '</span></div>';
+    }).join('');
+  });
+};
+window._pfAcSelect = function(email) {
+  if (_pfAcActiveInput) {
+    _pfAcActiveInput.value = email;
+    _pfAcActiveInput.focus();
+  }
+  _pfAcHide();
+};
+window._pfAcHide = function() {
+  var dd = document.getElementById('pf-ac-dd');
+  if (dd) dd.style.display = 'none';
+  _pfAcSelectedIdx = -1;
+};
+// Tastatur-Navigation im Dropdown
+document.addEventListener('keydown', function(e) {
+  var dd = document.getElementById('pf-ac-dd');
+  if (!dd || dd.style.display === 'none') return;
+  var items = dd.querySelectorAll('.pf-ac-item');
+  if (items.length === 0) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _pfAcSelectedIdx = Math.min(_pfAcSelectedIdx + 1, items.length - 1);
+    items.forEach(function(it, i) { it.classList.toggle('active', i === _pfAcSelectedIdx); });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _pfAcSelectedIdx = Math.max(_pfAcSelectedIdx - 1, 0);
+    items.forEach(function(it, i) { it.classList.toggle('active', i === _pfAcSelectedIdx); });
+  } else if (e.key === 'Enter' && _pfAcSelectedIdx >= 0 && _pfAcSelectedIdx < items.length) {
+    e.preventDefault();
+    _pfAcSelect(items[_pfAcSelectedIdx].getAttribute('data-email'));
+  } else if (e.key === 'Escape') {
+    _pfAcHide();
+  }
+});
 
 // ── Inline Compose ──────────────────────────────────
 window.pfOpenCompose=function(replyTo){
@@ -5004,7 +5079,6 @@ window.pfSend=function(){
   const subj=document.getElementById('pf-comp-subj').value.trim();
   const bodyHtml=_pfComposeQuill?_pfComposeQuill.root.innerHTML:'';
   const bodyPlain=_pfComposeQuill?_pfComposeQuill.getText():'';
-  if(!to||!subj){showToast('Empf\\u00e4nger und Betreff erforderlich','warnung');return;}
   _pfDoSend(from,to,cc,document.getElementById('pf-comp-bcc')?.value.trim()||'',subj,bodyPlain,bodyHtml,document.getElementById('pf-send-btn'),function(){pfCloseCompose();});
 };
 
@@ -5019,15 +5093,39 @@ window.pfSendModal=function(){
   const subj=document.getElementById('pf-cm-subj').value.trim();
   const bodyHtml=_pfComposeModalQuill?_pfComposeModalQuill.root.innerHTML:'';
   const bodyPlain=_pfComposeModalQuill?_pfComposeModalQuill.getText():'';
-  if(!to||!subj){showToast('Empf\\u00e4nger und Betreff erforderlich','warnung');return;}
   _pfDoSend(from,to,cc,bcc,subj,bodyPlain,bodyHtml,document.getElementById('pf-cm-send-btn'),function(){
     document.getElementById('pf-compose-modal-overlay').style.display='none';
     _pfComposeAttachments=[];
   });
 };
 
+// Anhang-Vergessen-Erkennung
+window._pfCheckAnhangVergessen=function(text,hasAttachments){
+  if(hasAttachments) return false;
+  var keywords=['anhang','anbei','beigef\\u00fcgt','im attachment','attached','als anlage','in der anlage','datei sende','datei schicke','beiliegend','see attached','please find'];
+  var lower=text.toLowerCase();
+  for(var i=0;i<keywords.length;i++){if(lower.indexOf(keywords[i])>=0) return true;}
+  return false;
+};
+// Empf\\u00e4nger nach Senden speichern
+window._pfSaveGesendeteEmpfaenger=function(to,cc,bcc){
+  var addrs=[to,cc,bcc].join(',').split(',').map(function(a){return a.trim();}).filter(function(a){return a && a.indexOf('@')>0;});
+  if(addrs.length===0)return;
+  fetch('/api/mail/kontakte/speichern',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adressen:addrs})}).catch(function(){});
+};
 // Gemeinsame Sende-Logik (mit Dateianhänge-Upload)
 window._pfDoSend=function(from,to,cc,bcc,subj,bodyPlain,bodyHtml,btn,onSuccess){
+  // Validierung: Empf\\u00e4nger
+  if(!to){showToast('Bitte Empf\\u00e4nger eingeben','warnung');return;}
+  // Validierung: Betreff — Warnung statt Abbruch
+  if(!subj){
+    if(!confirm('Ohne Betreff senden?')) return;
+  }
+  // Anhang-Vergessen-Check
+  var hasAtts=_pfComposeAttachments.filter(function(a){return a.file;}).length>0;
+  if(_pfCheckAnhangVergessen(bodyPlain,hasAtts)){
+    if(!confirm('Du erw\\u00e4hnst einen Anhang im Text, hast aber keinen angef\\u00fcgt.\\n\\nOhne Anhang senden?')) return;
+  }
   btn.disabled=true; const origText=btn.innerHTML; btn.textContent='Wird gesendet...';
   const files=_pfComposeAttachments.filter(function(a){return a.file;});
   function doSend(attIds){
@@ -5037,7 +5135,7 @@ window._pfDoSend=function(from,to,cc,bcc,subj,bodyPlain,bodyHtml,btn,onSuccess){
       body:JSON.stringify(pl)
     }).then(function(r){return r.json();}).then(function(d){
       btn.disabled=false;btn.innerHTML=origText;
-      if(d.ok){showToast('Mail gesendet \\u2713','ok');window._pfReplyMsgId=null;_pfComposeAttachments=[];if(onSuccess)onSuccess();}
+      if(d.ok){showToast('Mail gesendet \\u2713','ok');window._pfReplyMsgId=null;_pfComposeAttachments=[];_pfSaveGesendeteEmpfaenger(pl.to,pl.cc,pl.bcc);if(onSuccess)onSuccess();}
       else showToast('Fehler: '+(d.error||'?'),'fehler');
     }).catch(function(){btn.disabled=false;btn.innerHTML=origText;showToast('Netzwerkfehler','fehler');});
   }
@@ -27014,11 +27112,54 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
             kontakte = [k for k in kontakte if k['email'] not in own]
-            # Nach Häufigkeit sortieren (häufigste zuerst) — vereinfacht: alphabetisch
-            kontakte.sort(key=lambda k: k['email'])
+            # Gespeicherte Kontakte (mail_kontakte) mit höherer Priorität hinzufügen
+            try:
+                db2 = sqlite3.connect(str(TASKS_DB))
+                db2.row_factory = sqlite3.Row
+                saved = db2.execute("SELECT email, name, gesendet FROM mail_kontakte ORDER BY zuletzt DESC").fetchall()
+                db2.close()
+                for s in saved:
+                    e = s['email'].lower()
+                    if e not in seen and e not in own:
+                        seen.add(e)
+                        kontakte.insert(0, {"email": e, "name": s['name'], "gespeichert": True})
+            except Exception:
+                pass
+            # Gespeicherte zuerst, dann alphabetisch
+            saved_set = {k['email'] for k in kontakte if k.get('gespeichert')}
+            kontakte.sort(key=lambda k: (0 if k['email'] in saved_set else 1, k['email']))
             self._json({"ok": True, "kontakte": kontakte[:500]})
         except Exception as e:
             self._json({"ok": True, "kontakte": [], "error": str(e)})
+
+    def _api_mail_kontakte_speichern(self, body):
+        """POST /api/mail/kontakte/speichern — Gesendete Empfänger in mail_kontakte speichern."""
+        try:
+            adressen = body.get('adressen', [])
+            if not adressen:
+                self._json({"ok": True, "saved": 0})
+                return
+            _ensure_mail_kontakte_table()
+            db = sqlite3.connect(str(TASKS_DB))
+            saved = 0
+            for addr in adressen:
+                addr = addr.strip().lower()
+                if not addr or '@' not in addr:
+                    continue
+                db.execute("""
+                    INSERT INTO mail_kontakte (email, gesendet, zuletzt)
+                    VALUES (?, 1, datetime('now'))
+                    ON CONFLICT(email) DO UPDATE SET
+                        gesendet = gesendet + 1,
+                        zuletzt = datetime('now')
+                """, (addr,))
+                saved += 1
+            db.commit()
+            db.close()
+            # Cache invalidieren
+            self._json({"ok": True, "saved": saved})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
 
     # ── Kira-Feedback (Paket 6, session-oo) ──────────────────────────────────
 
@@ -29893,6 +30034,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/mail/send':
             self._api_mail_send(body)
+            return
+
+        if self.path == '/api/mail/kontakte/speichern':
+            self._api_mail_kontakte_speichern(body)
             return
 
         # Mail-HITL-Approve-Queue (Paket 2, session-oo)
