@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KIRA Partner – Mitgestalten & Feedback</title>
-<!-- generated: 2026-04-02 -->
+<!-- generated: 2026-04-09 -->
 <script>(function(){var t=localStorage.getItem('kira_pv_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <style>
 /* ============================================================
@@ -992,7 +992,7 @@ body{
 const CFG = {
   "pw_kai": "KaiAdmin2026",
   "pw_leni": "HalloLeni2026",
-  "app_start": "2026-04-02",
+  "app_start": "2026-04-09",
   "ntfy_kai": "raumkult-kai-2026-x7k",
   "ntfy_leni": "",
   "ntfy_server": "https://ntfy.sh",
@@ -1007,8 +1007,17 @@ const FEATURES = [
     "icon": "🏠",
     "name": "Das Cockpit — alles auf einen Blick",
     "status": "done",
-    "added": "2026-03-25",
-    "desc": "Auf einen Blick siehst du hier alles Wichtige: offene Aufgaben, wie viel Geld noch aussteht, was heute ansteht und was zuletzt passiert ist. Wie ein Kontrollzentrum — immer griffbereit.",
+    "added": "2026-04-03",
+    "desc": "Auf einen Blick siehst du hier alles Wichtige: offene Aufgaben, wie viel Geld noch aussteht, was heute ansteht und was zuletzt passiert ist. 3 wählbare Layouts mit Live-Animationen — dynamisch und lebendig.",
+    "leni_note": null
+  },
+  {
+    "id": "feed-widgets-dashboard",
+    "icon": "🌤️",
+    "name": "Live-Feed — Wetter, Nachrichten & Newsletter",
+    "status": "done",
+    "added": "2026-04-03",
+    "desc": "Im Dashboard erscheinen jetzt Live-Wetter, aktuelle Nachrichten mit Bildern (wie Windows Widgets) und ein Newsletter-Digest, den Kira zusammenstellt. Alles wechselt automatisch und ist konfigurierbar.",
     "leni_note": null
   },
   {
@@ -1108,6 +1117,15 @@ const FEATURES = [
     "status": "done",
     "added": "2026-03-25",
     "desc": "Neue E-Mails werden sofort geprüft — auch wenn die App im Hintergrund läuft. Kira erkennt selbst: Ist das eine Anfrage? Eine Beschwerde? Eine Bestellung? Und legt automatisch die passende Aufgabe an, bevor du die Mail überhaupt gesehen hast.",
+    "leni_note": null
+  },
+  {
+    "id": "activity-window-multi-trigger",
+    "icon": "🔔",
+    "name": "Intelligente Desktop-Benachrichtigungen",
+    "status": "done",
+    "added": "2026-04-03",
+    "desc": "KIRA meldet sich direkt auf dem Desktop wenn etwas Wichtiges passiert: überfällige Rechnungen, neue Kundenanfragen oder Entwürfe die auf deine Freigabe warten. Immer zur richtigen Zeit.",
     "leni_note": null
   },
   {
@@ -1405,6 +1423,195 @@ const FEATURES = [
     "status": "planned",
     "added": "2026-04-01",
     "desc": "Direkt vom Smartphone erfassen: kurze Notiz, Foto oder Dokument hochladen — Kira uebernimmt den Rest.",
+    "leni_note": null
+  },
+  {
+    "id": "guided-tours",
+    "icon": "🎓",
+    "name": "Geführte Tour durch jeden Bereich",
+    "status": "done",
+    "added": "2026-04-01",
+    "desc": "Jedes Modul hat eine eingebaute Tour die dir Schritt für Schritt erklärt was du siehst und was du tun kannst — ohne dass du etwas versehentlich veränderst. Einfach auf 'Tour' klicken.",
+    "leni_note": null
+  },
+  {
+    "id": "dokumente-modul",
+    "icon": "📄",
+    "name": "Dokumente-Management",
+    "status": "done",
+    "added": "2026-04-03",
+    "desc": "Dokumente hochladen, automatisch erkennen und zuordnen. Eigene Dokumente im Studio erstellen, als PDF/Word exportieren, drucken. Vorlagen mit Platzhaltern für wiederkehrende Schreiben.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-relevanz-wissen",
+    "icon": "🧠",
+    "name": "Kira lernt intelligent",
+    "status": "done",
+    "added": "2026-04-07",
+    "desc": "Kira nutzt jetzt ALLE gelernten Regeln und Korrekturen — nicht mehr nur die neuesten 12. Bei jeder Mail wählt sie die relevantesten Erkenntnisse aus, basierend auf Absender, Betreff-Ähnlichkeit und Aktualität.",
+    "leni_note": null
+  },
+  {
+    "id": "korrektur-konsolidierung",
+    "icon": "🔄",
+    "name": "Kira lernt aus Wiederholungen",
+    "status": "done",
+    "added": "2026-04-07",
+    "desc": "Wenn du dreimal die gleiche Korrektur machst, erstellt Kira daraus automatisch eine permanente Regel. So musst du den gleichen Fehler nicht immer wieder korrigieren.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-doku",
+    "icon": "📖",
+    "name": "Wie Kira funktioniert",
+    "status": "planned",
+    "added": "2026-04-07",
+    "desc": "Eine verständliche Erklärung, wie Kira Mails klassifiziert, lernt und Entscheidungen trifft — damit du nachvollziehen kannst, warum Kira was macht.",
+    "leni_note": null
+  },
+  {
+    "id": "anhang-extraktion",
+    "icon": "📎",
+    "name": "Anhang-Analyse — KI liest PDFs, Bilder und Dokumente",
+    "status": "done",
+    "added": "2026-04-09",
+    "desc": "KIRA liest jetzt den Inhalt von Mail-Anhängen (PDF, Word, ZIP, Bilder) bevor sie eine Mail einsortiert. Sogar Fotos werden per OCR gelesen oder direkt der KI gezeigt.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-universelle-handlungsfaehigkeit",
+    "icon": "🔧",
+    "name": "Kira kann überall handeln",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Kira kann jetzt in allen Modulen Daten korrigieren, ändern und anlegen — nicht nur lesen. Ob Mails, Tasks, Wissen oder Lexware: alles wird direkt erledigt.",
+    "leni_note": null
+  },
+  {
+    "id": "thread-awareness",
+    "icon": "🔗",
+    "name": "E-Mail-Verläufe verstehen",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "KIRA erkennt jetzt zusammengehörige E-Mail-Verläufe und klassifiziert Antworten im Kontext der vorherigen Nachrichten.",
+    "leni_note": null
+  },
+  {
+    "id": "projekt-vorgaenge",
+    "icon": "📁",
+    "name": "Projektmanagement",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Anfragen und Aufträge werden jetzt als Projekte zusammengefasst. KIRA ordnet neue Mails automatisch dem richtigen Projekt zu.",
+    "leni_note": null
+  },
+  {
+    "id": "leistungskatalog-ui",
+    "icon": "📋",
+    "name": "Leistungskatalog verwalten",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Ein vollständiger Katalog aller Leistungen, übersichtlich nach Gruppen sortiert. Neue Leistungen können per Website-Import automatisch erkannt werden.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-website-urls",
+    "icon": "🌐",
+    "name": "Kira verlinkt eure Website",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Wenn Leistungen von eurer Website importiert wurden, baut Kira die passenden Links in Antwort-Entwürfe ein.",
+    "leni_note": null
+  },
+  {
+    "id": "unternehmensprofile-ui",
+    "icon": "🏢",
+    "name": "Unternehmensprofile — alles an einem Ort",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Firmendaten, Team, Domains, Leistungskatalog, Artikel und Benutzerprofile — übersichtlich in einer neuen Struktur zusammengefasst.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-artikel-preise-tools",
+    "icon": "💰",
+    "name": "Kira kennt eure Preise",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Kira kann jetzt Preise nachschlagen, Angebotspositionen vorschlagen und Preisentwicklungen analysieren — direkt aus dem Lexware-Artikelkatalog.",
+    "leni_note": null
+  },
+  {
+    "id": "manuelle-artikel-verwaltung",
+    "icon": "📦",
+    "name": "Artikel selbst verwalten",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "Artikel und Preise können manuell angelegt, per CSV importiert und zu Lexware übertragen werden — auch ohne Lexware-Anbindung.",
+    "leni_note": null
+  },
+  {
+    "id": "preisentwicklung-statistik",
+    "icon": "📊",
+    "name": "Preisentwicklung im Blick",
+    "status": "done",
+    "added": "2026-04-08",
+    "desc": "KIRA zeichnet alle Preis-, Namens- und Beschreibungsänderungen von Artikeln auf. Chronologische Historie mit Trends, exportierbar als CSV.",
+    "leni_note": null
+  },
+  {
+    "id": "5-stufen-routing",
+    "icon": "🔀",
+    "name": "Intelligentes Mail-Routing",
+    "status": "done",
+    "added": "2026-04-02",
+    "desc": "Mails durchlaufen 5 Stufen bevor eine Aufgabe erstellt wird — nur bei echtem Handlungsbedarf.",
+    "leni_note": null
+  },
+  {
+    "id": "lexware-zahlungsabgleich",
+    "icon": "💳",
+    "name": "Automatischer Zahlungsabgleich",
+    "status": "done",
+    "added": "2026-04-01",
+    "desc": "Zahlungseingänge aus Lexware werden automatisch mit offenen Rechnungen abgeglichen.",
+    "leni_note": null
+  },
+  {
+    "id": "wissen-schreibstil-lernen",
+    "icon": "🧠",
+    "name": "Kira lernt deinen Stil",
+    "status": "done",
+    "added": "2026-04-02",
+    "desc": "Kira analysiert ausgehende Mails und lernt den Schreibstil und Geschäftsmuster des Teams.",
+    "leni_note": null
+  },
+  {
+    "id": "activity-drawer-win11",
+    "icon": "📰",
+    "name": "Aktivitäten im Windows-11-Stil",
+    "status": "done",
+    "added": "2026-04-03",
+    "desc": "Das Aktivitätsfenster sieht jetzt aus wie die Windows 11 Widgets — schick, modern, mit Glass-Effekt.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-chat-kontext",
+    "icon": "🧠",
+    "name": "Kira merkt sich das Gespräch",
+    "status": "done",
+    "added": "2026-04-09",
+    "desc": "Kira vergisst nicht mehr, worüber ihr gerade redet. Bei Folgefragen wie 'Ja bitte' weiß sie genau, worum es ging — wie in einem echten Gespräch.",
+    "leni_note": null
+  },
+  {
+    "id": "kira-chat-projekte",
+    "icon": "📂",
+    "name": "Chat-Projekte — Gespräche organisieren",
+    "status": "planned",
+    "added": "2026-04-09",
+    "desc": "Eigene Projekte anlegen und Kira-Chats darin sortieren — so findest du jedes Gespräch wieder. Wie bei ChatGPT, nur direkt in KIRA.",
     "leni_note": null
   }
 ];
