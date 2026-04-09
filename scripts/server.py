@@ -17066,6 +17066,64 @@ def generate_html() -> str:
   </div>
 </div>
 
+<!-- Erledigt + Kira lernt Modal -->
+<div class="modal-ov" id="erledigtModal">
+  <div class="modal" style="max-width:440px">
+    <h3 style="margin:0 0 4px;color:#16a34a">&#x2714; Was hast du getan?</h3>
+    <input type="hidden" id="em-tid">
+    <input type="hidden" id="em-kat">
+    <div id="em-titel" style="font-size:12px;color:var(--muted);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+    <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px">Kira merkt sich deine Aktion und nutzt sie f&uuml;r zuk&uuml;nftige Empfehlungen.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Rechnung bezahlt / &uuml;berwiesen')">Rechnung bezahlt</button>
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Kunde angerufen')">Kunde angerufen</button>
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Mail beantwortet')">Mail beantwortet</button>
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Angebot erstellt')">Angebot erstellt</button>
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Weitergeleitet')">Weitergeleitet</button>
+      <button class="ignorier-grund-btn" onclick="setErledigtAktion(this,'Bereits erledigt')">Bereits erledigt</button>
+    </div>
+    <input type="text" id="em-aktion" placeholder="Eigene Aktion beschreiben (optional)&hellip;"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')saveErledigt()">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="em-einstufung-ok" checked> Einstufung war korrekt</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:#16a34a;color:#fff" id="em-save-btn" onclick="saveErledigt()">Erledigt &amp; Kira lernt</button>
+      <button class="btn" onclick="quickErledigt()">Ohne Kommentar erledigen</button>
+      <button class="btn" onclick="closeErledigtModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Zur Kenntnis + Kira lernt Modal -->
+<div class="modal-ov" id="kenntnisModal">
+  <div class="modal" style="max-width:420px">
+    <h3 style="margin:0 0 4px;color:#2563eb">&#x1F4CB; Zur Kenntnis genommen</h3>
+    <input type="hidden" id="km-m-tid">
+    <input type="hidden" id="km-m-kat">
+    <div id="km-m-titel" style="font-size:12px;color:var(--muted);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+    <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px">M&ouml;chtest du noch etwas kommentieren? Kira lernt aus deinem Feedback.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="ignorier-grund-btn" onclick="setKenntnisKommentar(this,'Einstufung passt')">Einstufung passt</button>
+      <button class="ignorier-grund-btn" onclick="setKenntnisKommentar(this,'Einstufung falsch \u2014 h&auml;tte anders eingeordnet werden sollen')">Einstufung falsch</button>
+      <button class="ignorier-grund-btn" onclick="setKenntnisKommentar(this,'Wird sp&auml;ter relevant')">Sp&auml;ter relevant</button>
+      <button class="ignorier-grund-btn" onclick="setKenntnisKommentar(this,'Nur informativ')">Nur informativ</button>
+    </div>
+    <input type="text" id="km-m-kommentar" placeholder="Eigener Kommentar (optional)&hellip;"
+      style="width:100%;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;margin-bottom:10px;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')saveKenntnis()">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="km-m-einstufung-ok" checked> Einstufung war korrekt</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:#2563eb;color:#fff" id="km-m-save-btn" onclick="saveKenntnis()">Zur Kenntnis &amp; Kira lernt</button>
+      <button class="btn" onclick="quickKenntnis()">Ohne Kommentar</button>
+      <button class="btn" onclick="closeKenntnisModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Löschen + Kira lernt Modal -->
 <div class="modal-ov" id="loeschModal">
   <div class="modal" style="max-width:460px">
@@ -19235,17 +19293,104 @@ function _kmClearOrNextPreview(removedId) {{
 // Status setzen + KI-Lern-Eintrag speichern (einzeln, nicht bulk)
 function setStatusLernen(id, status, kat) {{
   if(status === 'ignorieren') {{ confirmIgnorieren(id, kat); return; }}
+  if(status === 'erledigt')    {{ confirmErledigt(id, kat); return; }}
+  if(status === 'zur_kenntnis') {{ confirmKenntnis(id, kat); return; }}
+  // Fallback für andere Status
+  _doStatusChange(id, status, kat);
+}}
+function _doStatusChange(id, status, kat, kommentar, einstufungOk) {{
   fetch('/api/task/'+id+'/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},
     body:JSON.stringify({{status, kat}})}}).then(r=>r.json()).then(d=>{{
     if(d.ok){{
       const el = document.getElementById('task-'+id);
       if(el){{el.style.opacity='0.2';setTimeout(()=>el.remove(),320);}}
-      const label = {{erledigt:'Erledigt ✓',zur_kenntnis:'Zur Kenntnis ✓'}}[status]||'Gespeichert';
-      showToast(label+' — KI lernt');
+      const label = {{erledigt:'Erledigt \u2714',zur_kenntnis:'Zur Kenntnis \u2714'}}[status]||'Gespeichert';
+      showToast(label+' \u2014 KI lernt');
+      // Lernregel speichern wenn Kommentar vorhanden
+      if(kommentar) {{
+        const einstufung = einstufungOk !== false ? 'korrekt' : 'falsch';
+        fetch('/api/wissen/neu', {{method:'POST', headers:{{'Content-Type':'application/json'}},
+          body: JSON.stringify({{kategorie:'gelernt',
+            titel: (status==='erledigt'?'Erledigt: ':'Zur Kenntnis: ')+kommentar.slice(0,60),
+            inhalt: 'Aufgabe '+id+' als '+status+' markiert. Aktion: "'+kommentar+'". Kategorie: '+kat+'. Einstufung: '+einstufung+'. Zuk\u00fcnftige \u00e4hnliche Mails entsprechend einordnen.'
+          }})}}).catch(()=>{{}});
+      }}
       _kmUpdateBadgesAfterAction(kat, 1);
       _kmClearOrNextPreview(id);
     }}
   }}).catch(()=>showToast('Fehler'));
+}}
+// ── Erledigt-Modal ──
+function confirmErledigt(tid, kat) {{
+  const card = document.getElementById('task-'+tid);
+  document.getElementById('em-tid').value = tid;
+  document.getElementById('em-kat').value = kat || '';
+  document.getElementById('em-titel').textContent = card ? (card.querySelector('.task-title,.wi-titel')||{{}}).textContent||'' : '';
+  document.getElementById('em-aktion').value = '';
+  document.getElementById('em-einstufung-ok').checked = true;
+  document.querySelectorAll('#erledigtModal .ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('em-save-btn').textContent = 'Erledigt \u0026 Kira lernt';
+  document.getElementById('em-save-btn').disabled = false;
+  document.getElementById('erledigtModal').classList.add('open');
+  setTimeout(()=>document.getElementById('em-aktion').focus(), 80);
+}}
+function setErledigtAktion(btn, text) {{
+  document.querySelectorAll('#erledigtModal .ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('em-aktion').value = text;
+}}
+function closeErledigtModal() {{ document.getElementById('erledigtModal').classList.remove('open'); }}
+function quickErledigt() {{
+  const tid = document.getElementById('em-tid').value;
+  const kat = document.getElementById('em-kat').value;
+  closeErledigtModal();
+  _doStatusChange(parseInt(tid), 'erledigt', kat);
+}}
+async function saveErledigt() {{
+  const tid    = document.getElementById('em-tid').value;
+  const kat    = document.getElementById('em-kat').value;
+  const aktion = document.getElementById('em-aktion').value.trim();
+  const einstufungOk = document.getElementById('em-einstufung-ok').checked;
+  const btn    = document.getElementById('em-save-btn');
+  btn.textContent = 'Wird gespeichert\u2026'; btn.disabled = true;
+  closeErledigtModal();
+  _doStatusChange(parseInt(tid), 'erledigt', kat, aktion || 'Erledigt ohne Details', einstufungOk);
+}}
+// ── Zur-Kenntnis-Modal ──
+function confirmKenntnis(tid, kat) {{
+  const card = document.getElementById('task-'+tid);
+  document.getElementById('km-m-tid').value = tid;
+  document.getElementById('km-m-kat').value = kat || '';
+  document.getElementById('km-m-titel').textContent = card ? (card.querySelector('.task-title,.wi-titel')||{{}}).textContent||'' : '';
+  document.getElementById('km-m-kommentar').value = '';
+  document.getElementById('km-m-einstufung-ok').checked = true;
+  document.querySelectorAll('#kenntnisModal .ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('km-m-save-btn').textContent = 'Zur Kenntnis \u0026 Kira lernt';
+  document.getElementById('km-m-save-btn').disabled = false;
+  document.getElementById('kenntnisModal').classList.add('open');
+  setTimeout(()=>document.getElementById('km-m-kommentar').focus(), 80);
+}}
+function setKenntnisKommentar(btn, text) {{
+  document.querySelectorAll('#kenntnisModal .ignorier-grund-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('km-m-kommentar').value = text;
+}}
+function closeKenntnisModal() {{ document.getElementById('kenntnisModal').classList.remove('open'); }}
+function quickKenntnis() {{
+  const tid = document.getElementById('km-m-tid').value;
+  const kat = document.getElementById('km-m-kat').value;
+  closeKenntnisModal();
+  _doStatusChange(parseInt(tid), 'zur_kenntnis', kat);
+}}
+async function saveKenntnis() {{
+  const tid       = document.getElementById('km-m-tid').value;
+  const kat       = document.getElementById('km-m-kat').value;
+  const kommentar = document.getElementById('km-m-kommentar').value.trim();
+  const einstufungOk = document.getElementById('km-m-einstufung-ok').checked;
+  const btn       = document.getElementById('km-m-save-btn');
+  btn.textContent = 'Wird gespeichert\u2026'; btn.disabled = true;
+  closeKenntnisModal();
+  _doStatusChange(parseInt(tid), 'zur_kenntnis', kat, kommentar || 'Zur Kenntnis ohne Kommentar', einstufungOk);
 }}
 function confirmIgnorieren(tid, kat) {{
   const card = document.getElementById('task-'+tid);
