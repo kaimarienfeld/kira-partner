@@ -4843,9 +4843,19 @@ window.pfOpenMail = function(m, el) {
       body.classList.add('iframe-mode');
       body.style.cssText = '';
       const iframe = document.createElement('iframe');
-      iframe.setAttribute('sandbox', 'allow-same-origin allow-popups-to-escape-sandbox');
+      iframe.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
       iframe.style.cssText = 'flex:1;width:100%;height:100%;border:none;background:#fff;display:block;min-height:0';
-      iframe.srcdoc = hasHtml ? d.html : rawText;
+      // HTML vorbereiten: Links in neuem Tab, Bilder responsive
+      let mailHtml = hasHtml ? d.html : rawText;
+      // <base target=_blank> für Links in neuem Tab
+      if(!/<base /i.test(mailHtml)) {
+        mailHtml = mailHtml.replace(/(<head[^>]*>)/i, '$1<base target="_blank">');
+        if(!/<head/i.test(mailHtml)) mailHtml = '<head><base target="_blank"></head>' + mailHtml;
+      }
+      // Responsive Bilder + max-width damit nichts überläuft
+      const responsiveCss = '<style>img{max-width:100%!important;height:auto!important}body{margin:0;padding:12px;overflow-x:hidden;word-wrap:break-word}table{max-width:100%!important}</style>';
+      mailHtml = mailHtml.replace(/(<head[^>]*>)/i, '$1' + responsiveCss);
+      iframe.srcdoc = mailHtml;
       body.appendChild(iframe);
     } else {
       pfUpdateViewerState('text');
@@ -4854,9 +4864,11 @@ window.pfOpenMail = function(m, el) {
       body.style.overflowY = 'auto';
       body.style.overflowX = 'hidden';
       body.style.whiteSpace = 'pre-wrap';
+      // Plain-Text: HTML-Entities dekodieren, aber kein HTML rendern
       const tmp = document.createElement('div');
       tmp.innerHTML = rawText;
-      body.textContent = tmp.textContent || '(kein Inhalt)';
+      const cleanText = tmp.textContent || '(kein Inhalt)';
+      body.textContent = cleanText;
     }
     if (d.anhaenge && d.anhaenge.length > 0) pfRenderAttachments(d.anhaenge);
     pfRenderHints(m, d);
@@ -20474,7 +20486,22 @@ function readMail(encodedMsgId) {{
   fetch('/api/mail/read?message_id='+encodedMsgId).then(r=>r.json()).then(d=>{{
     document.getElementById('mr-betreff').textContent=d.betreff||'(Kein Betreff)';
     document.getElementById('mr-meta').innerHTML='<strong>Von:</strong> '+(d.absender||'')+'<br><strong>An:</strong> '+(d.an||'')+'<br><strong>Datum:</strong> '+(d.datum||'');
-    document.getElementById('mr-body').textContent=d.text||'(Kein Inhalt)';
+    const mrBody=document.getElementById('mr-body');
+    if(d.html){{
+      mrBody.innerHTML='';
+      const mif=document.createElement('iframe');
+      mif.setAttribute('sandbox','allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+      mif.style.cssText='width:100%;min-height:400px;border:none;background:#fff';
+      let mhtml=d.html;
+      if(!/<base /i.test(mhtml)){{mhtml=mhtml.replace(/(<head[^>]*>)/i,'$1<base target=\"_blank\">');if(!/<head/i.test(mhtml))mhtml='<head><base target=\"_blank\"></head>'+mhtml;}}
+      mhtml=mhtml.replace(/(<head[^>]*>)/i,'$1<style>img{{max-width:100%!important;height:auto!important}}body{{margin:0;padding:12px}}</style>');
+      mif.srcdoc=mhtml;
+      mif.onload=function(){{try{{this.style.height=this.contentDocument.body.scrollHeight+'px'}}catch(e){{}}}};
+      mrBody.appendChild(mif);
+    }}else{{
+      mrBody.style.whiteSpace='pre-wrap';
+      mrBody.textContent=d.text||'(Kein Inhalt)';
+    }}
     if(d.anhaenge && d.anhaenge.length){{
       let ahtml='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><strong style="color:var(--gold);font-size:12px">Anhänge:</strong> ';
       d.anhaenge.forEach(a=>{{ ahtml+='<a href="/api/file?path='+encodeURIComponent(a.pfad)+'" target="_blank" class="att-link"><span class="att-icon">'+a.typ+'</span> '+a.name+'</a> '; }});
@@ -26252,17 +26279,33 @@ class DashboardHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _parse_eml_content(eml_path):
         """Parst EML-Datei, liefert (text_plain, html_sanitized).
-        html_sanitized ist HTML mit entfernten Scripts/Formularen für sichere Browser-Anzeige.
+        html_sanitized ist HTML mit CSS erhalten + cid: Inline-Bilder als data: URLs aufgelöst.
         KIRA soll weiterhin text_plain aus mail_index.db nutzen."""
         import email as _email
         from email import policy as _ep
         import re as _re
+        import base64 as _b64
         text, html = '', ''
+        cid_map = {}  # Content-ID → data: URL
         try:
             with open(str(eml_path), 'rb') as f:
                 raw = f.read()
             msg = _email.message_from_bytes(raw, policy=_ep.compat32)
             if msg.is_multipart():
+                # 1. Pass: cid-Bilder sammeln (inline images)
+                for part in msg.walk():
+                    ct  = part.get_content_type()
+                    cid = part.get('Content-ID', '')
+                    if cid and ct.startswith('image/'):
+                        # Content-ID: <image001.png@...> → image001.png@...
+                        cid_clean = cid.strip('<> ')
+                        try:
+                            payload = part.get_payload(decode=True)
+                            if payload and len(payload) < 2_000_000:  # Max 2MB pro Bild
+                                b64 = _b64.b64encode(payload).decode('ascii')
+                                cid_map[cid_clean] = f"data:{ct};base64,{b64}"
+                        except: pass
+                # 2. Pass: Text + HTML extrahieren
                 for part in msg.walk():
                     ct  = part.get_content_type()
                     cd  = str(part.get('Content-Disposition', ''))
@@ -26296,11 +26339,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except: pass
         except Exception:
             pass
-        # HTML sanitieren — Scripts, Forms, iframes entfernen
+        # cid: Referenzen in HTML durch data: URLs ersetzen
+        if html and cid_map:
+            for cid_key, data_url in cid_map.items():
+                html = html.replace(f'cid:{cid_key}', data_url)
+        # HTML sanitieren — Scripts/Forms/iframes entfernen, aber Style/Meta beibehalten
+        # (iframe sandbox isoliert bereits CSS/JS — Style muss bleiben für korrekte Darstellung)
         if html:
-            for tag in ['script','style','form','iframe','object','embed','meta','base','link']:
+            for tag in ['script','form','iframe','object','embed']:
                 html = _re.sub(rf'<{tag}[^>]*>.*?</{tag}>', '', html, flags=_re.DOTALL|_re.IGNORECASE)
                 html = _re.sub(rf'<{tag}[^>]*/>', '', html, flags=_re.IGNORECASE)
+            # <base> entfernen (verhindert relative URL-Auflösung), <link> nur wenn type=stylesheet belassen
+            html = _re.sub(r'<base[^>]*/?>',  '', html, flags=_re.IGNORECASE)
             html = _re.sub(r'\son\w+\s*=\s*["\'][^"\']*["\']', '', html, flags=_re.IGNORECASE)
             html = _re.sub(r'\son\w+\s*=\s*[^\s>]+', '', html, flags=_re.IGNORECASE)
             html = _re.sub(r'(href|src)\s*=\s*["\']javascript:[^"\']*["\']', 'href="#"', html, flags=_re.IGNORECASE)
@@ -26356,6 +26406,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     elif t:
                         result["text"] = t
                         break
+
+                # Fallback: mail.json → html_body Feld (falls EML kein HTML hatte)
+                if not result["html"] and mail_folder:
+                    mj = Path(mail_folder) / "mail.json"
+                    if mj.exists():
+                        try:
+                            md = json.loads(mj.read_text('utf-8'))
+                            if md.get("html_body"):
+                                result["html"] = md["html_body"]
+                            elif md.get("html"):
+                                result["html"] = md["html"]
+                        except: pass
 
                 # Anhänge aus DB-JSON-Liste oder Dateisystem
                 att_dir = None
