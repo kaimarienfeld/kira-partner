@@ -2385,6 +2385,7 @@ def build_postfach():
       <div class="pf-rm-titlebar">
         <div class="pf-rm-subject" id="pf-rm-subject"></div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+          <button class="pf-cm-btn" id="pf-rm-maximize" onclick="pfReadModalToggleMax()" title="Vollbild">&#x25A1;</button>
           <button class="pf-cm-btn" onclick="pfReadModalClose()" title="Schlie\u00dfen">&#x2715;</button>
         </div>
       </div>
@@ -2601,6 +2602,7 @@ def build_postfach():
 .pf-rm-body{flex:1;min-height:0;position:relative;overflow:hidden}
 .pf-rm-body iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff}
 .pf-rm-body.text-mode{overflow-y:auto;padding:20px;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.7;color:var(--text)}
+.pf-read-modal.maximized{width:100vw;max-width:100vw;height:100vh;max-height:100vh;border-radius:0}
 .pf-cm-titlebar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border)}
 .pf-cm-title{font-weight:700;font-size:15px;color:var(--text)}
 .pf-cm-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .12s}
@@ -2907,7 +2909,7 @@ def build_postfach():
 [data-theme="light"] .pf-attachment-row{background:#fff}
 
 /* ── VIEWER / CONTENT-SECTION ─────────────────────────────── */
-.pf-content-section{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.pf-content-section{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;grid-row:4}
 .pf-viewer-toolbar{display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-state-chip{font-size:11px;padding:2px 8px;border-radius:9px;font-weight:500;white-space:nowrap}
 .pf-chip-html{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)}
@@ -4896,6 +4898,7 @@ window.pfOpenMail = function(m, el) {
       body.style.cssText = '';
       const iframe = document.createElement('iframe');
       iframe.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+      iframe.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff';
       // HTML vorbereiten: Links in neuem Tab, Bilder responsive
       let mailHtml = hasHtml ? d.html : rawText;
       // <base target=_blank> für Links in neuem Tab
@@ -5208,24 +5211,32 @@ window.pfReadModalOpen=function(){
   } else {
     attBar.style.display='none';
   }
-  // Action-Buttons verdrahten (gleiche Funktionen wie Panel-Toolbar)
-  document.getElementById('pf-rm-reply').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-reply').click()};
-  document.getElementById('pf-rm-replyall').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-replyall').click()};
-  document.getElementById('pf-rm-forward').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-forward').click()};
+  // Action-Buttons: Reply/Forward direkt aufrufen (nicht über Panel-Buttons)
+  document.getElementById('pf-rm-reply').onclick=function(){pfReadModalClose();pfReply()};
+  document.getElementById('pf-rm-replyall').onclick=function(){pfReadModalClose();pfReplyAll()};
+  document.getElementById('pf-rm-forward').onclick=function(){pfReadModalClose();pfForward()};
   document.getElementById('pf-rm-read').onclick=function(){document.getElementById('pf-tb-read').click()};
   document.getElementById('pf-rm-flag').onclick=function(){document.getElementById('pf-tb-flag').click()};
   document.getElementById('pf-rm-pin').onclick=function(){document.getElementById('pf-tb-pin').click()};
   document.getElementById('pf-rm-delete').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-delete').click()};
   document.getElementById('pf-rm-kira').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-kira').click()};
-  document.getElementById('pf-rm-360').onclick=function(){pfReadModalClose();document.getElementById('pf-tb-360').click()};
   // ESC schließen
   ov._escHandler=function(e){if(e.key==='Escape'){pfReadModalClose();document.removeEventListener('keydown',ov._escHandler)}};
   document.addEventListener('keydown',ov._escHandler);
+};
+window.pfReadModalToggleMax=function(){
+  const modal=document.getElementById('pf-read-modal');
+  const btn=document.getElementById('pf-rm-maximize');
+  modal.classList.toggle('maximized');
+  btn.innerHTML=modal.classList.contains('maximized')?'&#x2750;':'&#x25A1;';
+  btn.title=modal.classList.contains('maximized')?'Verkleinern':'Vollbild';
 };
 window.pfReadModalClose=function(){
   const ov=document.getElementById('pf-read-modal-overlay');
   ov.style.display='none';
   document.getElementById('pf-rm-body').innerHTML='';
+  document.getElementById('pf-read-modal').classList.remove('maximized');
+  document.getElementById('pf-rm-maximize').innerHTML='&#x25A1;';
   if(ov._escHandler) document.removeEventListener('keydown',ov._escHandler);
 };
 
