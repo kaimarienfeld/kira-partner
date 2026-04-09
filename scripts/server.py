@@ -3105,7 +3105,7 @@ window.pfSaveCombinedKonten = function() {
   }).catch(()=>{});
 };
 window.pfSelectCombined = function() {
-  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType='all'; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch='';
+  _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType='all'; _pfCurrentFolderLabel='Gemeinsames Postfach'; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
   document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach';
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-sub-item').forEach(el=>el.classList.remove('active'));
@@ -3124,7 +3124,7 @@ window.pfToggleCombinedExpand = function(e) {
 window.pfSelectCombinedSub = function(folderType, label, el, e) {
   if(e) e.stopPropagation();
   _pfCurrentKonto='_combined_'; _pfCurrentFolder=''; _pfCurrentFolderType=folderType;
-  _pfCurrentFolderLabel=label; _pfOffset=0; _pfSearch='';
+  _pfCurrentFolderLabel=label; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
   document.getElementById('pf-mid-title').textContent='Gemeinsames Postfach — '+label;
   document.getElementById('pf-search').value='';
   document.querySelectorAll('.pf-folder-item,.pf-fav-item,.pf-combined-btn').forEach(x=>x.classList.remove('active'));
@@ -3173,6 +3173,7 @@ let _pfCurrentFolderLabel = '';
 let _pfFavorites = [];          // saved favorites from /api/mail/favorites
 let _pfCombinedExpanded = true; // combined inbox sub-folders open
 let _pfCurrentFolderType = '';  // for combined sub-folder filter (inbox|sent|drafts|all)
+let _pfUnreadOnly = false;      // true wenn Favorit nur ungelesene anzeigen soll
 let _pfFolderData = null;       // cached last /api/mail/folders response for re-render
 let _pfSelected = new Set();    // selected message_ids for bulk actions
 let _pfCurrentMail = null;      // currently open mail object
@@ -3390,7 +3391,11 @@ function pfBulkMarkRead(gelesen) {
     if(d.ok){
       ids.forEach(id=>{
         const el=document.querySelector('[data-msgid="'+id+'"]');
-        if(el){if(gelesen)el.classList.remove('unread');else el.classList.add('unread');}
+        if(el){
+          if(gelesen) el.classList.remove('unread'); else el.classList.add('unread');
+          // Im Ungelesen-Filter: gelesene Mails aus Liste entfernen
+          if(_pfUnreadOnly && gelesen) { el.style.opacity='0.3'; setTimeout(()=>el.remove(),400); }
+        }
       });
       pfClearSelection();
       _pfUpdateSidebarBadge();
@@ -3422,6 +3427,8 @@ function pfToggleRead(msgId, el) {
       _pfTotalUnread+=(gelesen?-1:1);
       if(_pfTotalUnread<0)_pfTotalUnread=0;
       _pfUpdateSidebarBadge();
+      // Im Ungelesen-Filter: gelesene Mails aus Liste entfernen
+      if(_pfUnreadOnly && gelesen) { el.style.opacity='0.3'; setTimeout(()=>el.remove(),400); }
     }
   }).catch(()=>{});
 }
@@ -3578,11 +3585,12 @@ function pfRenderFolders(data, onReady) {
         fi.className = 'pf-fav-item';
         fi.dataset.konto = fav.konto;
         fi.dataset.folder = fav.folder;
+        const isUnreadFav = !!fav.unread_only;
         const domain = (fav.konto||'').split('@')[1]||fav.konto;
         fi.innerHTML = pfFolderIconWrap(fav.folder)
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+fav.label+'</span>'
           +'<span style="font-size:10px;color:var(--text-muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:80px">'+domain+'</span>';
-        fi.onclick = ()=>pfSelectFolder(fav.konto, fav.folder, fav.label, fi);
+        fi.onclick = ()=>pfSelectFolder(fav.konto, fav.folder, fav.label, fi, isUnreadFav);
         tree.appendChild(fi);
       });
       // Unread inboxes (dedup with saved favorites)
@@ -3595,7 +3603,7 @@ function pfRenderFolders(data, onReady) {
         fi.innerHTML = pfFolderIconWrap('inbox')
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ungelesen '+displayName+'</span>'
           +'<span class="pf-fav-badge">'+inbox.unread+'</span>';
-        fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName, fi);
+        fi.onclick = ()=>pfSelectFolder(konto.email, inbox.name, 'Ungelesen '+displayName, fi, true);
         tree.appendChild(fi);
       });
       const sep = document.createElement('div'); sep.className='pf-fav-sep'; tree.appendChild(sep);
@@ -3714,8 +3722,9 @@ function pfToggleKonto(email, safe) {
 }
 
 // ── Select Folder ────────────────────────────────────────
-window.pfSelectFolder = function(email, folder, label, favEl) {
+window.pfSelectFolder = function(email, folder, label, favEl, unreadOnly) {
   _pfCurrentKonto=email; _pfCurrentFolder=folder; _pfOffset=0; _pfSearch='';
+  _pfUnreadOnly = !!unreadOnly;
   _pfCurrentFolderLabel = label;
   document.getElementById('pf-mid-title').textContent=label;
   const emptyDiv2=document.getElementById('pf-list-empty'); if(emptyDiv2){const t2=emptyDiv2.querySelector('div:last-child');if(t2)t2.textContent='Keine Mails vorhanden';}
@@ -3737,7 +3746,7 @@ window.pfSelectFolder = function(email, folder, label, favEl) {
 // ── Kira-Ausgang: Ordner auswählen ──────────────────────
 var _pfKiraStatus = null;
 window.pfSelectKiraFolder = function(status) {
-  _pfCurrentKonto='_kira_'; _pfCurrentFolder=status; _pfKiraStatus=status; _pfOffset=0; _pfSearch='';
+  _pfCurrentKonto='_kira_'; _pfCurrentFolder=status; _pfKiraStatus=status; _pfOffset=0; _pfSearch=''; _pfUnreadOnly=false;
   const labels={pending:'Entwürfe',sent:'Gesendet',rejected:'Abgelehnt',expired:'Abgelaufen'};
   _pfCurrentFolderLabel = 'Kira — '+(labels[status]||status);
   document.getElementById('pf-mid-title').textContent=_pfCurrentFolderLabel;
@@ -3772,6 +3781,7 @@ function pfLoadList(reset) {
   } else {
     url='/api/mail/list?konto='+encodeURIComponent(_pfCurrentKonto)+'&folder='+encodeURIComponent(_pfCurrentFolder)+'&offset='+_pfOffset+'&limit=50';
   }
+  if(_pfUnreadOnly) url+='&unread=1';
   if(_pfSearch) url+='&q='+encodeURIComponent(_pfSearch);
   fetch(url).then(r=>r.json()).then(data=>{
     _pfTotal=data.total||0;
@@ -4774,7 +4784,11 @@ function pfDoMarkRead(m) {
   const doMark=()=>{
     fetch('/api/mail/gelesen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[m.message_id],gelesen:true})});
     const itemEl=document.querySelector('[data-msgid="'+m.message_id+'"]');
-    if(itemEl) itemEl.classList.remove('unread');
+    if(itemEl) {
+      itemEl.classList.remove('unread');
+      // Im Ungelesen-Filter: gelesene Mail aus Liste entfernen
+      if(_pfUnreadOnly) { itemEl.style.opacity='0.3'; setTimeout(()=>itemEl.remove(),400); }
+    }
     _pfTotalUnread=Math.max(0,_pfTotalUnread-1);
     _pfUpdateSidebarBadge();
   };
@@ -27198,13 +27212,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({'total': 0, 'mails': [], 'error': str(e)})
 
     def _api_mail_list(self):
-        """GET /api/mail/list?konto=&folder=&offset=&limit=&q= — Mailsliste aus mail_index.db."""
+        """GET /api/mail/list?konto=&folder=&offset=&limit=&q=&unread= — Mailsliste aus mail_index.db."""
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         konto  = qs.get('konto',  [''])[0]
         folder = qs.get('folder', [''])[0]
         offset = int(qs.get('offset', ['0'])[0])
         limit  = min(int(qs.get('limit', ['50'])[0]), 200)
         q      = qs.get('q', [''])[0].strip()
+        unread_only = qs.get('unread', [''])[0] == '1'
 
         try:
             conn = sqlite3.connect(str(MAIL_INDEX_DB))
@@ -27216,6 +27231,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _folder_low = folder.lower()
             if 'inbox' in _folder_low or 'posteingang' in _folder_low:
                 where += " AND (snooze_until IS NULL OR datetime(snooze_until) <= datetime('now'))"
+            # Ungelesen-Filter für Favoriten-Ordner
+            if unread_only:
+                where += " AND gelesen=0"
             if q:
                 where += " AND (betreff LIKE ? OR absender LIKE ? OR text_plain LIKE ?)"
                 like = f"%{q}%"
