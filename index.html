@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KIRA Partner – Mitgestalten & Feedback</title>
-<!-- generated: 2026-04-09 -->
+<!-- generated: 2026-04-10 -->
 <script>(function(){var t=localStorage.getItem('kira_pv_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <style>
 /* ============================================================
@@ -992,7 +992,7 @@ body{
 const CFG = {
   "pw_kai": "KaiAdmin2026",
   "pw_leni": "HalloLeni2026",
-  "app_start": "2026-04-09",
+  "app_start": "2026-04-10",
   "ntfy_kai": "raumkult-kai-2026-x7k",
   "ntfy_leni": "",
   "ntfy_server": "https://ntfy.sh",
@@ -1160,9 +1160,9 @@ const FEATURES = [
     "icon": "👤",
     "name": "Vollständiges Kundenprofil",
     "status": "done",
-    "added": "2026-03-25",
-    "desc": "Geplant: Alles über einen Kunden auf einer Seite — alle bisherigen Mails, Angebote, Rechnungen und die komplette Geschichte. Perfekt für den Moment wenn jemand anruft und du sofort weißt: Wer ist das? Was haben wir miteinander gemacht?",
-    "leni_note": null
+    "added": "2026-04-10",
+    "desc": "Alles über einen Kunden auf einer Seite — alle bisherigen Mails, Angebote, Rechnungen, Projekte und die komplette Geschichte. Jetzt Teil des neuen Kundencenters mit Projekt-Zeitstrahl und Fallansicht.",
+    "leni_note": "Jetzt im Kundencenter integriert (CRM-Modul)"
   },
   {
     "id": "angebots-kalkulation",
@@ -1259,9 +1259,9 @@ const FEATURES = [
     "icon": "🎯",
     "name": "Vom ersten Kontakt bis zur Rechnung",
     "status": "done",
-    "added": "2026-03-28",
-    "desc": "Geplant: Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt — Anfrage, Angebot, Auftrag, Abrechnung. Conversion-Raten auf einen Blick, automatische Wiedervorlage bei vergessenen Kontakten.",
-    "leni_note": null
+    "added": "2026-04-10",
+    "desc": "Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt. Jetzt mit vollständigem Kundencenter: Projekte, Fälle, automatische Zuordnung per KI.",
+    "leni_note": "Jetzt im Kundencenter integriert (CRM-Modul)"
   },
   {
     "id": "partner-view",
@@ -1475,7 +1475,7 @@ const FEATURES = [
     "icon": "📎",
     "name": "Anhang-Analyse — KI liest PDFs, Bilder und Dokumente",
     "status": "done",
-    "added": "2026-04-09",
+    "added": "2026-04-10",
     "desc": "KIRA liest jetzt den Inhalt von Mail-Anhängen (PDF, Word, ZIP, Bilder) bevor sie eine Mail einsortiert. Sogar Fotos werden per OCR gelesen oder direkt der KI gezeigt.",
     "leni_note": null
   },
@@ -1612,6 +1612,114 @@ const FEATURES = [
     "status": "planned",
     "added": "2026-04-09",
     "desc": "Eigene Projekte anlegen und Kira-Chats darin sortieren — so findest du jedes Gespräch wieder. Wie bei ChatGPT, nur direkt in KIRA.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-kundencenter",
+    "icon": "👥",
+    "name": "Kundencenter — die vollständige Kundenakte",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Jeder Kunde hat jetzt eine eigene Akte: Projekte, Fälle, Timeline, Stammdaten — alles an einem Ort. Kira ordnet neue Mails automatisch dem richtigen Kunden und Projekt zu.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-kunden-classifier",
+    "icon": "🤖",
+    "name": "Automatische Kundenzuordnung",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Neue Mails werden automatisch dem richtigen Kunden und Projekt zugeordnet — per KI. Bei unklaren Fällen landet es in der Prüfliste.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-kira-tools",
+    "icon": "🔧",
+    "name": "Kira verwaltet Kunden",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Kira kann Kunden suchen, Akten laden, Projekte zuordnen, Faelle erstellen, Identitaeten pruefen, Clustering vorschlagen und Lernregeln verwalten.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-fallexport-streitfall",
+    "icon": "📤",
+    "name": "Fall-Export für Streitfälle",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Bei einem Streitfall alle relevanten Informationen als Dossier exportieren — Kunde, Projekt, Timeline, Classifier-Log — alles gebündelt.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-identitaets-graph",
+    "icon": "🔗",
+    "name": "Kontakt-Erkennung",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Kira erkennt wenn dieselbe Person von verschiedenen E-Mail-Adressen schreibt und verknuepft die Identitaeten automatisch.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-lernregeln",
+    "icon": "🧠",
+    "name": "Kira lernt aus Korrekturen",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Wenn du eine Zuordnung korrigierst, leitet Kira daraus eine Regel ab und wendet sie in Zukunft automatisch an.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-projekt-clustering",
+    "icon": "📊",
+    "name": "Automatische Projektgruppierung",
+    "status": "done",
+    "added": "2026-04-10",
+    "desc": "Kira gruppiert unzugeordnete Aktivitaeten und schlaegt Projekte vor. Du bestaetigst per Klick.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-health-score",
+    "icon": "💚",
+    "name": "Kunden-Gesundheitsampel",
+    "status": "done",
+    "added": "2026-04-11",
+    "desc": "Kira bewertet taeglich jeden Kunden mit 5 Faktoren. Unter 35% gibts eine Warnung.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-schreibstil",
+    "icon": "✍️",
+    "name": "Schreibstil-Erkennung",
+    "status": "done",
+    "added": "2026-04-11",
+    "desc": "Kira erkennt Kunden am Schreibstil, auch wenn sie von einer neuen Mailadresse schreiben.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-sentiment-trend",
+    "icon": "📈",
+    "name": "Stimmungs-Fruehwarnung",
+    "status": "done",
+    "added": "2026-04-11",
+    "desc": "Kira erkennt wenn ein Kunde in seinen Mails zunehmend unzufriedener klingt — bevor es zur Reklamation kommt.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-thread-linking",
+    "icon": "🔗",
+    "name": "Kanaluebergreifende Gespraeche",
+    "status": "done",
+    "added": "2026-04-11",
+    "desc": "Kira verbindet Mails, WhatsApp und Memos die zum selben Gespraech gehoeren — automatisch.",
+    "leni_note": null
+  },
+  {
+    "id": "crm-next-best-action",
+    "icon": "💡",
+    "name": "Naechster-Schritt-Empfehlung",
+    "status": "done",
+    "added": "2026-04-11",
+    "desc": "Kira schlaegt in jedem Fall die beste naechste Aktion vor — konkret und handlungsorientiert.",
     "leni_note": null
   }
 ];
