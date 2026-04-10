@@ -20786,6 +20786,23 @@ function executeStatusChange(type, id, action, data) {{
   }}).catch(()=>showToast('Fehler'));
 }}
 
+// ── Einstellungen-Schutz: Helfer für sichere Config-Werte ──────────────
+// Gibt null zurück wenn das DOM-Element nicht existiert → Backend überspringt null → bestehender Wert bleibt erhalten
+function _v(id, def) {{ const e=document.getElementById(id); if(!e) return null; return e.value?.trim() || def || ''; }}
+function _c(id) {{ const e=document.getElementById(id); return e!==null ? e.checked : null; }}
+function _i(id, def) {{ const e=document.getElementById(id); if(!e) return null; return parseInt(e.value)||def||0; }}
+function _f(id, def) {{ const e=document.getElementById(id); if(!e) return null; return parseFloat(e.value)||def||0; }}
+function _stripNulls(obj) {{
+  if(typeof obj!=='object'||obj===null||Array.isArray(obj)) return obj;
+  const r={{}};
+  for(const[k,v] of Object.entries(obj)) {{
+    if(v===null||v===undefined) continue;
+    if(typeof v==='object'&&!Array.isArray(v)) {{ const s=_stripNulls(v); if(Object.keys(s).length>0) r[k]=s; }}
+    else r[k]=v;
+  }}
+  return r;
+}}
+
 // Einstellungen speichern
 function saveSettings() {{
   // Provider-Modelle aus den aktuellen UI-Werten sammeln
@@ -20799,207 +20816,206 @@ function saveSettings() {{
 
   const cfg = {{
     ntfy: {{
-      aktiv:              document.getElementById('cfg-ntfy-aktiv')?.checked ?? false,
-      topic_name:         document.getElementById('cfg-ntfy-topic')?.value.trim() || '',
-      server:             document.getElementById('cfg-ntfy-server')?.value.trim() || 'https://ntfy.sh',
-      prioritaet:         document.getElementById('cfg-ntfy-prioritaet')?.value || 'default',
-      arbeitszeit_aktiv:  document.getElementById('cfg-ntfy-arbeitszeit-aktiv')?.checked ?? false,
-      arbeitszeit_von:    document.getElementById('cfg-ntfy-az-von')?.value || '08:00',
-      arbeitszeit_bis:    document.getElementById('cfg-ntfy-az-bis')?.value || '18:00',
-      urlaub_modus:       document.getElementById('cfg-ntfy-urlaub')?.checked ?? false,
-      urlaub_von:         document.getElementById('cfg-urlaub-von')?.value || '',
-      urlaub_bis:         document.getElementById('cfg-urlaub-bis')?.value || '',
-      urlaub_autoreply_aktiv:    document.getElementById('cfg-urlaub-autoreply')?.checked ?? false,
-      urlaub_autoreply_betreff:  document.getElementById('cfg-urlaub-autoreply-betreff')?.value || '',
-      urlaub_autoreply_text:     document.getElementById('cfg-urlaub-autoreply-text')?.value || ''
+      aktiv:              _c('cfg-ntfy-aktiv'),
+      topic_name:         _v('cfg-ntfy-topic'),
+      server:             _v('cfg-ntfy-server', 'https://ntfy.sh'),
+      prioritaet:         _v('cfg-ntfy-prioritaet', 'default'),
+      arbeitszeit_aktiv:  _c('cfg-ntfy-arbeitszeit-aktiv'),
+      arbeitszeit_von:    _v('cfg-ntfy-az-von', '08:00'),
+      arbeitszeit_bis:    _v('cfg-ntfy-az-bis', '18:00'),
+      urlaub_modus:       _c('cfg-ntfy-urlaub'),
+      urlaub_von:         _v('cfg-urlaub-von'),
+      urlaub_bis:         _v('cfg-urlaub-bis'),
+      urlaub_autoreply_aktiv:    _c('cfg-urlaub-autoreply'),
+      urlaub_autoreply_betreff:  _v('cfg-urlaub-autoreply-betreff'),
+      urlaub_autoreply_text:     _v('cfg-urlaub-autoreply-text')
     }},
     benachrichtigungen: {{
-      inapp_mail:     document.getElementById('cfg-inapp-mail')?.checked ?? true,
-      inapp_kira:     document.getElementById('cfg-inapp-kira')?.checked ?? true,
-      inapp_aufgaben: document.getElementById('cfg-inapp-aufgaben')?.checked ?? true,
-      inapp_bg:       document.getElementById('cfg-inapp-bg')?.checked ?? false,
-      inapp_fehler:   document.getElementById('cfg-inapp-fehler')?.checked ?? true
+      inapp_mail:     _c('cfg-inapp-mail'),
+      inapp_kira:     _c('cfg-inapp-kira'),
+      inapp_aufgaben: _c('cfg-inapp-aufgaben'),
+      inapp_bg:       _c('cfg-inapp-bg'),
+      inapp_fehler:   _c('cfg-inapp-fehler')
     }},
     email_notification: {{
-      aktiv:             document.getElementById('cfg-email-aktiv')?.checked ?? false,
-      smtp_server:       document.getElementById('cfg-smtp-server')?.value.trim() || '',
-      smtp_port:         parseInt(document.getElementById('cfg-smtp-port')?.value || '587', 10),
-      absender_email:    document.getElementById('cfg-smtp-from')?.value.trim() || '',
-      absender_passwort: document.getElementById('cfg-smtp-pw')?.value || '',
-      empfaenger_email:  document.getElementById('cfg-smtp-to')?.value.trim() || ''
+      aktiv:             _c('cfg-email-aktiv'),
+      smtp_server:       _v('cfg-smtp-server'),
+      smtp_port:         _i('cfg-smtp-port', 587),
+      absender_email:    _v('cfg-smtp-from'),
+      absender_passwort: _v('cfg-smtp-pw'),
+      empfaenger_email:  _v('cfg-smtp-to')
     }},
     aufgaben: {{
-      erinnerung_intervall_stunden: parseInt(document.getElementById('cfg-erinnerung-h')?.value)||24,
-      unanswered_check_days:        parseInt(document.getElementById('cfg-unanswered-days')?.value)||3,
-      deadline_warnung_tage:        parseInt(document.getElementById('cfg-deadline-warnung-tage')?.value)||1,
-      erinnerung_typ:               document.getElementById('cfg-erinnerung-typ')?.value || 'push',
-      default_prioritaet:           document.getElementById('cfg-default-prioritaet')?.value || 'normal',
-      auto_archiv_tage:             parseInt(document.getElementById('cfg-auto-archiv-tage')?.value)||0
+      erinnerung_intervall_stunden: _i('cfg-erinnerung-h', 24),
+      unanswered_check_days:        _i('cfg-unanswered-days', 3),
+      deadline_warnung_tage:        _i('cfg-deadline-warnung-tage', 1),
+      erinnerung_typ:               _v('cfg-erinnerung-typ', 'push'),
+      default_prioritaet:           _v('cfg-default-prioritaet', 'normal'),
+      auto_archiv_tage:             _i('cfg-auto-archiv-tage', 0)
     }},
     nachfass: {{
-      aktiv:              document.getElementById('cfg-nf-aktiv')?.checked ?? true,
-      benachrichtigung:   document.getElementById('cfg-nf-typ')?.value || 'push',
-      kira_nachfass_text: document.getElementById('cfg-nf-kira-text')?.checked ?? true,
-      intervall_1_tage:   parseInt(document.getElementById('cfg-nf-1')?.value)||7,
-      intervall_2_tage:   parseInt(document.getElementById('cfg-nf-2')?.value)||14,
-      intervall_3_tage:   parseInt(document.getElementById('cfg-nf-3')?.value)||30,
-      rechnung_tage:      parseInt(document.getElementById('cfg-nf-rechnung')?.value)||14
+      aktiv:              _c('cfg-nf-aktiv'),
+      benachrichtigung:   _v('cfg-nf-typ', 'push'),
+      kira_nachfass_text: _c('cfg-nf-kira-text'),
+      intervall_1_tage:   _i('cfg-nf-1', 7),
+      intervall_2_tage:   _i('cfg-nf-2', 14),
+      intervall_3_tage:   _i('cfg-nf-3', 30),
+      rechnung_tage:      _i('cfg-nf-rechnung', 14)
     }},
     server: {{
-      port:             parseInt(document.getElementById('cfg-server-port')?.value)||8765,
-      auto_open_browser: document.getElementById('cfg-auto-browser')?.checked ?? true
+      port:             _i('cfg-server-port', 8765),
+      auto_open_browser: _c('cfg-auto-browser')
     }},
     llm: {{
-      internet_recherche:      document.getElementById('cfg-llm-internet')?.checked ?? false,
-      geschaeftsdaten_teilen:  document.getElementById('cfg-llm-geschaeft')?.checked ?? true,
-      konversationen_speichern: document.getElementById('cfg-llm-konv')?.checked ?? true,
-      kontext_nachrichten:      parseInt(document.getElementById('cfg-llm-kontext-msgs')?.value || '20', 10),
-      max_kontext_items:        parseInt(document.getElementById('cfg-llm-max-items')?.value || '50', 10),
-      auto_wissen_extrahieren:  document.getElementById('cfg-llm-auto-wissen')?.checked ?? true,
-      antwort_laenge:           document.getElementById('cfg-llm-antwort-laenge')?.value || 'normal',
-      temperatur:               parseFloat((parseInt(document.getElementById('cfg-llm-temperatur')?.value||'7')/10).toFixed(1)),
+      internet_recherche:      _c('cfg-llm-internet'),
+      geschaeftsdaten_teilen:  _c('cfg-llm-geschaeft'),
+      konversationen_speichern: _c('cfg-llm-konv'),
+      kontext_nachrichten:      _i('cfg-llm-kontext-msgs', 20),
+      max_kontext_items:        _i('cfg-llm-max-items', 50),
+      auto_wissen_extrahieren:  _c('cfg-llm-auto-wissen'),
+      antwort_laenge:           _v('cfg-llm-antwort-laenge', 'normal'),
+      temperatur:               _f('cfg-llm-temperatur') !== null ? parseFloat((_i('cfg-llm-temperatur',7)/10).toFixed(1)) : null,
       _provider_updates: providerUpdates
     }},
     dashboard: {{
-      layout: document.getElementById('cfg-dashboard-layout')?.value || 'B',
-      refresh_intervall_s: parseInt(document.getElementById('cfg-dashboard-refresh')?.value||'30'),
-      konfetti: document.getElementById('cfg-dashboard-konfetti')?.checked ?? true,
-      reduced_motion: document.getElementById('cfg-dashboard-reduced')?.checked ?? false
+      layout:              _v('cfg-dashboard-layout', 'B'),
+      refresh_intervall_s: _i('cfg-dashboard-refresh', 30),
+      konfetti:            _c('cfg-dashboard-konfetti'),
+      reduced_motion:      _c('cfg-dashboard-reduced')
     }},
     news_feed: {{
       wetter: {{
-        aktiv: document.getElementById('cfg-nf-wetter-aktiv')?.checked ?? true,
-        standort: document.getElementById('cfg-nf-wetter-standort')?.value?.trim() || 'D\\u00fcsseldorf'
+        aktiv:    _c('cfg-nf-wetter-aktiv'),
+        standort: _v('cfg-nf-wetter-standort', 'D\\u00fcsseldorf')
       }},
       rss_feeds: window._esRssFeeds || [],
       newsletter_digest: {{
-        aktiv: document.getElementById('cfg-nf-newsletter-aktiv')?.checked ?? true,
-        max_items: parseInt(document.getElementById('cfg-nf-newsletter-max')?.value||'5')
+        aktiv:     _c('cfg-nf-newsletter-aktiv'),
+        max_items: _i('cfg-nf-newsletter-max', 5)
       }}
     }},
     anhang_extraktion: {{
-      aktiv:                document.getElementById('cfg-anh-aktiv')?.checked ?? true,
-      vision_fallback:      document.getElementById('cfg-anh-vision')?.checked ?? true,
-      ocr_aktiv:            document.getElementById('cfg-anh-ocr')?.checked ?? true,
-      zip_entpacken:        document.getElementById('cfg-anh-zip')?.checked ?? true,
-      max_dateigroesse_mb:  parseInt(document.getElementById('cfg-anh-max-mb')?.value || '20')
+      aktiv:                _c('cfg-anh-aktiv'),
+      vision_fallback:      _c('cfg-anh-vision'),
+      ocr_aktiv:            _c('cfg-anh-ocr'),
+      zip_entpacken:        _c('cfg-anh-zip'),
+      max_dateigroesse_mb:  _i('cfg-anh-max-mb', 20)
     }},
     protokoll: {{
-      max_eintraege: parseInt(document.getElementById('cfg-proto-max')?.value)||0,
-      tage:          parseInt(document.getElementById('cfg-proto-tage')?.value)||90
+      max_eintraege: _i('cfg-proto-max', 0),
+      tage:          _i('cfg-proto-tage', 90)
     }},
     runtime_log: {{
-      aktiv:                  document.getElementById('cfg-rl-aktiv')?.checked ?? true,
-      ui_events:              document.getElementById('cfg-rl-ui')?.checked ?? true,
-      kira_events:            document.getElementById('cfg-rl-kira')?.checked ?? true,
-      llm_events:             document.getElementById('cfg-rl-llm')?.checked ?? true,
-      hintergrund_events:     document.getElementById('cfg-rl-bg')?.checked ?? true,
-      settings_events:        document.getElementById('cfg-rl-settings')?.checked ?? true,
-      fehler_immer_loggen:    document.getElementById('cfg-rl-fehler')?.checked ?? true,
-      vollkontext_speichern:  document.getElementById('cfg-rl-vollkontext')?.checked ?? true,
-      kira_darf_lesen:        document.getElementById('cfg-rl-kira-lesen')?.checked ?? true
+      aktiv:                  _c('cfg-rl-aktiv'),
+      ui_events:              _c('cfg-rl-ui'),
+      kira_events:            _c('cfg-rl-kira'),
+      llm_events:             _c('cfg-rl-llm'),
+      hintergrund_events:     _c('cfg-rl-bg'),
+      settings_events:        _c('cfg-rl-settings'),
+      fehler_immer_loggen:    _c('cfg-rl-fehler'),
+      vollkontext_speichern:  _c('cfg-rl-vollkontext'),
+      kira_darf_lesen:        _c('cfg-rl-kira-lesen')
     }},
     kira: {{
-      launcher_variant:    document.getElementById('cfg-kira-variant')?.value || 'B',
-      size:                parseInt(document.getElementById('cfg-kira-size')?.value       || '112'),
-      prox_radius:         parseFloat(document.getElementById('cfg-kira-prox')?.value    || '0.5'),
-      bounce_dist:         parseInt(document.getElementById('cfg-kira-bounce')?.value     || '130'),
-      idle_mode:           document.getElementById('cfg-kira-idle')?.checked              ?? true,
-      idle_delay:          parseInt(document.getElementById('cfg-kira-idle-delay')?.value || '10'),
-      name:                (document.getElementById('cfg-kira-name')?.value.trim() || 'Kira'),
-      persoenlichkeit:     document.getElementById('cfg-kira-persoenlichkeit')?.value || 'direkt',
-      sprache:             document.getElementById('cfg-kira-sprache')?.value          || 'deutsch',
-      chitchat_erlaubt:    document.getElementById('cfg-kira-chitchat')?.checked       ?? true,
-      system_prompt_custom: (document.getElementById('cfg-kira-prompt-custom')?.value || '').trim(),
-      kontext_aufgaben:    document.getElementById('cfg-kira-kontext-aufgaben')?.value   || 'immer',
-      kontext_mails:       document.getElementById('cfg-kira-kontext-mails')?.value      || 'immer',
-      kontext_rechnungen:  document.getElementById('cfg-kira-kontext-rechnungen')?.value || 'immer',
+      launcher_variant:    _v('cfg-kira-variant', 'B'),
+      size:                _i('cfg-kira-size', 112),
+      prox_radius:         _f('cfg-kira-prox', 0.5),
+      bounce_dist:         _i('cfg-kira-bounce', 130),
+      idle_mode:           _c('cfg-kira-idle'),
+      idle_delay:          _i('cfg-kira-idle-delay', 10),
+      name:                _v('cfg-kira-name', 'Kira'),
+      persoenlichkeit:     _v('cfg-kira-persoenlichkeit', 'direkt'),
+      sprache:             _v('cfg-kira-sprache', 'deutsch'),
+      chitchat_erlaubt:    _c('cfg-kira-chitchat'),
+      system_prompt_custom: _v('cfg-kira-prompt-custom'),
+      kontext_aufgaben:    _v('cfg-kira-kontext-aufgaben', 'immer'),
+      kontext_mails:       _v('cfg-kira-kontext-mails', 'immer'),
+      kontext_rechnungen:  _v('cfg-kira-kontext-rechnungen', 'immer'),
       memory: {{
-        aktiv:         document.getElementById('cfg-mem-aktiv')?.checked    ?? true,
-        sessions:      parseInt(document.getElementById('cfg-mem-sessions')?.value || '3'),
-        summary_aktiv: document.getElementById('cfg-mem-summary')?.checked  ?? true,
-        token_budget:  parseInt(document.getElementById('cfg-mem-tokens')?.value   || '3200')
+        aktiv:         _c('cfg-mem-aktiv'),
+        sessions:      _i('cfg-mem-sessions', 3),
+        summary_aktiv: _c('cfg-mem-summary'),
+        token_budget:  _i('cfg-mem-tokens', 3200)
       }},
       react: {{
-        aktiv:       document.getElementById('cfg-react-aktiv')?.checked    ?? true,
-        max_schritte: parseInt(document.getElementById('cfg-react-schritte')?.value || '5')
+        aktiv:        _c('cfg-react-aktiv'),
+        max_schritte: _i('cfg-react-schritte', 5)
       }},
       feedback: {{
-        buttons_aktiv:  document.getElementById('cfg-fb-buttons')?.checked    ?? true,
-        auto_lernregeln: document.getElementById('cfg-fb-lernregeln')?.checked ?? true,
-        stil_lernen:    document.getElementById('cfg-fb-stillernen')?.checked  ?? true
+        buttons_aktiv:   _c('cfg-fb-buttons'),
+        auto_lernregeln: _c('cfg-fb-lernregeln'),
+        stil_lernen:     _c('cfg-fb-stillernen')
       }},
       sicherheit: {{
-        rate_limit_per_minute:      parseInt(document.getElementById('cfg-sec-rate')?.value     || '20'),
-        circuit_breaker_threshold:  parseInt(document.getElementById('cfg-sec-cb-fehler')?.value || '3'),
-        circuit_breaker_dauer:      parseInt(document.getElementById('cfg-sec-cb-dauer')?.value  || '300'),
-        audit_log_tage:             parseInt(document.getElementById('cfg-audit-log-tage')?.value || '90'),
-        nur_bestaetigt:             document.getElementById('cfg-audit-nur-bestaetigt')?.checked  ?? false
+        rate_limit_per_minute:      _i('cfg-sec-rate', 20),
+        circuit_breaker_threshold:  _i('cfg-sec-cb-fehler', 3),
+        circuit_breaker_dauer:      _i('cfg-sec-cb-dauer', 300),
+        audit_log_tage:             _i('cfg-audit-log-tage', 90),
+        nur_bestaetigt:             _c('cfg-audit-nur-bestaetigt')
       }}
     }},
     kira_proaktiv: {{
-      aktiv:                  document.getElementById('cfg-proaktiv-aktiv')?.checked        ?? true,
-      scan_intervall_min:     parseInt(document.getElementById('cfg-proaktiv-intervall')?.value    || '15'),
-      angebot_followup_tage:  parseInt(document.getElementById('cfg-proaktiv-angebot-tage')?.value || '7'),
-      mahnung_eskalation_tage: parseInt(document.getElementById('cfg-proaktiv-mahnung-tage')?.value || '14'),
-      konfidenz_stufe_a:      (parseInt(document.getElementById('cfg-proaktiv-konf-a')?.value || '85') / 100),
-      konfidenz_stufe_b:      (parseInt(document.getElementById('cfg-proaktiv-konf-b')?.value || '60') / 100),
-      morgen_briefing_aktiv:  document.getElementById('cfg-proaktiv-briefing-aktiv')?.checked ?? false,
-      morgen_briefing_uhrzeit: document.getElementById('cfg-proaktiv-briefing-uhr')?.value || '07:00'
+      aktiv:                   _c('cfg-proaktiv-aktiv'),
+      scan_intervall_min:      _i('cfg-proaktiv-intervall', 15),
+      angebot_followup_tage:   _i('cfg-proaktiv-angebot-tage', 7),
+      mahnung_eskalation_tage: _i('cfg-proaktiv-mahnung-tage', 14),
+      konfidenz_stufe_a:       _f('cfg-proaktiv-konf-a') !== null ? _i('cfg-proaktiv-konf-a', 85) / 100 : null,
+      konfidenz_stufe_b:       _f('cfg-proaktiv-konf-b') !== null ? _i('cfg-proaktiv-konf-b', 60) / 100 : null,
+      morgen_briefing_aktiv:   _c('cfg-proaktiv-briefing-aktiv'),
+      morgen_briefing_uhrzeit: _v('cfg-proaktiv-briefing-uhr', '07:00')
     }},
     mail_monitor: {{
-      aktiv:              document.getElementById('cfg-mail-monitor-aktiv')?.checked ?? true,
-      intervall_sekunden: (parseInt(document.getElementById('cfg-mail-intervall')?.value)||5)*60
+      aktiv:              _c('cfg-mail-monitor-aktiv'),
+      intervall_sekunden: _i('cfg-mail-intervall') !== null ? (_i('cfg-mail-intervall', 5))*60 : null
     }},
     mail_postfach: {{
-      refresh_intervall_min: parseInt(document.getElementById('cfg-postfach-refresh')?.value)||0,
-      lese_markierung: document.getElementById('cfg-lese-markierung')?.value||'sofort',
-      after_remove: document.getElementById('cfg-after-remove')?.value||'none'
+      refresh_intervall_min: _i('cfg-postfach-refresh', 0),
+      lese_markierung:       _v('cfg-lese-markierung', 'sofort'),
+      after_remove:          _v('cfg-after-remove', 'none')
     }},
     mail_klassifizierung: {{
-      classify:           document.getElementById('cfg-mail-classify')?.checked ?? false,
-      auto_tasks:         document.getElementById('cfg-mail-tasks')?.checked ?? false,
-      ignore_newsletter:  document.getElementById('cfg-mail-ignore-newsletter')?.checked ?? false,
-      eigene_domains_extra: undefined  // wird separat verwaltet, nicht überschreiben
+      classify:           _c('cfg-mail-classify'),
+      auto_tasks:         _c('cfg-mail-tasks'),
+      ignore_newsletter:  _c('cfg-mail-ignore-newsletter')
     }},
     mail_archiv: {{
-      pfad:                         document.getElementById('cfg-archiv-pfad')?.disabled ? undefined : (document.getElementById('cfg-archiv-pfad')?.value.trim() || ''),
-      neue_mails_archivieren:       document.getElementById('cfg-archiv-aktiv')?.checked ?? true,
-      geloeschte_bereinigung_aktiv: document.getElementById('cfg-archiv-bereinigung-aktiv')?.checked ?? true,
-      bereinigung_frist_tage:       parseInt(document.getElementById('cfg-archiv-bereinigung-frist')?.value || '90', 10)
+      pfad:                         document.getElementById('cfg-archiv-pfad')?.disabled ? null : _v('cfg-archiv-pfad'),
+      neue_mails_archivieren:       _c('cfg-archiv-aktiv'),
+      geloeschte_bereinigung_aktiv: _c('cfg-archiv-bereinigung-aktiv'),
+      bereinigung_frist_tage:       _i('cfg-archiv-bereinigung-frist', 90)
     }},
     dokumente: {{
-      aktiv:                  true,
-      feature_status:         document.getElementById('cfg-dok-aktiv')?.value || 'freigeschaltet',
-      ueberwachter_ordner:    document.getElementById('cfg-dok-ordner')?.value.trim() || '',
-      unterordner_ueberwachen: document.getElementById('cfg-dok-unterordner')?.checked ?? true,
-      ablage_pfad:            document.getElementById('cfg-dok-ablage')?.value.trim() || '',
-      ordner_struktur:        document.getElementById('cfg-dok-ordnerstruktur')?.value || 'jahr_kunde',
-      ocr_aktiv:              document.getElementById('cfg-dok-ocr')?.checked ?? true,
-      ocr_sprache:            document.getElementById('cfg-dok-ocr-sprache')?.value.trim() || 'deu+eng',
-      auto_klassifizierung:   document.getElementById('cfg-dok-auto-klass')?.checked ?? true,
-      konfidenz_schwelle:     parseFloat(document.getElementById('cfg-dok-konfidenz')?.value || '0.75'),
-      dubletten_erkennung:    document.getElementById('cfg-dok-dedup')?.checked ?? true,
-      kira_darf_erstellen:    document.getElementById('cfg-dok-kira-erstellen')?.checked ?? true,
-      kira_darf_zuordnen:     document.getElementById('cfg-dok-kira-zuordnen')?.checked ?? true,
-      max_upload_mb:          parseInt(document.getElementById('cfg-dok-max-upload')?.value || '25')
+      aktiv:                   true,
+      feature_status:          _v('cfg-dok-aktiv', 'freigeschaltet'),
+      ueberwachter_ordner:     _v('cfg-dok-ordner'),
+      unterordner_ueberwachen: _c('cfg-dok-unterordner'),
+      ablage_pfad:             _v('cfg-dok-ablage'),
+      ordner_struktur:         _v('cfg-dok-ordnerstruktur', 'jahr_kunde'),
+      ocr_aktiv:               _c('cfg-dok-ocr'),
+      ocr_sprache:             _v('cfg-dok-ocr-sprache', 'deu+eng'),
+      auto_klassifizierung:    _c('cfg-dok-auto-klass'),
+      konfidenz_schwelle:      _f('cfg-dok-konfidenz', 0.75),
+      dubletten_erkennung:     _c('cfg-dok-dedup'),
+      kira_darf_erstellen:     _c('cfg-dok-kira-erstellen'),
+      kira_darf_zuordnen:      _c('cfg-dok-kira-zuordnen'),
+      max_upload_mb:           _i('cfg-dok-max-upload', 25)
     }},
     activity_feed: {{
-      revival_tage: parseInt(document.getElementById('cfg-af-revival-tage')?.value || '7', 10)
+      revival_tage: _i('cfg-af-revival-tage', 7)
     }},
     backup: {{
-      aktiv:  document.getElementById('cfg-backup-aktiv')?.checked ?? false,
-      pfad:   document.getElementById('cfg-backup-pfad')?.value.trim() || '',
-      keep_n: parseInt(document.getElementById('cfg-backup-keep')?.value || '7', 10)
+      aktiv:  _c('cfg-backup-aktiv'),
+      pfad:   _v('cfg-backup-pfad'),
+      keep_n: _i('cfg-backup-keep', 7)
     }},
     benutzer_profile: _bpCollectProfile(),
-    firma_name:         (document.getElementById('cfg-profil-firma')?.value || '').trim(),
-    firma_branche:      (document.getElementById('cfg-profil-branche')?.value || '').trim(),
-    firma_beschreibung: (document.getElementById('cfg-profil-beschreibung')?.value || '').trim()
+    firma_name:         _v('cfg-profil-firma'),
+    firma_branche:      _v('cfg-profil-branche'),
+    firma_beschreibung: _v('cfg-profil-beschreibung')
   }};
   fetch('/api/einstellungen',{{
     method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify(cfg)
+    body:JSON.stringify(_stripNulls(cfg))
   }}).then(r=>r.json()).then(d=>{{
     if(d.ok){{showToast('Einstellungen gespeichert');_rtlog('settings','einstellungen_gespeichert','Einstellungen via UI gespeichert',{{submodul:'einstellungen',status:'ok'}});}}
     else{{showToast(d.error||'Fehler');_rtlog('settings','einstellungen_fehler',d.error||'Fehler',{{submodul:'einstellungen',status:'fehler'}});}}
@@ -31727,14 +31743,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 old = {}
                 try: old = json.loads(config_path.read_text('utf-8'))
                 except: pass
-                # Merge: keep _kommentar and _anleitung fields
-                merged = {**old, **body}
-                for key in body:
-                    if isinstance(body[key], dict) and isinstance(old.get(key), dict):
-                        merged[key] = {**old[key], **body[key]}
-                # Schutz: mail_archiv.pfad nie mit leerem String ueberschreiben
-                if not merged.get('mail_archiv', {}).get('pfad') and old.get('mail_archiv', {}).get('pfad'):
-                    merged.setdefault('mail_archiv', {})['pfad'] = old['mail_archiv']['pfad']
+
+                # ── Rekursiver Deep-Merge mit Null-Schutz ──────────────────
+                # null-Werte im Body = DOM-Element fehlte → bestehenden Wert behalten
+                def _deep_merge(base, patch):
+                    result = dict(base)
+                    for k, v in patch.items():
+                        if v is None:
+                            continue  # null = Element fehlt → nicht überschreiben
+                        if isinstance(v, dict) and isinstance(result.get(k), dict):
+                            result[k] = _deep_merge(result[k], v)
+                        else:
+                            result[k] = v
+                    return result
+
+                merged = _deep_merge(old, body)
                 # Provider-Updates aus llm._provider_updates anwenden
                 llm_section = merged.get("llm", {})
                 provider_updates = llm_section.pop("_provider_updates", None)
