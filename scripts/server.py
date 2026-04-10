@@ -18300,6 +18300,7 @@ let _crmCurrentKunde = null;
 let _crmCurrentProjekt = null;
 let _crmCurrentFall = null;
 let _crmKundenCache = [];
+let _crmProjekteCache = [];
 let _crmInitDone = false;
 
 function crmInit() {{
@@ -19390,9 +19391,6 @@ async function crmLoadLernregeln(kundenId) {{
     return d.ok ? (d.lernregeln||[]) : [];
   }} catch(e) {{ return []; }}
 }}
-
-let _crmCurrentProjekt = 0;
-let _crmProjekteCache = [];
 
 // === Lexware Office JS (session-eee) ===
 function showLexTab(tabId) {{
