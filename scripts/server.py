@@ -2527,7 +2527,7 @@ def build_postfach():
 .pf-item-att svg{width:16px;height:16px}
 .pf-list-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
 /* RIGHT PREVIEW */
-.pf-right{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.pf-right{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;position:relative}
 .pf-preview-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
 .pf-prev-hdr{padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-prev-betreff{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3}
@@ -2540,7 +2540,7 @@ def build_postfach():
 .pf-prev-anhaenge{padding:8px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .pf-att-chip{display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text)}
 .pf-att-chip:hover{border-color:#3b82f6;color:#3b82f6}
-.pf-prev-body{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;max-width:100%;box-sizing:border-box}
+.pf-prev-body{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;min-width:0;padding:20px;font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box}
 .pf-prev-body.iframe-mode{overflow:hidden;padding:0;position:relative}
 .pf-prev-body.iframe-mode iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff}
 .pf-thread-hdr{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-raised);border-top:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted)}
@@ -2839,7 +2839,7 @@ def build_postfach():
 [data-theme="light"] .pf-ribbon-wrap .pf-rbn-edge:hover{color:#1a73e8}
 
 /* ── DETAIL FRAME (Mail-Lesefläche) ──────────────────────── */
-.pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden;min-width:0}
+.pf-detail-frame{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);height:100%;overflow:hidden;min-width:0;max-width:100%;width:100%}
 
 /* ── MAIL-KOPF ───────────────────────────────────────────── */
 .pf-mail-head{padding:14px 20px 10px;border-bottom:1px solid var(--border);background:var(--bg-raised);flex-shrink:0}
@@ -2910,7 +2910,7 @@ def build_postfach():
 [data-theme="light"] .pf-attachment-row{background:#fff}
 
 /* ── VIEWER / CONTENT-SECTION ─────────────────────────────── */
-.pf-content-section{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;grid-row:4}
+.pf-content-section{display:flex;flex-direction:column;min-height:0;min-width:0;max-width:100%;overflow:hidden;grid-row:4}
 .pf-viewer-toolbar{display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--bg-raised);border-bottom:1px solid var(--border);flex-shrink:0}
 .pf-state-chip{font-size:11px;padding:2px 8px;border-radius:9px;font-weight:500;white-space:nowrap}
 .pf-chip-html{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)}
@@ -4098,7 +4098,7 @@ function pfShowKiraMail(item) {
   const mailHead = document.getElementById('pf-mail-head');
   if(mailHead) mailHead.innerHTML = '';
   if(empty) empty.style.display = 'none';
-  preview.style.display = '';
+  preview.style.display = 'grid';
   const tw = document.getElementById('pf-thread-wrap'); if(tw) tw.style.display='none';
   const vtb = document.getElementById('pf-viewer-toolbar'); if(vtb) vtb.style.display='none';
   const status = item.status || 'pending';
@@ -4116,7 +4116,7 @@ function pfShowKiraMail(item) {
     '</div>' : '';
   // Body-Rendering: Kira-Entwurf immer als scrollbarer Bereich (kein iframe-mode)
   body.className = 'pf-prev-body';
-  body.style.cssText = 'overflow-y:auto;overflow-x:hidden;padding:0;white-space:normal';
+  body.style.cssText = 'overflow-y:auto;overflow-x:hidden;padding:0;white-space:normal;min-width:0;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box';
   const hasHtml = !!item.body_html;
   const headerHtml =
     '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
