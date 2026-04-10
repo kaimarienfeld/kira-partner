@@ -4033,30 +4033,55 @@ function pfLoadKiraList(reset) {
   }).catch(()=>{ document.getElementById('pf-list-empty').style.display=''; });
 }
 
-// ── Kira-Queue-Item rendern ───────────────────────────────
+// ── Kira-Queue-Item rendern (gleiches Format wie normale Mails) ───────
 function pfRenderKiraMailItem(item, list) {
-  const div = document.createElement('div');
-  div.className = 'pf-mail-item';
-  div.dataset.kiraId = item.id;
-  const statusLabels={pending:'ausstehend',sent:'gesendet',rejected:'abgelehnt',expired:'abgelaufen'};
+  // Datums-Gruppe Header
+  const group = pfDateGroup(item.erstellt_am||'');
+  if(group !== _pfLastGroup) {
+    _pfLastGroup = group;
+    const gh = document.createElement('div');
+    gh.className = 'pf-date-group';
+    gh.textContent = group;
+    list.appendChild(gh);
+  }
+
+  const el = document.createElement('div');
+  el.className = 'pf-mail-item';
+  el.dataset.kiraId = item.id;
+  const statusLabels={pending:'Ausstehend',sent:'Gesendet',rejected:'Abgelehnt',expired:'Abgelaufen'};
   const statusColors={pending:'#f59e0b',sent:'#10b981',rejected:'#ef4444',expired:'#64748b'};
   const st = item.status || 'pending';
-  const timeStr = (item.erstellt_am||'').slice(11,16);
-  div.innerHTML =
-    '<div class="pf-mail-avatar" style="background:#7c3aed;color:#fff;font-size:14px">&#x1F916;</div>'+
-    '<div class="pf-mail-content">'+
-      '<div class="pf-mail-from">'+
-        '<span class="pf-mail-sender">Kira</span>'+
-        '<span class="pf-mail-time">'+timeStr+'</span>'+
-      '</div>'+
-      '<div class="pf-mail-subject">'+(item.betreff||'(kein Betreff)')+'</div>'+
-      '<div class="pf-mail-preview" style="display:flex;align-items:center;gap:6px">'+
-        '<span>An: '+(item.an||'')+'</span>'+
-        '<span style="background:'+statusColors[st]+';color:#fff;border-radius:6px;font-size:10px;padding:1px 6px;font-weight:700">'+statusLabels[st]+'</span>'+
-      '</div>'+
-    '</div>';
-  div.onclick = ()=>pfShowKiraMail(item);
-  list.appendChild(div);
+  const empf = item.an || '';
+  const empfName = empf.split('@')[0] || empf;
+  const datum = pfFormatDatum(item.erstellt_am||'');
+  const preview = (item.body_plain||'').replace(/\\s+/g,' ').slice(0,60);
+
+  // Avatar
+  const avatarEl = document.createElement('div');
+  avatarEl.className = 'pf-item-avatar';
+  avatarEl.style.background = '#7c3aed';
+  avatarEl.style.color = '#fff';
+  avatarEl.innerHTML = '&#x2709;';
+  el.appendChild(avatarEl);
+
+  // Body (gleiches Layout wie pfRenderMailItem)
+  const body = document.createElement('div');
+  body.className = 'pf-item-body';
+  body.innerHTML =
+    '<div class="pf-item-row1">'
+      +'<span class="pf-item-absender">An: '+esc(empfName)+'</span>'
+      +'<span class="pf-item-kira-badge" title="Kira-Entwurf">Kira</span>'
+      +'<span style="background:'+statusColors[st]+';color:#fff;border-radius:6px;font-size:10px;padding:1px 6px;font-weight:600;margin-left:2px">'+statusLabels[st]+'</span>'
+      +'<span class="pf-item-datum">'+esc(datum)+'</span>'
+    +'</div>'
+    +'<div class="pf-item-betreff">'+esc(item.betreff||'(kein Betreff)')+'</div>'
+    +'<div class="pf-item-row3">'
+      +'<span class="pf-item-preview">'+esc(preview)+'</span>'
+    +'</div>';
+  el.appendChild(body);
+
+  el.onclick = ()=>pfShowKiraMail(item);
+  list.appendChild(el);
 }
 
 // ── Kira-Mail im Viewer anzeigen ──────────────────────────
@@ -4089,36 +4114,34 @@ function pfShowKiraMail(item) {
       '<button class="btn btn-sm" style="background:#1e1e24;color:#f0f0f2;border:1px solid rgba(255,255,255,.1)" onclick="pfKiraMailBearbeiten('+item.id+')">&#x270E; Bearbeiten</button>'+
       '<button class="btn btn-sm" style="background:#065f46;color:#6ee7b7;border-color:#059669;font-weight:700" onclick="pfKiraMailFreigeben('+item.id+')">&#x2705; Freigeben &amp; Senden</button>'+
     '</div>' : '';
-  // Body-Rendering: HTML oder styled Plaintext
-  const hasHtml = !!item.body_html;
+  // Body-Rendering: Kira-Entwurf immer als scrollbarer Bereich (kein iframe-mode)
   body.className = 'pf-prev-body';
-  body.style.cssText = '';
+  body.style.cssText = 'overflow-y:auto;overflow-x:hidden;padding:0;white-space:normal';
+  const hasHtml = !!item.body_html;
+  const headerHtml =
+    '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
+    '<div style="padding:12px 18px">'+
+      '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
+      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
+      reasonHtml+
+    '</div>';
   if(hasHtml) {
-    body.classList.add('iframe-mode');
-    body.innerHTML =
-      '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
-      '<div style="padding:12px 18px">'+
-        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
-        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
-        reasonHtml+
-      '</div>';
+    body.innerHTML = headerHtml;
     const iframe = document.createElement('iframe');
     iframe.setAttribute('sandbox','allow-same-origin allow-popups-to-escape-sandbox');
-    iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;display:block;min-height:300px';
+    iframe.style.cssText = 'width:100%;border:none;background:#fff;display:block;min-height:300px';
     iframe.srcdoc = item.body_html;
+    iframe.onload = function(){{ try {{ iframe.style.height = iframe.contentDocument.body.scrollHeight + 20 + 'px'; }} catch(e){{}} }};
     body.appendChild(iframe);
     const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'padding:0 18px 16px';
     btnWrap.innerHTML = btnsHtml;
     body.appendChild(btnWrap);
   } else {
     const plainText = (item.body_plain||'');
-    body.innerHTML =
-      '<div style="padding:14px 18px;background:'+headerBg+';color:'+headerColor+';font-size:13px;font-weight:600;border-bottom:1px solid var(--border)">'+headerText+'</div>'+
-      '<div style="padding:16px 18px">'+
-        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+_esc(item.betreff||'(kein Betreff)')+'</div>'+
-        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">An: '+_esc(item.an||'')+'</div>'+
-        reasonHtml+
-        '<div style="font-size:14px;line-height:1.7;padding:16px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;word-wrap:break-word;font-family:inherit">'+_esc(plainText)+'</div>'+
+    body.innerHTML = headerHtml +
+      '<div style="padding:0 18px 16px">'+
+        '<div style="font-size:14px;line-height:1.7;padding:16px;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;word-wrap:break-word;word-break:break-word;font-family:inherit;max-width:100%;box-sizing:border-box">'+_esc(plainText)+'</div>'+
         btnsHtml+
       '</div>';
   }
@@ -4285,8 +4308,8 @@ window.pfKiraMailBearbeiten = function(id) {
     if(item.body_html) {
       _pfComposeModalQuill.root.innerHTML = item.body_html;
     } else {
-      const plain = (item.body_plain||'').replace(/\\n/g,'<br>');
-      _pfComposeModalQuill.root.innerHTML = '<p>'+plain+'</p>';
+      const paras = (item.body_plain||'').split(/\\n/).map(function(line){{ return '<p>'+(line||'<br>')+'</p>'; }}).join('');
+      _pfComposeModalQuill.root.innerHTML = paras;
     }
     // Signatur anhängen wenn nicht schon im Text
     const konto = dstSel ? dstSel.value : '';
