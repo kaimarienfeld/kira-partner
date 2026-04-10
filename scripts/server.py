@@ -3280,7 +3280,7 @@ let _pfAutoSelected = false;    // true wenn _pfAfterItemRemoved die nächste Ma
 let _pfKiraEditId = null;       // wenn gesetzt: Compose-Modal sendet über approve-API statt normale send-API
 
 // Preview zurücksetzen → "Keine E-Mail ausgewählt"
-function _pfClearPreview() {
+window._pfClearPreview = function _pfClearPreview() {
   _pfCurrentMail = null;
   _pfCurrentMsgId = null;
   window._pfCurrentKiraItem = null;
@@ -3291,7 +3291,7 @@ function _pfClearPreview() {
   if(empty) empty.style.display = 'flex';
   // Aktives Item in Liste deaktivieren
   document.querySelectorAll('.pf-mail-item.active').forEach(el=>el.classList.remove('active'));
-}
+};
 
 // Nach Entfernung einer Mail: nächste oder leere Anzeige je nach Einstellung
 function _pfAfterItemRemoved(removedMsgId) {
@@ -4009,7 +4009,7 @@ function pfLoadList(reset) {
 }
 
 // ── Kira-Queue-Liste laden ────────────────────────────────
-function pfLoadKiraList(reset) {
+window.pfLoadKiraList = function pfLoadKiraList(reset) {
   if(reset) { document.getElementById('pf-list').innerHTML=''; _pfLastGroup=null; }
   const status = _pfKiraStatus || 'pending';
   fetch('/api/mail/approve/pending?status='+status).then(r=>r.json()).then(data=>{
@@ -4032,7 +4032,7 @@ function pfLoadKiraList(reset) {
       badge.textContent=items.length; badge.style.display=items.length?'':'none';
     }
   }).catch(()=>{ document.getElementById('pf-list-empty').style.display=''; });
-}
+};
 
 // ── Kira-Queue-Item rendern (gleiches Format wie normale Mails) ───────
 function pfRenderKiraMailItem(item, list) {
@@ -4260,10 +4260,11 @@ window.pfKiraMailFreigebenSend = function(id, btn) {
             +'<div><span style="color:var(--muted)">Archiviert:</span> '+(d.archiviert?'&#x2714; im Postausgang':'Ja')+'</div>'
           +'</div>'
           +'<div style="display:flex;gap:8px;justify-content:flex-end">'
-            +'<button onclick="this.closest(&apos;div[style*=fixed]&apos;).remove();pfLoadKiraList(true)" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Schliessen</button>'
+            +'<button onclick="this.closest(&apos;div[style*=fixed]&apos;).remove();_pfClearPreview();pfLoadKiraList(true)" style="background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px">Schliessen</button>'
           +'</div>'
         +'</div>';
         document.body.appendChild(rm);
+        _pfClearPreview();
         pfLoadKiraList(true);
       } else {
         if(btn) { btn.disabled=false; btn.textContent='\\u2705 Senden'; }
@@ -5493,6 +5494,7 @@ window.pfSendModal=function(){
       _pfKiraEditId = null;
       if(d.ok){
         showToast('Kira-Entwurf gesendet \u2713','ok');
+        _pfClearPreview();
         pfLoadKiraList(true);
       } else {
         showToast('Fehler: '+(d.error||'?'),'fehler');
