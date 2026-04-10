@@ -499,7 +499,10 @@ build_kunden() mit 2-Spalten-Layout, 5 Sub-Panels, ~150Z CSS, ~500Z JS, 20+ API-
 ### 2026-04-10 14:15 — Paket 8 ✅ Kira + Einstellungen + Tour
 7 neue Kira-Tools + Handler, CRM-Kontext im System-Prompt, 5 Quick-Actions, CRM-Einstellungssektion (10 Optionen) in Einstellungen, 13+ elog-Events, Guided Tour (6 Schritte). Fix: _read_json_body → body-Parameter.
 
-### 2026-04-10 14:30 — Session-Ende
-**Erledigt:** Kunden/CRM Modul vollständig implementiert (Paket 1-8). ~2800 LOC server.py, ~400 LOC kunden_classifier.py, ~200 LOC kira_llm.py.
-**Offen geblieben:** Export-API für Fälle, Streitfall-Detail-Logik, Browser-Test ausstehend.
+### 2026-04-10 14:30 — Fortsetzung (Kontext-Recovery)
+do_PUT-Bug behoben (Alias do_PUT=do_POST in DashboardHandler). Export-API GET /api/crm/faelle/{id}/export implementiert (Streitfall-Dossier mit Kunde/Projekt/Aktivitäten/Classifier-Log). crmFallExport() JS mit Modal (JSON-Export + Streitfall-Markierung + Kopieren + Herunterladen). feature_registry.json +4 CRM-Einträge (106 total). KIRA_SYSTEM_ANALYSE.md Sektion 8.5 + Modul-Inventar + Changelog. KUNDEN_MASTERCHECKLISTE.md alle Punkte abgehakt.
+
+### 2026-04-10 15:00 — Session-Ende
+**Erledigt:** Kunden/CRM Modul vollständig implementiert (Paket 1-8 + Abschluss). ~3400 LOC total. do_PUT-Bug, Export-API, Streitfall-Dossier. Alle Tracking-Dateien aktualisiert.
+**Offen geblieben:** —
 **Status:** ✅ erledigt

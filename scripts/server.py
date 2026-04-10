@@ -18748,7 +18748,68 @@ function crmSaveNotiz() {{
 
 function crmFallDokument() {{ showToast('Dokument-Upload wird implementiert','info'); }}
 function crmFallKira() {{ crmKiraFragen(); }}
-function crmFallExport() {{ showToast('Export/Streitfall wird implementiert','info'); }}
+function crmFallExport() {{
+  if(!_crmCurrentFall) {{ showToast('Kein Fall ausgewählt','warn'); return; }}
+  const fid = _crmCurrentFall.id;
+  crmShowModal('Export / Streitfall-Dossier', `
+    <div style="padding:12px 0">
+      <p style="margin:0 0 12px;color:var(--text-muted)">Fall <b>#${{fid}}</b> — ${{_crmCurrentFall.titel||''}}</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="crm-action-btn" onclick="crmDoExport(${{fid}},'json')" style="flex:1;min-width:140px">
+          &#x1F4C4; JSON-Export</button>
+        <button class="crm-action-btn crm-btn-warn" onclick="crmDoExport(${{fid}},'streitfall')" style="flex:1;min-width:140px">
+          &#x26A0;&#xFE0F; Streitfall-Dossier</button>
+      </div>
+      <div id="crmExportResult" style="margin-top:16px;display:none">
+        <div style="background:var(--bg-raised);border-radius:8px;padding:12px;max-height:400px;overflow:auto">
+          <pre id="crmExportPre" style="white-space:pre-wrap;font-size:12px;margin:0"></pre>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="crm-action-btn" onclick="crmCopyExport()">&#x1F4CB; Kopieren</button>
+          <button class="crm-action-btn" onclick="crmDownloadExport()">&#x1F4E5; Herunterladen</button>
+        </div>
+      </div>
+    </div>
+  `, '');
+}}
+let _crmLastExport = null;
+async function crmDoExport(fid, typ) {{
+  showToast('Export wird erstellt...','info');
+  try {{
+    const r = await fetch('/api/crm/faelle/'+fid+'/export');
+    const d = await r.json();
+    if(!d.ok) {{ showToast('Fehler: '+(d.error||'Unbekannt'),'error'); return; }}
+    const exp = d.export;
+    if(typ==='streitfall') {{
+      exp.export_typ = 'streitfall_dossier';
+      // Fall als Streitfall markieren
+      await fetch('/api/crm/faelle/'+fid, {{method:'PUT',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{status:'streitfall',fall_typ:'streitfall'}})}});
+      showToast('Fall als Streitfall markiert + Export erstellt','success');
+    }} else {{
+      showToast('JSON-Export erstellt','success');
+    }}
+    _crmLastExport = JSON.stringify(exp, null, 2);
+    document.getElementById('crmExportPre').textContent = _crmLastExport;
+    document.getElementById('crmExportResult').style.display = 'block';
+  }} catch(e) {{ showToast('Export-Fehler: '+e,'error'); }}
+}}
+function crmCopyExport() {{
+  if(!_crmLastExport) return;
+  navigator.clipboard.writeText(_crmLastExport).then(()=>showToast('In Zwischenablage kopiert','success')).catch(()=>{{
+    const ta=document.createElement('textarea'); ta.value=_crmLastExport; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('Kopiert','success');
+  }});
+}}
+function crmDownloadExport() {{
+  if(!_crmLastExport) return;
+  const blob = new Blob([_crmLastExport], {{type:'application/json'}});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fall_export_' + (_crmCurrentFall?_crmCurrentFall.id:'') + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Download gestartet','success');
+}}
 function crmZuordnen(logId) {{ showToast('Zuordnungs-Dialog wird implementiert','info'); }}
 
 function crmShowModal(title, body, footer) {{
@@ -27463,6 +27524,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _m = re.match(r'^/api/crm/faelle/(\d+)/aktivitaeten$', self.path)
             # GET handled below in POST section
             self._json({"ok": False, "error": "Nur POST"})
+        elif re.match(r'^/api/crm/faelle/(\d+)/export$', self.path):
+            _m = re.match(r'^/api/crm/faelle/(\d+)/export$', self.path)
+            self._api_crm_faelle_export(int(_m.group(1)))
         elif re.match(r'^/api/crm/faelle/(\d+)$', self.path):
             _m = re.match(r'^/api/crm/faelle/(\d+)$', self.path)
             self._api_crm_faelle_get(int(_m.group(1)))
@@ -32260,6 +32324,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         finally:
             db.close()
 
+    def do_PUT(self):
+        """PUT-Requests werden wie POST behandelt (CRM-Update-Endpoints)."""
+        return self.do_POST()
+
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(length) or b'{}'
@@ -35017,6 +35085,69 @@ Regeln:
                   data.get("ereignis_typ","manuell"), data.get("zusammenfassung",""), data.get("volltext_auszug","")))
             db.commit()
             self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_export(self, fid):
+        """GET /api/crm/faelle/{id}/export — Fall-Export als JSON-Paket (Streitfall-Dossier)."""
+        db = self._crm_db()
+        try:
+            fall = db.execute("SELECT * FROM kunden_faelle WHERE id=?", (fid,)).fetchone()
+            if not fall:
+                self._json({"ok": False, "error": "Fall nicht gefunden"})
+                return
+            fall_d = dict(fall)
+            # Kunde laden
+            kunde = db.execute("SELECT * FROM kunden WHERE id=?", (fall_d.get("kunden_id"),)).fetchone()
+            kunde_d = dict(kunde) if kunde else {}
+            # Projekt laden (falls vorhanden)
+            projekt = None
+            if fall_d.get("projekt_id"):
+                projekt = db.execute("SELECT * FROM kunden_projekte WHERE id=?", (fall_d["projekt_id"],)).fetchone()
+            projekt_d = dict(projekt) if projekt else {}
+            # Alle Aktivitäten zum Fall
+            aktivitaeten = db.execute("""
+                SELECT * FROM kunden_aktivitaeten WHERE fall_id=? ORDER BY erstellt_am ASC
+            """, (fid,)).fetchall()
+            akt_list = [dict(a) for a in aktivitaeten]
+            # Classifier-Log-Einträge
+            clf_log = db.execute("""
+                SELECT * FROM kunden_classifier_log WHERE kunden_id_vorschlag=? ORDER BY erstellt_am DESC LIMIT 20
+            """, (fall_d.get("kunden_id"),)).fetchall()
+            clf_list = [dict(c) for c in clf_log]
+            # Identitäten des Kunden
+            identitaeten = db.execute("""
+                SELECT * FROM kunden_identitaeten WHERE kunden_id=?
+            """, (fall_d.get("kunden_id"),)).fetchall()
+            id_list = [dict(i) for i in identitaeten]
+            export = {
+                "export_typ": "streitfall_dossier",
+                "export_datum": datetime.now().isoformat(),
+                "fall": fall_d,
+                "kunde": kunde_d,
+                "projekt": projekt_d,
+                "identitaeten": id_list,
+                "aktivitaeten": akt_list,
+                "classifier_log": clf_list,
+                "zusammenfassung": {
+                    "fall_titel": fall_d.get("titel", ""),
+                    "fall_typ": fall_d.get("fall_typ", ""),
+                    "status": fall_d.get("status", ""),
+                    "kunde_name": kunde_d.get("firmenname") or kunde_d.get("name", ""),
+                    "projekt_name": projekt_d.get("projektname", ""),
+                    "anzahl_aktivitaeten": len(akt_list),
+                    "zeitraum_von": akt_list[0]["erstellt_am"] if akt_list else None,
+                    "zeitraum_bis": akt_list[-1]["erstellt_am"] if akt_list else None,
+                }
+            }
+            try:
+                from runtime_log import elog
+                elog("export_gestartet", f"Fall #{fid} Export erstellt: {fall_d.get('titel','')}")
+            except Exception:
+                pass
+            self._json({"ok": True, "export": export})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
         finally:

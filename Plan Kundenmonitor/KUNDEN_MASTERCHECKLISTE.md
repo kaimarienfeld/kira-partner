@@ -79,7 +79,7 @@ Stand: 2026-04-10
 - [x] GET /api/crm/faelle/{id}
 - [x] PUT /api/crm/faelle/{id}
 - [x] POST /api/crm/faelle/{id}/aktivitaeten
-- [ ] GET /api/crm/faelle/{id}/export
+- [x] GET /api/crm/faelle/{id}/export
 - [x] JS: crmLoadFall(), crmUpdateFallStatus(), crmAddAktivitaet()
 
 ## Paket 7 — Funktionspflicht ✅
@@ -89,7 +89,7 @@ Stand: 2026-04-10
 - [x] Neue E-Mail → Compose-Fenster
 - [x] Neue Rechnung/Angebot → Lexware-Modul
 - [x] Neuer Fall → Erstell-Dialog
-- [ ] Export/Streitfall → Streitfall-Ansicht (Grundgerüst vorhanden, Export-Logic offen)
+- [x] Export/Streitfall → Streitfall-Dossier-Modal mit JSON-Export + Herunterladen + Kopieren
 - [x] Kira fragen → Workspace mit Kontext
 - [x] Projekt wechseln → Dropdown + Filter
 - [x] Fall-Status ändern → In-place
@@ -109,9 +109,9 @@ Stand: 2026-04-10
 - [x] Guided Tour (6 Schritte)
 
 ## Paket-Abschluss
-- [ ] Git Commit
-- [ ] session_handoff.json aktualisiert
-- [ ] feature_registry.json aktualisiert
-- [ ] KIRA_SYSTEM_ANALYSE.md aktualisiert
-- [ ] KUNDEN_MASTERCHECKLISTE.md Punkte abgehakt
-- [ ] session_log.md Zwischeneintrag
+- [x] Git Commit
+- [x] session_handoff.json aktualisiert
+- [x] feature_registry.json aktualisiert (4 neue CRM-Einträge, kunden-360 + crm-pipeline aktualisiert)
+- [x] KIRA_SYSTEM_ANALYSE.md aktualisiert (Sektion 8.5, Modul-Inventar, Changelog)
+- [x] KUNDEN_MASTERCHECKLISTE.md Punkte abgehakt
+- [x] session_log.md Zwischeneintrag

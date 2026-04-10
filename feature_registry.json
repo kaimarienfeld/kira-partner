@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-pp-cont4",
+  "_updated": "session-ss",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -321,13 +321,13 @@
       "name": "Kunden-360-Ansicht",
       "icon": "👤",
       "leni_name": "Vollständiges Kundenprofil",
-      "leni_desc": "Geplant: Alles über einen Kunden auf einer Seite — alle bisherigen Mails, Angebote, Rechnungen und die komplette Geschichte. Perfekt für den Moment wenn jemand anruft und du sofort weißt: Wer ist das? Was haben wir miteinander gemacht?",
+      "leni_desc": "Alles über einen Kunden auf einer Seite — alle bisherigen Mails, Angebote, Rechnungen, Projekte und die komplette Geschichte. Jetzt Teil des neuen Kundencenters mit Projekt-Zeitstrahl und Fallansicht.",
       "leni_visible": true,
-      "leni_note": null,
+      "leni_note": "Jetzt im Kundencenter integriert (CRM-Modul)",
       "module": "server.py",
       "status": "done",
-      "last_updated": "2026-03-25",
-      "description": "Eigene Seite pro Kunde: Timeline aller Interaktionen, Mails, Angebote, Rechnungen"
+      "last_updated": "2026-04-10",
+      "description": "Jetzt Teil des CRM-Moduls: Kundenakte mit Projekt-Zeitstrahl, Verlauf, Fälle, Dokumente, Finanzen, Kira-Tab, Stammdaten"
     },
     {
       "id": "angebots-kalkulation",
@@ -486,13 +486,13 @@
       "name": "CRM Lead-Pipeline",
       "icon": "🎯",
       "leni_name": "Vom ersten Kontakt bis zur Rechnung",
-      "leni_desc": "Geplant: Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt — Anfrage, Angebot, Auftrag, Abrechnung. Conversion-Raten auf einen Blick, automatische Wiedervorlage bei vergessenen Kontakten.",
+      "leni_desc": "Eine visuelle Pipeline die jeden Auftrag von der ersten Anfrage bis zur bezahlten Rechnung verfolgt. Jetzt mit vollständigem Kundencenter: Projekte, Fälle, automatische Zuordnung per KI.",
       "leni_visible": true,
-      "leni_note": null,
+      "leni_note": "Jetzt im Kundencenter integriert (CRM-Modul)",
       "module": "server.py",
       "status": "done",
-      "last_updated": "2026-03-28",
-      "description": "Lead-Pipeline Anfrage→Angebot→Auftrag→Abrechnung, Conversion-Rate, Auto-Wiedervorlage"
+      "last_updated": "2026-04-10",
+      "description": "Lead-Pipeline jetzt Teil des CRM-Moduls: Kundenübersicht mit Akkordeon (Aktive/Leads/Inaktive/Archiv), Fallansicht mit Ticket-Layer, LLM-Classifier für automatische Zuordnung"
     },
     {
       "id": "partner-view",
@@ -1281,7 +1281,63 @@
       "session": "session-qq-cont6",
       "module": "server.py + kira_llm.py",
       "description": "Chat-Liste in Sidebar, Projekt-Ordner, Archivierung, Konversation fortsetzen/umbenennen. DB: kira_konversationen mit session_id bereits vorbereitet."
+    },
+    {
+      "id": "crm-kundencenter",
+      "name": "Kunden / CRM / Kundencenter",
+      "icon": "👥",
+      "leni_name": "Kundencenter — die vollständige Kundenakte",
+      "leni_desc": "Jeder Kunde hat jetzt eine eigene Akte: Projekte, Fälle, Timeline, Stammdaten — alles an einem Ort. Kira ordnet neue Mails automatisch dem richtigen Kunden und Projekt zu.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py + kunden_classifier.py + kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-ss",
+      "description": "8 Pakete: Datenmodell (6 DB-Tabellen in kunden.db), LLM-Kunden-Classifier (Fast-Path + LLM-Path), 2-Spalten-Navigation, Kundenübersicht mit Akkordeon, Kundenakte mit Projekt-Zeitstrahl, Fallansicht (Ticket-Layer), Export/Streitfall-Dossier, 7 Kira-Tools, CRM-Einstellungen (10 Optionen), Guided Tour (6 Schritte)."
+    },
+    {
+      "id": "crm-kunden-classifier",
+      "name": "LLM-Kunden-Classifier",
+      "icon": "🤖",
+      "leni_name": "Automatische Kundenzuordnung",
+      "leni_desc": "Neue Mails werden automatisch dem richtigen Kunden und Projekt zugeordnet — per KI. Bei unklaren Fällen landet es in der Prüfliste.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-ss",
+      "description": "Fast-Path (bekannte E-Mail → sofort), LLM-Path (Super-Prompt + JSON-Response), Confidence-Stufen (eindeutig/wahrscheinlich/prüfen/unklar), kunden_classifier_log, Integration in mail_monitor + daily_check"
+    },
+    {
+      "id": "crm-kira-tools",
+      "name": "7 CRM Kira-Tools",
+      "icon": "🔧",
+      "leni_name": "Kira verwaltet Kunden",
+      "leni_desc": "Kira kann Kunden suchen, Akten laden, Projekte zuordnen, Fälle erstellen und die Prüfliste abarbeiten — alles per Chat.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-ss",
+      "description": "kunden_suchen, kundenakte_laden, crm_projekt_zuordnen, crm_fall_erstellen, crm_fall_oeffnen, crm_kunden_klassifizieren, crm_aktivitaeten_pruefliste + System-Prompt-Erweiterung (Top 5, offene Fälle, unzugeordnete)"
+    },
+    {
+      "id": "crm-fallexport-streitfall",
+      "name": "Fall-Export / Streitfall-Dossier",
+      "icon": "📤",
+      "leni_name": "Fall-Export für Streitfälle",
+      "leni_desc": "Bei einem Streitfall alle relevanten Informationen als Dossier exportieren — Kunde, Projekt, Timeline, Classifier-Log — alles gebündelt.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "server.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-ss",
+      "description": "GET /api/crm/faelle/{id}/export, JSON-Export + Streitfall-Markierung, Modal mit Kopieren/Herunterladen"
     }
   ],
-  "_total": 102
+  "_total": 106
 }

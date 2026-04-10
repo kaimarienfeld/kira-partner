@@ -1,7 +1,7 @@
 # KIRA — Vollstaendige System-Analyse & Masterdatei
 
-**Erstellt:** 2026-03-30 | **Konsolidiert:** 2026-03-31 (session-xx) | **Aktualisiert:** 2026-04-01 (session-hhh)
-**Analysiert:** 37 Python-Module (~39.000 Zeilen), 7 SQLite-Datenbanken (46 Tabellen), 115+ API-Endpunkte
+**Erstellt:** 2026-03-30 | **Konsolidiert:** 2026-03-31 (session-xx) | **Aktualisiert:** 2026-04-10 (session-ss)
+**Analysiert:** 38 Python-Module (~42.000 Zeilen), 7 SQLite-Datenbanken (52 Tabellen), 135+ API-Endpunkte
 **Projektpfad:** `memory/` (Git-Repo)
 
 > **Diese Datei ist die einzige Wahrheitsquelle fuer KIRA-Architektur, Status und Planung.**
@@ -25,6 +25,7 @@
 > - session-fff (2026-04-01): Lexware UI Komplettausbau — 9 Einstellungs-Unterbereiche (Verbindung/Sync/Kategorien/Eingangsbelege/Vollautomatik/Regeln/Dataverse/Diagnose/Freischaltung), build_lexware() Seiten-Komplett-Umbau, Einstellungen-Subnav als horizontale Tab-Bar.
 > - session-ggg (2026-04-01): JS-Syntaxfehler behoben (\\' in HTML-Attributen, unquoted Strings im Lexware-Panel).
 > - session-hhh (2026-04-01): Lexware Bugfixes + Dataverse — Pane-2-Spaltenmenü (3-Spalten-Layout wie Mail & Konten), Tab-Highlighting-Fix (inline-style-Override), Verbindungstest-Fix (api_key aus Input + api_base_url /v1 korrigiert), Dataverse-Credentials-UI (Tenant-ID/Client-ID/Secret/Org-URL/Tabelle/Duplikat-Prueffeld), dataverse_client.py neu, /api/lexware/dataverse/test Endpoint.
+> - **session-ss (2026-04-10): CRM / Kundencenter Vollausbau — 8 Pakete: 6 DB-Tabellen, kunden_classifier.py (LLM-Routing), 20+ API-Endpoints, 7 Kira-Tools, Kundenübersicht/Kundenakte/Fallansicht/Streitfall-Export, CRM-Einstellungen, Guided Tour.**
 
 ---
 
@@ -92,12 +93,12 @@ kira_llm  mail_monitor  daily_check  kira_proaktiv
 
 ## 2. Modul-Inventar
 
-### Python-Module (37 Dateien, ~39.000 Zeilen)
+### Python-Module (38 Dateien, ~42.000 Zeilen)
 
 | Datei | Zeilen | Zweck |
 |---|---|---|
-| `server.py` | 24.502 | Haupt-Dashboard, 115+ API-Endpunkte, 8 build_*-Funktionen — Lexware-Panel + Dataverse-UI + Pane-2 |
-| `kira_llm.py` | 3.341 | Multi-LLM Chat, 23 Tools, Modell-Validierung, ReAct-Schleife, Circuit Breaker |
+| `server.py` | ~27.400 | Haupt-Dashboard, 135+ API-Endpunkte, 9 build_*-Funktionen — CRM + Lexware + Dataverse |
+| `kira_llm.py` | ~3.620 | Multi-LLM Chat, 30 Tools, Modell-Validierung, ReAct-Schleife, Circuit Breaker |
 | `mail_monitor.py` | 1.576 | IMAP-Polling (5 Konten), Mail-Klassifizierung, Task-Erstellung, OAuth2 |
 | `kira_proaktiv.py` | 1.107 | Autonomer Business-Scanner (11 Scans, alle 15 Min) |
 | `daily_check.py` | 1.058 | Taeglicher Mail-Scan, Erinnerungen, Nachklassifizierung |
@@ -119,6 +120,7 @@ kira_llm  mail_monitor  daily_check  kira_proaktiv
 | `case_engine_backfill.py` | 307 | Einmalige Migration: Bestandsdaten → Vorgaenge |
 | `response_gen.py` | 302 | Antwort-Generierung |
 | `archiv_cleanup.py` | 254 | Taegliche Bereinigung geloeschter Mails |
+| `kunden_classifier.py` | ~400 | LLM-Kunden-Classifier (Fast-Path + LLM-Path, Confidence-Stufen) |
 | `vorgang_router.py` | 244 | Routing: Mail-Klassifizierung → Vorgang-Typ |
 | `upgrade_geschaeft.py` | 231 | Geschaefts-DB-Upgrade |
 | `change_log.py` | 229 | Changelog-API + Suche |
@@ -139,7 +141,7 @@ kira_llm  mail_monitor  daily_check  kira_proaktiv
 |---|---|
 | `scripts/config.json` | Hauptkonfiguration (nie direkt editieren!) |
 | `scripts/secrets.json` | API-Keys (nie committen!) |
-| `feature_registry.json` | Feature-Status (38 Features, 24 Leni-sichtbar) |
+| `feature_registry.json` | Feature-Status (106 Features) |
 | `known_issues.json` | Bekannte Probleme (ISS-001 bis ISS-021) |
 | `session_handoff.json` | Letzter Arbeitsstand |
 | `knowledge/daily_check_status.json` | Daily-Check State |
@@ -507,6 +509,66 @@ Mail → Klassifizierung → Task → vorgang_router.py
 
 ---
 
+## 8.5 CRM / Kundencenter (session-ss, 2026-04-10)
+
+### Architektur
+
+**Kernkonzept:** Kunde = Akte → Projekt = Arbeitseinheit → Fall = konkreter Geschäftsvorfall (Anfrage, Reklamation, Mängel, Streitfall).
+
+```
+Mail eingehend
+    → mail_classifier.py (Kategorie)
+    → vorgang_router.py (Vorgang)
+    → kunden_classifier.py (Kunde/Projekt/Fall)
+        ├─ Fast-Path: bekannte E-Mail → sofort zuordnen
+        └─ LLM-Path: Super-Prompt + JSON → Confidence-Auswertung
+```
+
+### Datenbank (6 Tabellen in kunden.db)
+
+| Tabelle | Zweck | Spalten (Auswahl) |
+|---|---|---|
+| `kunden` (ALTER TABLE) | Kundenstamm | firmenname, kundentyp, status, lexware_id, kundenwert, fit_score, risiko_score |
+| `kunden_identitaeten` | Kontaktdaten | typ (mail/telefon/firma/domain), wert, confidence |
+| `kunden_projekte` | Projekttrennung | kunden_id, projektname, status, auftragswert |
+| `kunden_faelle` | Ticket-Layer | kunden_id, projekt_id, fall_typ, status, prioritaet |
+| `kunden_aktivitaeten` | Timeline | kunden_id, projekt_id, fall_id, ereignis_typ, zusammenfassung |
+| `kunden_classifier_log` | LLM-Protokoll | eingabe_typ, confidence, reasoning_kurz, user_bestaetigt |
+
+### API-Endpunkte (20+)
+
+**GET:** `/api/crm/kunden`, `/api/crm/contacts`, `/api/crm/stats`, `/api/crm/kunden/{id}`, `/api/crm/kunden/{id}/projekte`, `/api/crm/kunden/{id}/aktivitaeten`, `/api/crm/kunden/{id}/stammdaten`, `/api/crm/kunden/{id}/faelle`, `/api/crm/faelle/{id}`, `/api/crm/faelle/{id}/export`, `/api/crm/aktivitaeten/{id}`, `/api/crm/unzugeordnete`
+
+**POST:** `/api/crm/kunden`, `/api/crm/kunden/{id}/projekte`, `/api/crm/faelle`, `/api/crm/faelle/{id}/aktivitaeten`
+
+**PUT:** `/api/crm/kunden/{id}`, `/api/crm/faelle/{id}`, `/api/crm/projekte/{id}` (via do_PUT = do_POST Alias)
+
+### UI-Funktionen (server.py)
+
+| Funktion | Beschreibung |
+|---|---|
+| `build_kunden()` | Hauptfunktion CRM-Modul |
+| `_build_crm_subnav()` | 5 Untermenüpunkte |
+| `_build_crm_kundenuebersicht()` | Akkordeon-Gruppen (Aktive/Leads/Inaktive/Archiv) |
+| `_build_crm_kundenakte()` | Kundenkopf + Projekt-Zeitstrahl + Verlauf + Stammdaten |
+| `_build_crm_fallansicht()` | Ticket-Kopf + Timeline + Aktionen |
+
+### Kira-Tools (7 neue, kira_llm.py)
+
+`kunden_suchen`, `kundenakte_laden`, `crm_projekt_zuordnen`, `crm_fall_erstellen`, `crm_fall_oeffnen`, `crm_kunden_klassifizieren`, `crm_aktivitaeten_pruefliste`
+
+System-Prompt-Erweiterung: Top 5 Kunden, offene Fälle, unzugeordnete Aktivitäten, aktive Projekte.
+
+### Einstellungen (10 Optionen)
+
+CRM-Sektion in Einstellungen: Auto-Zuordnung, LLM-Classifier, Confidence-Schwelle, Geschäftskontakt-Filter, Auto-Fall-Erstellung, Standard-Fall-Typen, Export-Optionen, Log-Detailgrad.
+
+### CSS: `crm-*` Prefix
+
+Eigener Namespace für alle CRM-Klassen. Keine Kollision mit bestehenden Modulen.
+
+---
+
 ## 9. Dashboard & Server
 
 ### 9.1 server.py — 96 API-Endpunkte
@@ -526,6 +588,7 @@ Mail → Klassifizierung → Task → vorgang_router.py
 | `build_geschaeft()` | 3645 | 5 Sub-Tabs (RE/Angebote/Mahnungen/ER/Statistik) |
 | `build_einstellungen()` | 4350 | 55+ KB, 12 Sektionen, 3-Spalten |
 | `build_wissen()` | 7823 | 7 Kategorien, CRUD |
+| `build_kunden()` | ~13500 | CRM-Modul: Übersicht, Kundenakte, Fallansicht |
 | `build_section()` | 448 | Hilfs-Funktion fuer zusammenklappbare Sektionen |
 
 ### 9.3 CSS-Namespaces
@@ -539,6 +602,7 @@ Mail → Klassifizierung → Task → vorgang_router.py
 | `kk-*` | Kommunikation |
 | `kg-*` | Geschaeft |
 | `pf-*` | Postfach |
+| `crm-*` | CRM / Kundencenter |
 
 ---
 
