@@ -513,6 +513,18 @@ def classify_mail(konto: str, absender: str, betreff: str, text: str,
                   "Zur Kenntnis", "Shop-Vorgang ohne Frage", "niedrig",
                   routing="archivieren", erfordert_handlung=False)
 
+    # ── 6b. Geschäftskontakt-Filter (CRM) ──
+    try:
+        from kunden_classifier import ist_geschaeftskontakt
+        if not ist_geschaeftskontakt(absender, betreff):
+            # Kein Geschäftsfall — als Newsletter/Werbung klassifizieren
+            return _r("Newsletter / Werbung", "System / Newsletter", betreff, False,
+                      "Keine Aktion nötig",
+                      "Kein Geschäftskontakt (CRM-Filter)", "niedrig",
+                      routing="archivieren", erfordert_handlung=False)
+    except ImportError:
+        pass  # kunden_classifier nicht verfügbar — weiter mit alter Logik
+
     # ── 7. Echte Kundenanfragen (inkl. eigener Keywords aus Einstellungen) ──
     eigene = _load_eigene_keywords()
     strong = sum(1 for kw in CUSTOMER_STRONG if kw in comb)

@@ -533,6 +533,18 @@ def recheck_mails(seit_datum: str, bis_datum: str = None, dry_run: bool = False)
                     )
                 except Exception as _ve:
                     pass  # Router-Fehler stoppen nicht den Recheck
+                # ── CRM Kunden-Classifier (session-ss) ───────────────────────
+                try:
+                    from kunden_classifier import classify_kunde_projekt, apply_classification
+                    _crm = classify_kunde_projekt(
+                        absender=m.get("absender", ""), betreff=betr,
+                        text=(text or "")[:2000],
+                        eingabe_typ="mail", eingabe_id=msgid,
+                    )
+                    if _crm.get("ist_geschaeftsfall") and _crm.get("kunden_id"):
+                        apply_classification("mail", msgid, _crm)
+                except Exception:
+                    pass
             except Exception as e:
                 stats["fehler"] += 1
                 print(f"  [recheck] Task-Fehler: {e}")

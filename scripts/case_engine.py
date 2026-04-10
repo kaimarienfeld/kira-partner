@@ -616,6 +616,162 @@ KUNDEN_DB = KNOWLEDGE_DIR / "kunden.db"
 MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
 
 _projekt_columns_ensured = False
+_crm_tables_ensured = False
+
+def _ensure_crm_tables():
+    """Erstellt/migriert alle CRM-Tabellen in kunden.db (idempotent)."""
+    global _crm_tables_ensured
+    if _crm_tables_ensured:
+        return
+    if not KUNDEN_DB.exists():
+        _crm_tables_ensured = True
+        return
+    db = sqlite3.connect(str(KUNDEN_DB))
+    db.row_factory = sqlite3.Row
+    try:
+        # ALTER TABLE kunden — neue Spalten
+        kunden_neue_spalten = [
+            ("firmenname", "TEXT"),
+            ("ansprechpartner", "TEXT"),
+            ("kundentyp", "TEXT DEFAULT 'unbekannt'"),
+            ("status", "TEXT DEFAULT 'aktiv'"),
+            ("lexware_id", "TEXT"),
+            ("kundenwert", "REAL DEFAULT 0"),
+            ("fit_score", "REAL DEFAULT 0"),
+            ("zahlungsverhalten_score", "REAL DEFAULT 0"),
+            ("risiko_score", "REAL DEFAULT 0"),
+            ("metadata_json", "TEXT DEFAULT '{}'"),
+            ("aktualisiert_am", "TEXT"),
+        ]
+        for col, col_type in kunden_neue_spalten:
+            try:
+                db.execute(f"ALTER TABLE kunden ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass  # Spalte existiert bereits
+
+        # kunden_identitaeten
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_identitaeten (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kunden_id INTEGER NOT NULL,
+                typ TEXT NOT NULL DEFAULT 'mail',
+                wert TEXT NOT NULL,
+                confidence TEXT NOT NULL DEFAULT 'wahrscheinlich',
+                verifiziert INTEGER NOT NULL DEFAULT 0,
+                quelle TEXT DEFAULT 'auto',
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (kunden_id) REFERENCES kunden(id),
+                UNIQUE(kunden_id, typ, wert)
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ki_wert ON kunden_identitaeten(LOWER(wert))")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ki_kunden ON kunden_identitaeten(kunden_id)")
+
+        # kunden_projekte
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_projekte (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kunden_id INTEGER NOT NULL,
+                projektname TEXT NOT NULL,
+                projekttyp TEXT DEFAULT 'standard',
+                status TEXT NOT NULL DEFAULT 'planung',
+                beginn_am TEXT,
+                abschluss_am TEXT,
+                beschreibung TEXT,
+                auftragswert REAL DEFAULT 0,
+                naechste_aktion TEXT,
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+                aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (kunden_id) REFERENCES kunden(id)
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kp_kunden ON kunden_projekte(kunden_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kp_status ON kunden_projekte(status)")
+
+        # kunden_faelle
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_faelle (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kunden_id INTEGER NOT NULL,
+                projekt_id INTEGER,
+                fall_typ TEXT NOT NULL DEFAULT 'anfrage',
+                titel TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'offen',
+                prioritaet TEXT DEFAULT 'normal',
+                naechste_aktion TEXT,
+                faellig_am TEXT,
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+                aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now')),
+                confidence_score REAL DEFAULT 0,
+                auto_zugeordnet INTEGER DEFAULT 0,
+                manuell_geprueft INTEGER DEFAULT 0,
+                FOREIGN KEY (kunden_id) REFERENCES kunden(id),
+                FOREIGN KEY (projekt_id) REFERENCES kunden_projekte(id)
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kf_kunden ON kunden_faelle(kunden_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kf_projekt ON kunden_faelle(projekt_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kf_status ON kunden_faelle(status)")
+
+        # kunden_aktivitaeten
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_aktivitaeten (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kunden_id INTEGER NOT NULL,
+                projekt_id INTEGER,
+                fall_id INTEGER,
+                ereignis_typ TEXT NOT NULL DEFAULT 'manuell',
+                quelle_id TEXT,
+                quelle_tabelle TEXT,
+                zusammenfassung TEXT,
+                volltext_auszug TEXT,
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+                sichtbar_in_verlauf INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (kunden_id) REFERENCES kunden(id),
+                FOREIGN KEY (projekt_id) REFERENCES kunden_projekte(id),
+                FOREIGN KEY (fall_id) REFERENCES kunden_faelle(id)
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ka_kunden ON kunden_aktivitaeten(kunden_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ka_projekt ON kunden_aktivitaeten(projekt_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ka_fall ON kunden_aktivitaeten(fall_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ka_zeit ON kunden_aktivitaeten(erstellt_am)")
+
+        # kunden_classifier_log
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_classifier_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                eingabe_typ TEXT NOT NULL,
+                eingabe_id TEXT,
+                kunden_id_vorschlag INTEGER,
+                projekt_id_vorschlag INTEGER,
+                fall_typ_vorschlag TEXT,
+                confidence TEXT NOT NULL DEFAULT 'unklar',
+                reasoning_kurz TEXT,
+                llm_modell TEXT,
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+                user_bestaetigt INTEGER DEFAULT 0,
+                user_korrektur_kunden_id INTEGER,
+                user_korrektur_projekt_id INTEGER
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_cl_eingabe ON kunden_classifier_log(eingabe_typ, eingabe_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_cl_zeit ON kunden_classifier_log(erstellt_am)")
+
+        # Initiale Migration: bestehende kunden.email → kunden_identitaeten
+        existing = db.execute("SELECT COUNT(*) as c FROM kunden_identitaeten").fetchone()
+        if existing["c"] == 0:
+            db.execute("""
+                INSERT OR IGNORE INTO kunden_identitaeten (kunden_id, typ, wert, confidence, quelle)
+                SELECT id, 'mail', LOWER(email), 'wahrscheinlich', 'migration'
+                FROM kunden WHERE email IS NOT NULL AND email != ''
+            """)
+
+        db.commit()
+        _crm_tables_ensured = True
+    finally:
+        db.close()
+
 
 def _ensure_projekt_columns():
     """Erweitert vorgaenge + vorgang_links um projekt-spezifische Felder (einmalig)."""

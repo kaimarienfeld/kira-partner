@@ -1980,6 +1980,23 @@ def _process_mail(mail_data, konto_label, folder_name):
         _elog('system', 'projekt_zuordnung_fehler', f"Projekt-Fehler: {_pe}",
               source='mail_monitor', modul='projekt', status='fehler')
 
+    # ── CRM Kunden-Classifier (session-ss) ──────────────────────────────────
+    try:
+        from kunden_classifier import classify_kunde_projekt, apply_classification
+        _crm_result = classify_kunde_projekt(
+            absender=absender, betreff=betreff, text=text[:2000],
+            eingabe_typ="mail", eingabe_id=msg_id,
+        )
+        if _crm_result.get("ist_geschaeftsfall") and _crm_result.get("kunden_id"):
+            apply_classification("mail", msg_id, _crm_result)
+            if _crm_result.get("kunden_confidence") in ("pruefen", "unklar"):
+                _elog('system', 'unzugeordnet_markiert',
+                      f"Mail {msg_id[:30]} → Prüfliste ({_crm_result.get('reasoning','')})",
+                      source='mail_monitor', modul='crm_classifier', status='ok')
+    except Exception as _crm_e:
+        _elog('system', 'crm_classifier_fehler', f"CRM-Classifier: {_crm_e}",
+              source='mail_monitor', modul='crm_classifier', status='fehler')
+
     # ── Anthropic Billing Push ────────────────────────────────────────────────
     _check_anthropic_billing(absender, betreff, text)
 
