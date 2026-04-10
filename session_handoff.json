@@ -1,6 +1,6 @@
 {
-  "last_session": "session-tt2",
-  "date": "2026-04-10 20:00",
+  "last_session": "session-uu",
+  "date": "2026-04-10 23:45",
   "what_was_done": [
     "session-g: Kira-Workspace UI vollständig auf kq-*/kw-* umgebaut (CSS, HTML, 15 neue JS-Funktionen, 3-Spalten-Layout, Quick Panel 7 Items, Kontext-Bar, Quick-Actions, History-Sidebar)",
     "session-h: Runtime-Log-System erstellt (runtime_log.py neu, SQLite 2-Tabellen, WAL-Modus, kira_llm.py + server.py vollständig integriert)",
@@ -370,13 +370,15 @@
     "419 Mails noch unklassifiziert — per 'Alle Mails' Button nachklassifizieren (GPT-4o-mini)",
     "session-qq (2026-04-09): Postfach Compose Outlook-Style Komplett-Upgrade. Quill.js Rich-Text-Editor (volle Toolbar), Inline+Modal Dual-Mode mit Sync, Signatur-Auto-Einfügung mit Zero-Width-Space Marker (Quill-kompatibel), Konto-Wechsel ersetzt Signatur korrekt, mail_drafts Tabelle + /api/mail/draft/save, Kira-Draft-Integration, Datei/Emoji/Signatur-Wechsel Buttons. Dateianhänge-Upload (multipart + MIME-Attachment), Empfänger-Autovervollständigung (eigenes Dropdown ab 2 Zeichen, nicht mehr datalist), Betreff-Warnung, Anhang-Vergessen-Check, gesendete Empfänger in mail_kontakte speichern. Commits 27cc408 + eb31dca + 061ba05.",
     "session-qq-cont14 (2026-04-10): (A) Partner-View Auto-Pipeline: generate_partner_view.py --auto Modus mit GitHub-API-Push, Feature-Change-Detection, HTML-Mail+ntfy an Leni (1x/Tag). Commit c0dc527. (B) Postfach Favoriten-Kaskaden-Bug: Klick auf 1 ungelesene Mail markierte ALLE als gelesen — _pfAutoSelected Flag bricht Kette. Commit 411f250. (C) Einstellungen-Schutz: saveSettings() mit null-sicheren Helfern (_v/_c/_i/_f), _stripNulls(), Backend _deep_merge() mit null-Skip — fehlende DOM-Elemente überschreiben keine Config mehr. Commit 5a8c8a8.",
-    "session-qq-cont15 (2026-04-10): 5 UI-Fixes: (A) Global UI Overflow — body/app-shell/main-area/header overflow-Kette gefixt (b99b8a3). (B) Kira-Entwurf Speichern-Button — save action Backend+Frontend (286e7d4). (C) Activity Drawer nicht schließbar — overflow-x:hidden statt overflow:hidden auf .main-area (b320055). (D) Save-Button schloss Modal nicht + Preview-Update fehlte (45d2353). (E) pfLoadKiraList+_pfClearPreview auf window.* Scope-Fix + Preview leeren nach Freigabe/Senden (adadc8c)."
+    "session-qq-cont15 (2026-04-10): 5 UI-Fixes: (A) Global UI Overflow — body/app-shell/main-area/header overflow-Kette gefixt (b99b8a3). (B) Kira-Entwurf Speichern-Button — save action Backend+Frontend (286e7d4). (C) Activity Drawer nicht schließbar — overflow-x:hidden statt overflow:hidden auf .main-area (b320055). (D) Save-Button schloss Modal nicht + Preview-Update fehlte (45d2353). (E) pfLoadKiraList+_pfClearPreview auf window.* Scope-Fix + Preview leeren nach Freigabe/Senden (adadc8c).",
+    "session-uu (2026-04-10): CRM Vollausbau v3 — Intelligente Identitäts- und Projektauflösung. (1) DB: 2 neue Tabellen kunden_identitaeten_graph (11 Spalten) + kunden_lernregeln (11 Spalten) in case_engine.py. (2) kunden_classifier.py: ~600 neue LOC — erweiterter 3-Fragen-Super-Prompt (Wer/Projekt/Identität), numerische Confidence 0.0-1.0 → Handlungsmatrix (apply_classification_v2), Projekt-Clustering via LLM, Korrektur-Lernschleife (_lernregel_ableiten), 16 neue Funktionen. (3) server.py: 8 neue API-Endpunkte (Clustering, Korrektur, Identitäten, Lernregeln), Identitäten-Tab + Zeitstrahl-UI + Korrektur-Dialog, 10 neue JS-Funktionen, 5 neue CSS-Klassen, Einstellungen (Identitätsauflösung 5 Optionen + Lexware-Sync), saveSettings() erweitert. (4) kira_llm.py: 6 neue Tools (identitaet_pruefen/bestaetigen, projekt_clustering, korrektur_speichern, lernregeln_anzeigen/deaktivieren). (5) CRM-Tour auf 9 Schritte erweitert. (6) CRM_TECHNIK_REFERENZ.md vollständig aktualisiert. Syntax-Checks alle 4 Dateien OK. DB: 11 Tabellen verifiziert."
   ],
-  "next_steps": "CRM Lead-Flow + Nachqualifizierung implementiert. Nächster Schritt: Browser-Live-Test (Server starten, CRM öffnen, Lead-Flow testen).",
+  "next_steps": "Browser-Live-Test: Server starten, CRM öffnen, Identitäten-Tab testen, Clustering-Vorschlag prüfen, Korrektur-Dialog testen.",
   "open_items": [
     "GET /api/crm/faelle/{id}/export — Export-Logik noch nicht implementiert",
-    "Streitfall-Ansicht — Grundgeruest da, Detail-Logik offen",
+    "Streitfall-Ansicht — Grundgerüst da, Detail-Logik offen",
     "Browser-Test ausstehend (0 JS-Fehler, CRM navigierbar, Kira-Tools funktional)",
-    "CRM Lead-Flow Live-Test: Server starten, Mail von unbekanntem Absender simulieren, Lead-Bestätigung-Aufgabe prüfen"
+    "CRM Lead-Flow Live-Test: Server starten, Mail von unbekanntem Absender simulieren, Lead-Bestätigung-Aufgabe prüfen",
+    "Korrektur-Lernschleife Live-Test: Manuell korrigieren, Lernregel prüfen"
   ]
 }

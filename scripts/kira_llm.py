@@ -2398,6 +2398,69 @@ def get_tools(config=None):
         }
     })
 
+    # v2: Identitäts- und Projektauflösung + Lernschleife
+    tools.append({
+        "name": "crm_identitaet_pruefen",
+        "description": "Zeigt alle Identitäten eines Kunden + offene Vorschläge.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"kunden_id": {"type": "integer", "description": "Kunden-ID"}},
+            "required": ["kunden_id"]
+        }
+    })
+    tools.append({
+        "name": "crm_identitaet_bestaetigen",
+        "description": "Bestätigt oder lehnt eine Identitäts-Verbindung ab.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "graph_id": {"type": "integer", "description": "ID der Graph-Verbindung"},
+                "bestaetigt": {"type": "boolean", "description": "True=bestätigen, False=ablehnen"}
+            },
+            "required": ["graph_id", "bestaetigt"]
+        }
+    })
+    tools.append({
+        "name": "crm_projekt_clustering",
+        "description": "Startet LLM-Clustering für unzugeordnete Aktivitäten eines Kunden.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"kunden_id": {"type": "integer", "description": "Kunden-ID"}},
+            "required": ["kunden_id"]
+        }
+    })
+    tools.append({
+        "name": "crm_korrektur_speichern",
+        "description": "Korrigiert eine Zuordnung + leitet Lernregel ab.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "aktivitaet_id": {"type": "integer", "description": "Aktivitäts-ID"},
+                "kunden_id": {"type": "integer", "description": "Richtige Kunden-ID"},
+                "projekt_id": {"type": "integer", "description": "Richtige Projekt-ID (optional)"},
+                "notiz": {"type": "string", "description": "Kais Notiz (optional)"}
+            },
+            "required": ["aktivitaet_id", "kunden_id"]
+        }
+    })
+    tools.append({
+        "name": "crm_lernregeln_anzeigen",
+        "description": "Zeigt aktive Lernregeln eines Kunden oder alle.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"kunden_id": {"type": "integer", "description": "Kunden-ID (optional, 0=alle)"}}
+        }
+    })
+    tools.append({
+        "name": "crm_lernregel_deaktivieren",
+        "description": "Deaktiviert eine Lernregel.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"regel_id": {"type": "integer", "description": "Lernregel-ID"}},
+            "required": ["regel_id"]
+        }
+    })
+
     return tools
 
 
@@ -2484,6 +2547,12 @@ def execute_tool(name, params):
             "crm_nachqualifizierung_starten": _tool_crm_nachqualifizierung_starten,
             "crm_absender_ignorieren": _tool_crm_absender_ignorieren,
             "crm_ignorierte_anzeigen": _tool_crm_ignorierte_anzeigen,
+            "crm_identitaet_pruefen": _tool_crm_identitaet_pruefen,
+            "crm_identitaet_bestaetigen": _tool_crm_identitaet_bestaetigen,
+            "crm_projekt_clustering": _tool_crm_projekt_clustering,
+            "crm_korrektur_speichern": _tool_crm_korrektur_speichern,
+            "crm_lernregeln_anzeigen": _tool_crm_lernregeln_anzeigen,
+            "crm_lernregel_deaktivieren": _tool_crm_lernregel_deaktivieren,
         }
         handler = handlers.get(name)
         if not handler:
@@ -5701,6 +5770,121 @@ def _tool_crm_ignorierte_anzeigen(p):
         return {"ok": True, "message": "\n".join(lines), "anzahl": len(items)}
     except Exception as e:
         return {"ok": False, "error": f"Fehler: {e}"}
+
+
+# ── CRM v2 Tool-Handler: Identitäts-/Projektauflösung + Lernschleife ──────
+
+def _tool_crm_identitaet_pruefen(p):
+    """Zeigt alle Identitäten eines Kunden."""
+    try:
+        from kunden_classifier import get_identitaeten
+        kid = int(p.get("kunden_id", 0))
+        if not kid:
+            return {"ok": False, "error": "kunden_id fehlt"}
+        idents = get_identitaeten(kid)
+        if not idents:
+            return {"ok": True, "message": f"Keine Identitäten für Kunde {kid}.", "anzahl": 0}
+        lines = [f"{len(idents)} Identitäten für Kunde {kid}:\n"]
+        for i in idents:
+            v = "✓" if i.get("verifiziert") else ""
+            lines.append(f"  [{i.get('typ','')}] {i.get('wert','')} — {i.get('confidence','')} {v} (Quelle: {i.get('quelle','')})")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(idents)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_identitaet_bestaetigen(p):
+    """Bestätigt oder lehnt Identitäts-Verbindung ab."""
+    try:
+        from kunden_classifier import identitaet_bestaetigen
+        gid = int(p.get("graph_id", 0))
+        if not gid:
+            return {"ok": False, "error": "graph_id fehlt"}
+        ok = identitaet_bestaetigen(gid, p.get("bestaetigt", True))
+        return {"ok": ok, "message": "Bestätigt" if p.get("bestaetigt") else "Abgelehnt"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_projekt_clustering(p):
+    """Startet Projekt-Clustering."""
+    try:
+        from kunden_classifier import projekt_clustering
+        kid = int(p.get("kunden_id", 0))
+        if not kid:
+            return {"ok": False, "error": "kunden_id fehlt"}
+        result = projekt_clustering(kid)
+        if result.get("status") == "ok":
+            vs = result.get("vorschlaege", [])
+            if not vs:
+                return {"ok": True, "message": "Keine unzugeordneten Aktivitäten gefunden."}
+            lines = [f"{len(vs)} Clustering-Vorschläge:\n"]
+            for v in vs:
+                name = v.get("projektname_neu") or f"Projekt #{v.get('projekt_id', '?')}"
+                lines.append(f"  {name}: {len(v.get('aktivitaet_ids',[]))} Aktivitäten (Konfidenz: {v.get('confidence',0):.2f})")
+                lines.append(f"    {v.get('begruendung', '')}")
+            return {"ok": True, "message": "\n".join(lines), "vorschlaege": vs}
+        return {"ok": False, "error": result.get("fehler", "Unbekannter Fehler")}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_korrektur_speichern(p):
+    """Korrektur + Lernregel."""
+    try:
+        from kunden_classifier import korrektur_verarbeiten
+        aid = int(p.get("aktivitaet_id", 0))
+        kid = int(p.get("kunden_id", 0))
+        if not aid or not kid:
+            return {"ok": False, "error": "aktivitaet_id und kunden_id erforderlich"}
+        pid = int(p["projekt_id"]) if p.get("projekt_id") else None
+        result = korrektur_verarbeiten(aid, kid, pid, p.get("notiz", ""))
+        if result.get("status") == "ok":
+            msg = f"Korrektur gespeichert: Aktivität {aid} → Kunde {kid}"
+            lr = result.get("lernregel")
+            if lr:
+                msg += f"\nLernregel abgeleitet: {lr.get('beschreibung', '')}"
+            return {"ok": True, "message": msg}
+        return {"ok": False, "error": result.get("fehler", "")}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_lernregeln_anzeigen(p):
+    """Zeigt aktive Lernregeln."""
+    try:
+        from kunden_classifier import get_lernregeln
+        kid = p.get("kunden_id")
+        if kid == 0:
+            kid = None
+        regeln = get_lernregeln(kid)
+        if not regeln:
+            return {"ok": True, "message": "Keine aktiven Lernregeln.", "anzahl": 0}
+        lines = [f"{len(regeln)} aktive Lernregeln:\n"]
+        for r in regeln:
+            kunde = r.get("kunden_firma") or r.get("kunden_name") or "global"
+            try:
+                bed = json.loads(r.get("bedingung_json", "{}"))
+                desc = bed.get("beschreibung", r.get("regel_typ", ""))
+            except Exception:
+                desc = r.get("regel_typ", "")
+            lines.append(f"  #{r['id']} [{r.get('regel_typ','')}] {desc} (Kunde: {kunde}, {r.get('anwendungen',0)}x)")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(regeln)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_lernregel_deaktivieren(p):
+    """Deaktiviert Lernregel."""
+    try:
+        from kunden_classifier import lernregel_deaktivieren
+        rid = int(p.get("regel_id", 0))
+        if not rid:
+            return {"ok": False, "error": "regel_id fehlt"}
+        ok = lernregel_deaktivieren(rid)
+        return {"ok": ok, "message": f"Lernregel {rid} deaktiviert" if ok else "Fehler"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # Init DB bei Import

@@ -590,3 +590,35 @@ do_PUT-Bug behoben (Alias do_PUT=do_POST in DashboardHandler). Export-API GET /a
 **Erledigt:** CRM Lead-Flow + Nachqualifizierung vollständig implementiert (7 Pakete).
 **Offen geblieben:** —
 **Status:** ✅ erledigt
+
+---
+
+## 2026-04-10 22:00 — Session-Start (session-uu)
+**Auftrag:** CRM Vollausbau v3 — `000_PROMPT_CRM_Vollausbau_v3_FINAL.md` prüfen, Fehlendes einbauen/ergänzen. Danach CRM_TECHNIK_REFERENZ.md + alle Checklisten/Featurelisten/Partnerlisten aktualisieren. GitHub Push mit Benachrichtigung.
+**Status:** offen
+
+### 2026-04-10 22:10 — Gap-Analyse
+7-Paket-Prompt gegen bestehenden Code geprüft. Fehlend: 2 DB-Tabellen, erweiterter Super-Prompt, Handlungsmatrix, Clustering, Lernschleife, 8 API-Endpunkte, 6 Kira-Tools, UI-Erweiterungen, Tour-Upgrade.
+
+### 2026-04-10 22:30 — Paket 1: DB (kunden_identitaeten_graph + kunden_lernregeln)
+2 neue Tabellen in `_ensure_crm_tables()` (case_engine.py). 11 Spalten je Tabelle. DB verifiziert: 11 Tabellen.
+
+### 2026-04-10 22:50 — Paket 2-4: Classifier v3
+kunden_classifier.py: ~600 neue LOC. 3-Fragen-Super-Prompt, numerische Confidence, Handlungsmatrix, Clustering, Lernschleife, 16 neue Funktionen.
+
+### 2026-04-10 23:10 — Paket 5: UI-Erweiterungen
+server.py: Identitäten-Tab, Projekt-Zeitstrahl visuell, Korrektur-Dialog, 10 JS-Funktionen, 5 CSS-Klassen, Identitäts-Konfidenz-Indikator in Kundenliste.
+
+### 2026-04-10 23:20 — Paket 6: API-Endpunkte (8 neue)
+Clustering-Vorschlag/-Anwenden, Korrektur, Identitäts-Bestätigung, Lernregeln CRUD.
+
+### 2026-04-10 23:30 — Paket 7: Kira-Tools + Einstellungen + Tour
+6 neue Kira-Tools, Einstellungen (Identitätsauflösung + Lexware-Sync), saveSettings() erweitert, Tour 6→9 Schritte.
+
+### 2026-04-10 23:45 — Tests + Tracking
+Syntax-Checks: 4/4 OK. DB: 11 Tabellen OK. CRM_TECHNIK_REFERENZ.md vollständig aktualisiert. session_handoff.json + session_log.md aktualisiert.
+
+### 2026-04-10 23:50 — Session-Ende
+**Erledigt:** CRM Vollausbau v3 komplett — 2 DB-Tabellen, 600 LOC Classifier, 8 API-Endpunkte, 6 Kira-Tools, UI (Identitäten/Zeitstrahl/Korrektur), Tour 9 Schritte, Technik-Referenz aktualisiert.
+**Offen geblieben:** Browser-Live-Test, feature_registry.json, partner_view.
+**Status:** ✅ erledigt

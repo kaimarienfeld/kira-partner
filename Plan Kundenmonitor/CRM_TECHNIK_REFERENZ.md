@@ -1,6 +1,6 @@
 # CRM / Kundencenter — Vollständige Technik-Referenz
 
-**Stand:** 2026-04-10 | **Sessions:** session-ss, session-tt | **Commits:** `9bc5594`, `438371a`, `350bd96`
+**Stand:** 2026-04-10 | **Sessions:** session-ss, session-tt, session-uu (v3-Vollausbau) | **Commits:** `9bc5594`, `438371a`, `350bd96`, (session-uu pending)
 
 ---
 
@@ -12,12 +12,12 @@
 | `scripts/kunden_classifier.py` | **NEU** | ~620 Zeilen (Lexware-Only-Basis seit session-tt) |
 | `scripts/kunden_lexware_sync.py` | **NEU** (session-tt) | ~280 Zeilen — Lexware → kunden.db Sync |
 | `scripts/kunden_mail_retroaktiv.py` | **NEU** (session-tt) | ~200 Zeilen — Retroaktiver Mail-Scan |
-| `scripts/kira_llm.py` | Erweitert | ~280 neue Zeilen (7 Tools + Handler + Kontext) |
-| `scripts/case_engine.py` | Erweitert | `_ensure_crm_tables()` — 6 Tabellen (Migration entfernt session-tt) |
+| `scripts/kira_llm.py` | Erweitert | ~460 neue Zeilen (13 Tools + Handler + Kontext) |
+| `scripts/case_engine.py` | Erweitert | `_ensure_crm_tables()` — 8 Tabellen (+graph, +lernregeln seit v3) |
 | `scripts/mail_classifier.py` | Erweitert | Geschäftskontakt-Filter (~30 Zeilen) |
 | `scripts/mail_monitor.py` | Erweitert | Classifier-Aufruf nach vorgang_router (~20 Zeilen) |
 | `scripts/daily_check.py` | Erweitert | Classifier-Aufruf bei Nachklassifizierung (~20 Zeilen) |
-| `knowledge/kunden.db` | Repariert (session-tt) | 273 Lexware-Kunden, 285 Identitäten, 1.718 Aktivitäten |
+| `knowledge/kunden.db` | Repariert (session-tt) + v3-Tabellen | 11 Tabellen: 273 Kunden, 285 Identitäten, 1.718 Aktivitäten, +graph, +lernregeln |
 
 ---
 
@@ -145,12 +145,56 @@ LLM-Entscheidungsprotokoll: Jede Klassifizierung wird protokolliert.
 
 **Indizes:** `idx_cl_eingabe`, `idx_cl_zeit`
 
-### 2.7 Tabellenbeziehungen (ER-Diagramm)
+### 2.7 Neue Tabelle `kunden_identitaeten_graph` (v3)
+
+Verknüpfungsgraph zwischen Identitäten — erkennt wenn dieselbe Person verschiedene E-Mail-Adressen nutzt.
+
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `id` | INTEGER PK | Auto-Increment |
+| `identitaet_a_id` | INTEGER FK → kunden_identitaeten.id | Identität A |
+| `identitaet_b_id` | INTEGER FK → kunden_identitaeten.id | Identität B |
+| `confidence` | REAL | Vertrauensscore 0.0-1.0 |
+| `confidence_stufe` | TEXT | `eindeutig` / `wahrscheinlich` / `prüfen` / `unklar` |
+| `reasoning` | TEXT | LLM-Begründung |
+| `entschieden_durch` | TEXT | `llm` / `kai` / `auto` |
+| `kai_bestaetigt` | INTEGER | 1 = von Kai bestätigt |
+| `kai_abgelehnt` | INTEGER | 1 = von Kai abgelehnt |
+| `erstellt_am` | TEXT | Zeitstempel |
+| `bestaetigt_am` | TEXT | Bestätigungszeitstempel |
+
+**Indizes:** `idx_kig_unique` UNIQUE(MIN(a,b), MAX(a,b))
+
+### 2.8 Neue Tabelle `kunden_lernregeln` (v3)
+
+Generalisierte Regeln, die KIRA aus Kais Korrekturen ableitet und bei zukünftigen Klassifizierungen anwendet.
+
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `id` | INTEGER PK | Auto-Increment |
+| `kunden_id` | INTEGER FK (nullable) | Spezifisch für Kunden oder global (NULL) |
+| `regel_typ` | TEXT | `absender_muster` / `domain_zuordnung` / `betreff_muster` / `projekt_signal` / `identitaet_link` |
+| `bedingung_json` | TEXT | JSON-Bedingung (z.B. `{"domain":"firma.de"}`) |
+| `aktion_json` | TEXT | JSON-Aktion (z.B. `{"zuordnen_zu_kunde":42}`) |
+| `confidence` | REAL | Regelstärke 0.0-1.0 |
+| `quelle` | TEXT | `kai_korrektur` / `llm_ableitung` / `manuell` |
+| `anwendungen` | INTEGER | Wie oft bereits angewendet |
+| `letzte_anwendung` | TEXT | Zeitstempel letzte Nutzung |
+| `erstellt_am` | TEXT | Zeitstempel |
+| `aktiv` | INTEGER | 1 = aktiv, 0 = deaktiviert |
+
+**Indizes:** `idx_klr_kunden`, `idx_klr_aktiv`
+
+### 2.9 Tabellenbeziehungen (ER-Diagramm)
 
 ```
 kunden (id)
   │
   ├─→ kunden_identitaeten (kunden_id FK)      1:n   Kontaktdaten
+  │     │
+  │     └─→ kunden_identitaeten_graph          n:n   Identitäts-Verknüpfungen (v3)
+  │           (identitaet_a_id, identitaet_b_id FK)
+  │
   ├─→ kunden_projekte (kunden_id FK)           1:n   Projekte
   │     │
   │     ├─→ kunden_faelle (projekt_id FK)      1:n   Fälle pro Projekt
@@ -161,7 +205,8 @@ kunden (id)
   │
   ├─→ kunden_faelle (kunden_id FK)             1:n   Fälle direkt am Kunden
   ├─→ kunden_aktivitaeten (kunden_id FK)       1:n   Alle Aktivitäten
-  └─→ kunden_classifier_log (kunden_id_vorschlag) 1:n   Klassifizierungsprotokoll
+  ├─→ kunden_classifier_log (kunden_id_vorschlag) 1:n   Klassifizierungsprotokoll
+  └─→ kunden_lernregeln (kunden_id FK)         1:n   Lernregeln aus Korrekturen (v3)
 ```
 
 ---
@@ -183,33 +228,61 @@ Mail eingehend
       │     Absender-E-Mail → kunden_identitaeten WHERE confidence='eindeutig'
       │     → Treffer → sofort zuordnen (kein LLM nötig)
       │
-      ├─ 3. LLM-Path
-      │     Super-Prompt mit:
-      │       - Absender, Betreff, Text-Auszug
-      │       - Alle Kunden mit Identitäten, Projekten, letzte Aktivitäten
-      │     → JSON-Response mit kunden_id, projekt_id, confidence, reasoning
+      ├─ 3. LLM-Path (v3: 3-Fragen-Super-Prompt)
+      │     FRAGE 1: Wer ist dieser Absender? (über E-Mail hinaus)
+      │     FRAGE 2: Welches Projekt? (inhaltsbasiert, nicht zeitbasiert)
+      │     FRAGE 3: Neue Identität vorschlagen?
+      │     + Lernregeln als Kontext
+      │     → JSON: {kunden_confidence (0.0-1.0), projekt_id, neue_identitaet, neue_lernregel}
       │
-      └─ 4. Confidence-Auswertung
-            eindeutig (≥0.85) → auto-zuordnen
-            wahrscheinlich (0.65-0.84) → zuordnen + Kira-Hinweis
-            prüfen (0.40-0.64) → Prüfliste
-            unklar (<0.40) → Prüfliste
+      ├─ 4. Nachverarbeitung (v3):
+      │     - _process_neue_identitaet() → Auto bei ≥0.85
+      │     - _process_neues_projekt() → Auto bei ≥0.70
+      │     - _process_lernregel() → Speichern in kunden_lernregeln
+      │
+      └─ 5. Confidence-basierte Handlungsmatrix (v3):
+            ≥0.90 → auto-zuordnen (kein Hinweis)
+            0.70–0.89 → zuordnen + Kai fragen (Bestätigung)
+            0.50–0.69 → Vorschlag in Prüfliste
+            <0.50 → manuell zuordnen
 ```
 
 ### 3.2 Funktionen in `kunden_classifier.py`
 
-| Funktion | Zeile | Beschreibung |
-|---|---|---|
-| `ist_geschaeftskontakt()` | 65 | Newsletter/noreply-Filter (Regex + Domain-Check) |
-| `_fast_path()` | 112 | Lookup in kunden_identitaeten (confidence=eindeutig) |
-| `_build_kunden_kontext()` | 169 | Baut Kontextblock aller Kunden für LLM |
-| `_build_llm_prompt()` | 221 | Generiert vollständigen LLM-Prompt |
-| `_parse_llm_response()` | 258 | Parst JSON-Response des LLM |
-| `classify_kunde_projekt()` | 296 | **Hauptfunktion** — orchestriert die 4-Stufen-Pipeline |
-| `_log_classification()` | 435 | Schreibt in `kunden_classifier_log` |
-| `apply_classification()` | 465 | Wendet Ergebnis an (Identität + Aktivität + Fall anlegen) |
-| `korrektur_speichern()` | 528 | Manuelle Korrektur speichern (Update log + Identität hochstufen) |
-| `get_unzugeordnete()` | 582 | Prüfliste: Alle nicht bestätigten Einträge |
+#### Bestehende Funktionen (session-ss/tt)
+
+| Funktion | Beschreibung |
+|---|---|
+| `ist_geschaeftskontakt()` | Newsletter/noreply-Filter (Regex + Domain-Check) |
+| `_fast_path()` | Lookup in kunden_identitaeten (confidence=eindeutig) |
+| `_build_llm_prompt()` | **v3: Erweiterter 3-Fragen-Super-Prompt** (wer/welches Projekt/neue Identität) |
+| `_parse_llm_response()` | **v3: Numerische Confidence→Stufe-Konvertierung** (0.0-1.0 → Stufen) |
+| `classify_kunde_projekt()` | **Hauptfunktion** — orchestriert Pipeline, v3: +Identität/Projekt/Lernregel |
+| `_log_classification()` | Schreibt in `kunden_classifier_log` |
+| `apply_classification()` | Wendet Ergebnis an (Identität + Aktivität + Fall anlegen) |
+| `korrektur_speichern()` | Manuelle Korrektur speichern (Update log + Identität hochstufen) |
+| `get_unzugeordnete()` | Prüfliste: Alle nicht bestätigten Einträge |
+
+#### Neue Funktionen (v3 — session-uu)
+
+| Funktion | Beschreibung |
+|---|---|
+| `_tabelle_existiert(conn, name)` | Prüft ob Tabelle in DB existiert |
+| `_build_kunden_kontext_erweitert(conn)` | Token-effizienter Kontextblock mit GROUP_CONCAT Identitäten, Projekte, Aktivitäten, Lernregeln |
+| `_build_lernregeln_kontext(conn)` | Formatiert aktive Lernregeln als LLM-Kontext |
+| `_process_neue_identitaet(parsed, result, email)` | Auto-Anlage bei Confidence ≥ 0.85, sonst als Vorschlag |
+| `_process_neues_projekt(parsed, result)` | Auto-Anlage bei `projekt_ist_neu=true` + Confidence ≥ 0.70 |
+| `_process_lernregel(parsed, result)` | Speichert LLM-Regelvorschlag in kunden_lernregeln |
+| `apply_classification_v2(eingabe_typ, eingabe_id, result)` | **Handlungsmatrix**: ≥0.90 auto / 0.70-0.89 zuordnen+fragen / 0.50-0.69 vorschlag / <0.50 manuell |
+| `_elog_safe(event, summary)` | Sicherer Wrapper für runtime_log.elog() |
+| `projekt_clustering(kunden_id)` | LLM-basierte Gruppierung unzugeordneter Aktivitäten → Projektvorschläge |
+| `clustering_anwenden(kunden_id, vorschlag)` | Wendet bestätigte Clustering-Ergebnisse an |
+| `korrektur_verarbeiten(aktivitaet_id, richtige_kunden_id, richtige_projekt_id, kai_notiz)` | Korrektur + Identitäts-Upgrade + Lernregel-Ableitung |
+| `_lernregel_ableiten(conn, aktivitaet, kunden_id, projekt_id, kai_notiz)` | LLM leitet generalisierbare Regel aus Korrektur ab |
+| `get_lernregeln(kunden_id, nur_aktive)` | Lernregeln abrufen mit Kunden-JOIN |
+| `lernregel_deaktivieren(regel_id)` | Regel deaktivieren (aktiv=0) |
+| `get_identitaeten(kunden_id)` | Identitäten mit Graph-Verbindungen laden |
+| `identitaet_bestaetigen(graph_id, bestaetigt)` | Kai bestätigt/lehnt Identitäts-Link ab |
 
 ### 3.3 Integration
 
@@ -219,9 +292,9 @@ Mail eingehend
 
 ---
 
-## 4. API-Endpunkte (22 Stück)
+## 4. API-Endpunkte (30 Stück)
 
-### 4.1 GET-Endpunkte (13)
+### 4.1 GET-Endpunkte (15)
 
 | Pfad | Handler | Beschreibung |
 |---|---|---|
@@ -238,8 +311,10 @@ Mail eingehend
 | `/api/crm/faelle/{id}/export` | `_api_crm_faelle_export(fid)` | Streitfall-Dossier (Kunde+Projekt+Timeline+Log) |
 | `/api/crm/aktivitaeten/{id}` | `_api_crm_aktivitaet_get(aid)` | Einzelne Aktivität mit Detail |
 | `/api/crm/unzugeordnete` | `_api_crm_unzugeordnete()` | Classifier-Prüfliste (unbestätigte Zuordnungen) |
+| `/api/crm/kunden/{id}/identitaeten` | `_api_crm_identitaeten_get(kid)` | Identitäten mit Graph-Verbindungen (v3) |
+| `/api/crm/kunden/{id}/lernregeln` | `_api_crm_lernregeln_get(kid)` | Lernregeln eines Kunden (v3) |
 
-### 4.2 POST-Endpunkte (4)
+### 4.2 POST-Endpunkte (12)
 
 | Pfad | Handler | Beschreibung |
 |---|---|---|
@@ -247,6 +322,13 @@ Mail eingehend
 | `/api/crm/kunden/{id}/projekte` | `_api_crm_projekte_create(kid, data)` | Neues Projekt für Kunden |
 | `/api/crm/faelle` | `_api_crm_faelle_create(data)` | Neuen Fall anlegen |
 | `/api/crm/faelle/{id}/aktivitaeten` | `_api_crm_faelle_add_aktivitaet(fid, data)` | Aktivität zu Fall hinzufügen |
+| `/api/crm/kunden/{id}/clustering-vorschlag` | `_api_crm_clustering_vorschlag(kid)` | LLM-Clustering-Vorschlag für unzugeordnete Aktivitäten (v3) |
+| `/api/crm/kunden/{id}/clustering-anwenden` | `_api_crm_clustering_anwenden(kid, data)` | Bestätigten Clustering-Vorschlag anwenden (v3) |
+| `/api/crm/korrektur` | `_api_crm_korrektur(data)` | Korrektur + Lernregel-Ableitung (v3) |
+| `/api/crm/identitaet-bestaetigen` | `_api_crm_identitaet_bestaetigen(data)` | Kai bestätigt/lehnt Identitäts-Link ab (v3) |
+| `/api/crm/lernregeln` | `_api_crm_lernregeln_get()` | Alle aktiven Lernregeln abrufen (v3) |
+| `/api/crm/lernregeln/{id}/deaktivieren` | `_api_crm_lernregel_deaktivieren(id)` | Lernregel deaktivieren (v3) |
+| `/api/crm/kunden/{id}/identitaeten` | `_api_crm_identitaeten_get(kid)` | Identitäten inkl. Graph-Links (v3) |
 
 ### 4.3 PUT-Endpunkte (3) — via `do_PUT = do_POST` Alias
 
@@ -280,7 +362,7 @@ Ohne diesen Alias würden alle JS-Aufrufe mit `method:'PUT'` ins Leere laufen (D
 | `_build_crm_kundenakte()` | (inline) | Kundenkopf + Projekt-Zeitstrahl + Verlauf + Stammdaten |
 | `_build_crm_fallansicht()` | (inline) | Ticket-Kopf + Timeline + Aktionen |
 
-### 5.2 JavaScript-Funktionen (47 Stück)
+### 5.2 JavaScript-Funktionen (57 Stück)
 
 #### Navigation & State
 | Funktion | Beschreibung |
@@ -355,6 +437,20 @@ Ohne diesen Alias würden alle JS-Aufrufe mit `method:'PUT'` ins Leere laufen (D
 | `crmCloseModal()` | Modal schließen |
 | `crmZuordnen(logId)` | Zuordnungs-Dialog (Stub für Prüfliste) |
 
+#### v3: Identitäten + Clustering + Korrektur + Lernregeln
+| Funktion | Beschreibung |
+|---|---|
+| `crmLoadIdentitaeten(kundenId)` | Identitäten + Graph-Verbindungen laden |
+| `crmIdentBestaetigen(graphId, bestaetigt)` | Identitäts-Link bestätigen/ablehnen |
+| `crmBuildZeitstrahl(projekte)` | Projekt-Zeitstrahl visuell rendern |
+| `crmSwitchProjekt(projektId)` | Projektfilter im Zeitstrahl wechseln |
+| `crmClusteringVorschlag(kundenId)` | LLM-Clustering-Vorschlag abrufen + anzeigen |
+| `crmClusteringAnwenden(kundenId, vorschlag)` | Clustering-Ergebnis bestätigen + anwenden |
+| `crmKorrekturDialog(aktivitaetId)` | Korrektur-Modal öffnen |
+| `crmKorrekturSpeichern()` | Korrektur + Lernregel-Ableitung senden |
+| `crmLoadLernregeln(kundenId)` | Lernregeln laden + anzeigen |
+| `crmShowAkteTab(tab)` | Erweitert: lädt auch Identitäten-Tab |
+
 ---
 
 ## 6. CSS-System
@@ -387,6 +483,16 @@ Alle CRM-spezifischen CSS-Klassen verwenden den Prefix `crm-` um Kollisionen zu 
 | `.crm-stammdaten` | Rechte Kontextspalte |
 | `.crm-tab-bar` | Tab-Leiste (Verlauf/Fälle/Dokumente/etc.) |
 | `.crm-tab-bar span.active` | Aktiver Tab |
+| `.crm-ident-indicator` | Identitäts-Konfidenz-Indikator in Kundenliste (v3) |
+| `.crm-ident-ok` | Grün — alle Identitäten bestätigt (v3) |
+| `.crm-ident-pruefen` | Gelb — Vorschläge warten auf Bestätigung (v3) |
+| `.crm-ident-lead` | Grau — Lead ohne Identitäten (v3) |
+| `.crm-btn-sm` | Kleiner Aktions-Button (v3) |
+| `.crm-zeitstrahl-container` | Zeitstrahl-Wrapper (v3) |
+| `.crm-zeitstrahl-item` | Einzelner Zeitstrahl-Eintrag (v3) |
+| `.crm-zs-aktiv` | Aktives Projekt im Zeitstrahl (v3) |
+| `.crm-projekt-switch-bar` | Projektumschalter-Leiste (v3) |
+| `.crm-ident-tab` | Identitäten-Tab-Container (v3) |
 
 ### CSS-Variablen (aus Mockups)
 
@@ -394,9 +500,11 @@ Verwendet die globalen KIRA-Design-Variablen: `--bg`, `--bg-raised`, `--text`, `
 
 ---
 
-## 7. Kira-Tools (7 neue in `kira_llm.py`)
+## 7. Kira-Tools (13 in `kira_llm.py`)
 
 ### 7.1 Tool-Definitionen
+
+#### Bestehende Tools (session-ss)
 
 | Tool-Name | Parameter | Beschreibung |
 |---|---|---|
@@ -407,6 +515,17 @@ Verwendet die globalen KIRA-Design-Variablen: `--bg`, `--bg-raised`, `--text`, `
 | `crm_fall_oeffnen` | `fall_id` (integer) | Lädt Fall + zugehörige Aktivitäten |
 | `crm_kunden_klassifizieren` | `eingabe_typ`, `eingabe_id` | Ruft `classify_kunde_projekt()` + `apply_classification()` |
 | `crm_aktivitaeten_pruefliste` | (keine) | Ruft `get_unzugeordnete()` — Liste nicht bestätigter Zuordnungen |
+
+#### Neue Tools (v3 — session-uu)
+
+| Tool-Name | Parameter | Beschreibung |
+|---|---|---|
+| `crm_identitaet_pruefen` | `kunden_id` (integer) | Zeigt alle Identitäten + Graph-Verbindungen eines Kunden |
+| `crm_identitaet_bestaetigen` | `graph_id`, `bestaetigt` (bool) | Kai bestätigt oder lehnt Identitäts-Link ab |
+| `crm_projekt_clustering` | `kunden_id` (integer) | LLM-basierte Gruppierung unzugeordneter Aktivitäten → Projektvorschläge |
+| `crm_korrektur_speichern` | `aktivitaet_id`, `kunden_id`, `projekt_id`, optional: `notiz` | Korrektur + Lernregel-Ableitung |
+| `crm_lernregeln_anzeigen` | optional: `kunden_id` | Alle aktiven Lernregeln anzeigen |
+| `crm_lernregel_deaktivieren` | `regel_id` (integer) | Lernregel deaktivieren |
 
 ### 7.2 Handler-Funktionen
 
@@ -456,7 +575,7 @@ Aktiviert via `kiraSetQuickActions('crm')` in `crmKiraFragen()`.
 
 Nav-Eintrag: `esShowSec('crm')` → zeigt CRM-Einstellungssektion.
 
-### 8.2 Konfigurationsoptionen (10 Stück)
+### 8.2 Konfigurationsoptionen (15 Stück)
 
 | Config-Key | Typ | Default | Beschreibung |
 |---|---|---|---|
@@ -470,6 +589,11 @@ Nav-Eintrag: `esShowSec('crm')` → zeigt CRM-Einstellungssektion.
 | `crm.log_detail` | Select | `normal` | Log-Detailgrad (minimal/normal/verbose) |
 | `crm.lexware_sync` | Boolean | `true` | Lexware-Kontakte als Kunden synchronisieren |
 | `crm.max_timeline` | Number | `50` | Max. Aktivitäten in Timeline |
+| `crm.auto_identitaet` | Boolean | `true` | Automatische Identitätserkennung (v3) |
+| `crm.ident_schwelle` | Range | `0.85` | Confidence-Schwelle für Auto-Identitätsanlage (0.5-1.0) (v3) |
+| `crm.ident_fragen_ab` | Range | `0.60` | Ab dieser Confidence Kai fragen (0.3-0.9) (v3) |
+| `crm.lernregeln_aktiv` | Boolean | `true` | Lernregeln aus Korrekturen aktiviert (v3) |
+| `crm.sync_interval` | Select | `6h` | Lexware-Sync-Intervall (v3) |
 
 ### 8.3 Speicherung
 
@@ -486,7 +610,13 @@ crm: {
     export_format: _v('cfg-crm-export-format', 'json'),
     log_detail: _v('cfg-crm-log-detail', 'normal'),
     lexware_sync: _chk('cfg-crm-lexware-sync'),
-    max_timeline: parseInt(_v('cfg-crm-max-timeline', '50'))
+    max_timeline: parseInt(_v('cfg-crm-max-timeline', '50')),
+    // v3-Erweiterungen:
+    auto_identitaet: _chk('cfg-crm-auto-ident'),
+    ident_schwelle: parseFloat(_v('cfg-crm-ident-schwelle', '0.85')),
+    ident_fragen_ab: parseFloat(_v('cfg-crm-ident-fragen-ab', '0.60')),
+    lernregeln_aktiv: _chk('cfg-crm-lernregeln'),
+    sync_interval: _v('cfg-crm-sync-interval', '6h')
 }
 ```
 
@@ -513,18 +643,21 @@ crm: {
 
 ---
 
-## 10. Guided Tour (6 Schritte)
+## 10. Guided Tour (9 Schritte — v3)
 
 Definiert als `window.KIRA_TOUR_CRM` im `<script>`-Block:
 
 | Schritt | Highlight-Element | Beschreibung |
 |---|---|---|
-| 1 | `.crm-subnav` | "Navigation — hier findest du alle Bereiche des Kundencenters" |
-| 2 | `#crm-panel-uebersicht` | "Kundenübersicht mit Akkordeon-Gruppen" |
-| 3 | `.crm-filter-bar` | "Suche und Filter — finde Kunden schnell" |
-| 4 | `.crm-projekt-zeitstrahl` | "Projekt-Zeitstrahl — alle Projekte auf einer Timeline" |
-| 5 | `.crm-fall-kopf` | "Fallansicht — jeder Geschäftsvorfall als Ticket" |
-| 6 | `.crm-action-bar` | "Aktionen — E-Mail, Notiz, Kira fragen, Export" |
+| 1 | `.crm-subnav` | Navigation — alle Bereiche des Kundencenters |
+| 2 | `.crm-accordion-header` | Kundengruppen — Aktive, Leads, Inaktive auf-/zuklappen |
+| 3 | `.crm-ident-indicator` | Identitäts-Status — Konfidenz der Kontaktdaten (v3) |
+| 4 | `.crm-projekt-zeitstrahl` | Projekt-Zeitstrahl — alle Projekte über Jahre |
+| 5 | `.crm-projekt-switch` | Projektumschalter — zwischen Projekten wechseln |
+| 6 | `.crm-ident-tab` | Identitäten-Tab — Kontaktdaten prüfen/bestätigen (v3) |
+| 7 | `.crm-fall-kopf` | Fallansicht — Mail, Chat, Memos, Dokumente pro Fall |
+| 8 | `.crm-action-bar` | Aktionen — E-Mail, Notiz, Kira fragen, Streitfall |
+| 9 | `#crm-kira-fragen` | Kira fragen — voller Kundenkontext automatisch übergeben |
 
 Gestartet via Tour-Button in der CRM-Toolbar:
 ```html
@@ -575,8 +708,21 @@ Gestartet via Tour-Button in der CRM-Toolbar:
     │  4. Ergebnis in DB:                                                    │
     │     - kunden_classifier_log (Protokoll)                                │
     │     - kunden_identitaeten (neue Identität bei eindeutig)               │
+    │     - kunden_identitaeten_graph (Graph-Link bei neuer Identität, v3)   │
     │     - kunden_aktivitaeten (Verlaufseintrag)                            │
     │     - kunden_faelle (neuer Fall wenn auto_fall_erstellung=true)         │
+    │     - kunden_lernregeln (wenn LLM Regel vorschlägt, v3)                │
+    │     - kunden_projekte (wenn projekt_ist_neu=true, v3)                  │
+    └──────────────────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │  5. Korrektur-Lernschleife (v3):                                       │
+    │     Kai korrigiert → korrektur_verarbeiten()                           │
+    │     → Identität hochstufen auf 'eindeutig'                             │
+    │     → LLM leitet generalisierbare Regel ab                             │
+    │     → Speichern in kunden_lernregeln                                   │
+    │     → Regel wird bei nächster Klassifizierung angewendet               │
     └──────────────────────────────────────────────────────────────────────────┘
 ```
 

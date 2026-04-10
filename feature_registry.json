@@ -1,6 +1,6 @@
 {
   "_schema": "v3",
-  "_updated": "session-ss",
+  "_updated": "2026-04-10",
   "_note": "leni_* Felder steuern die Partner-View (partner_view.html). leni_visible:false = wird nicht angezeigt.",
   "features": [
     {
@@ -1293,8 +1293,8 @@
       "module": "server.py + kunden_classifier.py + kira_llm.py",
       "status": "done",
       "last_updated": "2026-04-10",
-      "session": "session-ss",
-      "description": "8 Pakete: Datenmodell (6 DB-Tabellen in kunden.db), LLM-Kunden-Classifier (Fast-Path + LLM-Path), 2-Spalten-Navigation, Kundenübersicht mit Akkordeon, Kundenakte mit Projekt-Zeitstrahl, Fallansicht (Ticket-Layer), Export/Streitfall-Dossier, 7 Kira-Tools, CRM-Einstellungen (10 Optionen), Guided Tour (6 Schritte)."
+      "session": "session-uu",
+      "description": "8 Pakete + v3-Erweiterungen: Datenmodell (8+2 DB-Tabellen), LLM-Classifier v2 (3-Fragen-Super-Prompt + Handlungsmatrix + Lernschleife), Identitaets-Graph, Projekt-Clustering, Korrektur-Lernregeln, 30 API-Endpunkte, 13 Kira-Tools, CRM-Einstellungen (15 Optionen), Guided Tour (9 Schritte)."
     },
     {
       "id": "crm-kunden-classifier",
@@ -1307,22 +1307,22 @@
       "module": "kunden_classifier.py",
       "status": "done",
       "last_updated": "2026-04-10",
-      "session": "session-ss",
-      "description": "Fast-Path (bekannte E-Mail → sofort), LLM-Path (Super-Prompt + JSON-Response), Confidence-Stufen (eindeutig/wahrscheinlich/prüfen/unklar), kunden_classifier_log, Integration in mail_monitor + daily_check"
+      "session": "session-uu",
+      "description": "v2: 3-Fragen-Super-Prompt (Wer/Projekt/Identitaet), numerische Confidence 0.0-1.0, Handlungsmatrix (auto/fragen/vorschlag/manuell), Projekt-Clustering, Korrektur-Lernschleife (LLM leitet Regeln ab), kunden_lernregeln Tabelle, apply_classification_v2"
     },
     {
       "id": "crm-kira-tools",
-      "name": "7 CRM Kira-Tools",
+      "name": "13 CRM Kira-Tools",
       "icon": "🔧",
       "leni_name": "Kira verwaltet Kunden",
-      "leni_desc": "Kira kann Kunden suchen, Akten laden, Projekte zuordnen, Fälle erstellen und die Prüfliste abarbeiten — alles per Chat.",
+      "leni_desc": "Kira kann Kunden suchen, Akten laden, Projekte zuordnen, Faelle erstellen, Identitaeten pruefen, Clustering vorschlagen und Lernregeln verwalten.",
       "leni_visible": true,
       "leni_note": null,
       "module": "kira_llm.py",
       "status": "done",
       "last_updated": "2026-04-10",
-      "session": "session-ss",
-      "description": "kunden_suchen, kundenakte_laden, crm_projekt_zuordnen, crm_fall_erstellen, crm_fall_oeffnen, crm_kunden_klassifizieren, crm_aktivitaeten_pruefliste + System-Prompt-Erweiterung (Top 5, offene Fälle, unzugeordnete)"
+      "session": "session-uu",
+      "description": "Basis (7): kunden_suchen, kundenakte_laden, crm_projekt_zuordnen, crm_fall_erstellen/oeffnen, crm_kunden_klassifizieren, crm_aktivitaeten_pruefliste. v3 (6): crm_identitaet_pruefen/bestaetigen, crm_projekt_clustering, crm_korrektur_speichern, crm_lernregeln_anzeigen/deaktivieren"
     },
     {
       "id": "crm-fallexport-streitfall",
@@ -1337,7 +1337,49 @@
       "last_updated": "2026-04-10",
       "session": "session-ss",
       "description": "GET /api/crm/faelle/{id}/export, JSON-Export + Streitfall-Markierung, Modal mit Kopieren/Herunterladen"
+    },
+    {
+      "id": "crm-identitaets-graph",
+      "name": "Identitaets-Graph",
+      "icon": "🔗",
+      "leni_name": "Kontakt-Erkennung",
+      "leni_desc": "Kira erkennt wenn dieselbe Person von verschiedenen E-Mail-Adressen schreibt und verknuepft die Identitaeten automatisch.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py + case_engine.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-uu",
+      "description": "kunden_identitaeten_graph Tabelle, LLM-basierte Identitaets-Vorschlaege, Confidence-Anzeige in Kundenliste, Identitaeten-Tab mit Bestaetigen/Ablehnen"
+    },
+    {
+      "id": "crm-lernregeln",
+      "name": "Korrektur-Lernschleife",
+      "icon": "🧠",
+      "leni_name": "Kira lernt aus Korrekturen",
+      "leni_desc": "Wenn du eine Zuordnung korrigierst, leitet Kira daraus eine Regel ab und wendet sie in Zukunft automatisch an.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-uu",
+      "description": "kunden_lernregeln Tabelle (5 Regeltypen), korrektur_verarbeiten() + _lernregel_ableiten() via LLM, Lernregeln-Verwaltung (anzeigen/deaktivieren), Regeln im Classifier-Kontext"
+    },
+    {
+      "id": "crm-projekt-clustering",
+      "name": "Projekt-Clustering",
+      "icon": "📊",
+      "leni_name": "Automatische Projektgruppierung",
+      "leni_desc": "Kira gruppiert unzugeordnete Aktivitaeten und schlaegt Projekte vor. Du bestaetigst per Klick.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py + server.py",
+      "status": "done",
+      "last_updated": "2026-04-10",
+      "session": "session-uu",
+      "description": "LLM-basiertes Clustering unzugeordneter Aktivitaeten, Vorschlag-API, Anwenden-API, Kira-Tool crm_projekt_clustering"
     }
   ],
-  "_total": 106
+  "_total": 109
 }

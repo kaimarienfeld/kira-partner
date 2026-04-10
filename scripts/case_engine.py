@@ -771,6 +771,56 @@ def _ensure_crm_tables():
         db.execute("CREATE INDEX IF NOT EXISTS idx_kig_email ON kunden_ignoriert(LOWER(absender_email))")
         db.execute("CREATE INDEX IF NOT EXISTS idx_kig_domain ON kunden_ignoriert(absender_domain)")
 
+        # --- Identitäts-Graph (session-uu, 2026-04-10) ---
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_identitaeten_graph (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                identitaet_a_id INTEGER NOT NULL
+                    REFERENCES kunden_identitaeten(id) ON DELETE CASCADE,
+                identitaet_b_id INTEGER NOT NULL
+                    REFERENCES kunden_identitaeten(id) ON DELETE CASCADE,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                confidence_stufe TEXT NOT NULL
+                    CHECK(confidence_stufe IN ('eindeutig','wahrscheinlich','pruefen','unklar')),
+                reasoning TEXT,
+                entschieden_durch TEXT DEFAULT 'llm'
+                    CHECK(entschieden_durch IN ('llm','kai_manuell','lernregel')),
+                kai_bestaetigt INTEGER DEFAULT 0,
+                kai_abgelehnt INTEGER DEFAULT 0,
+                erstellt_am TEXT NOT NULL,
+                bestaetigt_am TEXT
+            )
+        """)
+        db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_kig_pair
+            ON kunden_identitaeten_graph(
+                MIN(identitaet_a_id, identitaet_b_id),
+                MAX(identitaet_a_id, identitaet_b_id)
+            )""")
+
+        # --- Lernregeln aus Kai-Korrekturen (session-uu, 2026-04-10) ---
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_lernregeln (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kunden_id INTEGER REFERENCES kunden(id),
+                regel_typ TEXT NOT NULL
+                    CHECK(regel_typ IN (
+                        'identitaet','projekt_signal','kanal_muster',
+                        'ausschluss','projekt_typ'
+                    )),
+                bedingung_json TEXT NOT NULL,
+                aktion_json TEXT NOT NULL,
+                confidence REAL DEFAULT 1.0,
+                quelle TEXT DEFAULT 'kai_korrektur'
+                    CHECK(quelle IN ('kai_korrektur','llm_schluss','manuell')),
+                anwendungen INTEGER DEFAULT 0,
+                letzte_anwendung TEXT,
+                erstellt_am TEXT NOT NULL,
+                aktiv INTEGER DEFAULT 1
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_klr_kunde ON kunden_lernregeln(kunden_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_klr_typ ON kunden_lernregeln(regel_typ, aktiv)")
+
         # Migration entfernt (session-tt, 2026-04-10):
         # Kunden kommen ausschließlich aus Lexware Office (REGEL-09).
         # Import läuft über kunden_lexware_sync.py.

@@ -12716,6 +12716,57 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
   </div>
 
   <div class="es-grp">
+    <div class="es-grp-h">Identit&auml;tsaufl&ouml;sung</div>
+    <div class="es-grp-sub">Wie KIRA erkennt ob verschiedene Kontaktdaten zur selben Person geh&ouml;ren.</div>
+    <div class="es-row">
+      <label class="es-lbl">Automatische Identit&auml;tserkennung</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-auto-ident" {'checked' if crm_cfg.get('auto_identitaet', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">LLM erkennt ob neue Absender zu bestehenden Kunden geh&ouml;ren</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Schwellwert Auto-Identit&auml;t</label>
+      <input type="range" id="cfg-crm-ident-schwelle" min="0.5" max="1" step="0.05"
+        value="{crm_cfg.get('ident_schwelle', 0.85)}" class="es-range" style="width:200px"
+        oninput="this.nextElementSibling.textContent=this.value">
+      <span class="es-range-val">{crm_cfg.get('ident_schwelle', 0.85)}</span>
+      <span class="es-hint">Ab dieser Konfidenz wird die Identit&auml;t automatisch angelegt</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Kai fragen ab Konfidenz</label>
+      <input type="range" id="cfg-crm-ident-fragen" min="0.3" max="0.9" step="0.05"
+        value="{crm_cfg.get('ident_fragen_ab', 0.70)}" class="es-range" style="width:200px"
+        oninput="this.nextElementSibling.textContent=this.value">
+      <span class="es-range-val">{crm_cfg.get('ident_fragen_ab', 0.70)}</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Lernregeln aktiv</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-lernregeln" {'checked' if crm_cfg.get('lernregeln_aktiv', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Kira lernt aus Kais Korrekturen und wendet Regeln beim n&auml;chsten Mal an</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Lernregeln verwalten</label>
+      <button class="es-btn" onclick="crmLoadLernregeln().then(r=>showToast(r.length+' aktive Lernregeln','info'))">Lernregeln anzeigen</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Lexware-Sync</div>
+    <div class="es-grp-sub">Synchronisation mit Lexware Office (einzige Stammdatenquelle)</div>
+    <div class="es-row">
+      <label class="es-lbl">Sync-Intervall</label>
+      <select id="cfg-crm-sync-interval" class="es-sel">
+        <option value="taeglich" {'selected' if crm_cfg.get('sync_interval','taeglich')=='taeglich' else ''}>T&auml;glich</option>
+        <option value="woechentlich" {'selected' if crm_cfg.get('sync_interval','taeglich')=='woechentlich' else ''}>W&ouml;chentlich</option>
+        <option value="manuell" {'selected' if crm_cfg.get('sync_interval','taeglich')=='manuell' else ''}>Nur manuell</option>
+      </select>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Jetzt synchronisieren</label>
+      <button class="es-btn" onclick="crmTriggerSync()">Lexware-Sync starten</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
     <div class="es-grp-h">Ticket-Verhalten</div>
     <div class="es-grp-sub">Wie F&auml;lle/Tickets automatisch erstellt und verwaltet werden.</div>
     <div class="es-row">
@@ -14702,6 +14753,7 @@ def build_kunden():
   <div class="crm-akte-tabs">
     <button class="crm-tab active" data-tab="verlauf" onclick="crmShowAkteTab('verlauf')">Verlauf</button>
     <button class="crm-tab" data-tab="faelle" onclick="crmShowAkteTab('faelle')">F&auml;lle / Tickets</button>
+    <button class="crm-tab crm-ident-tab" data-tab="identitaeten" onclick="crmShowAkteTab('identitaeten')">Identit&auml;ten</button>
     <button class="crm-tab" data-tab="dokumente" onclick="crmShowAkteTab('dokumente')">Dokumente</button>
     <button class="crm-tab" data-tab="finanzen" onclick="crmShowAkteTab('finanzen')">Finanzen</button>
     <button class="crm-tab" data-tab="kira" onclick="crmShowAkteTab('kira')">Kira</button>
@@ -14709,10 +14761,14 @@ def build_kunden():
   <div class="crm-akte-layout">
     <div class="crm-akte-main">
       <div class="crm-akte-tab-content active" id="crmTabVerlauf">
+        <div id="crmProjektZeitstrahl" class="crm-projekt-zeitstrahl"></div>
         <div id="crmVerlaufTimeline" class="crm-timeline"></div>
       </div>
       <div class="crm-akte-tab-content" id="crmTabFaelle">
         <div id="crmFaelleList"></div>
+      </div>
+      <div class="crm-akte-tab-content" id="crmTabIdentitaeten">
+        <div id="crmIdentitaetenList" class="crm-ident-list"></div>
       </div>
       <div class="crm-akte-tab-content" id="crmTabDokumente">
         <div id="crmDokList"></div>
@@ -18311,8 +18367,11 @@ function _crmRenderKunden(kunden) {{
       const typClass = typ==='geschaeft'?'green':typ==='privat'?'blue':typ==='intern'?'violet':'gray';
       const statusClass = (k.status||'aktiv')==='aktiv'?'green':(k.status||'')==='lead'?'orange':(k.status||'')==='inaktiv'?'gray':'gray';
       const letzteAkt = k.letztkontakt ? k.letztkontakt.substring(0,10) : '\\u2014';
+      const identIcon = (k.status||'')==='lead' ? '<span class="crm-ident-indicator crm-ident-lead" title="Lead — noch nicht best\\u00e4tigt">&#x25CF;</span>'
+        : (k.ident_unsicher ? '<span class="crm-ident-indicator crm-ident-pruefen" title="Identit\\u00e4t pr\\u00fcfen">&#x2753;</span>'
+        : '<span class="crm-ident-indicator crm-ident-ok" title="Identit\\u00e4t best\\u00e4tigt">&#x2714;</span>');
       return '<tr onclick="crmOpenKunde('+k.id+')">' +
-        '<td><strong>'+_crmEsc(name)+'</strong><br><small style="color:var(--muted)">'+_crmEsc(k.email||'')+'</small></td>' +
+        '<td>'+identIcon+' <strong>'+_crmEsc(name)+'</strong><br><small style="color:var(--muted)">'+_crmEsc(k.email||'')+'</small></td>' +
         '<td><span class="crm-tag '+typClass+'">'+_crmEsc(typ)+'</span></td>' +
         '<td>'+_crmEsc(k.letztes_projekt||'\\u2014')+'</td>' +
         '<td>'+letzteAkt+'</td>' +
@@ -18420,6 +18479,8 @@ function crmLoadProjektSwitch(kundenId) {{
     }});
     html += '</div>';
     el.innerHTML = html;
+    _crmProjekteCache = projekte;
+    crmBuildZeitstrahl(projekte);
   }}).catch(e=>console.warn('CRM projekte:',e));
 }}
 
@@ -18467,6 +18528,7 @@ function crmShowAkteTab(tab) {{
   if(tabBtn) tabBtn.classList.add('active');
   // Daten laden wenn noetig
   if(tab==='faelle' && _crmCurrentKunde) crmLoadFaelle(_crmCurrentKunde.id);
+  if(tab==='identitaeten' && _crmCurrentKunde) crmLoadIdentitaeten(_crmCurrentKunde.id);
 }}
 
 function crmLoadFaelle(kundenId) {{
@@ -19046,6 +19108,161 @@ async function crmZeigeIgnorierteListe() {{
     showToast('Ignorierte Absender: Funktion folgt in CRM-UI', 'info');
   }} catch(e) {{}}
 }}
+
+// === CRM v2: Identitäten-Tab + Zeitstrahl + Clustering + Korrektur (session-uu) ===
+
+function crmLoadIdentitaeten(kundenId) {{
+  kundenId = kundenId || (_crmCurrentKunde && _crmCurrentKunde.id);
+  if(!kundenId) return;
+  const el = document.getElementById('crmIdentitaetenList');
+  if(!el) return;
+  el.innerHTML = '<div style="padding:20px;color:var(--muted)">Lade Identit\\u00e4ten...</div>';
+  fetch('/api/crm/kunden/'+kundenId+'/identitaeten').then(r=>r.json()).then(d=>{{
+    if(!d.ok) {{ el.innerHTML='<div style="color:var(--red)">Fehler: '+(d.error||'')+'</div>'; return; }}
+    const idents = d.identitaeten||[];
+    if(!idents.length) {{ el.innerHTML='<div style="padding:20px;color:var(--muted)">Keine Identit\\u00e4ten vorhanden</div>'; return; }}
+    el.innerHTML = '<table class="crm-table"><thead><tr><th>Typ</th><th>Wert</th><th>Konfidenz</th><th>Quelle</th><th>Aktion</th></tr></thead><tbody>' +
+      idents.map(i => {{
+        const confClass = i.confidence==='eindeutig'?'green':i.confidence==='wahrscheinlich'?'orange':'gray';
+        const verifIcon = i.verifiziert ? '\\u2714' : '';
+        let aktionen = '';
+        if(!i.verifiziert && i.confidence!=='eindeutig') {{
+          aktionen = '<button class="crm-btn-sm crm-btn-green" onclick="crmIdentBestaetigen('+i.id+',true)">Best\\u00e4tigen</button> ' +
+            '<button class="crm-btn-sm crm-btn-red" onclick="crmIdentBestaetigen('+i.id+',false)">Ablehnen</button>';
+        }}
+        return '<tr><td>'+_crmEsc(i.typ)+'</td><td>'+_crmEsc(i.wert)+'</td>' +
+          '<td><span class="crm-tag '+confClass+'">'+_crmEsc(i.confidence)+' '+verifIcon+'</span></td>' +
+          '<td>'+_crmEsc(i.quelle||'')+'</td><td>'+aktionen+'</td></tr>';
+      }}).join('') + '</tbody></table>';
+  }}).catch(e=>{{ el.innerHTML='<div style="color:var(--red)">Netzwerkfehler</div>'; }});
+}}
+
+async function crmIdentBestaetigen(identId, bestaetigt) {{
+  // Find graph_id from identity — use graph_verbindungen
+  try {{
+    const r = await fetch('/api/crm/identitaet-bestaetigen', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{graph_id:identId, bestaetigt:bestaetigt}})
+    }});
+    const d = await r.json();
+    showToast(d.ok ? (bestaetigt ? 'Identit\\u00e4t best\\u00e4tigt' : 'Identit\\u00e4t abgelehnt') : ('Fehler: '+(d.error||'')), d.ok?'success':'error');
+    if(d.ok && _crmCurrentKunde) crmLoadIdentitaeten(_crmCurrentKunde.id);
+  }} catch(e) {{}}
+}}
+
+function crmBuildZeitstrahl(projekte) {{
+  const el = document.getElementById('crmProjektZeitstrahl');
+  if(!el) return;
+  if(!projekte||!projekte.length) {{ el.innerHTML=''; return; }}
+  const sorted = projekte.sort((a,b) => (a.beginn_am||'').localeCompare(b.beginn_am||''));
+  const statusColors = {{aktiv:'var(--green)',planung:'var(--blue)',abgeschlossen:'var(--muted)',archiv:'var(--muted)'}};
+  el.innerHTML = '<div class="crm-zeitstrahl-title">Projekt-Zeitstrahl</div>' +
+    '<div class="crm-zeitstrahl-container">' +
+    sorted.map(p => {{
+      const color = statusColors[p.status]||'var(--muted)';
+      const beginn = (p.beginn_am||'').substring(0,7)||'?';
+      const ende = p.abschluss_am ? p.abschluss_am.substring(0,7) : 'laufend';
+      const aktiv = p.status==='aktiv'||p.status==='planung';
+      return '<div class="crm-zeitstrahl-item'+(aktiv?' crm-zs-aktiv':'')+'" style="border-left:4px solid '+color+'" onclick="crmSwitchProjekt('+p.id+')">' +
+        '<div class="crm-zs-datum">'+beginn+' \\u2014 '+ende+'</div>' +
+        '<div class="crm-zs-name">'+_crmEsc(p.projektname||'')+'</div>' +
+        '<span class="crm-tag '+(aktiv?'green':'gray')+'">'+_crmEsc(p.status||'')+'</span></div>';
+    }}).join('') + '</div>';
+}}
+
+function crmSwitchProjekt(pid) {{
+  _crmCurrentProjekt = pid;
+  const sw = document.getElementById('crmProjektSwitch');
+  if(sw) {{
+    const proj = (_crmProjekteCache||[]).find(p => p.id===pid);
+    if(proj) sw.innerHTML = '<div class="crm-projekt-switch-bar">Ansicht: <strong>'+_crmEsc(proj.projektname)+'</strong> <button class="crm-btn-sm" onclick="crmSwitchProjekt(0)">Gesamtakte</button></div>';
+  }}
+  if(_crmCurrentKunde) crmLoadVerlauf(_crmCurrentKunde.id);
+}}
+
+async function crmClusteringVorschlag() {{
+  if(!_crmCurrentKunde) return;
+  showToast('Starte Clustering...', 'info');
+  try {{
+    const r = await fetch('/api/crm/kunden/'+_crmCurrentKunde.id+'/clustering-vorschlag', {{method:'POST'}});
+    const d = await r.json();
+    if(d.status!=='ok') {{ showToast('Clustering-Fehler: '+(d.fehler||''), 'error'); return; }}
+    if(!d.vorschlaege||!d.vorschlaege.length) {{ showToast('Keine Vorschl\\u00e4ge \\u2014 alle Aktivit\\u00e4ten sind zugeordnet', 'info'); return; }}
+    let html = '<div style="padding:16px"><h3>Projekt-Clustering-Vorschl\\u00e4ge</h3>';
+    d.vorschlaege.forEach((v,i) => {{
+      const name = v.ist_bestehendes_projekt ? ('Bestehendes Projekt #'+v.projekt_id) : ('Neues Projekt: '+_crmEsc(v.projektname_neu||''));
+      html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:8px 0">' +
+        '<strong>'+name+'</strong><br>' +
+        '<small>'+_crmEsc(v.begruendung||'')+'</small><br>' +
+        '<small>Konfidenz: '+(v.confidence||0).toFixed(2)+' | '+(v.aktivitaet_ids||[]).length+' Aktivit\\u00e4ten</small><br>' +
+        '<button class="crm-btn crm-btn-primary" onclick="crmClusteringAnwenden('+JSON.stringify(v).replace(/"/g,'&quot;')+')">\\u2714 Anwenden</button></div>';
+    }});
+    html += '</div>';
+    showModal('Projekt-Clustering', html);
+  }} catch(e) {{ showToast('Fehler: '+e, 'error'); }}
+}}
+
+async function crmClusteringAnwenden(vorschlag) {{
+  if(!_crmCurrentKunde) return;
+  try {{
+    const r = await fetch('/api/crm/kunden/'+_crmCurrentKunde.id+'/clustering-anwenden', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{vorschlag:vorschlag}})
+    }});
+    const d = await r.json();
+    showToast(d.status==='ok' ? d.zugeordnet+' Aktivit\\u00e4ten zugeordnet' : ('Fehler: '+(d.fehler||'')), d.status==='ok'?'success':'error');
+    if(d.status==='ok') {{ crmOpenKunde(_crmCurrentKunde.id); }}
+  }} catch(e) {{}}
+}}
+
+function crmKorrekturDialog(aktivitaetId) {{
+  if(!_crmCurrentKunde) return;
+  let html = '<div style="padding:16px">' +
+    '<h3>Zuordnung korrigieren</h3>' +
+    '<label>Richtiger Kunde (ID):</label><br>' +
+    '<input type="number" id="crmKorrKunde" value="'+(_crmCurrentKunde.id||'')+'" class="es-inp" style="width:120px"><br><br>' +
+    '<label>Richtiges Projekt (ID, optional):</label><br>' +
+    '<input type="number" id="crmKorrProjekt" value="'+(_crmCurrentProjekt||'')+'" class="es-inp" style="width:120px"><br><br>' +
+    '<label>Notiz (optional):</label><br>' +
+    '<textarea id="crmKorrNotiz" class="es-inp" rows="2" style="width:100%"></textarea><br><br>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmKorrekturSpeichern('+aktivitaetId+')">Korrektur speichern + Lernregel ableiten</button>' +
+    '</div>';
+  showModal('Zuordnung korrigieren', html);
+}}
+
+async function crmKorrekturSpeichern(aktivitaetId) {{
+  const kid = parseInt(document.getElementById('crmKorrKunde')?.value||'0');
+  const pid = document.getElementById('crmKorrProjekt')?.value;
+  const notiz = document.getElementById('crmKorrNotiz')?.value||'';
+  if(!kid) {{ showToast('Bitte Kunden-ID angeben', 'error'); return; }}
+  try {{
+    const r = await fetch('/api/crm/korrektur', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{aktivitaet_id:aktivitaetId, kunden_id:kid, projekt_id:pid?parseInt(pid):null, notiz:notiz}})
+    }});
+    const d = await r.json();
+    if(d.status==='ok') {{
+      let msg = 'Korrektur gespeichert.';
+      if(d.lernregel) msg += ' Lernregel: '+d.lernregel.beschreibung;
+      showToast(msg, 'success');
+      closeModal();
+      if(_crmCurrentKunde) crmOpenKunde(_crmCurrentKunde.id);
+    }} else {{ showToast('Fehler: '+(d.fehler||''), 'error'); }}
+  }} catch(e) {{ showToast('Fehler: '+e, 'error'); }}
+}}
+
+async function crmLoadLernregeln(kundenId) {{
+  kundenId = kundenId || (_crmCurrentKunde && _crmCurrentKunde.id);
+  try {{
+    const url = kundenId ? '/api/crm/kunden/'+kundenId+'/lernregeln' : '/api/crm/lernregeln';
+    const r = await fetch(url);
+    const d = await r.json();
+    return d.ok ? (d.lernregeln||[]) : [];
+  }} catch(e) {{ return []; }}
+}}
+
+let _crmCurrentProjekt = 0;
+let _crmProjekteCache = [];
 
 // === Lexware Office JS (session-eee) ===
 function showLexTab(tabId) {{
@@ -22485,7 +22702,12 @@ function saveSettings() {{
       default_prioritaet: _v('cfg-crm-default-prio', 'normal'),
       log_detail:         _v('cfg-crm-log-detail', 'standard'),
       export_format:      _v('cfg-crm-export-format', 'pdf'),
-      lexware_sync:       _c('cfg-crm-lexware-sync')
+      lexware_sync:       _c('cfg-crm-lexware-sync'),
+      auto_identitaet:    _c('cfg-crm-auto-ident'),
+      ident_schwelle:     parseFloat((document.getElementById('cfg-crm-ident-schwelle')||{{}}).value||'0.85'),
+      ident_fragen_ab:    parseFloat((document.getElementById('cfg-crm-ident-fragen')||{{}}).value||'0.70'),
+      lernregeln_aktiv:   _c('cfg-crm-lernregeln'),
+      sync_interval:      _v('cfg-crm-sync-interval', 'taeglich')
     }},
     benutzer_profile: _bpCollectProfile(),
     firma_name:         _v('cfg-profil-firma'),
@@ -25899,6 +26121,27 @@ a:hover{text-decoration:underline;}
 .crm-field input,.crm-field select,.crm-field textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font:inherit;font-size:var(--fs-sm);background:var(--bg-raised);color:var(--text);}
 .crm-field textarea{min-height:80px;resize:vertical;}
 .crm-field.full{grid-column:1/-1;}
+/* v2: Identitäts-Konfidenz-Indikator */
+.crm-ident-indicator{display:inline-block;width:16px;text-align:center;font-size:12px;vertical-align:middle;margin-right:4px;}
+.crm-ident-ok{color:var(--green);}
+.crm-ident-pruefen{color:var(--orange);}
+.crm-ident-lead{color:var(--muted);}
+/* v2: Identitäten-Tab */
+.crm-ident-list table{width:100%;}
+.crm-btn-sm{padding:3px 8px;font-size:11px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;color:#fff;}
+.crm-btn-sm.crm-btn-green{background:var(--green);}
+.crm-btn-sm.crm-btn-red{background:var(--red);}
+/* v2: Projekt-Zeitstrahl */
+.crm-projekt-zeitstrahl{margin-bottom:16px;}
+.crm-zeitstrahl-title{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.crm-zeitstrahl-container{display:flex;flex-direction:column;gap:6px;}
+.crm-zeitstrahl-item{padding:8px 14px;border-radius:var(--radius);background:var(--bg-raised);cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:12px;}
+.crm-zeitstrahl-item:hover{background:var(--bg);}
+.crm-zeitstrahl-item.crm-zs-aktiv{background:rgba(124,93,255,.06);border-color:var(--accent);}
+.crm-zs-datum{font-size:11px;color:var(--muted);font-weight:700;min-width:110px;}
+.crm-zs-name{flex:1;font-size:var(--fs-sm);font-weight:700;}
+/* v2: Projekt-Switch-Bar */
+.crm-projekt-switch-bar{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:var(--fs-sm);}
 @media(max-width:900px){
   .crm-module{grid-template-columns:1fr;}
   .crm-subnav{display:none;}
@@ -27007,18 +27250,24 @@ window.KIRA_TOUR_DASHBOARD = [
 
 // \u2500\u2500 Kunden / CRM Tour (session-ss) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.KIRA_TOUR_CRM = [
-  {area:'\u00dcberblick',title:'Kunden / CRM \u2014 Dein Kundenzentrum',
-   text:'Das CRM-Modul ist die zentrale Stelle f\u00fcr alle Kundendaten. Hier laufen Mails, Projekte, F\u00e4lle und Aktivit\u00e4ten zusammen \u2014 alles an einem Ort. Links die Navigation, rechts der Inhalt.'},
-  {area:'\u00dcbersicht',title:'Kunden\u00fcbersicht mit Akkordeon',target:'#crmAccordionContainer',
-   text:'Die \u00dcbersicht gruppiert alle Kunden nach Status: Aktive, Leads, Inaktive, Archiv. Jede Gruppe l\u00e4sst sich auf- und zuklappen. Oben filterst du nach Name, Typ oder Status. Klicke auf einen Kunden um seine Akte zu \u00f6ffnen.'},
-  {area:'Projekttrennung',title:'Projekte \u2014 das Herzst\u00fcck',
-   text:'Jeder Kunde kann mehrere Projekte haben (z.B. Sichtbeton K\u00fcche 2023, Badezimmer 2026). Mit dem Projektumschalter in der Kundenakte filterst du den Verlauf nach Projekt \u2014 so bleibt alles \u00fcbersichtlich.'},
-  {area:'Fallansicht',title:'F\u00e4lle / Tickets',
-   text:'Ein Fall ist ein konkreter Gesch\u00e4ftsvorfall: Anfrage, Angebot, Reklamation, M\u00e4ngel. Jeder Fall b\u00fcndelt alle relevanten Mails, Notizen und Dokumente. Von hier startest du auch E-Mails oder fragst Kira.'},
-  {area:'Classifier',title:'KI-Zuordnung',
-   text:'KIRA erkennt automatisch welcher Kunde und welches Projekt zu einer Mail geh\u00f6ren. Bei unsicheren Ergebnissen landest du in der Pr\u00fcfliste (Men\u00fc: Aktivit\u00e4ten) \u2014 dort best\u00e4tigst oder korrigierst du per Klick.'},
-  {area:'Fertig',title:'Tour abgeschlossen!',
-   text:'Das CRM-Modul gibt dir die volle Kontrolle \u00fcber alle Kundenbeziehungen. Tipp: Nutze den lila "Kira fragen"-Button in der Kundenakte \u2014 Kira kennt dann den vollen Kundenkontext.'}
+  {area:'Navigation',title:'Navigation',target:'.crm-subnav',
+   text:'Hier findest du alle Bereiche des Kundencenters. Contacts sind alle bekannten Absender, Kunden sind verifizierte Gesch\u00e4ftskunden aus Lexware.'},
+  {area:'Kundengruppen',title:'Kundengruppen',target:'.crm-accordion-header',
+   text:'Kunden sind in Gruppen eingeteilt: Aktive, Leads, Inaktive. Klick auf die Gruppe um sie auf- oder zuzuklappen.'},
+  {area:'Identit\u00e4t',title:'Identit\u00e4ts-Status',target:'.crm-ident-indicator',
+   text:'Dieses Icon zeigt wie sicher Kira die Kontaktdaten des Kunden kennt. Gr\u00fcn = alle Identit\u00e4ten best\u00e4tigt. Gelb = Kira hat Vorschl\u00e4ge die du pr\u00fcfen solltest.'},
+  {area:'Zeitstrahl',title:'Projekt-Zeitstrahl',target:'.crm-projekt-zeitstrahl',
+   text:'Jeder Kunde kann mehrere Projekte \u00fcber Jahre haben. Diese Zeitachse zeigt alle Projekte. Wichtig: eine M\u00e4ngelanzeige aus 2025 f\u00fcr ein Projekt von 2023 wird hier richtig zugeordnet.'},
+  {area:'Projektumschalter',title:'Projektumschalter',target:'.crm-projekt-switch',
+   text:'Hier siehst du welches Projekt gerade aktiv ist. Wechsle zwischen Projekten oder w\u00e4hle Gesamtakte um alles auf einmal zu sehen.'},
+  {area:'Identit\u00e4ten',title:'Identit\u00e4ten-Tab',target:'.crm-ident-tab',
+   text:'Hier siehst du alle bekannten Kontaktdaten dieses Kunden. Kira kann erkennen wenn jemand von einer anderen Mailadresse schreibt. Du kannst Kiras Vorschl\u00e4ge hier best\u00e4tigen oder ablehnen.'},
+  {area:'Fallansicht',title:'Fallansicht',target:'.crm-fall-kopf',
+   text:'Jeder Gesch\u00e4ftsvorfall hat eine eigene Ansicht. Dort laufen Mail, Kira-Chat, Memos, Dokumente und Rechnungen zu diesem einen Fall zusammen.'},
+  {area:'Aktionen',title:'Aktionen',target:'.crm-action-bar',
+   text:'Von hier aus kannst du E-Mails schreiben, Notizen anlegen, Kira fragen oder einen Streitfall dokumentieren. Kira bekommt dabei den vollen Kontext des Falls.'},
+  {area:'Kira',title:'Kira fragen',target:'#crm-kira-fragen',
+   text:'Wenn du auf Kira fragen klickst, \u00fcbergibt KIRA automatisch den kompletten Kundenverlauf und den aktuellen Fall an Kira. Du musst nichts erkl\u00e4ren \u2014 Kira wei\u00df schon was los ist.'}
 ];
 
 // \u2500\u2500 Einstellungen Tour (D-10) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -27761,6 +28010,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif re.match(r'^/api/crm/aktivitaeten/(\d+)$', self.path):
             _m = re.match(r'^/api/crm/aktivitaeten/(\d+)$', self.path)
             self._api_crm_aktivitaet_get(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)/identitaeten$', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/identitaeten$', self.path)
+            self._api_crm_identitaeten_get(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)/lernregeln$', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/lernregeln$', self.path)
+            self._api_crm_lernregeln_get(int(_m.group(1)))
+        elif self.path == '/api/crm/lernregeln':
+            self._api_crm_lernregeln_get(None)
 
         elif self.path.startswith('/api/kira/kosten/uebersicht'):
             self._api_kosten_uebersicht()
@@ -34253,6 +34510,42 @@ Regeln:
         if _crm_lex_anlegen:
             self._api_crm_lexware_anlegen(int(_crm_lex_anlegen.group(1)))
             return
+        # v2: Clustering-Vorschlag
+        _crm_cluster = re.match(r'^/api/crm/kunden/(\d+)/clustering-vorschlag$', self.path)
+        if _crm_cluster:
+            self._api_crm_clustering_vorschlag(int(_crm_cluster.group(1)))
+            return
+        # v2: Clustering anwenden
+        _crm_cluster_apply = re.match(r'^/api/crm/kunden/(\d+)/clustering-anwenden$', self.path)
+        if _crm_cluster_apply:
+            self._api_crm_clustering_anwenden(int(_crm_cluster_apply.group(1)), body)
+            return
+        # v2: Korrektur speichern
+        if self.path == '/api/crm/korrektur':
+            self._api_crm_korrektur(body)
+            return
+        # v2: Identität bestätigen
+        if self.path == '/api/crm/identitaet-bestaetigen':
+            self._api_crm_identitaet_bestaetigen(body)
+            return
+        # v2: Lernregeln abrufen
+        _crm_lernregeln = re.match(r'^/api/crm/kunden/(\d+)/lernregeln$', self.path)
+        if _crm_lernregeln:
+            self._api_crm_lernregeln_get(int(_crm_lernregeln.group(1)))
+            return
+        if self.path == '/api/crm/lernregeln':
+            self._api_crm_lernregeln_get(None)
+            return
+        # v2: Lernregel deaktivieren
+        _crm_lr_deakt = re.match(r'^/api/crm/lernregeln/(\d+)/deaktivieren$', self.path)
+        if _crm_lr_deakt:
+            self._api_crm_lernregel_deaktivieren(int(_crm_lr_deakt.group(1)))
+            return
+        # v2: Identitäten eines Kunden
+        _crm_ident = re.match(r'^/api/crm/kunden/(\d+)/identitaeten$', self.path)
+        if _crm_ident:
+            self._api_crm_identitaeten_get(int(_crm_ident.group(1)))
+            return
 
         # Kunden-Alias speichern
         if self.path == '/api/kunden/alias':
@@ -35035,7 +35328,8 @@ Regeln:
             rows = db.execute("""
                 SELECT k.*,
                     (SELECT COUNT(*) FROM kunden_faelle kf WHERE kf.kunden_id=k.id AND kf.status NOT IN ('erledigt','archiv')) as offene_faelle,
-                    (SELECT kp.projektname FROM kunden_projekte kp WHERE kp.kunden_id=k.id ORDER BY kp.aktualisiert_am DESC LIMIT 1) as letztes_projekt
+                    (SELECT kp.projektname FROM kunden_projekte kp WHERE kp.kunden_id=k.id ORDER BY kp.aktualisiert_am DESC LIMIT 1) as letztes_projekt,
+                    (SELECT COUNT(*) FROM kunden_identitaeten ki WHERE ki.kunden_id=k.id AND ki.confidence IN ('pruefen','unklar','wahrscheinlich') AND ki.verifiziert=0) as ident_unsicher
                 FROM kunden k ORDER BY k.letztkontakt DESC NULLS LAST
             """).fetchall()
             self._json({"ok": True, "kunden": [dict(r) for r in rows]})
@@ -35588,6 +35882,80 @@ Regeln:
                 except Exception:
                     pass
                 self._json({"ok": False, "error": f"Lexware-Fehler: {lex_err}"})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    # ── CRM v2: Clustering, Korrektur, Identitäten, Lernregeln ──────────────
+
+    def _api_crm_clustering_vorschlag(self, kunden_id: int):
+        """POST /api/crm/kunden/{id}/clustering-vorschlag"""
+        try:
+            from kunden_classifier import projekt_clustering
+            result = projekt_clustering(kunden_id)
+            self._json(result)
+        except Exception as e:
+            self._json({"status": "fehler", "fehler": str(e)})
+
+    def _api_crm_clustering_anwenden(self, kunden_id: int, body: dict):
+        """POST /api/crm/kunden/{id}/clustering-anwenden"""
+        try:
+            from kunden_classifier import clustering_anwenden
+            vorschlag = body.get("vorschlag", body)
+            result = clustering_anwenden(kunden_id, vorschlag)
+            self._json(result)
+        except Exception as e:
+            self._json({"status": "fehler", "fehler": str(e)})
+
+    def _api_crm_korrektur(self, body: dict):
+        """POST /api/crm/korrektur — Zuordnungs-Korrektur + Lernschleife"""
+        try:
+            from kunden_classifier import korrektur_verarbeiten
+            result = korrektur_verarbeiten(
+                aktivitaet_id=int(body.get("aktivitaet_id", 0)),
+                richtige_kunden_id=int(body.get("kunden_id", 0)),
+                richtige_projekt_id=int(body["projekt_id"]) if body.get("projekt_id") else None,
+                kai_notiz=body.get("notiz", ""),
+            )
+            self._json(result)
+        except Exception as e:
+            self._json({"status": "fehler", "fehler": str(e)})
+
+    def _api_crm_identitaet_bestaetigen(self, body: dict):
+        """POST /api/crm/identitaet-bestaetigen"""
+        try:
+            from kunden_classifier import identitaet_bestaetigen
+            ok = identitaet_bestaetigen(
+                graph_id=int(body.get("graph_id", 0)),
+                bestaetigt=body.get("bestaetigt", True),
+            )
+            self._json({"ok": ok})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_identitaeten_get(self, kunden_id: int):
+        """GET /api/crm/kunden/{id}/identitaeten"""
+        try:
+            from kunden_classifier import get_identitaeten
+            data = get_identitaeten(kunden_id)
+            self._json({"ok": True, "identitaeten": data})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_lernregeln_get(self, kunden_id):
+        """GET /api/crm/kunden/{id}/lernregeln oder /api/crm/lernregeln"""
+        try:
+            from kunden_classifier import get_lernregeln
+            data = get_lernregeln(kunden_id)
+            self._json({"ok": True, "lernregeln": data})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_lernregel_deaktivieren(self, regel_id: int):
+        """POST /api/crm/lernregeln/{id}/deaktivieren"""
+        try:
+            from kunden_classifier import lernregel_deaktivieren
+            ok = lernregel_deaktivieren(regel_id)
+            self._json({"ok": ok})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 

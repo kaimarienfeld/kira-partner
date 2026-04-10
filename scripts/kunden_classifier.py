@@ -262,72 +262,316 @@ def _build_kunden_kontext(max_kunden: int = 50) -> str:
         return "(Fehler beim Laden des Kunden-Kontexts)"
 
 
+def _tabelle_existiert(conn, name: str) -> bool:
+    """Prüft ob Tabelle existiert."""
+    r = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
+    return r is not None
+
+
+def _build_kunden_kontext_erweitert(conn=None) -> str:
+    """
+    Token-effizienter Kunden-Kontext mit Identitäten, Projekten,
+    letzten Aktivitäten und Lernregeln für den erweiterten Super-Prompt.
+    """
+    close_db = False
+    try:
+        if conn is None:
+            conn = _get_kunden_db()
+            close_db = True
+
+        kunden = conn.execute('''
+            SELECT k.id, k.name, k.firmenname, k.status,
+                   GROUP_CONCAT(DISTINCT ki.typ || ':' || ki.wert) AS identitaeten
+            FROM kunden k
+            LEFT JOIN kunden_identitaeten ki
+                ON ki.kunden_id = k.id
+                AND ki.confidence IN ('eindeutig','wahrscheinlich')
+            WHERE k.lexware_id IS NOT NULL
+              AND k.status != 'archiv'
+            GROUP BY k.id
+            ORDER BY k.kundenwert DESC, k.name ASC
+            LIMIT 100
+        ''').fetchall()
+
+        projekte = conn.execute('''
+            SELECT kp.kunden_id, kp.id, kp.projektname, kp.status,
+                   kp.beginn_am, kp.abschluss_am
+            FROM kunden_projekte kp
+            JOIN kunden k ON k.id = kp.kunden_id
+            WHERE k.lexware_id IS NOT NULL
+            ORDER BY kp.kunden_id, kp.beginn_am DESC
+        ''').fetchall()
+
+        aktivitaeten = conn.execute('''
+            SELECT ka.kunden_id, ka.ereignis_typ, ka.zusammenfassung, ka.erstellt_am
+            FROM kunden_aktivitaeten ka
+            JOIN kunden k ON k.id = ka.kunden_id
+            WHERE k.lexware_id IS NOT NULL
+              AND ka.sichtbar_in_verlauf = 1
+            ORDER BY ka.kunden_id, ka.erstellt_am DESC
+        ''').fetchall()
+
+        lernregeln = []
+        if _tabelle_existiert(conn, 'kunden_lernregeln'):
+            lernregeln = conn.execute('''
+                SELECT kunden_id, regel_typ, bedingung_json, aktion_json,
+                       confidence, anwendungen
+                FROM kunden_lernregeln
+                WHERE aktiv = 1
+                ORDER BY anwendungen DESC
+                LIMIT 20
+            ''').fetchall()
+
+        # Indizes aufbauen
+        proj_by_kunde = {}
+        for p in projekte:
+            proj_by_kunde.setdefault(p['kunden_id'], []).append(p)
+
+        akt_by_kunde = {}
+        for a in aktivitaeten:
+            lst = akt_by_kunde.setdefault(a['kunden_id'], [])
+            if len(lst) < 5:
+                lst.append(a)
+
+        regel_by_kunde = {}
+        globale_regeln = []
+        for r in lernregeln:
+            if r['kunden_id']:
+                regel_by_kunde.setdefault(r['kunden_id'], []).append(r)
+            else:
+                globale_regeln.append(r)
+
+        zeilen = []
+        for k in kunden:
+            kid = k['id']
+            name = k['name'] or k['firmenname'] or f"Kunde #{kid}"
+            zeilen.append(f"\n#{kid}: {name} [{k['status']}]")
+
+            if k['identitaeten']:
+                zeilen.append(f"  Kontakte: {k['identitaeten']}")
+
+            for p in proj_by_kunde.get(kid, [])[:4]:
+                zeitraum = ""
+                if p['beginn_am']:
+                    zeitraum = f" {p['beginn_am'][:7]}"
+                    if p['abschluss_am']:
+                        zeitraum += f"—{p['abschluss_am'][:7]}"
+                zeilen.append(f"  Projekt #{p['id']}: {p['projektname']} [{p['status']}]{zeitraum}")
+
+            for a in akt_by_kunde.get(kid, [])[:3]:
+                zeilen.append(f"  [{a['erstellt_am'][:10]}] {a['ereignis_typ']}: {(a['zusammenfassung'] or '')[:60]}")
+
+            for r in regel_by_kunde.get(kid, []):
+                try:
+                    bed = json.loads(r['bedingung_json'])
+                    desc = bed.get('beschreibung', r['regel_typ'])
+                except Exception:
+                    desc = r['regel_typ']
+                zeilen.append(f"  Lernregel: {desc}")
+
+        if close_db:
+            conn.close()
+        return '\n'.join(zeilen) if zeilen else "Noch keine Kunden vorhanden."
+    except Exception as e:
+        logger.warning("Erweiterter Kunden-Kontext Fehler: %s", e)
+        if close_db and conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        return "(Fehler beim Laden des erweiterten Kunden-Kontexts)"
+
+
+def _build_lernregeln_kontext(conn=None) -> str:
+    """Baut Lernregeln-Kontext für den Super-Prompt."""
+    close_db = False
+    try:
+        if conn is None:
+            conn = _get_kunden_db()
+            close_db = True
+        if not _tabelle_existiert(conn, 'kunden_lernregeln'):
+            return "(Noch keine Lernregeln)"
+        regeln = conn.execute('''
+            SELECT kl.id, kl.kunden_id, kl.regel_typ, kl.bedingung_json,
+                   kl.aktion_json, kl.anwendungen, k.name as kunden_name
+            FROM kunden_lernregeln kl
+            LEFT JOIN kunden k ON k.id = kl.kunden_id
+            WHERE kl.aktiv = 1
+            ORDER BY kl.anwendungen DESC
+            LIMIT 20
+        ''').fetchall()
+        if close_db:
+            conn.close()
+        if not regeln:
+            return "(Noch keine Lernregeln)"
+        lines = []
+        for r in regeln:
+            kunde = r['kunden_name'] or "global"
+            try:
+                bed = json.loads(r['bedingung_json'])
+                desc = bed.get('beschreibung', r['regel_typ'])
+            except Exception:
+                desc = r['regel_typ']
+            lines.append(f"- [{r['regel_typ']}] {desc} (Kunde: {kunde}, {r['anwendungen']}x angewendet)")
+        return '\n'.join(lines)
+    except Exception as e:
+        logger.debug("Lernregeln-Kontext Fehler: %s", e)
+        return "(Fehler beim Laden der Lernregeln)"
+
+
 def _build_llm_prompt(absender: str, betreff: str, text_auszug: str,
-                      datum: str, kunden_kontext: str) -> str:
-    """Baut den Super-Prompt für den Kunden-Classifier."""
-    return f"""Du bist ein Geschäftsprozess-Klassifizierer für ein Handwerksunternehmen (Sichtbeton/Betonkosmetik).
+                      datum: str, kunden_kontext: str,
+                      lernregeln_kontext: str = "") -> str:
+    """Baut den erweiterten Super-Prompt für den Kunden-Classifier (v2).
+    Beantwortet drei Fragen gleichzeitig: Wer? Welches Projekt? Neue Identität?"""
+    return f"""Du bist der CRM-Analyst von KIRA für ein Handwerksunternehmen
+(Sichtbeton / Betonkosmetik / Oberflächenveredelung).
 
-Analysiere diese neue Nachricht und beantworte NUR als JSON:
+Analysiere die neue Aktivität und beantworte alle drei Fragen.
 
-{{
-  "kunden_id": null oder ID (z.B. 42),
-  "kunden_confidence": "eindeutig|wahrscheinlich|pruefen|unklar",
-  "projekt_id": null oder ID,
-  "projekt_confidence": "eindeutig|wahrscheinlich|pruefen|unklar",
-  "fall_typ": "anfrage|angebot|nachfass|rechnung|reklamation|maengel|streitfall|intern|freigabe|kein_geschaeftsfall",
-  "ist_geschaeftsfall": true oder false,
-  "reasoning": "max 2 Sätze warum"
-}}
-
-Bekannte Kunden und Projekte:
-{kunden_kontext}
-
-Neue Nachricht:
-Absender: {absender}
+## NEUE AKTIVITÄT
+Typ: mail
+Von: {absender}
 Betreff: {betreff}
 Datum: {datum}
-Inhalt (Auszug):
+Inhalt:
 {text_auszug[:2000]}
 
-Wichtige Regeln:
-- Mängelanzeigen gehören zum ABGESCHLOSSENEN Projekt, nicht zu einem neuen
-- Newsletter, Automails, Marketing → ist_geschaeftsfall = false
-- Wenn Absender eine bekannte Kunden-E-Mail ist → kunden_confidence = "eindeutig"
-- Zeitlicher Abstand beachten: Mail 2 Jahre nach Projektabschluss = Nachprojekt-Fall
-- Nie zwei verschiedene Projekte zusammenmischen
-- Bei komplett unbekanntem Absender → kunden_id = null, kunden_confidence = "unklar"
-- Antworte NUR mit dem JSON-Objekt, kein anderer Text"""
+## BEKANNTE KUNDEN MIT HISTORIA
+{kunden_kontext}
+
+## GELERNTE REGELN (aus Kai-Korrekturen)
+{lernregeln_kontext or '(Noch keine Lernregeln)'}
+
+---
+
+## FRAGE 1: WER IST DAS?
+
+Prüfe NICHT nur die E-Mail-Adresse. Prüfe auch:
+- Wird ein bekannter Firmenname erwähnt?
+- Passt der Inhalt / die Wortwahl zu einem bekannten Kunden?
+- Gibt es zeitliche Nähe zu bekannten Aktivitäten dieses Kunden?
+- Gibt es gelernte Regeln die hier greifen?
+- Ist die Absender-Domain zu einem bekannten Kunden ähnlich?
+
+Wenn der Absender nicht bekannt ist, aber sehr wahrscheinlich
+ein bekannter Kunde von einer anderen Adresse ist: erkenne das.
+
+## FRAGE 2: WELCHES PROJEKT?
+
+Wenn ein Kunde gefunden: zu welchem Projekt passt der Inhalt?
+
+WICHTIGE REGELN:
+- Prüfe den INHALT, nicht nur den Zeitraum
+- Mängelanzeige / Reklamation zu abgeschlossenem Projekt = ALTES Projekt
+- Zahlung / Rechnung = gehört zum Projekt das sie ausgelöst hat
+- Neue Leistung / anderer Raum / anderes Material = NEUES Projekt
+- "Wie besprochen" / "damals" / "vor X Jahren" = Bezug auf altes Projekt
+
+## FRAGE 3: NEUE IDENTITÄT?
+
+Wenn der Absender nicht in den bekannten Identitäten steht,
+aber mit hoher Wahrscheinlichkeit ein bekannter Kunde ist:
+schlage die neue Identität vor.
+
+---
+
+## ANTWORT — NUR JSON, kein Text
+
+{{
+  "kunden_id": null oder integer,
+  "kunden_confidence": 0.0 bis 1.0,
+  "kunden_confidence_stufe": "eindeutig|wahrscheinlich|pruefen|unklar",
+  "kunden_reasoning": "max 2 Sätze warum dieser Kunde",
+
+  "projekt_id": null oder integer,
+  "projekt_ist_neu": true oder false,
+  "projekt_neuer_name_vorschlag": null oder "Vorgeschlagener Projektname",
+  "projekt_confidence": 0.0 bis 1.0,
+  "projekt_confidence_stufe": "eindeutig|wahrscheinlich|pruefen|unklar",
+  "projekt_reasoning": "max 2 Sätze warum dieses oder neues Projekt",
+
+  "neue_identitaet": {{
+    "vorschlagen": true oder false,
+    "typ": "mail|telefon|firma|domain",
+    "wert": "die neue Identität",
+    "confidence": 0.0 bis 1.0,
+    "reasoning": "warum diese Identität zu diesem Kunden gehört"
+  }},
+
+  "ist_geschaeftsfall": true oder false,
+  "fall_typ": "anfrage|angebot|nachfass|rechnung|reklamation|maengel|streitfall|intern|freigabe|allgemein|kein_geschaeftsfall",
+
+  "neue_lernregel": {{
+    "erstellen": true oder false,
+    "regel_typ": "identitaet|projekt_signal|kanal_muster|ausschluss|projekt_typ",
+    "beschreibung": "Was Kira gelernt hat (max 1 Satz)",
+    "bedingung_json": {{}},
+    "aktion_json": {{}}
+  }}
+}}"""
 
 
 def _parse_llm_response(antwort: str) -> dict | None:
-    """Parst die LLM-JSON-Antwort."""
+    """Parst die LLM-JSON-Antwort (v2 — mit Identitäts- + Projekt-Feldern)."""
     try:
-        # JSON aus der Antwort extrahieren
         text = antwort.strip()
-        # Markdown Code-Block entfernen
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*\n?", "", text)
             text = re.sub(r"\n?```\s*$", "", text)
-        # Erstes { ... } finden
         start = text.find("{")
         end = text.rfind("}")
         if start >= 0 and end > start:
             text = text[start:end + 1]
         result = json.loads(text)
 
-        # Validierung
-        valid_confidence = {"eindeutig", "wahrscheinlich", "pruefen", "unklar"}
+        valid_stufen = {"eindeutig", "wahrscheinlich", "pruefen", "unklar"}
         valid_fall_typen = {
             "anfrage", "angebot", "nachfass", "rechnung", "reklamation",
-            "maengel", "streitfall", "intern", "freigabe", "kein_geschaeftsfall",
+            "maengel", "streitfall", "intern", "freigabe", "allgemein",
+            "kein_geschaeftsfall",
         }
 
-        if result.get("kunden_confidence") not in valid_confidence:
-            result["kunden_confidence"] = "unklar"
-        if result.get("projekt_confidence") not in valid_confidence:
-            result["projekt_confidence"] = "unklar"
+        # v2: numerische confidence → stufe ableiten (abwärtskompatibel)
+        for prefix in ("kunden", "projekt"):
+            score_key = f"{prefix}_confidence"
+            stufe_key = f"{prefix}_confidence_stufe"
+            score = result.get(score_key)
+            if isinstance(score, (int, float)):
+                # Numerischer Score → Stufe ableiten
+                if score >= 0.85:
+                    result[stufe_key] = "eindeutig"
+                elif score >= 0.60:
+                    result[stufe_key] = "wahrscheinlich"
+                elif score >= 0.40:
+                    result[stufe_key] = "pruefen"
+                else:
+                    result[stufe_key] = "unklar"
+            elif isinstance(score, str) and score in valid_stufen:
+                # Alt-Format: String direkt als Stufe
+                result[stufe_key] = score
+                result[score_key] = _confidence_to_score(score)
+
+            if result.get(stufe_key) not in valid_stufen:
+                result[stufe_key] = "unklar"
+
+        # Abwärtskompatibel: kunden_confidence als Stufe-String
+        if isinstance(result.get("kunden_confidence"), (int, float)):
+            result["kunden_confidence"] = result.get("kunden_confidence_stufe", "unklar")
+        if isinstance(result.get("projekt_confidence"), (int, float)):
+            result["projekt_confidence"] = result.get("projekt_confidence_stufe", "unklar")
+
         if result.get("fall_typ") not in valid_fall_typen:
             result["fall_typ"] = "anfrage"
+
+        # Reasoning aus v2-Feldern zusammenbauen
+        if not result.get("reasoning"):
+            parts = []
+            if result.get("kunden_reasoning"):
+                parts.append(result["kunden_reasoning"])
+            if result.get("projekt_reasoning"):
+                parts.append(result["projekt_reasoning"])
+            result["reasoning"] = " | ".join(parts) if parts else ""
 
         return result
     except Exception as e:
@@ -419,8 +663,10 @@ def classify_kunde_projekt(
             _log_classification(eingabe_typ, eingabe_id, result, llm_modell="fallback")
             return result
 
-        kunden_kontext = _build_kunden_kontext(max_kunden=50)
-        prompt = _build_llm_prompt(absender, betreff, text[:2000], datum, kunden_kontext)
+        kunden_kontext = _build_kunden_kontext_erweitert()
+        lernregeln_kontext = _build_lernregeln_kontext()
+        prompt = _build_llm_prompt(absender, betreff, text[:2000], datum,
+                                   kunden_kontext, lernregeln_kontext)
 
         llm_result = classify_direct(prompt, max_tokens=512)
 
@@ -466,7 +712,16 @@ def classify_kunde_projekt(
             modell = f"{modell}/{llm_result['model']}"
         log_id = _log_classification(eingabe_typ, eingabe_id, result, llm_modell=modell)
 
-        # 6. Lead-Flow: unbekannter Absender + Geschäftsfall
+        # 6a. v2: Neue Identität vorschlagen
+        _process_neue_identitaet(parsed, result, email)
+
+        # 6b. v2: Neues Projekt auto-anlegen (wenn confident genug)
+        _process_neues_projekt(parsed, result)
+
+        # 6c. v2: Lernregel aus LLM-Vorschlag speichern
+        _process_lernregel(parsed, result)
+
+        # 7. Lead-Flow: unbekannter Absender + Geschäftsfall
         if result.get("kunden_id") is None and result.get("ist_geschaeftsfall"):
             mail_daten = {
                 "absender_email": email,
@@ -1358,3 +1613,622 @@ def _update_kunden_stats(kunden_id: int, conn):
             """, (stats["anzahl"], stats["erstes"], stats["letztes"], kunden_id))
     except Exception as e:
         logger.debug("Kunden-Stats Update Fehler: %s", e)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v2 — Intelligente Identitäts- und Projektauflösung (session-uu)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _process_neue_identitaet(parsed: dict, result: dict, absender_email: str):
+    """Verarbeitet LLM-Vorschlag für neue Identität → kunden_identitaeten + Graph."""
+    try:
+        ni = parsed.get("neue_identitaet")
+        if not ni or not ni.get("vorschlagen"):
+            return
+        kid = result.get("kunden_id")
+        if not kid:
+            return
+        wert = ni.get("wert", "").strip().lower()
+        typ = ni.get("typ", "mail")
+        if not wert:
+            return
+        conf = ni.get("confidence", 0.5)
+        stufe = "wahrscheinlich" if conf >= 0.7 else "pruefen"
+
+        db = _get_kunden_db()
+        # Duplikat-Check
+        exists = db.execute(
+            "SELECT id FROM kunden_identitaeten WHERE kunden_id = ? AND LOWER(wert) = ? AND typ = ?",
+            (kid, wert, typ)
+        ).fetchone()
+        if exists:
+            db.close()
+            return
+
+        # Auto-anlegen wenn Confidence hoch genug (>= 0.85)
+        auto = conf >= 0.85
+        quelle = "llm" if not auto else "llm"
+        db.execute("""
+            INSERT INTO kunden_identitaeten (kunden_id, typ, wert, confidence, verifiziert, quelle, erstellt_am)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (kid, typ, wert, "eindeutig" if auto else stufe, 1 if auto else 0, quelle))
+
+        # Graph-Eintrag: Beziehung zwischen Absender-Identität und neuer Identität
+        absender_ident = db.execute(
+            "SELECT id FROM kunden_identitaeten WHERE kunden_id = ? AND LOWER(wert) = ? LIMIT 1",
+            (kid, absender_email.lower())
+        ).fetchone()
+        neue_ident = db.execute(
+            "SELECT id FROM kunden_identitaeten WHERE kunden_id = ? AND LOWER(wert) = ? AND typ = ? LIMIT 1",
+            (kid, wert, typ)
+        ).fetchone()
+        if absender_ident and neue_ident:
+            a_id = min(absender_ident["id"], neue_ident["id"])
+            b_id = max(absender_ident["id"], neue_ident["id"])
+            db.execute("""
+                INSERT OR IGNORE INTO kunden_identitaeten_graph
+                (identitaet_a_id, identitaet_b_id, confidence, confidence_stufe,
+                 reasoning, entschieden_durch, erstellt_am)
+                VALUES (?, ?, ?, ?, ?, 'llm', datetime('now'))
+            """, (a_id, b_id, conf, stufe, ni.get("reasoning", "")[:200]))
+
+        db.commit()
+        db.close()
+
+        event = "identitaet_auto_angelegt" if auto else "identitaet_vorgeschlagen"
+        try:
+            from runtime_log import elog
+            elog(event, f"Identität {typ}:{wert} für Kunde {kid} (Confidence {conf:.2f})")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug("Neue Identität Verarbeitung: %s", e)
+
+
+def _process_neues_projekt(parsed: dict, result: dict):
+    """Legt neues Projekt an wenn LLM es vorschlägt und Confidence hoch."""
+    try:
+        if not parsed.get("projekt_ist_neu"):
+            return
+        kid = result.get("kunden_id")
+        if not kid:
+            return
+        pname = parsed.get("projekt_neuer_name_vorschlag")
+        if not pname:
+            return
+        pconf = parsed.get("projekt_confidence", 0)
+        if isinstance(pconf, str):
+            pconf = _confidence_to_score(pconf)
+        if pconf < 0.70:
+            return  # Nur ab wahrscheinlich
+
+        db = _get_kunden_db()
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+        cur = db.execute("""
+            INSERT INTO kunden_projekte
+            (kunden_id, projektname, projekttyp, status, beginn_am, erstellt_am, aktualisiert_am)
+            VALUES (?, ?, 'standard', 'planung', ?, ?, ?)
+        """, (kid, pname[:200], jetzt[:10], jetzt, jetzt))
+        pid = cur.lastrowid
+        result["projekt_id"] = pid
+        result["projekt_name"] = pname
+        db.commit()
+        db.close()
+
+        try:
+            from runtime_log import elog
+            elog("projekt_auto_angelegt", f"Projekt '{pname}' für Kunde {kid} angelegt (ID {pid})")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug("Neues Projekt Verarbeitung: %s", e)
+
+
+def _process_lernregel(parsed: dict, result: dict):
+    """Speichert Lernregel wenn LLM eine vorschlägt und Confidence >= 0.90."""
+    try:
+        lr = parsed.get("neue_lernregel")
+        if not lr or not lr.get("erstellen"):
+            return
+        kid = result.get("kunden_id")
+        regel_typ = lr.get("regel_typ", "identitaet")
+        valid_typen = {"identitaet", "projekt_signal", "kanal_muster", "ausschluss", "projekt_typ"}
+        if regel_typ not in valid_typen:
+            return
+
+        bedingung = lr.get("bedingung_json") or {}
+        if isinstance(bedingung, str):
+            bedingung = json.loads(bedingung)
+        bedingung["beschreibung"] = lr.get("beschreibung", "")[:200]
+
+        aktion = lr.get("aktion_json") or {}
+        if isinstance(aktion, str):
+            aktion = json.loads(aktion)
+
+        db = _get_kunden_db()
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+        db.execute("""
+            INSERT INTO kunden_lernregeln
+            (kunden_id, regel_typ, bedingung_json, aktion_json, confidence, quelle, erstellt_am)
+            VALUES (?, ?, ?, ?, ?, 'llm_schluss', ?)
+        """, (kid, regel_typ, json.dumps(bedingung, ensure_ascii=False),
+              json.dumps(aktion, ensure_ascii=False), 0.9, jetzt))
+        db.commit()
+        db.close()
+
+        try:
+            from runtime_log import elog
+            elog("lernregel_angelegt", f"Lernregel '{regel_typ}' für Kunde {kid}: {lr.get('beschreibung', '')[:80]}")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug("Lernregel Verarbeitung: %s", e)
+
+
+# ── apply_classification_v2 — Confidence-basierte Handlungsmatrix ──────────
+
+def apply_classification_v2(eingabe_typ: str, eingabe_id: str, result: dict) -> dict:
+    """
+    Erweiterte Zuordnung mit Handlungsmatrix:
+      >= 0.90: Auto-Zuordnung + Info-Aufgabe (niedrig)
+      0.70–0.89: Zuordnung + Kai wird gefragt (Ja/Nein)
+      0.50–0.69: Vorschlag in Prüf-Inbox + Aufgabe
+      < 0.50: Prüf-Inbox, Kai entscheidet komplett
+    """
+    if not result.get("ist_geschaeftsfall"):
+        return {"aktion": "ignoriert", "auto": False}
+    kid = result.get("kunden_id")
+    if not kid:
+        return {"aktion": "pruef_inbox", "auto": False}
+
+    conf_stufe = result.get("kunden_confidence", "unklar")
+    conf_score = _confidence_to_score(conf_stufe)
+    # v2-Felder bevorzugen
+    if isinstance(result.get("kunden_confidence"), (int, float)):
+        conf_score = result["kunden_confidence"]
+
+    try:
+        from case_engine import _ensure_crm_tables
+        _ensure_crm_tables()
+        db = _get_kunden_db()
+
+        # Aktivitäts-Eintrag erstellen
+        auto = conf_score >= 0.70
+        db.execute("""
+            INSERT INTO kunden_aktivitaeten
+            (kunden_id, projekt_id, ereignis_typ, quelle_id, quelle_tabelle,
+             zusammenfassung, sichtbar_in_verlauf)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+        """, (kid, result.get("projekt_id"), eingabe_typ, eingabe_id,
+              eingabe_typ, (result.get("reasoning", "") or "")[:300]))
+
+        # Kunden-Kontakt aktualisieren
+        db.execute("""
+            UPDATE kunden SET letztkontakt = datetime('now'),
+                              aktualisiert_am = datetime('now')
+            WHERE id = ?
+        """, (kid,))
+        db.commit()
+        db.close()
+
+        # Handlungsmatrix
+        if conf_score >= 0.90:
+            aktion = "auto_zugeordnet"
+            _elog_safe("kunde_zugeordnet_auto",
+                       f"Kunde {kid} auto-zugeordnet (Score {conf_score:.2f})")
+        elif conf_score >= 0.70:
+            aktion = "zugeordnet_frage"
+            _elog_safe("kunde_zugeordnet_auto",
+                       f"Kunde {kid} zugeordnet, Kai wird gefragt (Score {conf_score:.2f})")
+        elif conf_score >= 0.50:
+            aktion = "vorschlag_pruef_inbox"
+            _elog_safe("unzugeordnet_markiert",
+                       f"Vorschlag: Kunde {kid} (Score {conf_score:.2f}) → Prüf-Inbox")
+        else:
+            aktion = "pruef_inbox"
+            _elog_safe("unzugeordnet_markiert",
+                       f"Unsicher: Kunde {kid} (Score {conf_score:.2f}) → Prüf-Inbox")
+
+        return {"aktion": aktion, "auto": auto, "confidence_score": conf_score}
+    except Exception as e:
+        logger.error("apply_classification_v2 Fehler: %s", e)
+        return {"aktion": "fehler", "auto": False}
+
+
+def _elog_safe(event: str, summary: str):
+    """Wrapper für elog — ignoriert Fehler."""
+    try:
+        from runtime_log import elog
+        elog(event, summary)
+    except Exception:
+        pass
+
+
+# ── Projekt-Clustering ─────────────────────────────────────────────────────
+
+PROJEKT_CLUSTERING_PROMPT = """Analysiere diese Aktivitäten eines Handwerksunternehmens
+und schlage sinnvolle Projektgruppierungen vor.
+
+BESTEHENDE PROJEKTE:
+{bestehende_projekte}
+
+AKTIVITÄTEN OHNE PROJEKTZUORDNUNG (chronologisch):
+{aktivitaeten_liste}
+
+CLUSTERING-REGELN:
+- Zeitraum allein ist KEIN Kriterium — Inhalt und Kontext zählen
+- Mängelanzeige / Reklamation zu altem Projekt = gehört zum ALTEN Projekt
+- Neue Leistungsart / anderer Raum / anderes Objekt = neues Projekt
+- Zahlungen / Rechnungen gehören zum Projekt das sie ausgelöst hat
+- Planungs-Mails vor Projektbeginn gehören zum Projekt das daraus entstand
+
+ANTWORT NUR ALS JSON:
+{{
+  "projektvorschlaege": [
+    {{
+      "ist_bestehendes_projekt": true oder false,
+      "projekt_id": null oder integer,
+      "projektname_neu": null oder "Name für neues Projekt",
+      "aktivitaet_ids": [list der zugehörigen Aktivität-IDs],
+      "confidence": 0.0 bis 1.0,
+      "begruendung": "max 2 Sätze"
+    }}
+  ]
+}}"""
+
+
+def projekt_clustering(kunden_id: int) -> dict:
+    """
+    Startet LLM-basiertes Clustering für unzugeordnete Aktivitäten eines Kunden.
+    Gibt Vorschläge zurück — Kai muss bestätigen.
+    """
+    try:
+        db = _get_kunden_db()
+        # Bestehende Projekte laden
+        projekte = db.execute("""
+            SELECT id, projektname, status, beginn_am, abschluss_am
+            FROM kunden_projekte WHERE kunden_id = ?
+            ORDER BY beginn_am DESC
+        """, (kunden_id,)).fetchall()
+
+        proj_text = "\n".join(
+            f"Projekt #{p['id']}: {p['projektname']} [{p['status']}] "
+            f"{(p['beginn_am'] or '')[:10]}–{(p['abschluss_am'] or 'laufend')[:10]}"
+            for p in projekte
+        ) if projekte else "(Noch keine Projekte)"
+
+        # Unzugeordnete Aktivitäten
+        aktivitaeten = db.execute("""
+            SELECT id, ereignis_typ, zusammenfassung, erstellt_am
+            FROM kunden_aktivitaeten
+            WHERE kunden_id = ? AND projekt_id IS NULL
+              AND sichtbar_in_verlauf = 1
+            ORDER BY erstellt_am ASC
+            LIMIT 100
+        """, (kunden_id,)).fetchall()
+        db.close()
+
+        if not aktivitaeten:
+            return {"status": "ok", "vorschlaege": [],
+                    "hinweis": "Keine unzugeordneten Aktivitäten"}
+
+        akt_text = "\n".join(
+            f"ID {a['id']}: [{a['erstellt_am'][:10]}] {a['ereignis_typ']}: {(a['zusammenfassung'] or '')[:100]}"
+            for a in aktivitaeten
+        )
+
+        prompt = PROJEKT_CLUSTERING_PROMPT.format(
+            bestehende_projekte=proj_text,
+            aktivitaeten_liste=akt_text,
+        )
+
+        from kira_llm import classify_direct
+        llm_result = classify_direct(prompt, max_tokens=1024)
+        if llm_result.get("error"):
+            return {"status": "fehler", "fehler": llm_result["error"]}
+
+        parsed = _parse_llm_response(llm_result.get("antwort", ""))
+        if not parsed:
+            return {"status": "fehler", "fehler": "LLM-Antwort nicht parsbar"}
+
+        vorschlaege = parsed.get("projektvorschlaege", [])
+
+        _elog_safe("clustering_gestartet",
+                   f"Clustering für Kunde {kunden_id}: {len(vorschlaege)} Vorschläge, "
+                   f"{len(aktivitaeten)} Aktivitäten")
+
+        return {"status": "ok", "vorschlaege": vorschlaege}
+    except Exception as e:
+        logger.error("Projekt-Clustering Fehler: %s", e)
+        return {"status": "fehler", "fehler": str(e)}
+
+
+def clustering_anwenden(kunden_id: int, vorschlag: dict) -> dict:
+    """Wendet einen bestätigten Clustering-Vorschlag an."""
+    try:
+        db = _get_kunden_db()
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+
+        if vorschlag.get("ist_bestehendes_projekt") and vorschlag.get("projekt_id"):
+            pid = vorschlag["projekt_id"]
+        elif vorschlag.get("projektname_neu"):
+            cur = db.execute("""
+                INSERT INTO kunden_projekte
+                (kunden_id, projektname, projekttyp, status, beginn_am, erstellt_am, aktualisiert_am)
+                VALUES (?, ?, 'standard', 'planung', ?, ?, ?)
+            """, (kunden_id, vorschlag["projektname_neu"][:200], jetzt[:10], jetzt, jetzt))
+            pid = cur.lastrowid
+        else:
+            db.close()
+            return {"status": "fehler", "fehler": "Kein Projekt angegeben"}
+
+        akt_ids = vorschlag.get("aktivitaet_ids", [])
+        updated = 0
+        for aid in akt_ids:
+            db.execute("""
+                UPDATE kunden_aktivitaeten SET projekt_id = ?
+                WHERE id = ? AND kunden_id = ?
+            """, (pid, aid, kunden_id))
+            updated += 1
+
+        db.commit()
+        db.close()
+
+        _elog_safe("clustering_vorschlag_bestaetigt",
+                   f"Clustering: {updated} Aktivitäten → Projekt {pid} (Kunde {kunden_id})")
+
+        return {"status": "ok", "projekt_id": pid, "zugeordnet": updated}
+    except Exception as e:
+        logger.error("Clustering-Anwenden Fehler: %s", e)
+        return {"status": "fehler", "fehler": str(e)}
+
+
+# ── Korrektur + Lernschleife ───────────────────────────────────────────────
+
+def korrektur_verarbeiten(aktivitaet_id: int, richtige_kunden_id: int,
+                          richtige_projekt_id: int = None,
+                          kai_notiz: str = "") -> dict:
+    """
+    Verarbeitet eine Kai-Korrektur:
+    1. Zuordnung in kunden_aktivitaeten korrigieren
+    2. Identität auf 'eindeutig' hochstufen
+    3. LLM leitet Lernregel ab
+    4. Lernregel in kunden_lernregeln speichern
+    """
+    try:
+        db = _get_kunden_db()
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+
+        # 1. Zuordnung korrigieren
+        akt = db.execute(
+            "SELECT * FROM kunden_aktivitaeten WHERE id = ?",
+            (aktivitaet_id,)
+        ).fetchone()
+        if not akt:
+            db.close()
+            return {"status": "fehler", "fehler": "Aktivität nicht gefunden"}
+
+        alter_kunde = akt["kunden_id"]
+        altes_projekt = akt["projekt_id"]
+
+        db.execute("""
+            UPDATE kunden_aktivitaeten
+            SET kunden_id = ?, projekt_id = ?
+            WHERE id = ?
+        """, (richtige_kunden_id, richtige_projekt_id, aktivitaet_id))
+
+        # 2. Identitäten hochstufen
+        db.execute("""
+            UPDATE kunden_identitaeten
+            SET confidence = 'eindeutig', verifiziert = 1
+            WHERE kunden_id = ? AND confidence != 'eindeutig'
+        """, (richtige_kunden_id,))
+
+        # 3. Classifier-Log aktualisieren
+        if akt["quelle_id"]:
+            db.execute("""
+                UPDATE kunden_classifier_log
+                SET user_bestaetigt = 1,
+                    user_korrektur_kunden_id = ?,
+                    user_korrektur_projekt_id = ?
+                WHERE eingabe_id = ? AND user_bestaetigt = 0
+            """, (richtige_kunden_id, richtige_projekt_id, akt["quelle_id"]))
+
+        db.commit()
+
+        # 4. LLM-Lernregel ableiten
+        lernregel_result = _lernregel_ableiten(
+            db, akt, richtige_kunden_id, richtige_projekt_id, kai_notiz
+        )
+
+        db.close()
+
+        _elog_safe("korrektur_gespeichert",
+                   f"Korrektur: Akt {aktivitaet_id} → Kunde {richtige_kunden_id} "
+                   f"(vorher {alter_kunde}), Projekt {richtige_projekt_id}")
+
+        return {
+            "status": "ok",
+            "alter_kunde": alter_kunde,
+            "altes_projekt": altes_projekt,
+            "lernregel": lernregel_result,
+        }
+    except Exception as e:
+        logger.error("Korrektur Fehler: %s", e)
+        return {"status": "fehler", "fehler": str(e)}
+
+
+def _lernregel_ableiten(conn, aktivitaet: sqlite3.Row, kunden_id: int,
+                         projekt_id: int, kai_notiz: str) -> dict | None:
+    """Leitet via LLM eine generalisierbare Lernregel aus der Korrektur ab."""
+    try:
+        # Kunden-Info laden
+        kunde = conn.execute("SELECT name, firmenname FROM kunden WHERE id = ?",
+                             (kunden_id,)).fetchone()
+        kname = (kunde["firmenname"] or kunde["name"] or f"#{kunden_id}") if kunde else f"#{kunden_id}"
+
+        pname = ""
+        if projekt_id:
+            proj = conn.execute("SELECT projektname FROM kunden_projekte WHERE id = ?",
+                                (projekt_id,)).fetchone()
+            pname = proj["projektname"] if proj else ""
+
+        prompt = f"""Eine Zuordnung wurde korrigiert.
+Aktivität: [{aktivitaet['ereignis_typ']}] {(aktivitaet['zusammenfassung'] or '')[:200]}
+Richtige Zuordnung: Kunde {kname}, Projekt {pname or 'keins'}
+Kais Notiz: {kai_notiz or '(keine)'}
+
+Was ist das generalisierbare Muster?
+Welche Lernregel sollte Kira ableiten?
+
+Antwort als JSON: {{ "regel_typ": "identitaet|projekt_signal|kanal_muster|ausschluss|projekt_typ", "beschreibung": "max 1 Satz", "bedingung_json": {{}}, "aktion_json": {{}} }}"""
+
+        from kira_llm import classify_direct
+        llm_result = classify_direct(prompt, max_tokens=300)
+        if llm_result.get("error"):
+            return None
+
+        parsed = _parse_llm_response(llm_result.get("antwort", ""))
+        if not parsed:
+            return None
+
+        regel_typ = parsed.get("regel_typ", "identitaet")
+        valid_typen = {"identitaet", "projekt_signal", "kanal_muster", "ausschluss", "projekt_typ"}
+        if regel_typ not in valid_typen:
+            regel_typ = "identitaet"
+
+        bedingung = parsed.get("bedingung_json") or {}
+        if isinstance(bedingung, str):
+            bedingung = json.loads(bedingung)
+        bedingung["beschreibung"] = parsed.get("beschreibung", "")[:200]
+
+        aktion = parsed.get("aktion_json") or {}
+        if isinstance(aktion, str):
+            aktion = json.loads(aktion)
+
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+        conn.execute("""
+            INSERT INTO kunden_lernregeln
+            (kunden_id, regel_typ, bedingung_json, aktion_json, confidence, quelle, erstellt_am)
+            VALUES (?, ?, ?, ?, 1.0, 'kai_korrektur', ?)
+        """, (kunden_id, regel_typ, json.dumps(bedingung, ensure_ascii=False),
+              json.dumps(aktion, ensure_ascii=False), jetzt))
+        conn.commit()
+
+        _elog_safe("lernregel_angelegt",
+                   f"Lernregel '{regel_typ}' aus Korrektur: {parsed.get('beschreibung', '')[:80]}")
+
+        return {"regel_typ": regel_typ, "beschreibung": parsed.get("beschreibung", "")}
+    except Exception as e:
+        logger.debug("Lernregel-Ableitung: %s", e)
+        return None
+
+
+# ── Lernregeln-Verwaltung ──────────────────────────────────────────────────
+
+def get_lernregeln(kunden_id: int = None, nur_aktive: bool = True) -> list[dict]:
+    """Gibt Lernregeln zurück (optional gefiltert nach Kunde)."""
+    try:
+        db = _get_kunden_db()
+        if not _tabelle_existiert(db, 'kunden_lernregeln'):
+            db.close()
+            return []
+        query = """
+            SELECT kl.*, k.name as kunden_name, k.firmenname as kunden_firma
+            FROM kunden_lernregeln kl
+            LEFT JOIN kunden k ON k.id = kl.kunden_id
+            WHERE 1=1
+        """
+        params = []
+        if nur_aktive:
+            query += " AND kl.aktiv = 1"
+        if kunden_id is not None:
+            query += " AND (kl.kunden_id = ? OR kl.kunden_id IS NULL)"
+            params.append(kunden_id)
+        query += " ORDER BY kl.anwendungen DESC, kl.erstellt_am DESC LIMIT 50"
+        rows = db.execute(query, params).fetchall()
+        db.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        logger.debug("Lernregeln abrufen: %s", e)
+        return []
+
+
+def lernregel_deaktivieren(regel_id: int) -> bool:
+    """Deaktiviert eine Lernregel."""
+    try:
+        db = _get_kunden_db()
+        db.execute("UPDATE kunden_lernregeln SET aktiv = 0 WHERE id = ?", (regel_id,))
+        db.commit()
+        db.close()
+        _elog_safe("lernregel_deaktiviert", f"Lernregel {regel_id} deaktiviert")
+        return True
+    except Exception as e:
+        logger.debug("Lernregel deaktivieren: %s", e)
+        return False
+
+
+# ── Identitäten-Verwaltung ──────────────────────────────────────────────────
+
+def get_identitaeten(kunden_id: int) -> list[dict]:
+    """Gibt alle Identitäten eines Kunden zurück inkl. Graph-Info."""
+    try:
+        db = _get_kunden_db()
+        idents = db.execute("""
+            SELECT ki.*, k.name as kunden_name
+            FROM kunden_identitaeten ki
+            JOIN kunden k ON k.id = ki.kunden_id
+            WHERE ki.kunden_id = ?
+            ORDER BY ki.confidence DESC, ki.erstellt_am ASC
+        """, (kunden_id,)).fetchall()
+
+        result = []
+        for i in idents:
+            d = dict(i)
+            # Graph-Verbindungen laden
+            graph = db.execute("""
+                SELECT g.*, ki2.wert as verbunden_mit, ki2.typ as verbunden_typ
+                FROM kunden_identitaeten_graph g
+                JOIN kunden_identitaeten ki2 ON
+                    (g.identitaet_a_id = ki2.id AND g.identitaet_b_id = ?)
+                    OR (g.identitaet_b_id = ki2.id AND g.identitaet_a_id = ?)
+                WHERE g.identitaet_a_id = ? OR g.identitaet_b_id = ?
+            """, (i["id"], i["id"], i["id"], i["id"])).fetchall()
+            d["graph_verbindungen"] = [dict(g) for g in graph]
+            result.append(d)
+
+        db.close()
+        return result
+    except Exception as e:
+        logger.debug("Identitäten abrufen: %s", e)
+        return []
+
+
+def identitaet_bestaetigen(graph_id: int, bestaetigt: bool) -> bool:
+    """Kai bestätigt oder lehnt eine Identitäts-Verbindung ab."""
+    try:
+        db = _get_kunden_db()
+        jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+        if bestaetigt:
+            db.execute("""
+                UPDATE kunden_identitaeten_graph
+                SET kai_bestaetigt = 1, kai_abgelehnt = 0,
+                    confidence_stufe = 'eindeutig', confidence = 1.0,
+                    entschieden_durch = 'kai_manuell', bestaetigt_am = ?
+                WHERE id = ?
+            """, (jetzt, graph_id))
+            _elog_safe("identitaet_bestaetigt", f"Identitäts-Verbindung {graph_id} bestätigt")
+        else:
+            db.execute("""
+                UPDATE kunden_identitaeten_graph
+                SET kai_abgelehnt = 1, kai_bestaetigt = 0,
+                    entschieden_durch = 'kai_manuell'
+                WHERE id = ?
+            """, (graph_id,))
+            _elog_safe("identitaet_abgelehnt", f"Identitäts-Verbindung {graph_id} abgelehnt")
+        db.commit()
+        db.close()
+        return True
+    except Exception as e:
+        logger.debug("Identität bestätigen: %s", e)
+        return False
