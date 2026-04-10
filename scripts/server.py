@@ -4330,14 +4330,28 @@ window.pfSaveKiraDraft = function() {
   const bodyPlain = _pfComposeModalQuill ? _pfComposeModalQuill.getText() : '';
   const bodyHtml = _pfComposeModalQuill ? _pfComposeModalQuill.root.innerHTML : '';
   const subj = document.getElementById('pf-cm-subj').value.trim();
+  const saveId = _pfKiraEditId;
   btn.disabled=true; btn.textContent='Speichere\u2026';
-  fetch('/api/mail/approve/'+_pfKiraEditId, {
+  fetch('/api/mail/approve/'+saveId, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'save', body:bodyPlain, body_html:bodyHtml, subject:subj})
   }).then(function(r){return r.json();}).then(function(d){
     btn.disabled=false; btn.innerHTML='&#x1F4BE; Speichern';
     if(d.ok){
+      // Modal schließen (ohne confirm-Dialog)
+      document.getElementById('pf-compose-modal-overlay').style.display='none';
+      var saveBtnEl=document.getElementById('pf-cm-save-draft-btn');
+      if(saveBtnEl) saveBtnEl.style.display='none';
+      _pfKiraEditId = null;
+      _pfComposeAttachments=[];
       showToast('Entwurf gespeichert \u2713','ok');
+      // Kira-Item im Speicher aktualisieren + Vorschau neu rendern
+      if(window._pfCurrentKiraItem && window._pfCurrentKiraItem.id === saveId) {
+        window._pfCurrentKiraItem.body_plain = bodyPlain;
+        window._pfCurrentKiraItem.body_html = bodyHtml;
+        window._pfCurrentKiraItem.betreff = subj;
+        pfShowKiraMail(window._pfCurrentKiraItem);
+      }
       pfLoadKiraList(true);
     } else {
       showToast('Fehler: '+(d.error||'?'),'fehler');
