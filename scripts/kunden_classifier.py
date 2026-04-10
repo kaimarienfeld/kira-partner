@@ -112,15 +112,19 @@ def ist_geschaeftskontakt(absender: str, betreff: str = "", headers: dict = None
 def _fast_path(absender_email: str) -> dict | None:
     """
     Prüft ob Absender eindeutig einem Kunden zugeordnet ist.
+    Stufe 1: Exakter Email-Match in kunden_identitaeten
+    Stufe 2: Domain-Match (nur für Geschäfts-Domains, nicht Freemail)
     Returns Zuordnungsergebnis oder None wenn LLM nötig.
     """
     try:
         db = _get_kunden_db()
+        # Stufe 1: Exakter Email-Match
         row = db.execute("""
             SELECT ki.kunden_id, ki.confidence, k.name, k.firmenname
             FROM kunden_identitaeten ki
             JOIN kunden k ON k.id = ki.kunden_id
             WHERE LOWER(ki.wert) = ? AND ki.typ = 'mail'
+              AND k.lexware_id IS NOT NULL
             ORDER BY CASE ki.confidence
                 WHEN 'eindeutig' THEN 1
                 WHEN 'wahrscheinlich' THEN 2
@@ -129,6 +133,20 @@ def _fast_path(absender_email: str) -> dict | None:
             END
             LIMIT 1
         """, (absender_email.lower(),)).fetchone()
+
+        if not row:
+            # Stufe 2: Domain-Match
+            domain = _extract_domain(absender_email)
+            if domain:
+                row = db.execute("""
+                    SELECT ki.kunden_id, 'wahrscheinlich' as confidence,
+                           k.name, k.firmenname
+                    FROM kunden_identitaeten ki
+                    JOIN kunden k ON k.id = ki.kunden_id
+                    WHERE LOWER(ki.wert) = ? AND ki.typ = 'domain'
+                      AND k.lexware_id IS NOT NULL
+                    LIMIT 1
+                """, (domain.lower(),)).fetchone()
 
         if not row:
             db.close()
@@ -167,7 +185,10 @@ def _fast_path(absender_email: str) -> dict | None:
 # ── LLM-Kontext laden ────────────────────────────────────────────────────────
 
 def _build_kunden_kontext(max_kunden: int = 50) -> str:
-    """Baut kompakten Kunden-Kontext für den Super-Prompt."""
+    """Baut kompakten Kunden-Kontext für den Super-Prompt.
+
+    NUR Lexware-verifizierte Kunden werden einbezogen (REGEL-09).
+    """
     try:
         db = _get_kunden_db()
         kunden = db.execute("""
@@ -175,6 +196,7 @@ def _build_kunden_kontext(max_kunden: int = 50) -> str:
                    k.letztkontakt
             FROM kunden k
             WHERE k.status != 'archiv'
+              AND k.lexware_id IS NOT NULL AND k.lexware_id != ''
             ORDER BY k.letztkontakt DESC NULLS LAST
             LIMIT ?
         """, (max_kunden,)).fetchall()

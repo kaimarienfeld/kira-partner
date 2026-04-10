@@ -1,12 +1,30 @@
 # Kunden-Classifier — Konzept
 
-Stand: 2026-04-10
+Stand: 2026-04-10 (aktualisiert session-tt: Lexware-Only-Basis)
 
 ---
 
 ## Zweck
 
 Jede neue Aktivität (Mail, Memo, Dokument) wird analysiert und einem Kunden + Projekt + Fall-Typ zugeordnet. Kein reines Regel-Matching — kontextbewusstes Verständnis durch LLM.
+
+**REGEL-09: Lexware ist die einzige Kunden-Stammdatenquelle.** Kunden kommen ausschließlich aus Lexware Office — NICHT aus dem Mail-Archiv.
+
+---
+
+## Datenfluss
+
+```
+Lexware Office (273 Kontakte)
+    │
+    └── kunden_lexware_sync.py
+          │
+          ├── kunden.db/kunden (lexware_id gesetzt)
+          └── kunden.db/kunden_identitaeten
+                ├── E-Mails (confidence='eindeutig', quelle='lexware')
+                ├── Domains (confidence='wahrscheinlich', quelle='lexware')
+                └── Telefon  (confidence='eindeutig', quelle='lexware')
+```
 
 ---
 
@@ -20,13 +38,19 @@ Neue Mail/Memo/Dokument
     │
     ├── 2. Vorgang-Router (vorgang_router.py) — unverändert
     │
-    └── 3. Kunden-Classifier (kunden_classifier.py) — NEU
+    └── 3. Kunden-Classifier (kunden_classifier.py)
           │
-          ├── Fast-Path: Absender in kunden_identitaeten
-          │   mit confidence='eindeutig'
+          ├── Fast-Path Stufe 1: Exakter Email-Match
+          │   Absender in kunden_identitaeten (typ='mail')
+          │   WHERE k.lexware_id IS NOT NULL
           │   → Sofort zuordnen, kein LLM
           │
+          ├── Fast-Path Stufe 2: Domain-Match
+          │   Absender-Domain in kunden_identitaeten (typ='domain')
+          │   → Zuordnen mit confidence='wahrscheinlich'
+          │
           └── LLM-Path: Super-Prompt
+              → NUR Lexware-Kunden als Kontext
               → JSON-Response auswerten
               → Nach Confidence handeln
 ```
@@ -35,70 +59,43 @@ Neue Mail/Memo/Dokument
 
 ## Fast-Path (kein LLM nötig)
 
+Stufe 1 — Exakter Email-Match:
 ```python
-def _fast_path(absender_email: str) -> dict | None:
-    """Prüft ob Absender eindeutig einem Kunden zugeordnet ist."""
-    row = db.execute("""
-        SELECT ki.kunden_id, ki.confidence, k.name, k.firmenname
-        FROM kunden_identitaeten ki
-        JOIN kunden k ON k.id = ki.kunden_id
-        WHERE LOWER(ki.wert) = ? AND ki.typ = 'mail'
-        ORDER BY ki.confidence ASC LIMIT 1
-    """, (absender_email.lower(),)).fetchone()
-    
-    if row and row['confidence'] == 'eindeutig':
-        # Aktives Projekt finden
-        projekt = db.execute("""
-            SELECT id, projektname FROM kunden_projekte
-            WHERE kunden_id = ? AND status = 'aktiv'
-            ORDER BY aktualisiert_am DESC LIMIT 1
-        """, (row['kunden_id'],)).fetchone()
-        
-        return {
-            'kunden_id': row['kunden_id'],
-            'kunden_confidence': 'eindeutig',
-            'projekt_id': projekt['id'] if projekt else None,
-            'projekt_confidence': 'wahrscheinlich' if projekt else 'unklar',
-            'fast_path': True
-        }
-    return None
+row = db.execute("""
+    SELECT ki.kunden_id, ki.confidence, k.name, k.firmenname
+    FROM kunden_identitaeten ki
+    JOIN kunden k ON k.id = ki.kunden_id
+    WHERE LOWER(ki.wert) = ? AND ki.typ = 'mail'
+      AND k.lexware_id IS NOT NULL  -- NUR Lexware-Kunden
+    LIMIT 1
+""", (absender_email.lower(),)).fetchone()
+```
+
+Stufe 2 — Domain-Match (Fallback):
+```python
+row = db.execute("""
+    SELECT ki.kunden_id, 'wahrscheinlich' as confidence, k.name, k.firmenname
+    FROM kunden_identitaeten ki
+    JOIN kunden k ON k.id = ki.kunden_id
+    WHERE LOWER(ki.wert) = ? AND ki.typ = 'domain'
+      AND k.lexware_id IS NOT NULL
+    LIMIT 1
+""", (domain.lower(),)).fetchone()
 ```
 
 ---
 
-## LLM Super-Prompt
+## LLM-Kontext (nur Lexware-Kunden)
 
-```
-Du bist ein Geschäftsprozess-Klassifizierer für ein Handwerksunternehmen.
-
-Analysiere diese neue Nachricht und beantworte NUR als JSON:
-
-{
-  "kunden_id": null oder ID,
-  "kunden_confidence": "eindeutig|wahrscheinlich|pruefen|unklar",
-  "projekt_id": null oder ID,
-  "projekt_confidence": "eindeutig|wahrscheinlich|pruefen|unklar",
-  "fall_typ": "anfrage|angebot|nachfass|rechnung|reklamation|maengel|streitfall|intern|freigabe|kein_geschaeftsfall",
-  "ist_geschaeftsfall": true|false,
-  "reasoning": "max 2 Sätze warum"
-}
-
-Bekannte Kunden und Projekte:
-[KUNDEN_KONTEXT — Top 50 Kunden mit Identitäten + Projekten]
-
-Neue Nachricht:
-Absender: [ABSENDER]
-Betreff: [BETREFF]
-Inhalt: [INHALT_AUSZUG — max 2000 Zeichen]
-Datum: [DATUM]
-
-Wichtige Regeln:
-- Mängelanzeigen gehören zum ABGESCHLOSSENEN Projekt, nicht zu einem neuen
-- Newsletter, Automails, Marketing → ist_geschaeftsfall = false
-- Wenn Absender bekannte Lexware-ID hat → kunden_confidence = "eindeutig"
-- Zeitlicher Abstand beachten: Mail 2 Jahre nach Projektabschluss = Nachprojekt-Fall
-- Nie zwei verschiedene Projekte zusammenmischen
-- Bei komplett unbekanntem Absender → kunden_id = null, kunden_confidence = "unklar"
+```python
+kunden = db.execute("""
+    SELECT k.id, k.name, k.firmenname, k.email, k.kundentyp, k.status, k.letztkontakt
+    FROM kunden k
+    WHERE k.status != 'archiv'
+      AND k.lexware_id IS NOT NULL AND k.lexware_id != ''
+    ORDER BY k.letztkontakt DESC NULLS LAST
+    LIMIT 50
+""", ()).fetchall()
 ```
 
 ---
@@ -114,12 +111,30 @@ Wichtige Regeln:
 
 ---
 
+## Lexware-Sync
+
+| Script | Zweck |
+|---|---|
+| `kunden_lexware_sync.py` | Lexware Office → kunden.db (Import/Update) |
+| `kunden_mail_retroaktiv.py` | Mail-Archiv gegen Kundenliste scannen |
+
+Sync-Ablauf:
+1. Liest `tasks.db/lexware_kontakte` (bereits via `lexware_client.py` synchronisiert)
+2. INSERT/UPDATE in `kunden.db/kunden` (alle mit `lexware_id`)
+3. Alle E-Mails + Domains + Telefon → `kunden_identitaeten`
+
+Trigger:
+- Manuell: POST /api/crm/lexware-sync
+- Automatisch: kira_proaktiv.py (6h-Intervall, wenn `crm.lexware_sync=true`)
+
+---
+
 ## Performance-Regeln
 
-1. **Nicht synchron bei jeder Mail** — asynchron im Hintergrund
-2. **Fast-Path zuerst** — bekannte E-Mail = kein LLM
+1. **Fast-Path zuerst** — bekannte E-Mail = kein LLM
+2. **Domain-Match als Stufe 2** — Geschäfts-Domains (nicht Freemail)
 3. **Cache** — gleiche Absender+Betreff-Kombi → 1h Cache
-4. **Kunden-Kontext kompakt** — max 50 Kunden, nur Name+E-Mail+Projekte
+4. **Kunden-Kontext kompakt** — max 50 Kunden, nur Lexware-verifizierte
 5. **Günstigstes Modell** — Haiku/kleine Modelle bevorzugen (REGEL: kein Prio-Provider)
 
 ---

@@ -1,5 +1,25 @@
 # Session Log
 
+## 2026-04-10 18:16 — Session-Start: CRM Datenbank-Reparatur (session-tt)
+**Auftrag:** CRM Kunden-Datenbank Reparatur — Lexware als einzige Stammdaten-Quelle herstellen. 10 Schritte: Bestandsaufnahme, Backup, falsche Kunden löschen, Lexware-Import, Classifier umstellen, retroaktiver Mail-Scan, Settings UI, Doku, Tests, Commit. Autonomer Durchlauf ohne Rückfragen.
+**Status:** erledigt
+
+### 2026-04-10 18:45 — Session-Ende
+**Erledigt:**
+- Schritt 1: Bestandsaufnahme — 1433 falsche Kunden (ALLE aus Mail-Archiv), 0 Lexware-verknüpft
+- Schritt 2: Backup kunden.db.backup_vor_reparatur_20260410 (14.9 MB)
+- Schritt 3: Alle 1433 falschen Einträge gelöscht (Sicherheitschecks bestanden: 0 Lexware-IDs)
+- Schritt 4: kunden_lexware_sync.py NEU — 273 Lexware-Kontakte importiert (128 Firmen, 145 Personen), 285 Identitäten (186 mail, 84 domain, 15 telefon)
+- Schritt 5: Classifier auf Lexware-Only umgestellt (_build_kunden_kontext + _fast_path mit WHERE lexware_id IS NOT NULL, Domain-Match Stufe 2), alte Migration in case_engine.py entfernt
+- Schritt 6: kunden_mail_retroaktiv.py NEU — 12654 Mails gescannt, 1718 zugeordnet (13.6%), 96 Kunden mit Statistiken aktualisiert
+- Schritt 7: CRM-Einstellungen erweitert (Sync-Status, Lexware-Sync-Button, Retro-Scan-Button, 3 neue API-Endpoints)
+- Schritt 8: KUNDEN_CLASSIFIER_KONZEPT.md + CRM_TECHNIK_REFERENZ.md + CRM_REPARATUR_ANALYSE.md aktualisiert
+- Schritt 9: Alle Tests bestanden (DB-Integrität, Fast-Path, Domain-Match, Newsletter-Filter, Syntax-Check)
+- Schritt 10: Git Commit + Tracking
+**Offen geblieben:** —
+
+---
+
 ## 2026-04-10 13:30 — Session-Start (session-rr)
 **Auftrag:** Konsolidierte KIRA_MASTERLISTE.md erstellen — alle Features, Pläne, Bugs, Wünsche und Programmier-Regeln aus 10+ Einzellisten zusammenführen. Sync-Regeln und AGENT.md-Integration.
 **Status:** erledigt

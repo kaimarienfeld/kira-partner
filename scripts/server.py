@@ -7947,6 +7947,7 @@ function esShowSec(id) {{
   if(id==='integrationen') {{ esIntegLoad(); }}
   if(id==='protokoll') {{ esShowProtoTab('runtime'); }}
   if(id==='lexware') {{ if(window.esShowLexSec) window.esShowLexSec('verbindung'); }}
+  if(id==='crm') {{ if(window.crmLoadSyncStatus) crmLoadSyncStatus(); }}
   if(id==='unternehmensprofile') {{
     document.querySelectorAll('.up-sub').forEach(function(d){{d.style.display='none';}});
     var def = document.getElementById('up-sub-firmendaten');
@@ -12701,11 +12702,25 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
 
   <div class="es-grp">
     <div class="es-grp-h">Lexware-Synchronisation</div>
-    <div class="es-grp-sub">Stammdaten-Abgleich mit Lexware Office (REGEL-09: Lexware ist f&uuml;hrend).</div>
+    <div class="es-grp-sub">Stammdaten-Abgleich mit Lexware Office (REGEL-09: Lexware ist die einzige Kunden-Quelle).</div>
     <div class="es-row">
       <label class="es-lbl">Auto-Sync aktiv</label>
       <label class="es-toggle"><input type="checkbox" id="cfg-crm-lexware-sync" {'checked' if crm_cfg.get('lexware_sync', True) else ''}><span class="es-slider"></span></label>
       <span class="es-hint">Stammdaten alle 6h aus Lexware Office abgleichen</span>
+    </div>
+    <div class="es-row" id="crm-sync-status-row">
+      <label class="es-lbl">Sync-Status</label>
+      <span id="crm-sync-status" class="es-hint" style="font-weight:600">Wird geladen...</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Jetzt synchronisieren</label>
+      <button class="es-btn" onclick="crmLexwareSyncJetzt()" id="btn-crm-sync-jetzt" style="background:var(--blue);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer">Lexware-Sync starten</button>
+      <span class="es-hint">Kunden aus Lexware Office importieren/aktualisieren</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Retroaktiver Mail-Scan</label>
+      <button class="es-btn" onclick="crmRetroScanJetzt()" id="btn-crm-retro-scan" style="background:var(--violet,#7c3aed);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer">Mail-Archiv scannen</button>
+      <span class="es-hint">Bestehende Mails gegen Lexware-Kundenliste abgleichen</span>
     </div>
   </div>
 </div>
@@ -18821,6 +18836,51 @@ function crmShowModal(title, body, footer) {{
 
 function crmCloseModal() {{
   document.getElementById('crmModalOverlay').style.display = 'none';
+}}
+
+// CRM Lexware-Sync + Retro-Scan (session-tt)
+async function crmLexwareSyncJetzt() {{
+  const btn = document.getElementById('btn-crm-sync-jetzt');
+  if(btn) {{ btn.disabled = true; btn.textContent = 'Synchronisiere...'; }}
+  try {{
+    const r = await fetch('/api/crm/lexware-sync', {{method:'POST'}});
+    const d = await r.json();
+    if(d.ok) {{
+      showToast('Lexware-Sync: ' + d.neu + ' neu, ' + d.aktualisiert + ' aktualisiert, ' + d.identitaeten_neu + ' Identit\\xe4ten', 'success');
+      crmLoadSyncStatus();
+    }} else {{
+      showToast('Sync-Fehler: ' + (d.error||'Unbekannt'), 'error');
+    }}
+  }} catch(e) {{ showToast('Sync-Fehler: ' + e.message, 'error'); }}
+  if(btn) {{ btn.disabled = false; btn.textContent = 'Lexware-Sync starten'; }}
+}}
+
+async function crmRetroScanJetzt() {{
+  const btn = document.getElementById('btn-crm-retro-scan');
+  if(btn) {{ btn.disabled = true; btn.textContent = 'Scanne...'; }}
+  try {{
+    const r = await fetch('/api/crm/retro-scan', {{method:'POST'}});
+    const d = await r.json();
+    if(d.ok) {{
+      showToast('Retro-Scan: ' + d.zugeordnet + '/' + d.mails_gesamt + ' Mails zugeordnet, ' + d.aktivitaeten_erstellt + ' Aktivit\\xe4ten', 'success');
+      crmLoadSyncStatus();
+    }} else {{
+      showToast('Scan-Fehler: ' + (d.error||'Unbekannt'), 'error');
+    }}
+  }} catch(e) {{ showToast('Scan-Fehler: ' + e.message, 'error'); }}
+  if(btn) {{ btn.disabled = false; btn.textContent = 'Mail-Archiv scannen'; }}
+}}
+
+async function crmLoadSyncStatus() {{
+  try {{
+    const r = await fetch('/api/crm/sync-status', {{method:'POST'}});
+    const d = await r.json();
+    const el = document.getElementById('crm-sync-status');
+    if(el && d.ok) {{
+      el.textContent = d.kunden + ' Kunden, ' + d.identitaeten + ' Identit\\xe4ten' + (d.letzte_sync ? ' — Letzte Sync: ' + d.letzte_sync : '');
+      el.style.color = d.kunden > 0 ? 'var(--green, #22c55e)' : 'var(--orange, #f59e0b)';
+    }}
+  }} catch(e) {{}}
 }}
 
 // === Lexware Office JS (session-eee) ===
@@ -33996,6 +34056,17 @@ Regeln:
             self._api_crm_faelle_add_aktivitaet(int(_crm_fall_akt.group(1)), body)
             return
 
+        # CRM Lexware-Sync + Retro-Scan (session-tt)
+        if self.path == '/api/crm/lexware-sync':
+            self._api_crm_lexware_sync()
+            return
+        if self.path == '/api/crm/retro-scan':
+            self._api_crm_retro_scan()
+            return
+        if self.path == '/api/crm/sync-status':
+            self._api_crm_sync_status()
+            return
+
         # Kunden-Alias speichern
         if self.path == '/api/kunden/alias':
             alias_email = (body.get('alias_email','') or '').strip().lower()
@@ -35159,6 +35230,43 @@ Regeln:
             from kunden_classifier import get_unzugeordnete
             items = get_unzugeordnete(50)
             self._json({"ok": True, "items": items})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_lexware_sync(self):
+        """POST /api/crm/lexware-sync — Lexware-Kontakte in kunden.db synchronisieren."""
+        try:
+            from kunden_lexware_sync import sync_lexware_kunden
+            result = sync_lexware_kunden(dry_run=False)
+            try:
+                from runtime_log import elog
+                elog("lexware_sync_manuell", f"Manueller Lexware-Sync: {result['neu']} neu, {result['aktualisiert']} aktualisiert")
+            except Exception:
+                pass
+            self._json({"ok": True, **result})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_retro_scan(self):
+        """POST /api/crm/retro-scan — Mail-Archiv retroaktiv gegen Kundenliste scannen."""
+        try:
+            from kunden_mail_retroaktiv import scan_mails
+            result = scan_mails(dry_run=False)
+            try:
+                from runtime_log import elog
+                elog("mail_retroaktiv_manuell", f"Manueller Retro-Scan: {result['zugeordnet']}/{result['mails_gesamt']} Mails zugeordnet")
+            except Exception:
+                pass
+            self._json({"ok": True, **result})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_sync_status(self):
+        """POST /api/crm/sync-status — Status der Lexware-Synchronisation."""
+        try:
+            from kunden_lexware_sync import get_sync_status
+            status = get_sync_status()
+            self._json({"ok": True, **status})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 
