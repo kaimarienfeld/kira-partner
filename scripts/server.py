@@ -23929,7 +23929,7 @@ a:hover{text-decoration:underline;}
 
 /* Main content */
 .main-area{flex:1;margin-left:var(--sidebar-w);transition:margin-left .22s cubic-bezier(.4,0,.2,1);
-  display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow:hidden;}
+  display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;overflow-y:auto;}
 .sidebar.collapsed ~ .main-area,.app-shell.sb-collapsed .main-area{margin-left:var(--sidebar-collapsed-w);}
 
 /* Header / Topbar */
