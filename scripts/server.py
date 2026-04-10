@@ -3275,6 +3275,7 @@ let _pfCurrentMail = null;      // currently open mail object
 let _pfMarkReadMode = 'sofort'; // sofort|5s|30s|manuell
 let _pfMarkReadTimer = null;    // pending mark-read timeout
 let _pfAfterRemove = 'none';    // 'none' = "Keine Mail ausgewählt", 'next' = nächste Mail anzeigen
+let _pfAutoSelected = false;    // true wenn _pfAfterItemRemoved die nächste Mail automatisch auswählt
 
 // Preview zurücksetzen → "Keine E-Mail ausgewählt"
 function _pfClearPreview() {
@@ -3297,12 +3298,12 @@ function _pfAfterItemRemoved(removedMsgId) {
     const items = document.querySelectorAll('#pf-list .pf-mail-item:not(.pf-thread-child)');
     let found = false;
     for(const item of items) {
-      if(found) { item.click(); return; }
+      if(found) { _pfAutoSelected=true; item.click(); return; }
       if(item.dataset.msgid === removedMsgId) found = true;
     }
     // Kein nächstes gefunden → vorheriges oder leere Anzeige
     if(items.length > 0 && items[items.length-1].dataset.msgid !== removedMsgId) {
-      items[items.length-1].click(); return;
+      _pfAutoSelected=true; items[items.length-1].click(); return;
     }
   }
   _pfClearPreview();
@@ -4934,7 +4935,10 @@ window.pfOpenMail = function(m, el) {
     pfUpdateViewerState(null);
   });
 
-  if (m.unread) pfDoMarkRead(m);
+  // Im Ungelesen-Filter: Auto-ausgewählte Mails NICHT sofort als gelesen markieren
+  // (verhindert Kaskade: markRead → remove → autoSelect next → markRead → remove → ...)
+  if (m.unread && !(_pfUnreadOnly && _pfAutoSelected)) pfDoMarkRead(m);
+  _pfAutoSelected = false;
 
   if (m.thread_id && m.thread_id !== m.message_id) {
     fetch('/api/mail/thread?thread_id='+encodeURIComponent(m.thread_id)).then(r=>r.json()).then(d=>{
