@@ -2361,6 +2361,7 @@ def build_postfach():
       <div class="pf-cm-footer">
         <div style="display:flex;gap:8px;align-items:center">
           <button class="pf-comp-send-btn" onclick="pfSendModal()" id="pf-cm-send-btn">&#x27A4; Senden</button>
+          <button class="pf-comp-send-btn" onclick="pfSaveKiraDraft()" id="pf-cm-save-draft-btn" style="display:none;background:#6366f1" title="&Auml;nderungen am Entwurf speichern ohne zu senden">&#x1F4BE; Speichern</button>
           <select id="pf-cm-send-opts" class="pf-cm-send-opts" title="Sende-Optionen">
             <option value="send">Jetzt senden</option>
             <option value="draft">Als Entwurf speichern</option>
@@ -4316,9 +4317,35 @@ window.pfKiraMailBearbeiten = function(id) {
     if(konto) _pfInsertSignatur(_pfComposeModalQuill, konto);
     _pfComposeModalQuill.focus();
   });
-  // Sende-Optionen: nur "Jetzt senden" (kein Entwurf-speichern für Kira-Drafts)
+  // Sende-Optionen + Speichern-Button für Kira-Drafts
   const sendOpts = document.getElementById('pf-cm-send-opts');
   if(sendOpts) sendOpts.value = 'send';
+  const saveBtn = document.getElementById('pf-cm-save-draft-btn');
+  if(saveBtn) saveBtn.style.display = '';
+};
+// Kira-Entwurf speichern (ohne zu senden)
+window.pfSaveKiraDraft = function() {
+  if(!_pfKiraEditId) return;
+  const btn = document.getElementById('pf-cm-save-draft-btn');
+  const bodyPlain = _pfComposeModalQuill ? _pfComposeModalQuill.getText() : '';
+  const bodyHtml = _pfComposeModalQuill ? _pfComposeModalQuill.root.innerHTML : '';
+  const subj = document.getElementById('pf-cm-subj').value.trim();
+  btn.disabled=true; btn.textContent='Speichere\u2026';
+  fetch('/api/mail/approve/'+_pfKiraEditId, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'save', body:bodyPlain, body_html:bodyHtml, subject:subj})
+  }).then(function(r){return r.json();}).then(function(d){
+    btn.disabled=false; btn.innerHTML='&#x1F4BE; Speichern';
+    if(d.ok){
+      showToast('Entwurf gespeichert \u2713','ok');
+      pfLoadKiraList(true);
+    } else {
+      showToast('Fehler: '+(d.error||'?'),'fehler');
+    }
+  }).catch(function(){
+    btn.disabled=false; btn.innerHTML='&#x1F4BE; Speichern';
+    showToast('Netzwerkfehler','fehler');
+  });
 };
 window.pfKiraMailSendenBearbeitet = function(id, btn) {
   var ta=document.getElementById('kiraEditBody');
@@ -5357,6 +5384,8 @@ window.pfComposeModalClose=function(){
   window._pfReplyMsgId=null;
   _pfKiraEditId=null;
   _pfComposeAttachments=[];
+  var saveBtn=document.getElementById('pf-cm-save-draft-btn');
+  if(saveBtn) saveBtn.style.display='none';
 };
 
 // Felder zwischen Inline und Modal synchronisieren
@@ -28325,8 +28354,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         new_body  = body.get("body", "").strip()      # wenn edit: neuer Text
         now       = datetime.now().isoformat()
 
-        if action not in ("approve", "reject", "edit"):
-            self._json({"ok": False, "error": "action muss approve | reject | edit sein"})
+        if action not in ("approve", "reject", "edit", "save"):
+            self._json({"ok": False, "error": "action muss approve | reject | edit | save sein"})
             return
         try:
             db = sqlite3.connect(str(TASKS_DB))
@@ -28469,6 +28498,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if reclassified:
                     resp["reclassified"] = reclassified
                 self._json(resp)
+                return
+
+            # save → nur body/betreff in DB aktualisieren, NICHT senden
+            if action == "save":
+                save_plain = new_body or (row["body_plain"] or "")
+                save_html = (body.get("body_html") or "").strip() or (row["body_html"] or "")
+                save_subj = (body.get("subject") or "").strip() or row["betreff"]
+                db.execute(
+                    "UPDATE mail_approve_queue SET body_plain=?, body_html=?, betreff=? WHERE id=?",
+                    (save_plain, save_html, save_subj, queue_id)
+                )
+                db.commit()
+                db.close()
+                rlog("server", "kira_entwurf_gespeichert",
+                     f"Kira-Entwurf #{queue_id} gespeichert (ohne Versand)",
+                     modul="server", source="server", actor_type="nutzer", status="ok")
+                self._json({"ok": True, "message": f"Entwurf #{queue_id} gespeichert."})
                 return
 
             # approve oder edit (edit → body übernehmen, dann senden)
