@@ -1,5 +1,18 @@
 # Session Log
 
+## 2026-04-10 13:30 — Session-Start (session-rr)
+**Auftrag:** Konsolidierte KIRA_MASTERLISTE.md erstellen — alle Features, Pläne, Bugs, Wünsche und Programmier-Regeln aus 10+ Einzellisten zusammenführen. Sync-Regeln und AGENT.md-Integration.
+**Status:** erledigt
+
+### 2026-04-10 14:00 — Session-Ende
+**Erledigt:**
+- KIRA_MASTERLISTE.md erstellt mit 9 Kapiteln: Sync-Regeln, 13 Programmier-Regeln, 94 fertige Features, 5 teilweise fertige, 9 geplante Module (detailliert mit CRM/Social/Dokumente/Vertrag), ~25 offene Wünsche, aktive Bugs, Kai-Aktionen
+- AGENT.md erweitert: Session-Start liest Masterliste, Session-Ende aktualisiert sie (Punkt 9a)
+- Geplante Module besonders detailliert: Kunden/CRM mit Projekttrennung, Fallansicht, Akkordeon-Logik; Social/DMs mit Kanal-Strategie; Dokumente mit Studio-Konzept; Vertragsprüfung
+**Offen geblieben:** —
+
+---
+
 ## 2026-04-09 05:30 — Session-Start (session-qq)
 **Auftrag:** Postfach Compose vollwertig machen: Rich-Text-Editor, Modal-Fenstermodus (wie Outlook), Signatur-Integration, Entwurf-Speicherung, Formatierung
 **Status:** erledigt
@@ -437,4 +450,56 @@
 **End-to-End Test:**
 - Lauf 1: GitHub Push ✓ (Commit 52aef7f), 68 Features erkannt (erster Snapshot), Mail ✓ (info@raumkult.eu → marlenabraham@gmail.com, BCC info@), ntfy ✓
 - Lauf 2: HTML identisch → kein Push, keine Änderungen → keine Mail (korrekt)
+**Status:** ✅ erledigt
+
+### 2026-04-10 09:00 — Postfach Kaskaden-Bug + Einstellungen-Schutz (session-qq-cont14)
+**Auftrag:** (B) Favoriten-Ungelesen: Klick auf 1 Mail markiert ALLE als gelesen. (C) Einstellungen werden bei Systemarbeit zurückgesetzt (mail_monitor inaktiv, lese_markierung wechselt zu sofort etc.)
+**Änderungen:**
+1. **Kaskaden-Bug behoben** (Commit 411f250): `_pfAutoSelected` Flag verhindert dass auto-selektierte Mails in Ungelesen-Ansicht als gelesen markiert werden. Kette: pfOpenMail→pfDoMarkRead→_pfAfterItemRemoved→pfOpenMail wird unterbrochen.
+2. **Einstellungen-Schutz** (Commit 5a8c8a8): `saveSettings()` komplett auf null-sichere Helfer umgebaut (`_v/_c/_i/_f`). Fehlende DOM-Elemente → null → `_stripNulls()` entfernt sie → Backend `_deep_merge()` überspringt null → bestehende Config-Werte bleiben erhalten. ~80 `getElementById`-Muster ersetzt.
+**Verifiziert:** Config intakt — mail_monitor.aktiv=true, lese_markierung=manuell, after_remove=none, intervall=900
+**Offen:** mail_favorites=[] (leer durch Kaskaden-Bug, muss Kai neu setzen), Ungelesen-Zähler erholen sich bei neuen Mails
+**Status:** ✅ erledigt
+
+### 2026-04-10 10:15 — Kira-Entwürfe: Voller Compose-Editor (session-qq-cont14)
+**Auftrag:** Kira-Entwürfe "Bearbeiten" soll identisch aussehen wie "Neue Mail" — Quill-Editor, Kontoauswahl, Signatur, Formatierung
+**Änderungen:**
+1. `pfKiraMailBearbeiten()`: Öffnet jetzt den Compose-Modal (pf-compose-modal-overlay) statt simples Textarea-Modal. Vorbefüllt mit Draft-Daten (Von, An, Betreff, Body als HTML/Plain), Signatur wird automatisch eingefügt.
+2. `_pfKiraEditId` globale Variable: Steuert ob `pfSendModal()` über approve-API sendet statt normale send-API.
+3. `pfSendModal()`: Erkennt Kira-Drafts und sendet über `/api/mail/approve/{id}` mit `action:'edit'` + `body_html`.
+4. Backend: `body_html` wird aus Request gelesen und an `send_mail()` weitergereicht.
+5. `pfComposeModalMinimize/Close`: Reset von `_pfKiraEditId`.
+**Commit:** ed4c325
+**Status:** ✅ erledigt
+
+### 2026-04-10 10:45 — Kira-Entwürfe: 3 UI-Fixes (session-qq-cont14)
+**Auftrag:** (1) Preview-Panel reißt rechts aus. (2) HTML-Formatierung geht im Editor verloren. (3) Kira-Entwürfe-Liste sieht anders aus als normales Postfach.
+**Änderungen:**
+1. **Preview-Overflow behoben**: Kira-Vorschau nutzt jetzt scrollbaren Body statt `iframe-mode` mit `position:absolute`. iframe.onload passt Höhe automatisch an.
+2. **HTML-Formatierung erhalten**: `body_plain` wird pro Zeile als eigenes `<p>`-Element in Quill geladen statt als ein Fließtext-Block.
+3. **Kira-Listen-Optik identisch mit Postfach**: `pfRenderKiraMailItem` nutzt jetzt `pf-item-avatar` + `pf-item-body` + `pf-item-row1/betreff/row3`-Struktur. Datums-Gruppen (Heute/Gestern/Diese Woche/Älter), `pfFormatDatum` (Di 14:03 / 02.04.), Kira+Status-Badges.
+**Commit:** 5b73053
+**Status:** ✅ erledigt
+
+---
+
+## 2026-04-10 12:00 — Session-Start (session-ss)
+**Auftrag:** Kunden/CRM/Kundencenter Vollausbau — 8 Pakete gemäß PROMPT_Kunden_CRM_v2_FINAL.md implementieren. Plan erstellen, bestätigen, dann ohne Stopp alles implementieren.
+**Status:** erledigt
+
+### 2026-04-10 12:30 — Paket 1 ✅ Plandateien + Gap-Analyse
+7 Plandateien in Plan Kundenmonitor/ erstellt.
+
+### 2026-04-10 12:45 — Paket 2 ✅ Datenmodell + LLM-Projekt-Classifier
+6 DB-Tabellen, kunden_classifier.py (~400 LOC), Geschäftskontakt-Filter, Classifier-Integration. Commit 9bc5594.
+
+### 2026-04-10 13:30 — Paket 3-7 ✅ Navigation + UI + API + Funktionspflicht
+build_kunden() mit 2-Spalten-Layout, 5 Sub-Panels, ~150Z CSS, ~500Z JS, 20+ API-Endpoints. Akkordeon-Übersicht, Kundenakte mit Projekt-Zeitstrahl, Fallansicht mit Timeline, alle Aktionen verdrahtet.
+
+### 2026-04-10 14:15 — Paket 8 ✅ Kira + Einstellungen + Tour
+7 neue Kira-Tools + Handler, CRM-Kontext im System-Prompt, 5 Quick-Actions, CRM-Einstellungssektion (10 Optionen) in Einstellungen, 13+ elog-Events, Guided Tour (6 Schritte). Fix: _read_json_body → body-Parameter.
+
+### 2026-04-10 14:30 — Session-Ende
+**Erledigt:** Kunden/CRM Modul vollständig implementiert (Paket 1-8). ~2800 LOC server.py, ~400 LOC kunden_classifier.py, ~200 LOC kira_llm.py.
+**Offen geblieben:** Export-API für Fälle, Streitfall-Detail-Logik, Browser-Test ausstehend.
 **Status:** ✅ erledigt

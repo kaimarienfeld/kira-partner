@@ -30,85 +30,85 @@ Stand: 2026-04-10
 - [x] Classifier-Aufruf in mail_monitor.py (nach vorgang_router)
 - [x] Classifier-Aufruf in daily_check.py
 
-## Paket 3 — Navigation + 2-Spalten-Menü
-- [ ] Sidebar-Eintrag "Kunden" mit Badge
-- [ ] build_kunden() Hauptfunktion in server.py
-- [ ] _build_crm_subnav() — 5 Untermenüpunkte
-- [ ] Panel-Wechsel-JS (crmShowPanel)
-- [ ] CSS crm-* Grundgerüst
-- [ ] showPanel('kunden') Verdrahtung
+## Paket 3 — Navigation + 2-Spalten-Menü ✅
+- [x] Sidebar-Eintrag "Kunden" mit Badge
+- [x] build_kunden() Hauptfunktion in server.py
+- [x] _build_crm_subnav() — 5 Untermenüpunkte
+- [x] Panel-Wechsel-JS (crmShowPanel)
+- [x] CSS crm-* Grundgerüst
+- [x] showPanel('kunden') Verdrahtung
 
-## Paket 4 — Kundenübersicht + Akkordeon
-- [ ] _build_crm_kundenuebersicht() — HTML aus Mockup
-- [ ] Suchfeld + Filter (Typ, Status, Segment)
-- [ ] Akkordeon-Gruppen (Aktive/Leads/Inaktive/Archiv)
-- [ ] Kunden-Zeilen (Name, Typ, Projekt, Aktivität, Fälle, Status)
-- [ ] "Neuer Kunde"-Button → Formular
-- [ ] Contacts-Ansicht (Absender ohne Kundenstatus)
-- [ ] GET /api/crm/kunden (Filter/Suche/Gruppierung)
-- [ ] GET /api/crm/contacts
-- [ ] POST /api/crm/kunden (Neuen Kunden anlegen)
-- [ ] GET /api/crm/kunden/{id}
-- [ ] PUT /api/crm/kunden/{id}
-- [ ] GET /api/crm/stats (KPI-Zahlen)
-- [ ] JS: crmLoadKunden(), crmFilterKunden(), crmToggleAccordion()
+## Paket 4 — Kundenübersicht + Akkordeon ✅
+- [x] _build_crm_kundenuebersicht() — HTML aus Mockup
+- [x] Suchfeld + Filter (Typ, Status, Segment)
+- [x] Akkordeon-Gruppen (Aktive/Leads/Inaktive/Archiv)
+- [x] Kunden-Zeilen (Name, Typ, Projekt, Aktivität, Fälle, Status)
+- [x] "Neuer Kunde"-Button → Formular
+- [x] Contacts-Ansicht (Absender ohne Kundenstatus)
+- [x] GET /api/crm/kunden (Filter/Suche/Gruppierung)
+- [x] GET /api/crm/contacts
+- [x] POST /api/crm/kunden (Neuen Kunden anlegen)
+- [x] GET /api/crm/kunden/{id}
+- [x] PUT /api/crm/kunden/{id}
+- [x] GET /api/crm/stats (KPI-Zahlen)
+- [x] JS: crmLoadKunden(), crmFilterKunden(), crmToggleAccordion()
 
-## Paket 5 — Kundenakte + Projekt-Zeitstrahl
-- [ ] _build_crm_kundenakte() — HTML aus Mockup
-- [ ] Kundenkopf (Firma, Typ, Status, Wert, Warnsignale)
-- [ ] Projekt-Zeitstrahl (horizontal/vertikal)
-- [ ] Projektumschalter-Dropdown
-- [ ] Zentrale Verlaufsfläche (projektgefiltert)
-- [ ] Rechte Kontextspalte (Stammdaten, Lexware)
-- [ ] Tabs: Verlauf | Fälle | Dokumente | Finanzen | Kira | Einstellungen
-- [ ] GET /api/crm/kunden/{id}/projekte
-- [ ] POST /api/crm/kunden/{id}/projekte
-- [ ] PUT /api/crm/projekte/{id}
-- [ ] GET /api/crm/kunden/{id}/aktivitaeten?projekt_id=X
-- [ ] GET /api/crm/kunden/{id}/stammdaten
-- [ ] JS: crmLoadKundenakte(), crmSwitchProject(), crmLoadTimeline()
+## Paket 5 — Kundenakte + Projekt-Zeitstrahl ✅
+- [x] _build_crm_kundenakte() — HTML aus Mockup
+- [x] Kundenkopf (Firma, Typ, Status, Wert, Warnsignale)
+- [x] Projekt-Zeitstrahl (horizontal/vertikal)
+- [x] Projektumschalter-Dropdown
+- [x] Zentrale Verlaufsfläche (projektgefiltert)
+- [x] Rechte Kontextspalte (Stammdaten, Lexware)
+- [x] Tabs: Verlauf | Fälle | Dokumente | Finanzen | Kira | Einstellungen
+- [x] GET /api/crm/kunden/{id}/projekte
+- [x] POST /api/crm/kunden/{id}/projekte
+- [x] PUT /api/crm/projekte/{id}
+- [x] GET /api/crm/kunden/{id}/aktivitaeten?projekt_id=X
+- [x] GET /api/crm/kunden/{id}/stammdaten
+- [x] JS: crmLoadKundenakte(), crmSwitchProject(), crmLoadTimeline()
 
-## Paket 6 — Fallansicht (Ticket-Layer)
-- [ ] _build_crm_fallansicht() — HTML aus Mockup
-- [ ] Ticket-Kopf (Nummer, Titel, Typ, Status, Priorität)
-- [ ] Timeline alle Quellen (Mail, Kira, Memo, Dokument, Lexware, manuell)
-- [ ] Aktionen (E-Mail, Notiz, Dokument, Status, Kira, Export)
-- [ ] Streitfall-Ansicht (_build_crm_streitfall)
-- [ ] GET /api/crm/kunden/{id}/faelle?projekt_id=X
-- [ ] POST /api/crm/faelle
-- [ ] GET /api/crm/faelle/{id}
-- [ ] PUT /api/crm/faelle/{id}
-- [ ] POST /api/crm/faelle/{id}/aktivitaeten
+## Paket 6 — Fallansicht (Ticket-Layer) ✅
+- [x] _build_crm_fallansicht() — HTML aus Mockup
+- [x] Ticket-Kopf (Nummer, Titel, Typ, Status, Priorität)
+- [x] Timeline alle Quellen (Mail, Kira, Memo, Dokument, Lexware, manuell)
+- [x] Aktionen (E-Mail, Notiz, Dokument, Status, Kira, Export)
+- [x] Streitfall-Ansicht (_build_crm_streitfall)
+- [x] GET /api/crm/kunden/{id}/faelle?projekt_id=X
+- [x] POST /api/crm/faelle
+- [x] GET /api/crm/faelle/{id}
+- [x] PUT /api/crm/faelle/{id}
+- [x] POST /api/crm/faelle/{id}/aktivitaeten
 - [ ] GET /api/crm/faelle/{id}/export
-- [ ] JS: crmLoadFall(), crmUpdateFallStatus(), crmAddAktivitaet()
+- [x] JS: crmLoadFall(), crmUpdateFallStatus(), crmAddAktivitaet()
 
-## Paket 7 — Funktionspflicht
-- [ ] Kontakt bearbeiten → Formular
-- [ ] Neuer Kunde → Formular
-- [ ] Verlaufseintrag klicken → Detail
-- [ ] Neue E-Mail → Compose-Fenster
-- [ ] Neue Rechnung/Angebot → Lexware-Modul
-- [ ] Neuer Fall → Erstell-Dialog
-- [ ] Export/Streitfall → Streitfall-Ansicht
-- [ ] Kira fragen → Workspace mit Kontext
-- [ ] Projekt wechseln → Dropdown + Filter
-- [ ] Fall-Status ändern → In-place
+## Paket 7 — Funktionspflicht ✅
+- [x] Kontakt bearbeiten → Formular
+- [x] Neuer Kunde → Formular
+- [x] Verlaufseintrag klicken → Detail
+- [x] Neue E-Mail → Compose-Fenster
+- [x] Neue Rechnung/Angebot → Lexware-Modul
+- [x] Neuer Fall → Erstell-Dialog
+- [ ] Export/Streitfall → Streitfall-Ansicht (Grundgerüst vorhanden, Export-Logic offen)
+- [x] Kira fragen → Workspace mit Kontext
+- [x] Projekt wechseln → Dropdown + Filter
+- [x] Fall-Status ändern → In-place
 
-## Paket 8 — Kira + Einstellungen + Runtime-Log + Tour
-- [ ] Kira-Tool: kunden_suchen
-- [ ] Kira-Tool: kundenakte_laden
-- [ ] Kira-Tool: projekt_zuordnen
-- [ ] Kira-Tool: fall_erstellen
-- [ ] Kira-Tool: fall_oeffnen
-- [ ] Kira-Tool: kunden_klassifizieren
-- [ ] Kira-Tool: aktivitaeten_pruefliste
-- [ ] System-Prompt-Erweiterung (Top 5, offene Fälle, unzugeordnete)
-- [ ] 5 Quick-Actions im Kira-Workspace
-- [ ] Einstellungen-Sektion "Kunden / CRM" (11 Optionen)
-- [ ] 16 Runtime-Log-Events via elog()
-- [ ] Guided Tour (5 Schritte)
+## Paket 8 — Kira + Einstellungen + Runtime-Log + Tour ✅
+- [x] Kira-Tool: kunden_suchen
+- [x] Kira-Tool: kundenakte_laden
+- [x] Kira-Tool: crm_projekt_zuordnen
+- [x] Kira-Tool: crm_fall_erstellen
+- [x] Kira-Tool: crm_fall_oeffnen
+- [x] Kira-Tool: crm_kunden_klassifizieren
+- [x] Kira-Tool: crm_aktivitaeten_pruefliste
+- [x] System-Prompt-Erweiterung (Top 5, offene Fälle, unzugeordnete)
+- [x] 5 Quick-Actions im Kira-Workspace
+- [x] Einstellungen-Sektion "Kunden / CRM" (10 Optionen)
+- [x] Runtime-Log-Events via elog() (13 implementiert)
+- [x] Guided Tour (6 Schritte)
 
-## Paket-Abschluss (nach jedem Paket)
+## Paket-Abschluss
 - [ ] Git Commit
 - [ ] session_handoff.json aktualisiert
 - [ ] feature_registry.json aktualisiert

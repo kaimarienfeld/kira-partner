@@ -1296,6 +1296,69 @@ def _build_data_context(config, kira_cfg=None):
         pass
 
     db.close()
+
+    # ── CRM-Kontext: Top-Kunden, offene Fälle, unzugeordnete (session-ss) ──
+    try:
+        _kdb_path = SCRIPTS_DIR.parent / "knowledge" / "kunden.db"
+        if _kdb_path.exists():
+            _kdb = sqlite3.connect(str(_kdb_path))
+            _kdb.row_factory = sqlite3.Row
+            # Top 5 aktive Kunden
+            _top = _kdb.execute("""
+                SELECT k.id, k.name, k.firmenname, k.email, k.status, k.letztkontakt,
+                       (SELECT COUNT(*) FROM kunden_faelle f WHERE f.kunden_id=k.id AND f.status NOT IN ('erledigt','archiv')) as offene_faelle,
+                       (SELECT p.projektname FROM kunden_projekte p WHERE p.kunden_id=k.id AND p.status='aktiv' ORDER BY p.aktualisiert_am DESC LIMIT 1) as aktives_projekt
+                FROM kunden k WHERE k.status='aktiv'
+                ORDER BY k.letztkontakt DESC LIMIT 5
+            """).fetchall()
+            if _top:
+                ctx += f"\n=== TOP KUNDEN ({len(_top)} zuletzt aktiv) ===\n"
+                for _tk in _top:
+                    _fn = f" ({_tk['firmenname']})" if _tk['firmenname'] else ""
+                    _fp = f" | Projekt: {_tk['aktives_projekt']}" if _tk['aktives_projekt'] else ""
+                    _ff = f" | {_tk['offene_faelle']} offene Fälle" if _tk['offene_faelle'] else ""
+                    ctx += f"  [#{_tk['id']}] {_tk['name'] or '?'}{_fn} | {_tk['email'] or '-'}{_fp}{_ff}\n"
+            # Offene Fälle
+            _of = _kdb.execute("""
+                SELECT f.id, f.titel, f.fall_typ, f.status, f.prioritaet, f.faellig_am,
+                       k.name as kunde_name, k.firmenname
+                FROM kunden_faelle f JOIN kunden k ON f.kunden_id=k.id
+                WHERE f.status NOT IN ('erledigt','archiv')
+                ORDER BY CASE f.prioritaet WHEN 'dringend' THEN 0 WHEN 'hoch' THEN 1 ELSE 2 END, f.aktualisiert_am DESC
+                LIMIT 10
+            """).fetchall()
+            if _of:
+                ctx += f"\n=== OFFENE CRM-FÄLLE ({len(_of)}) ===\n"
+                for _ofi in _of:
+                    _kn = _ofi['firmenname'] or _ofi['kunde_name'] or '?'
+                    _prio = f" [PRIO: {_ofi['prioritaet']}]" if _ofi['prioritaet'] in ('hoch','dringend') else ""
+                    _fdl = f" | Fällig: {_ofi['faellig_am'][:10]}" if _ofi['faellig_am'] else ""
+                    ctx += f"  [#{_ofi['id']}] {_ofi['titel'][:50]} | {_ofi['fall_typ']} | {_kn}{_prio}{_fdl}\n"
+            # Unzugeordnete Aktivitäten
+            try:
+                _unz = _kdb.execute("""
+                    SELECT COUNT(*) FROM kunden_classifier_log WHERE user_bestaetigt=0 AND confidence IN ('pruefen','unklar')
+                """).fetchone()
+                if _unz and _unz[0] > 0:
+                    ctx += f"\n⚠ {_unz[0]} unzugeordnete Aktivitäten warten auf Prüfung (Tool: crm_aktivitaeten_pruefliste)\n"
+            except Exception:
+                pass
+            # Aktive Projekte
+            _ap = _kdb.execute("""
+                SELECT p.id, p.projektname, p.status, k.name as kunde_name, k.firmenname
+                FROM kunden_projekte p JOIN kunden k ON p.kunden_id=k.id
+                WHERE p.status IN ('aktiv','planung')
+                ORDER BY p.aktualisiert_am DESC LIMIT 8
+            """).fetchall()
+            if _ap:
+                ctx += f"\n=== AKTIVE KUNDENPROJEKTE ({len(_ap)}) ===\n"
+                for _api in _ap:
+                    _kn2 = _api['firmenname'] or _api['kunde_name'] or '?'
+                    ctx += f"  [#{_api['id']}] {_api['projektname']} | {_kn2} | {_api['status']}\n"
+            _kdb.close()
+    except Exception:
+        pass
+
     return ctx
 
 
@@ -2166,6 +2229,122 @@ def get_tools(config=None):
         }
     })
 
+    # ── CRM / Kunden-Tools (session-ss: Paket 8) ──────────────────────────────
+    tools.append({
+        "name": "kunden_suchen",
+        "description": (
+            "Sucht Kunden in der CRM-Datenbank nach Name, E-Mail, Firma oder Stichwort. "
+            "Gibt Liste mit Kundennummer, Name, Firma, Status und letztem Projekt zurück."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "suchbegriff": {"type": "string", "description": "Suchtext (Name, E-Mail, Firma)"},
+                "status": {"type": "string", "description": "Optionaler Statusfilter (aktiv/lead/inaktiv/archiv)"}
+            },
+            "required": ["suchbegriff"]
+        }
+    })
+
+    tools.append({
+        "name": "kundenakte_laden",
+        "description": (
+            "Lädt die vollständige Kundenakte inkl. Projekte, offene Fälle, letzte Aktivitäten "
+            "und Stammdaten. Verwende dies wenn ein Benutzer nach einem bestimmten Kunden fragt."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunden_id": {"type": "integer", "description": "ID des Kunden in kunden.db"}
+            },
+            "required": ["kunden_id"]
+        }
+    })
+
+    tools.append({
+        "name": "crm_projekt_zuordnen",
+        "description": (
+            "Ordnet eine Aktivität (Mail, Dokument, Fall) einem bestimmten Kundenprojekt zu. "
+            "Nutze dies wenn der Benutzer eine manuelle Zuordnung machen möchte."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "aktivitaet_id": {"type": "integer", "description": "ID der Aktivität in kunden_aktivitaeten"},
+                "projekt_id": {"type": "integer", "description": "Ziel-Projekt-ID in kunden_projekte"}
+            },
+            "required": ["aktivitaet_id", "projekt_id"]
+        }
+    })
+
+    tools.append({
+        "name": "crm_fall_erstellen",
+        "description": (
+            "Erstellt einen neuen Fall/Ticket für einen Kunden. Fall-Typen: anfrage, angebot, "
+            "reklamation, maengel, streitfall, allgemein. Gehört immer zu einem Kunden, optional zu einem Projekt."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunden_id": {"type": "integer", "description": "ID des Kunden"},
+                "titel": {"type": "string", "description": "Kurztitel des Falls"},
+                "fall_typ": {"type": "string", "description": "Typ: anfrage|angebot|reklamation|maengel|streitfall|allgemein"},
+                "projekt_id": {"type": "integer", "description": "Optionale Projekt-ID"},
+                "prioritaet": {"type": "string", "description": "normal|hoch|dringend (Standard: normal)"},
+                "naechste_aktion": {"type": "string", "description": "Beschreibung der nächsten Aktion"}
+            },
+            "required": ["kunden_id", "titel", "fall_typ"]
+        }
+    })
+
+    tools.append({
+        "name": "crm_fall_oeffnen",
+        "description": (
+            "Lädt die Details eines Falls/Tickets inkl. vollständiger Timeline (Mails, Notizen, "
+            "Dokumente, Statusänderungen). Verwende dies wenn der Benutzer einen Fall ansehen möchte."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "fall_id": {"type": "integer", "description": "ID des Falls in kunden_faelle"}
+            },
+            "required": ["fall_id"]
+        }
+    })
+
+    tools.append({
+        "name": "crm_kunden_klassifizieren",
+        "description": (
+            "Startet die Kunden-Klassifizierung für eine Mail oder einen Kontakt. "
+            "Nutzt den LLM-Classifier um den Kunden/Projekt automatisch zu erkennen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "eingabe_typ": {"type": "string", "description": "mail|kontakt"},
+                "eingabe_id": {"type": "string", "description": "Message-ID der Mail oder E-Mail-Adresse"},
+                "absender": {"type": "string", "description": "E-Mail-Adresse des Absenders"},
+                "betreff": {"type": "string", "description": "Betreff der Mail (optional)"},
+                "text_auszug": {"type": "string", "description": "Textauszug (optional, max 500 Zeichen)"}
+            },
+            "required": ["eingabe_typ", "eingabe_id"]
+        }
+    })
+
+    tools.append({
+        "name": "crm_aktivitaeten_pruefliste",
+        "description": (
+            "Zeigt alle unzugeordneten oder unsicheren Aktivitäten, die manuelle Prüfung benötigen. "
+            "Gibt Vorschläge des Classifiers mit Confidence-Werten zurück."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max. Anzahl Ergebnisse (Standard: 20)"}
+            }
+        }
+    })
+
     return tools
 
 
@@ -2239,6 +2418,14 @@ def execute_tool(name, params):
             "artikel_preise_abfragen": _tool_artikel_preise_abfragen,
             "angebot_positionen_vorschlagen": _tool_angebot_positionen_vorschlagen,
             "preisentwicklung_abfragen": _tool_preisentwicklung_abfragen,
+            # CRM / Kunden-Tools (session-ss)
+            "kunden_suchen": _tool_kunden_suchen,
+            "kundenakte_laden": _tool_kundenakte_laden,
+            "crm_projekt_zuordnen": _tool_crm_projekt_zuordnen,
+            "crm_fall_erstellen": _tool_crm_fall_erstellen,
+            "crm_fall_oeffnen": _tool_crm_fall_oeffnen,
+            "crm_kunden_klassifizieren": _tool_crm_kunden_klassifizieren,
+            "crm_aktivitaeten_pruefliste": _tool_crm_aktivitaeten_pruefliste,
         }
         handler = handlers.get(name)
         if not handler:
@@ -5183,6 +5370,220 @@ def _tool_preisentwicklung_abfragen(p):
         lines.append(f"\nStatistik: Min {_min:.2f} | Max {_max:.2f} | Durchschnitt {_avg:.2f} EUR | Trend: {trend}")
 
     return {"ok": True, "message": "\n".join(lines), "eintraege": len(rows)}
+
+
+# ── CRM / Kunden Tool-Handler (session-ss: Paket 8) ─────────────────────────
+
+def _tool_kunden_suchen(p):
+    """Sucht Kunden in kunden.db."""
+    suchbegriff = (p.get("suchbegriff") or "").strip()
+    if not suchbegriff:
+        return {"ok": False, "error": "Suchbegriff erforderlich"}
+    status_filter = (p.get("status") or "").strip()
+    import sqlite3
+    try:
+        kdb = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "kunden.db"))
+        kdb.row_factory = sqlite3.Row
+        like = f"%{suchbegriff}%"
+        q = """
+            SELECT k.id, k.name, k.firmenname, k.email, k.kundentyp, k.status,
+                   k.kundenwert, k.letztkontakt,
+                   (SELECT COUNT(*) FROM kunden_faelle f WHERE f.kunden_id=k.id AND f.status NOT IN ('erledigt','archiv')) as offene_faelle,
+                   (SELECT p.projektname FROM kunden_projekte p WHERE p.kunden_id=k.id ORDER BY p.aktualisiert_am DESC LIMIT 1) as letztes_projekt
+            FROM kunden k
+            LEFT JOIN kunden_identitaeten ki ON ki.kunden_id=k.id
+            WHERE (k.name LIKE ? OR k.firmenname LIKE ? OR k.email LIKE ? OR ki.wert LIKE ?)
+        """
+        params = [like, like, like, like]
+        if status_filter:
+            q += " AND k.status=?"
+            params.append(status_filter)
+        q += " GROUP BY k.id ORDER BY k.letztkontakt DESC LIMIT 30"
+        rows = kdb.execute(q, params).fetchall()
+        kdb.close()
+        if not rows:
+            return {"ok": True, "message": f"Keine Kunden gefunden für '{suchbegriff}'."}
+        lines = [f"{len(rows)} Kunden gefunden:\n"]
+        for r in rows:
+            firma = f" ({r['firmenname']})" if r['firmenname'] else ""
+            faelle = f" | {r['offene_faelle']} offene Fälle" if r['offene_faelle'] else ""
+            proj = f" | Projekt: {r['letztes_projekt']}" if r['letztes_projekt'] else ""
+            lines.append(f"  [#{r['id']}] {r['name'] or '?'}{firma} | {r['email'] or '-'} | {r['kundentyp'] or '?'} | {r['status'] or '?'}{faelle}{proj}")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(rows)}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_kundenakte_laden(p):
+    """Lädt vollständige Kundenakte."""
+    kid = p.get("kunden_id")
+    if not kid:
+        return {"ok": False, "error": "kunden_id erforderlich"}
+    import sqlite3
+    try:
+        kdb = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "kunden.db"))
+        kdb.row_factory = sqlite3.Row
+        kunde = kdb.execute("SELECT * FROM kunden WHERE id=?", (kid,)).fetchone()
+        if not kunde:
+            kdb.close()
+            return {"ok": False, "error": f"Kunde #{kid} nicht gefunden"}
+        lines = [f"=== KUNDENAKTE #{kid} ==="]
+        lines.append(f"Name: {kunde['name'] or '-'} | Firma: {kunde['firmenname'] or '-'}")
+        lines.append(f"E-Mail: {kunde['email'] or '-'} | Typ: {kunde['kundentyp'] or '-'} | Status: {kunde['status'] or '-'}")
+        if kunde['kundenwert']:
+            lines.append(f"Kundenwert: {kunde['kundenwert']} EUR")
+        if kunde['notiz']:
+            lines.append(f"Notiz: {kunde['notiz'][:200]}")
+        # Identitäten
+        idents = kdb.execute("SELECT typ, wert, confidence FROM kunden_identitaeten WHERE kunden_id=?", (kid,)).fetchall()
+        if idents:
+            lines.append(f"\nIdentitäten ({len(idents)}):")
+            for i in idents:
+                lines.append(f"  {i['typ']}: {i['wert']} ({i['confidence']})")
+        # Projekte
+        projekte = kdb.execute("SELECT * FROM kunden_projekte WHERE kunden_id=? ORDER BY beginn_am DESC", (kid,)).fetchall()
+        if projekte:
+            lines.append(f"\nProjekte ({len(projekte)}):")
+            for pr in projekte:
+                wert = f" | {pr['auftragswert']} EUR" if pr['auftragswert'] else ""
+                lines.append(f"  [{pr['id']}] {pr['projektname']} | {pr['status']}{wert} | Beginn: {(pr['beginn_am'] or '-')[:10]}")
+        # Fälle
+        faelle = kdb.execute("SELECT * FROM kunden_faelle WHERE kunden_id=? ORDER BY aktualisiert_am DESC LIMIT 10", (kid,)).fetchall()
+        if faelle:
+            lines.append(f"\nFälle/Tickets ({len(faelle)}):")
+            for f in faelle:
+                lines.append(f"  [{f['id']}] {f['titel']} | {f['fall_typ']} | {f['status']} | Prio: {f['prioritaet'] or 'normal'}")
+        # Letzte Aktivitäten
+        akt = kdb.execute("SELECT * FROM kunden_aktivitaeten WHERE kunden_id=? ORDER BY erstellt_am DESC LIMIT 10", (kid,)).fetchall()
+        if akt:
+            lines.append(f"\nLetzte Aktivitäten ({len(akt)}):")
+            for a in akt:
+                lines.append(f"  {(a['erstellt_am'] or '')[:16]} | {a['ereignis_typ']} | {(a['zusammenfassung'] or '')[:80]}")
+        kdb.close()
+        return {"ok": True, "message": "\n".join(lines)}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_projekt_zuordnen(p):
+    """Ordnet Aktivität einem Projekt zu."""
+    aid = p.get("aktivitaet_id")
+    pid = p.get("projekt_id")
+    if not aid or not pid:
+        return {"ok": False, "error": "aktivitaet_id und projekt_id erforderlich"}
+    import sqlite3
+    try:
+        kdb = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "kunden.db"))
+        kdb.execute("UPDATE kunden_aktivitaeten SET projekt_id=? WHERE id=?", (pid, aid))
+        kdb.commit()
+        kdb.close()
+        _elog("kira", "aktivitaet_zugeordnet", f"Aktivität #{aid} → Projekt #{pid}",
+              source="kira_llm", modul="crm", submodul="zuordnung")
+        return {"ok": True, "message": f"Aktivität #{aid} wurde Projekt #{pid} zugeordnet."}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_fall_erstellen(p):
+    """Erstellt neuen Fall/Ticket."""
+    kid = p.get("kunden_id")
+    titel = (p.get("titel") or "").strip()
+    fall_typ = (p.get("fall_typ") or "allgemein").strip()
+    if not kid or not titel:
+        return {"ok": False, "error": "kunden_id und titel erforderlich"}
+    import sqlite3
+    try:
+        kdb = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "kunden.db"))
+        cur = kdb.execute("""
+            INSERT INTO kunden_faelle (kunden_id, projekt_id, fall_typ, titel, status, prioritaet, naechste_aktion)
+            VALUES (?, ?, ?, ?, 'offen', ?, ?)
+        """, (kid, p.get("projekt_id"), fall_typ, titel,
+              p.get("prioritaet", "normal"), p.get("naechste_aktion", "")))
+        fid = cur.lastrowid
+        kdb.commit()
+        kdb.close()
+        _elog("kira", "fall_erstellt", f"Fall #{fid}: {titel} ({fall_typ}) für Kunde #{kid}",
+              source="kira_llm", modul="crm", submodul="faelle")
+        return {"ok": True, "message": f"Fall #{fid} erstellt: {titel} ({fall_typ})", "fall_id": fid}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_fall_oeffnen(p):
+    """Lädt Fall-Details + Timeline."""
+    fid = p.get("fall_id")
+    if not fid:
+        return {"ok": False, "error": "fall_id erforderlich"}
+    import sqlite3
+    try:
+        kdb = sqlite3.connect(str(SCRIPTS_DIR.parent / "knowledge" / "kunden.db"))
+        kdb.row_factory = sqlite3.Row
+        fall = kdb.execute("SELECT * FROM kunden_faelle WHERE id=?", (fid,)).fetchone()
+        if not fall:
+            kdb.close()
+            return {"ok": False, "error": f"Fall #{fid} nicht gefunden"}
+        lines = [f"=== FALL #{fid} ==="]
+        lines.append(f"Titel: {fall['titel']}")
+        lines.append(f"Typ: {fall['fall_typ']} | Status: {fall['status']} | Priorität: {fall['prioritaet'] or 'normal'}")
+        lines.append(f"Kunde: #{fall['kunden_id']} | Projekt: #{fall['projekt_id'] or '-'}")
+        if fall['naechste_aktion']:
+            lines.append(f"Nächste Aktion: {fall['naechste_aktion']}")
+        if fall['faellig_am']:
+            lines.append(f"Fällig: {fall['faellig_am']}")
+        # Timeline
+        akt = kdb.execute("""
+            SELECT * FROM kunden_aktivitaeten WHERE fall_id=? ORDER BY erstellt_am DESC LIMIT 30
+        """, (fid,)).fetchall()
+        if akt:
+            lines.append(f"\nTimeline ({len(akt)} Einträge):")
+            for a in akt:
+                lines.append(f"  {(a['erstellt_am'] or '')[:16]} | {a['ereignis_typ']} | {(a['zusammenfassung'] or '')[:100]}")
+        kdb.close()
+        return {"ok": True, "message": "\n".join(lines)}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_kunden_klassifizieren(p):
+    """Startet Kunden-Klassifizierung."""
+    eingabe_typ = (p.get("eingabe_typ") or "mail").strip()
+    eingabe_id = (p.get("eingabe_id") or "").strip()
+    if not eingabe_id:
+        return {"ok": False, "error": "eingabe_id erforderlich"}
+    try:
+        from kunden_classifier import classify_kunde_projekt, apply_classification
+        result = classify_kunde_projekt(
+            absender=p.get("absender", eingabe_id),
+            betreff=p.get("betreff", ""),
+            text_auszug=p.get("text_auszug", ""),
+            eingabe_typ=eingabe_typ,
+            eingabe_id=eingabe_id
+        )
+        if result and result.get("kunden_id"):
+            apply_classification(result, eingabe_typ=eingabe_typ, eingabe_id=eingabe_id)
+            conf = result.get("confidence", "?")
+            return {"ok": True, "message": f"Klassifiziert: Kunde #{result['kunden_id']} | Projekt: {result.get('projekt_id', '-')} | Confidence: {conf}"}
+        else:
+            return {"ok": True, "message": f"Keine sichere Zuordnung möglich. Confidence: {result.get('confidence', '?') if result else 'fehler'}"}
+    except Exception as e:
+        return {"ok": False, "error": f"Classifier-Fehler: {e}"}
+
+
+def _tool_crm_aktivitaeten_pruefliste(p):
+    """Zeigt unzugeordnete Aktivitäten."""
+    limit = int(p.get("limit", 20))
+    try:
+        from kunden_classifier import get_unzugeordnete
+        items = get_unzugeordnete(limit=limit)
+        if not items:
+            return {"ok": True, "message": "Keine unzugeordneten Aktivitäten vorhanden."}
+        lines = [f"{len(items)} unzugeordnete Aktivitäten:\n"]
+        for it in items:
+            lines.append(f"  [{it.get('id', '?')}] {it.get('eingabe_typ', '?')} | {it.get('confidence', '?')} | "
+                         f"Vorschlag: Kunde #{it.get('kunden_id_vorschlag', '-')} | {(it.get('reasoning_kurz') or '')[:80]}")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(items)}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
 
 
 # Init DB bei Import

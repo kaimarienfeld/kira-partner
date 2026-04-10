@@ -325,6 +325,11 @@ def classify_kunde_projekt(
             "reasoning": "Newsletter/Noreply/Marketing-Absender erkannt",
         }
         _log_classification(eingabe_typ, eingabe_id, result, llm_modell="regel")
+        try:
+            from runtime_log import elog
+            elog("kein_geschaeftsfall", f"Kein Geschäftsfall: {absender[:60]} | {betreff[:40]}")
+        except Exception:
+            pass
         return result
 
     # 2. Fast-Path
@@ -340,6 +345,11 @@ def classify_kunde_projekt(
         return cached[1]
 
     # 4. LLM-Klassifizierung
+    try:
+        from runtime_log import elog as _elog_cls
+        _elog_cls("classifier_aufgerufen", f"LLM-Classifier für {absender[:50]} | {betreff[:40]}")
+    except Exception:
+        pass
     try:
         from kira_llm import classify_direct, get_providers
 

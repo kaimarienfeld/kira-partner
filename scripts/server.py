@@ -7328,6 +7328,7 @@ def build_einstellungen():
     capture_cfg_es     = config.get("capture", {})
     cf_tunnel_cfg      = config.get("cloudflare_tunnel", {})
     cf_public_url      = cf_tunnel_cfg.get("public_url", "")
+    crm_cfg            = config.get("crm", {})
     # Benutzerprofile laden
     from task_manager import get_active_profile as _gap
     _profil = _gap(config)
@@ -8063,6 +8064,7 @@ function esInfoPopup(btn, text) {{
   <div class="es-sn" data-essec="dokumente-einst" onclick="esShowSec('dokumente-einst')"><span class="es-sico">&#x1F4C4;</span>Dokumente</div>
   <div class="es-sn" data-essec="integrationen" onclick="esShowSec('integrationen')"><span class="es-sico">&#x21C4;</span>Integrationen</div>
   <div class="es-sn" data-essec="lexware" onclick="esShowSec('lexware')"><span class="es-sico">&#x1F4CB;</span>Lexware Office</div>
+  <div class="es-sn" data-essec="crm" onclick="esShowSec('crm')"><span class="es-sico">&#x1F465;</span>Kunden / CRM</div>
   <div class="es-sn" data-essec="automationen" onclick="esShowSec('automationen')"><span class="es-sico">&#x27F3;</span>Automationen</div>
   <div class="es-sn" data-essec="sicherheit-audit" onclick="esShowSec('sicherheit-audit')"><span class="es-sico">&#x1F6E1;</span>Sicherheit &amp; Audit</div>
   <div class="es-sn" data-essec="verbrauch" onclick="esShowSec('verbrauch')"><span class="es-sico">&#x1F4CA;</span>Verbrauch &amp; Kosten</div>
@@ -12614,6 +12616,100 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
   </script>
 </div>
 
+<!-- ── SECTION: KUNDEN / CRM ──────────────────────────────────────────── -->
+<div class="es-sec-panel" id="es-sec-crm">
+  <div class="es-sec-h">Kunden / CRM</div>
+  <div class="es-sec-sub">Zuordnungslogik, Klassifizierung, Ticket-Verhalten und Protokoll f&uuml;r das CRM-Modul konfigurieren.</div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Zuordnungslogik</div>
+    <div class="es-grp-sub">Wie eingehende Mails und Aktivit&auml;ten automatisch Kunden und Projekten zugeordnet werden.</div>
+    <div class="es-row">
+      <label class="es-lbl">Automatische Zuordnung</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-auto-zuordnung" {'checked' if crm_cfg.get('auto_zuordnung', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Mails mit eindeutigem Absender werden automatisch dem Kunden zugeordnet</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">LLM-Classifier aktiv</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-llm-classifier" {'checked' if crm_cfg.get('llm_classifier', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Bei unbekannten Absendern den KI-Classifier einsetzen</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Confidence-Schwelle</label>
+      <select id="cfg-crm-confidence-schwelle" class="es-sel">
+        <option value="eindeutig" {'selected' if crm_cfg.get('confidence_schwelle','wahrscheinlich')=='eindeutig' else ''}>Nur eindeutig (streng)</option>
+        <option value="wahrscheinlich" {'selected' if crm_cfg.get('confidence_schwelle','wahrscheinlich')=='wahrscheinlich' else ''}>Wahrscheinlich (empfohlen)</option>
+        <option value="pruefen" {'selected' if crm_cfg.get('confidence_schwelle','wahrscheinlich')=='pruefen' else ''}>Auch pr&uuml;fen (locker)</option>
+      </select>
+      <span class="es-hint">Ab welcher Confidence-Stufe automatisch zugeordnet wird</span>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Gesch&auml;ftskontakt-Filter</div>
+    <div class="es-grp-sub">Newsletter, noreply und Marketing-Mails vor dem Classifier ausfiltern.</div>
+    <div class="es-row">
+      <label class="es-lbl">Gesch&auml;ftskontakt-Filter aktiv</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-geschaeftsfilter" {'checked' if crm_cfg.get('geschaeftsfilter', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Bekannte Newsletter-Domains und noreply-Adressen &uuml;berspringen</span>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Ticket-Verhalten</div>
+    <div class="es-grp-sub">Wie F&auml;lle/Tickets automatisch erstellt und verwaltet werden.</div>
+    <div class="es-row">
+      <label class="es-lbl">Auto-Fall-Erstellung</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-auto-fall" {'checked' if crm_cfg.get('auto_fall', False) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Bei neuer Anfrage automatisch einen Fall/Ticket erstellen</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Standard-Fall-Typen</label>
+      <input type="text" id="cfg-crm-fall-typen" value="{esc(crm_cfg.get('fall_typen', 'anfrage,angebot,reklamation,maengel,streitfall,allgemein'))}" class="es-inp" style="width:340px">
+      <span class="es-hint">Kommagetrennte Liste der verf&uuml;gbaren Fall-Typen</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Standard-Priorit&auml;t</label>
+      <select id="cfg-crm-default-prio" class="es-sel">
+        <option value="normal" {'selected' if crm_cfg.get('default_prioritaet','normal')=='normal' else ''}>Normal</option>
+        <option value="hoch" {'selected' if crm_cfg.get('default_prioritaet','normal')=='hoch' else ''}>Hoch</option>
+        <option value="dringend" {'selected' if crm_cfg.get('default_prioritaet','normal')=='dringend' else ''}>Dringend</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Export &amp; Protokoll</div>
+    <div class="es-row">
+      <label class="es-lbl">Classifier-Log Detailgrad</label>
+      <select id="cfg-crm-log-detail" class="es-sel">
+        <option value="minimal" {'selected' if crm_cfg.get('log_detail','standard')=='minimal' else ''}>Minimal (nur Fehler)</option>
+        <option value="standard" {'selected' if crm_cfg.get('log_detail','standard')=='standard' else ''}>Standard</option>
+        <option value="ausfuehrlich" {'selected' if crm_cfg.get('log_detail','standard')=='ausfuehrlich' else ''}>Ausf&uuml;hrlich (inkl. LLM-Reasoning)</option>
+      </select>
+      <span class="es-hint">Wie viel Detail im Classifier-Log gespeichert wird</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Fall-Export Format</label>
+      <select id="cfg-crm-export-format" class="es-sel">
+        <option value="pdf" {'selected' if crm_cfg.get('export_format','pdf')=='pdf' else ''}>PDF</option>
+        <option value="zip" {'selected' if crm_cfg.get('export_format','pdf')=='zip' else ''}>ZIP (alle Dokumente)</option>
+        <option value="beide" {'selected' if crm_cfg.get('export_format','pdf')=='beide' else ''}>Beides</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Lexware-Synchronisation</div>
+    <div class="es-grp-sub">Stammdaten-Abgleich mit Lexware Office (REGEL-09: Lexware ist f&uuml;hrend).</div>
+    <div class="es-row">
+      <label class="es-lbl">Auto-Sync aktiv</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-lexware-sync" {'checked' if crm_cfg.get('lexware_sync', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Stammdaten alle 6h aus Lexware Office abgleichen</span>
+    </div>
+  </div>
+</div>
+
 <!-- ── SECTION: AUTOMATIONEN ──────────────────────────────────────────── -->
 <div class="es-sec-panel" id="es-sec-automationen">
   <div class="es-sec-h">Automationen</div>
@@ -14352,6 +14448,311 @@ def build_wissen(db):
     <div id="wissen-level-regelsteuerung" class="wissen-level">{regelsteuerung_html}</div>
     <div id="wissen-level-maillernen" class="wissen-level">{maillernen_html}</div>
     <div id="wissen-level-neu" class="wissen-level">{neue_html}</div>"""
+
+# ── KUNDEN / CRM Panel (session-ss) ──────────────────────────────────────────
+
+def build_kunden():
+    """Kunden/CRM Modul — 2-Spalten-Layout mit Sub-Navigation + 5 Panels."""
+
+    # ── CRM Stats laden ────────────────────────────────────────────────────
+    stats = {"kunden_aktiv": 0, "kunden_leads": 0, "kunden_inaktiv": 0,
+             "kunden_archiv": 0, "projekte_aktiv": 0, "faelle_offen": 0,
+             "unzugeordnet": 0, "contacts": 0}
+    try:
+        from case_engine import _ensure_crm_tables, KUNDEN_DB as _CKDB
+        _ensure_crm_tables()
+        _cdb = sqlite3.connect(str(_CKDB))
+        _cdb.row_factory = sqlite3.Row
+
+        # Kunden nach Status zaehlen
+        for row in _cdb.execute("SELECT COALESCE(status,'aktiv') as s, COUNT(*) as c FROM kunden GROUP BY s").fetchall():
+            key = f"kunden_{row['s']}" if f"kunden_{row['s']}" in stats else None
+            if key:
+                stats[key] = row["c"]
+        stats["contacts"] = _cdb.execute("SELECT COUNT(*) FROM kunden").fetchone()[0]
+
+        # Aktive Projekte
+        try:
+            stats["projekte_aktiv"] = _cdb.execute(
+                "SELECT COUNT(*) FROM kunden_projekte WHERE status IN ('aktiv','planung')"
+            ).fetchone()[0]
+        except Exception:
+            pass
+
+        # Offene Faelle
+        try:
+            stats["faelle_offen"] = _cdb.execute(
+                "SELECT COUNT(*) FROM kunden_faelle WHERE status NOT IN ('erledigt','archiv')"
+            ).fetchone()[0]
+        except Exception:
+            pass
+
+        # Unzugeordnete
+        try:
+            stats["unzugeordnet"] = _cdb.execute(
+                "SELECT COUNT(*) FROM kunden_classifier_log WHERE user_bestaetigt=0 AND confidence IN ('pruefen','unklar')"
+            ).fetchone()[0]
+        except Exception:
+            pass
+
+        _cdb.close()
+    except Exception:
+        pass
+
+    # ── Sub-Navigation (2. Spalte) ─────────────────────────────────────────
+    subnav = f"""
+<div class="crm-subnav">
+  <div class="crm-subnav-head">
+    <div class="crm-subnav-title">&#x1F465; Kunden</div>
+    <div class="crm-subnav-desc">CRM &amp; Kundenverwaltung</div>
+  </div>
+  <div class="crm-subnav-items">
+    <div class="crm-subnav-item active" data-crm-panel="contacts" onclick="crmShowPanel('contacts')">
+      <span class="crm-subnav-icon">&#x1F4C7;</span>
+      <span class="crm-subnav-label">Contacts</span>
+      <span class="crm-subnav-badge">{stats['contacts']}</span>
+    </div>
+    <div class="crm-subnav-item" data-crm-panel="kunden" onclick="crmShowPanel('kunden')">
+      <span class="crm-subnav-icon">&#x1F465;</span>
+      <span class="crm-subnav-label">Kunden</span>
+      <span class="crm-subnav-badge">{stats['kunden_aktiv']}</span>
+    </div>
+    <div class="crm-subnav-item" data-crm-panel="projekte" onclick="crmShowPanel('projekte')">
+      <span class="crm-subnav-icon">&#x1F4C1;</span>
+      <span class="crm-subnav-label">Kundenprojekte</span>
+      <span class="crm-subnav-badge">{stats['projekte_aktiv']}</span>
+    </div>
+    <div class="crm-subnav-item" data-crm-panel="aktivitaeten" onclick="crmShowPanel('aktivitaeten')">
+      <span class="crm-subnav-icon">&#x1F514;</span>
+      <span class="crm-subnav-label">Aktivit&auml;ten</span>
+      {'<span class="crm-subnav-badge crm-badge-warn">' + str(stats["unzugeordnet"]) + '</span>' if stats["unzugeordnet"] > 0 else '<span class="crm-subnav-badge">0</span>'}
+    </div>
+    <div class="crm-subnav-item" data-crm-panel="pipeline" onclick="crmShowPanel('pipeline')">
+      <span class="crm-subnav-icon">&#x1F4CA;</span>
+      <span class="crm-subnav-label">Vertriebs-Dashboard</span>
+    </div>
+  </div>
+</div>"""
+
+    # ── KPI-Zeile ──────────────────────────────────────────────────────────
+    kpis = f"""
+<div class="crm-kpis">
+  <div class="crm-kpi"><small>Aktive Kunden</small><strong>{stats['kunden_aktiv']}</strong></div>
+  <div class="crm-kpi"><small>Leads</small><strong>{stats['kunden_leads']}</strong></div>
+  <div class="crm-kpi"><small>Aktive Projekte</small><strong>{stats['projekte_aktiv']}</strong></div>
+  <div class="crm-kpi"><small>Offene F&auml;lle</small><strong>{stats['faelle_offen']}</strong></div>
+  <div class="crm-kpi"><small>Unzugeordnet</small><strong class="{'crm-warn' if stats['unzugeordnet'] > 0 else ''}">{stats['unzugeordnet']}</strong></div>
+  <div class="crm-kpi"><small>Inaktiv / Archiv</small><strong>{stats['kunden_inaktiv'] + stats['kunden_archiv']}</strong></div>
+</div>"""
+
+    # ── Toolbar ────────────────────────────────────────────────────────────
+    toolbar = """
+<div class="crm-toolbar">
+  <div class="crm-toolbar-left">
+    <input class="crm-search" id="crmSearchInput" placeholder="&#x1F50D; Kunde, Firma, E-Mail suchen&hellip;" oninput="crmFilterList()" autocomplete="off">
+    <select class="crm-filter-select" id="crmFilterTyp" onchange="crmFilterList()">
+      <option value="">Alle Typen</option>
+      <option value="geschaeft">Gesch&auml;ft</option>
+      <option value="privat">Privat</option>
+      <option value="intern">Intern</option>
+    </select>
+    <select class="crm-filter-select" id="crmFilterStatus" onchange="crmFilterList()">
+      <option value="">Alle Status</option>
+      <option value="aktiv">Aktiv</option>
+      <option value="lead">Lead</option>
+      <option value="inaktiv">Inaktiv</option>
+      <option value="archiv">Archiv</option>
+    </select>
+  </div>
+  <div class="crm-toolbar-right">
+    <button class="crm-btn crm-btn-primary" onclick="crmNeuerKunde()">+ Neuer Kunde</button>
+    <button class="crm-btn" onclick="crmLoadKunden()">&#x21BB; Aktualisieren</button>
+    <button class="kt-tour-btn" onclick="kira_tour.start(window.KIRA_TOUR_CRM,{{erklaermodus:true}})" title="Gef&uuml;hrte Tour durch das Kunden-Modul">Tour</button>
+  </div>
+</div>"""
+
+    # ── Akkordeon-Container (wird per JS gefuellt) ─────────────────────────
+    accordion = """
+<div id="crmAccordionContainer">
+  <div class="crm-accordion" data-group="aktiv">
+    <div class="crm-acc-head" onclick="crmToggleAccordion('aktiv')">
+      <span class="crm-acc-title">&#x2705; Aktive Kunden <span class="crm-acc-count" id="crmCountAktiv">0</span></span>
+      <span class="crm-acc-arrow" id="crmArrowAktiv">&#x25BC;</span>
+    </div>
+    <div class="crm-acc-body" id="crmBodyAktiv">
+      <table class="crm-table" id="crmTableAktiv"><thead><tr>
+        <th>Name / Firma</th><th>Typ</th><th>Letztes Projekt</th><th>Letzte Aktivit&auml;t</th><th>Offene F&auml;lle</th><th>Status</th>
+      </tr></thead><tbody id="crmTbodyAktiv"></tbody></table>
+    </div>
+  </div>
+  <div class="crm-accordion" data-group="lead">
+    <div class="crm-acc-head" onclick="crmToggleAccordion('lead')">
+      <span class="crm-acc-title">&#x1F4E8; Leads <span class="crm-acc-count" id="crmCountLead">0</span></span>
+      <span class="crm-acc-arrow" id="crmArrowLead">&#x25BC;</span>
+    </div>
+    <div class="crm-acc-body" id="crmBodyLead">
+      <table class="crm-table" id="crmTableLead"><thead><tr>
+        <th>Name / Firma</th><th>Typ</th><th>Erstkontakt</th><th>Letzte Aktivit&auml;t</th><th>Quelle</th><th>Status</th>
+      </tr></thead><tbody id="crmTbodyLead"></tbody></table>
+    </div>
+  </div>
+  <div class="crm-accordion collapsed" data-group="inaktiv">
+    <div class="crm-acc-head" onclick="crmToggleAccordion('inaktiv')">
+      <span class="crm-acc-title">&#x23F8; Inaktive Kunden <span class="crm-acc-count" id="crmCountInaktiv">0</span></span>
+      <span class="crm-acc-arrow" id="crmArrowInaktiv">&#x25B6;</span>
+    </div>
+    <div class="crm-acc-body" id="crmBodyInaktiv" style="display:none">
+      <table class="crm-table" id="crmTableInaktiv"><thead><tr>
+        <th>Name / Firma</th><th>Typ</th><th>Letzter Kontakt</th><th>Projekte</th><th>Status</th>
+      </tr></thead><tbody id="crmTbodyInaktiv"></tbody></table>
+    </div>
+  </div>
+  <div class="crm-accordion collapsed" data-group="archiv">
+    <div class="crm-acc-head" onclick="crmToggleAccordion('archiv')">
+      <span class="crm-acc-title">&#x1F4E6; Archiv <span class="crm-acc-count" id="crmCountArchiv">0</span></span>
+      <span class="crm-acc-arrow" id="crmArrowArchiv">&#x25B6;</span>
+    </div>
+    <div class="crm-acc-body" id="crmBodyArchiv" style="display:none">
+      <table class="crm-table" id="crmTableArchiv"><thead><tr>
+        <th>Name / Firma</th><th>Letzter Kontakt</th><th>Projekte</th><th>Status</th>
+      </tr></thead><tbody id="crmTbodyArchiv"></tbody></table>
+    </div>
+  </div>
+</div>"""
+
+    # ── Kundenakte Panel (wird per JS gefuellt) ────────────────────────────
+    kundenakte = """
+<div id="crmKundenaktePanel" class="crm-panel" style="display:none">
+  <div class="crm-akte-header" id="crmAkteHeader"></div>
+  <div class="crm-akte-project-switch" id="crmProjektSwitch"></div>
+  <div class="crm-akte-tabs">
+    <button class="crm-tab active" data-tab="verlauf" onclick="crmShowAkteTab('verlauf')">Verlauf</button>
+    <button class="crm-tab" data-tab="faelle" onclick="crmShowAkteTab('faelle')">F&auml;lle / Tickets</button>
+    <button class="crm-tab" data-tab="dokumente" onclick="crmShowAkteTab('dokumente')">Dokumente</button>
+    <button class="crm-tab" data-tab="finanzen" onclick="crmShowAkteTab('finanzen')">Finanzen</button>
+    <button class="crm-tab" data-tab="kira" onclick="crmShowAkteTab('kira')">Kira</button>
+  </div>
+  <div class="crm-akte-layout">
+    <div class="crm-akte-main">
+      <div class="crm-akte-tab-content active" id="crmTabVerlauf">
+        <div id="crmVerlaufTimeline" class="crm-timeline"></div>
+      </div>
+      <div class="crm-akte-tab-content" id="crmTabFaelle">
+        <div id="crmFaelleList"></div>
+      </div>
+      <div class="crm-akte-tab-content" id="crmTabDokumente">
+        <div id="crmDokList"></div>
+      </div>
+      <div class="crm-akte-tab-content" id="crmTabFinanzen">
+        <div id="crmFinanzList"></div>
+      </div>
+      <div class="crm-akte-tab-content" id="crmTabKira">
+        <div id="crmKiraPanel"></div>
+      </div>
+    </div>
+    <div class="crm-akte-sidebar">
+      <div class="crm-akte-sidebar-section" id="crmStammdaten"></div>
+      <div class="crm-akte-sidebar-section" id="crmVerknuepfungen"></div>
+      <div class="crm-akte-sidebar-section" id="crmDirektaktionen">
+        <div class="crm-sidebar-title">Aktionen</div>
+        <button class="crm-action-btn" onclick="crmNeueEmail()">&#x2709; Neue E-Mail</button>
+        <button class="crm-action-btn" onclick="crmNeuerFall()">&#x1F4CB; Neuer Fall</button>
+        <button class="crm-action-btn" onclick="crmKiraFragen()">&#x2728; Kira fragen</button>
+        <button class="crm-action-btn" onclick="crmNeuesAngebot()">&#x1F4B0; Neues Angebot</button>
+        <button class="crm-action-btn" onclick="crmKontaktBearbeiten()">&#x270F; Kontakt bearbeiten</button>
+      </div>
+    </div>
+  </div>
+</div>"""
+
+    # ── Fallansicht Panel (wird per JS gefuellt) ──────────────────────────
+    fallansicht = """
+<div id="crmFallPanel" class="crm-panel" style="display:none">
+  <div class="crm-fall-header" id="crmFallHeader"></div>
+  <div class="crm-fall-layout">
+    <div class="crm-fall-main">
+      <div class="crm-fall-timeline" id="crmFallTimeline"></div>
+      <div class="crm-fall-actions">
+        <button class="crm-action-btn" onclick="crmFallNeueEmail()">&#x2709; Neue E-Mail</button>
+        <button class="crm-action-btn" onclick="crmFallNeueNotiz()">&#x1F4DD; Neue Notiz</button>
+        <button class="crm-action-btn" onclick="crmFallDokument()">&#x1F4CE; Dokument</button>
+        <button class="crm-action-btn" onclick="crmFallKira()">&#x2728; Kira fragen</button>
+        <button class="crm-action-btn crm-btn-warn" onclick="crmFallExport()">&#x1F4E4; Export / Streitfall</button>
+      </div>
+    </div>
+    <div class="crm-fall-sidebar" id="crmFallSidebar"></div>
+  </div>
+</div>"""
+
+    # ── Projekte-Panel ─────────────────────────────────────────────────────
+    projekte_panel = """
+<div id="crmProjektePanel" class="crm-panel" style="display:none">
+  <div class="crm-section-header">
+    <h2>Kundenprojekte</h2>
+    <button class="crm-btn crm-btn-primary" onclick="crmNeuesProjekt()">+ Neues Projekt</button>
+  </div>
+  <div id="crmProjekteListe" class="crm-projekte-grid"></div>
+</div>"""
+
+    # ── Aktivitaeten-Panel (Pruefliste) ────────────────────────────────────
+    aktivitaeten_panel = """
+<div id="crmAktivitaetenPanel" class="crm-panel" style="display:none">
+  <div class="crm-section-header">
+    <h2>Unzugeordnete Aktivit&auml;ten</h2>
+    <button class="crm-btn" onclick="crmLoadUnzugeordnete()">&#x21BB; Aktualisieren</button>
+  </div>
+  <div id="crmUnzugeordneteListe"></div>
+</div>"""
+
+    # ── Pipeline-Panel ─────────────────────────────────────────────────────
+    pipeline_panel = """
+<div id="crmPipelinePanel" class="crm-panel" style="display:none">
+  <div class="crm-section-header">
+    <h2>Vertriebs-Dashboard</h2>
+  </div>
+  <div id="crmPipelineContent" class="crm-pipeline-grid"></div>
+</div>"""
+
+    # ── Modals (Neuer Kunde, Kontakt bearbeiten, Eintrag-Detail, Streitfall) ──
+    modals = """
+<div class="crm-modal-overlay" id="crmModalOverlay" style="display:none" onclick="crmCloseModal()">
+  <div class="crm-modal" onclick="event.stopPropagation()">
+    <div class="crm-modal-header">
+      <h3 id="crmModalTitle">Dialog</h3>
+      <button class="crm-modal-close" onclick="crmCloseModal()">&times;</button>
+    </div>
+    <div class="crm-modal-body" id="crmModalBody"></div>
+    <div class="crm-modal-footer" id="crmModalFooter"></div>
+  </div>
+</div>"""
+
+    # ── Zusammenbau ────────────────────────────────────────────────────────
+    return f"""
+<div class="crm-module">
+  {subnav}
+  <div class="crm-main">
+    <div class="crm-main-header">
+      <button class="crm-back-btn" id="crmBackBtn" style="display:none" onclick="crmBack()">&#x2190; Zur&uuml;ck</button>
+      <h1 id="crmMainTitle">Kunden&uuml;bersicht</h1>
+    </div>
+    {kpis}
+    <div id="crmContactsPanel" class="crm-panel">
+      {toolbar}
+      {accordion}
+    </div>
+    <div id="crmKundenPanel" class="crm-panel" style="display:none">
+      {toolbar}
+      {accordion}
+    </div>
+    {kundenakte}
+    {fallansicht}
+    {projekte_panel}
+    {aktivitaeten_panel}
+    {pipeline_panel}
+  </div>
+  {modals}
+</div>"""
+
 
 # ── LEXWARE OFFICE Panel ──────────────────────────────────────────────────────
 def build_lexware(db):
@@ -16852,6 +17253,25 @@ def generate_html() -> str:
         ).fetchone()[0]
     except Exception:
         _dok_neu_count = 0
+    # CRM Badge-Zaehler fuer Sidebar (session-ss)
+    _crm_badge_count = 0
+    try:
+        from case_engine import _ensure_crm_tables, KUNDEN_DB as _CRM_KUNDEN_DB
+        _ensure_crm_tables()
+        _crm_db = sqlite3.connect(str(_CRM_KUNDEN_DB))
+        _crm_db.row_factory = sqlite3.Row
+        _crm_offene = _crm_db.execute(
+            "SELECT COUNT(*) FROM kunden_faelle WHERE status NOT IN ('erledigt','archiv')"
+        ).fetchone()[0]
+        _crm_unzug = _crm_db.execute(
+            "SELECT COUNT(*) FROM kunden_classifier_log WHERE user_bestaetigt=0 AND confidence IN ('pruefen','unklar')"
+        ).fetchone()[0]
+        _crm_badge_count = _crm_offene + _crm_unzug
+        _crm_db.close()
+    except Exception:
+        pass
+    # Kunden-Modul HTML bauen (session-ss)
+    kunden_html = build_kunden()
     db.close()
 
     # Kira Launcher — SVG-Varianten
@@ -16929,9 +17349,9 @@ def generate_html() -> str:
     </div>
     <div class="sidebar-group">
       <div class="sidebar-group-label">Module</div>
-      <div class="sidebar-item planned" id="nav-kunden" onclick="showPanel('kunden')" data-label="Kunden">
+      <div class="sidebar-item" id="nav-kunden" onclick="showPanel('kunden');crmInit()" data-label="Kunden">
         <span class="si-icon">&#x1F465;</span><span class="si-label">Kunden</span>
-        <span class="si-badge planned">Geplant</span>
+        {f'<span class="si-badge" style="background:rgba(124,93,255,.12);color:#7c5dff;border-color:rgba(124,93,255,.25)">{_crm_badge_count}</span>' if _crm_badge_count > 0 else ''}
       </div>
       <div class="sidebar-item planned" id="nav-marketing" onclick="showPanel('marketing')" data-label="Marketing">
         <span class="si-icon">&#x1F4E3;</span><span class="si-label">Marketing</span>
@@ -17075,22 +17495,7 @@ def generate_html() -> str:
     </div>
   </div>
 
-  <!-- Geplante Module gem&auml;&szlig; Prompt_04 -->
-  <div class="panel" id="panel-kunden">
-    <div class="planned-shell">
-      <div class="planned-shell-icon">&#x1F465;</div>
-      <div class="planned-shell-title">Kunden</div>
-      <div class="planned-shell-desc">Zentrale Kundenverwaltung mit 360&deg;-Sicht auf jeden Kontakt.</div>
-      <div class="planned-badge">&#x1F6A7; In Planung</div>
-      <div class="planned-features">
-        <div class="planned-feature-item">&#x2192; Timeline &ndash; Chronologischer Verlauf aller Interaktionen</div>
-        <div class="planned-feature-item">&#x2192; Pipeline &ndash; Leads und Anfragen im Prozess verfolgen</div>
-        <div class="planned-feature-item">&#x2192; Potenzial &ndash; Gesch&auml;ftspotenzial je Kunde bewerten</div>
-        <div class="planned-feature-item">&#x2192; Zahlungsverhalten &ndash; Zahlungsmoral und -muster</div>
-        <div class="planned-feature-item">&#x2192; Offene Themen &ndash; Unbeantwortete Fragen, laufende Vorg&auml;nge</div>
-      </div>
-    </div>
-  </div>
+  <div class="panel" id="panel-kunden">{kunden_html}</div>
   <div class="panel" id="panel-marketing">
     <div class="planned-shell">
       <div class="planned-shell-icon">&#x1F4E3;</div>
@@ -17714,6 +18119,647 @@ function showPanel(name) {{
   if(name==='geschaeft') {{ setTimeout(loadGeschKiraSignale, 500); }}
   if(name==='capture' && typeof window.capLoadStats==='function') {{ setTimeout(window.capLoadStats, 400); }}
   if(name==='dokumente' && typeof window.dokLoadList==='function') {{ setTimeout(window.dokLoadList, 200); }}
+  if(name==='kunden' && typeof window.crmInit==='function') {{ setTimeout(window.crmInit, 200); }}
+}}
+
+// === CRM / Kunden JS (session-ss) ===
+let _crmCurrentPanel = 'contacts';
+let _crmCurrentKunde = null;
+let _crmCurrentProjekt = null;
+let _crmCurrentFall = null;
+let _crmKundenCache = [];
+let _crmInitDone = false;
+
+function crmInit() {{
+  if(_crmInitDone) return;
+  _crmInitDone = true;
+  crmLoadKunden();
+}}
+
+function crmShowPanel(name) {{
+  _crmCurrentPanel = name;
+  document.querySelectorAll('.crm-subnav-item').forEach(i=>i.classList.remove('active'));
+  const item = document.querySelector('[data-crm-panel="'+name+'"]');
+  if(item) item.classList.add('active');
+  // Alle Sub-Panels verstecken
+  document.querySelectorAll('#panel-kunden .crm-panel').forEach(p=>p.style.display='none');
+  const titles = {{contacts:'Kunden\\u00fcbersicht',kunden:'Kunden',projekte:'Kundenprojekte',aktivitaeten:'Aktivit\\u00e4ten',pipeline:'Vertriebs-Dashboard'}};
+  const mainTitle = document.getElementById('crmMainTitle');
+  if(mainTitle) mainTitle.textContent = titles[name]||name;
+  const backBtn = document.getElementById('crmBackBtn');
+  if(backBtn) backBtn.style.display = 'none';
+  if(name==='contacts'||name==='kunden') {{
+    const cp = document.getElementById('crmContactsPanel');
+    if(cp) cp.style.display='';
+    crmLoadKunden();
+  }} else if(name==='projekte') {{
+    const pp = document.getElementById('crmProjektePanel');
+    if(pp) pp.style.display='';
+    crmLoadProjekte();
+  }} else if(name==='aktivitaeten') {{
+    const ap = document.getElementById('crmAktivitaetenPanel');
+    if(ap) ap.style.display='';
+    crmLoadUnzugeordnete();
+  }} else if(name==='pipeline') {{
+    const plp = document.getElementById('crmPipelinePanel');
+    if(plp) plp.style.display='';
+    crmLoadPipeline();
+  }}
+}}
+
+function crmBack() {{
+  // Zurueck zur Uebersicht
+  const akteP = document.getElementById('crmKundenaktePanel');
+  const fallP = document.getElementById('crmFallPanel');
+  if(fallP && fallP.style.display !== 'none') {{
+    fallP.style.display='none';
+    if(akteP) akteP.style.display='';
+    document.getElementById('crmMainTitle').textContent = _crmCurrentKunde ? (_crmCurrentKunde.firmenname||_crmCurrentKunde.name||'Kundenakte') : 'Kundenakte';
+    return;
+  }}
+  if(akteP) akteP.style.display='none';
+  const cp = document.getElementById('crmContactsPanel');
+  if(cp) cp.style.display='';
+  document.getElementById('crmBackBtn').style.display='none';
+  document.getElementById('crmMainTitle').textContent = 'Kunden\\u00fcbersicht';
+  _crmCurrentKunde = null;
+  _crmCurrentProjekt = null;
+}}
+
+function crmToggleAccordion(group) {{
+  const acc = document.querySelector('.crm-accordion[data-group="'+group+'"]');
+  if(!acc) return;
+  const body = document.getElementById('crmBody'+group.charAt(0).toUpperCase()+group.slice(1));
+  const arrow = document.getElementById('crmArrow'+group.charAt(0).toUpperCase()+group.slice(1));
+  if(!body) return;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  if(arrow) arrow.innerHTML = collapsed ? '&#x25BC;' : '&#x25B6;';
+  acc.classList.toggle('collapsed', !collapsed);
+}}
+
+function crmFilterList() {{
+  const q = (document.getElementById('crmSearchInput')?.value||'').toLowerCase();
+  const ft = document.getElementById('crmFilterTyp')?.value||'';
+  const fs = document.getElementById('crmFilterStatus')?.value||'';
+  _crmRenderKunden(_crmKundenCache.filter(k => {{
+    const name = ((k.firmenname||'')+(k.name||'')+(k.email||'')).toLowerCase();
+    if(q && !name.includes(q)) return false;
+    if(ft && (k.kundentyp||'unbekannt')!==ft) return false;
+    if(fs && (k.status||'aktiv')!==fs) return false;
+    return true;
+  }}));
+}}
+
+function crmLoadKunden() {{
+  fetch('/api/crm/kunden').then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    _crmKundenCache = d.kunden||[];
+    _crmRenderKunden(_crmKundenCache);
+  }}).catch(e=>console.warn('CRM loadKunden:',e));
+}}
+
+function _crmRenderKunden(kunden) {{
+  const groups = {{aktiv:[],lead:[],inaktiv:[],archiv:[]}};
+  kunden.forEach(k => {{
+    const s = k.status||'aktiv';
+    if(groups[s]) groups[s].push(k);
+    else groups.aktiv.push(k);
+  }});
+  Object.keys(groups).forEach(g => {{
+    const tbody = document.getElementById('crmTbody'+g.charAt(0).toUpperCase()+g.slice(1));
+    const countEl = document.getElementById('crmCount'+g.charAt(0).toUpperCase()+g.slice(1));
+    if(countEl) countEl.textContent = groups[g].length;
+    if(!tbody) return;
+    tbody.innerHTML = groups[g].map(k => {{
+      const name = k.firmenname || k.name || k.email || '?';
+      const typ = k.kundentyp || 'unbekannt';
+      const typClass = typ==='geschaeft'?'green':typ==='privat'?'blue':typ==='intern'?'violet':'gray';
+      const statusClass = (k.status||'aktiv')==='aktiv'?'green':(k.status||'')==='lead'?'orange':(k.status||'')==='inaktiv'?'gray':'gray';
+      const letzteAkt = k.letztkontakt ? k.letztkontakt.substring(0,10) : '\\u2014';
+      return '<tr onclick="crmOpenKunde('+k.id+')">' +
+        '<td><strong>'+_crmEsc(name)+'</strong><br><small style="color:var(--muted)">'+_crmEsc(k.email||'')+'</small></td>' +
+        '<td><span class="crm-tag '+typClass+'">'+_crmEsc(typ)+'</span></td>' +
+        '<td>'+_crmEsc(k.letztes_projekt||'\\u2014')+'</td>' +
+        '<td>'+letzteAkt+'</td>' +
+        '<td>'+(k.offene_faelle||0)+'</td>' +
+        '<td><span class="crm-tag '+statusClass+'">'+_crmEsc(k.status||'aktiv')+'</span></td></tr>';
+    }}).join('');
+  }});
+}}
+
+function _crmEsc(s) {{ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }}
+
+function crmOpenKunde(id) {{
+  fetch('/api/crm/kunden/'+id).then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    _crmCurrentKunde = d.kunde;
+    _crmCurrentProjekt = null;
+    // Panels umschalten
+    document.getElementById('crmContactsPanel').style.display='none';
+    document.getElementById('crmKundenPanel').style.display='none';
+    const akteP = document.getElementById('crmKundenaktePanel');
+    if(akteP) akteP.style.display='';
+    document.getElementById('crmBackBtn').style.display='';
+    document.getElementById('crmMainTitle').textContent = d.kunde.firmenname||d.kunde.name||'Kundenakte';
+    // Header rendern
+    _crmRenderAkteHeader(d.kunde);
+    // Projekte + Timeline laden
+    crmLoadProjektSwitch(id);
+    crmLoadTimeline(id, null);
+    crmShowAkteTab('verlauf');
+    // Stammdaten
+    _crmRenderStammdaten(d.kunde);
+  }}).catch(e=>console.warn('CRM openKunde:',e));
+}}
+
+function _crmRenderAkteHeader(k) {{
+  const h = document.getElementById('crmAkteHeader');
+  if(!h) return;
+  const name = k.firmenname || k.name || '?';
+  const typ = k.kundentyp || 'unbekannt';
+  const typClass = typ==='geschaeft'?'green':typ==='privat'?'blue':'gray';
+  const statusClass = (k.status||'aktiv')==='aktiv'?'green':'gray';
+  h.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">' +
+    '<div><div style="font-size:var(--fs-xxl);font-weight:850">'+_crmEsc(name)+'</div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px"><span class="crm-tag '+typClass+'">'+_crmEsc(typ)+'</span>' +
+    '<span class="crm-tag '+statusClass+'">'+_crmEsc(k.status||'aktiv')+'</span>' +
+    (k.kundenwert ? '<span style="font-weight:700;color:var(--muted)">Wert: '+Number(k.kundenwert).toLocaleString('de-DE')+'\\u00a0\\u20ac</span>' : '') +
+    '</div></div>' +
+    '<div style="display:flex;gap:6px">' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmNeueEmail()">\\u2709 Neue E-Mail</button>' +
+    '<button class="crm-btn" onclick="crmKiraFragen()">\\u2728 Kira fragen</button></div></div>';
+}}
+
+function _crmRenderStammdaten(k) {{
+  const el = document.getElementById('crmStammdaten');
+  if(!el) return;
+  const fields = [
+    ['E-Mail', k.email],
+    ['Firma', k.firmenname],
+    ['Ansprechpartner', k.ansprechpartner],
+    ['Kundentyp', k.kundentyp],
+    ['Erstkontakt', k.erstkontakt],
+    ['Letzter Kontakt', k.letztkontakt],
+    ['Lexware-ID', k.lexware_id],
+    ['Mails gesamt', k.anzahl_mails],
+  ].filter(f=>f[1]);
+  el.innerHTML = '<div class="crm-sidebar-title">Stammdaten</div>' +
+    fields.map(f=>'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--muted);font-weight:700">'+f[0]+'</div><div style="font-size:var(--fs-sm)">'+_crmEsc(String(f[1]))+'</div></div>').join('');
+}}
+
+function crmLoadProjektSwitch(kundenId) {{
+  fetch('/api/crm/kunden/'+kundenId+'/projekte').then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmProjektSwitch');
+    if(!el || !d.ok) return;
+    const projekte = d.projekte||[];
+    if(projekte.length===0) {{
+      el.innerHTML = '<div style="color:var(--muted);font-size:var(--fs-sm)">Noch keine Projekte angelegt &mdash; <a href="#" onclick="crmNeuesProjektFuerKunde();return false">Projekt erstellen</a></div>';
+      return;
+    }}
+    let html = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-weight:700;font-size:var(--fs-sm)">Projekt:</span>';
+    html += '<select class="crm-filter-select" onchange="crmSwitchProject(this.value)" id="crmProjektSelect">';
+    html += '<option value="">Gesamtakte</option>';
+    projekte.forEach(p => {{
+      const sel = _crmCurrentProjekt && _crmCurrentProjekt==p.id ? ' selected' : '';
+      const statusIcon = p.status==='aktiv'?'\\ud83d\\udfe2':p.status==='abgeschlossen'?'\\u2705':'\\ud83d\\udfe1';
+      html += '<option value="'+p.id+'"'+sel+'>'+statusIcon+' '+_crmEsc(p.projektname)+' ('+_crmEsc(p.status)+')</option>';
+    }});
+    html += '</select></div>';
+    // Projekt-Zeitstrahl
+    html += '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">';
+    projekte.forEach(p => {{
+      const color = p.status==='aktiv'?'var(--accent)':p.status==='abgeschlossen'?'#6e7a8f':'#df8f1f';
+      const bg = p.status==='aktiv'?'rgba(124,93,255,.08)':p.status==='abgeschlossen'?'rgba(110,122,143,.08)':'rgba(223,143,31,.08)';
+      html += '<div onclick="crmSwitchProject('+p.id+')" style="cursor:pointer;padding:6px 12px;border-radius:var(--radius);border:1px solid '+color+';background:'+bg+';font-size:12px;font-weight:700">';
+      html += (p.beginn_am||'').substring(0,4)+': '+_crmEsc(p.projektname);
+      html += '</div>';
+    }});
+    html += '</div>';
+    el.innerHTML = html;
+  }}).catch(e=>console.warn('CRM projekte:',e));
+}}
+
+function crmSwitchProject(projektId) {{
+  _crmCurrentProjekt = projektId ? parseInt(projektId) : null;
+  const sel = document.getElementById('crmProjektSelect');
+  if(sel) sel.value = projektId||'';
+  if(_crmCurrentKunde) crmLoadTimeline(_crmCurrentKunde.id, _crmCurrentProjekt);
+  _rtlog('ui','projekt_gewechselt','Projekt gewechselt: '+projektId,{{submodul:'crm'}});
+}}
+
+function crmLoadTimeline(kundenId, projektId) {{
+  let url = '/api/crm/kunden/'+kundenId+'/aktivitaeten';
+  if(projektId) url += '?projekt_id='+projektId;
+  fetch(url).then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmVerlaufTimeline');
+    if(!el || !d.ok) return;
+    const items = d.aktivitaeten||[];
+    if(items.length===0) {{
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">Noch keine Aktivit\\u00e4ten f\\u00fcr diesen Kunden.</div>';
+      return;
+    }}
+    el.innerHTML = items.map(a => {{
+      const typ = a.ereignis_typ||'manuell';
+      const icons = {{mail:'\\u2709',kira:'\\u2728',memo:'\\ud83d\\udcdd',dokument:'\\ud83d\\udcc4',geschaeft:'\\ud83d\\udcb0',lexware:'\\ud83d\\udccb',manuell:'\\u270f',routing:'\\u27a1'}};
+      const icon = icons[typ]||'\\u2022';
+      return '<div class="crm-timeline-item" onclick="crmOpenAktivitaet('+a.id+')">' +
+        '<div class="crm-avatar '+typ+'">'+icon+'</div>' +
+        '<div class="crm-bubble"><div class="crm-bubble-head">' +
+        '<span class="crm-bubble-title">'+_crmEsc(a.zusammenfassung||typ)+'</span>' +
+        '<span class="crm-bubble-time">'+_crmEsc((a.erstellt_am||'').substring(0,16))+'</span></div>' +
+        (a.volltext_auszug ? '<div class="crm-bubble-text">'+_crmEsc(a.volltext_auszug.substring(0,200))+'</div>' : '') +
+        '<div style="margin-top:6px"><span class="crm-tag gray">'+_crmEsc(typ)+'</span></div>' +
+        '</div></div>';
+    }}).join('');
+  }}).catch(e=>console.warn('CRM timeline:',e));
+}}
+
+function crmShowAkteTab(tab) {{
+  document.querySelectorAll('.crm-akte-tab-content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.crm-tab').forEach(t=>t.classList.remove('active'));
+  const content = document.getElementById('crmTab'+tab.charAt(0).toUpperCase()+tab.slice(1));
+  if(content) content.classList.add('active');
+  const tabBtn = document.querySelector('.crm-tab[data-tab="'+tab+'"]');
+  if(tabBtn) tabBtn.classList.add('active');
+  // Daten laden wenn noetig
+  if(tab==='faelle' && _crmCurrentKunde) crmLoadFaelle(_crmCurrentKunde.id);
+}}
+
+function crmLoadFaelle(kundenId) {{
+  let url = '/api/crm/kunden/'+kundenId+'/faelle';
+  if(_crmCurrentProjekt) url += '?projekt_id='+_crmCurrentProjekt;
+  fetch(url).then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmFaelleList');
+    if(!el || !d.ok) return;
+    const faelle = d.faelle||[];
+    if(faelle.length===0) {{
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:30px">Keine F\\u00e4lle. <a href="#" onclick="crmNeuerFall();return false">Neuen Fall anlegen</a></div>';
+      return;
+    }}
+    el.innerHTML = '<table class="crm-table"><thead><tr><th>Nr</th><th>Titel</th><th>Typ</th><th>Status</th><th>Priorit\\u00e4t</th><th>F\\u00e4llig</th></tr></thead><tbody>' +
+      faelle.map(f => {{
+        const statusClass = f.status==='offen'?'orange':f.status==='aktiv'?'green':f.status==='erledigt'?'gray':'red';
+        return '<tr onclick="crmOpenFall('+f.id+')">' +
+          '<td>#'+f.id+'</td><td><strong>'+_crmEsc(f.titel)+'</strong></td>' +
+          '<td><span class="crm-tag violet">'+_crmEsc(f.fall_typ)+'</span></td>' +
+          '<td><span class="crm-tag '+statusClass+'">'+_crmEsc(f.status)+'</span></td>' +
+          '<td>'+_crmEsc(f.prioritaet||'normal')+'</td>' +
+          '<td>'+_crmEsc((f.faellig_am||'\\u2014').substring(0,10))+'</td></tr>';
+      }}).join('') + '</tbody></table>';
+  }}).catch(e=>console.warn('CRM faelle:',e));
+}}
+
+function crmOpenFall(fallId) {{
+  fetch('/api/crm/faelle/'+fallId).then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    _crmCurrentFall = d.fall;
+    document.getElementById('crmKundenaktePanel').style.display='none';
+    const fp = document.getElementById('crmFallPanel');
+    if(fp) fp.style.display='';
+    document.getElementById('crmBackBtn').style.display='';
+    document.getElementById('crmMainTitle').textContent = 'Fall #'+d.fall.id+': '+(d.fall.titel||'');
+    // Header
+    const fh = document.getElementById('crmFallHeader');
+    if(fh) {{
+      const f = d.fall;
+      const statusClass = f.status==='offen'?'orange':f.status==='aktiv'?'green':'gray';
+      fh.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div><div style="font-size:var(--fs-xl);font-weight:850">#'+f.id+' '+_crmEsc(f.titel)+'</div>' +
+        '<div style="display:flex;gap:8px;margin-top:6px">' +
+        '<span class="crm-tag violet">'+_crmEsc(f.fall_typ)+'</span>' +
+        '<span class="crm-tag '+statusClass+'">'+_crmEsc(f.status)+'</span>' +
+        '<span class="crm-tag gray">'+_crmEsc(f.prioritaet||'normal')+'</span>' +
+        (f.faellig_am?'<span style="color:var(--muted);font-size:var(--fs-sm)">F\\u00e4llig: '+_crmEsc(f.faellig_am.substring(0,10))+'</span>':'') +
+        '</div></div>' +
+        '<div><select class="crm-filter-select" onchange="crmUpdateFallStatus('+f.id+',this.value)">' +
+        ['entwurf','offen','aktiv','warten_kunde','intern_blockiert','erledigt','eskalation','archiv'].map(s =>
+          '<option value="'+s+'"'+(s===f.status?' selected':'')+'>'+s+'</option>'
+        ).join('') + '</select></div></div>';
+    }}
+    // Timeline
+    const tl = d.aktivitaeten||[];
+    const te = document.getElementById('crmFallTimeline');
+    if(te) {{
+      te.innerHTML = tl.length===0 ? '<div style="color:var(--muted);padding:20px;text-align:center">Noch keine Eintr\\u00e4ge in diesem Fall.</div>' :
+        tl.map(a => {{
+          const typ = a.ereignis_typ||'manuell';
+          const icons = {{mail:'\\u2709',kira:'\\u2728',memo:'\\ud83d\\udcdd',dokument:'\\ud83d\\udcc4',geschaeft:'\\ud83d\\udcb0',lexware:'\\ud83d\\udccb',manuell:'\\u270f',routing:'\\u27a1'}};
+          return '<div class="crm-timeline-item"><div class="crm-avatar '+typ+'">'+(icons[typ]||'\\u2022')+'</div>' +
+            '<div class="crm-bubble"><div class="crm-bubble-head">' +
+            '<span class="crm-bubble-title">'+_crmEsc(a.zusammenfassung||typ)+'</span>' +
+            '<span class="crm-bubble-time">'+_crmEsc((a.erstellt_am||'').substring(0,16))+'</span></div>' +
+            (a.volltext_auszug?'<div class="crm-bubble-text">'+_crmEsc(a.volltext_auszug.substring(0,300))+'</div>':'') +
+            '</div></div>';
+        }}).join('');
+    }}
+    // Sidebar
+    const fs = document.getElementById('crmFallSidebar');
+    if(fs && d.fall) {{
+      const f = d.fall;
+      fs.innerHTML = '<div class="crm-akte-sidebar-section"><div class="crm-sidebar-title">Fall-Details</div>' +
+        '<div style="margin-bottom:6px;font-size:var(--fs-sm)"><strong>Typ:</strong> '+_crmEsc(f.fall_typ)+'</div>' +
+        '<div style="margin-bottom:6px;font-size:var(--fs-sm)"><strong>Erstellt:</strong> '+_crmEsc((f.erstellt_am||'').substring(0,16))+'</div>' +
+        (f.naechste_aktion?'<div style="margin-bottom:6px;font-size:var(--fs-sm)"><strong>N\\u00e4chste Aktion:</strong> '+_crmEsc(f.naechste_aktion)+'</div>':'') +
+        '</div>';
+    }}
+  }}).catch(e=>console.warn('CRM openFall:',e));
+}}
+
+function crmUpdateFallStatus(fallId, neuerStatus) {{
+  fetch('/api/crm/faelle/'+fallId, {{
+    method:'PUT', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{status:neuerStatus}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) showToast('Fall-Status ge\\u00e4ndert: '+neuerStatus, 'success');
+  }}).catch(e=>console.warn('CRM updateFall:',e));
+}}
+
+function crmLoadProjekte() {{
+  fetch('/api/crm/projekte').then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmProjekteListe');
+    if(!el||!d.ok) return;
+    const projekte = d.projekte||[];
+    if(projekte.length===0) {{
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">Noch keine Projekte angelegt.</div>';
+      return;
+    }}
+    el.innerHTML = projekte.map(p => {{
+      const color = p.status==='aktiv'?'green':p.status==='abgeschlossen'?'gray':'orange';
+      return '<div class="crm-projekt-card" onclick="crmOpenKunde('+p.kunden_id+')">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:8px">' +
+        '<strong>'+_crmEsc(p.projektname)+'</strong>' +
+        '<span class="crm-tag '+color+'">'+_crmEsc(p.status)+'</span></div>' +
+        '<div style="font-size:var(--fs-sm);color:var(--muted)">'+_crmEsc(p.kunde_name||'')+'</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+(p.beginn_am||'').substring(0,10)+' \\u2014 '+(p.abschluss_am||'laufend').substring(0,10)+'</div>' +
+        '</div>';
+    }}).join('');
+  }}).catch(e=>console.warn('CRM projekte:',e));
+}}
+
+function crmLoadUnzugeordnete() {{
+  fetch('/api/crm/unzugeordnete').then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmUnzugeordneteListe');
+    if(!el||!d.ok) return;
+    const items = d.items||[];
+    if(items.length===0) {{
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">\\u2705 Alle Aktivit\\u00e4ten sind zugeordnet.</div>';
+      return;
+    }}
+    el.innerHTML = '<table class="crm-table"><thead><tr><th>Typ</th><th>Eingabe</th><th>Vorschlag</th><th>Confidence</th><th>Begr\\u00fcndung</th><th>Aktion</th></tr></thead><tbody>' +
+      items.map(i => {{
+        const confClass = i.confidence==='pruefen'?'orange':'red';
+        return '<tr><td>'+_crmEsc(i.eingabe_typ)+'</td>' +
+          '<td>'+_crmEsc(i.eingabe_id||'?').substring(0,20)+'</td>' +
+          '<td>'+_crmEsc(i.kunden_name||'\\u2014')+'</td>' +
+          '<td><span class="crm-tag '+confClass+'">'+_crmEsc(i.confidence)+'</span></td>' +
+          '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+_crmEsc(i.reasoning_kurz||'')+'</td>' +
+          '<td><button class="crm-btn" onclick="crmZuordnen('+i.id+')">Zuordnen</button></td></tr>';
+      }}).join('') + '</tbody></table>';
+  }}).catch(e=>console.warn('CRM unzugeordnete:',e));
+}}
+
+function crmLoadPipeline() {{
+  fetch('/api/crm/stats').then(r=>r.json()).then(d=>{{
+    const el = document.getElementById('crmPipelineContent');
+    if(!el||!d.ok) return;
+    const s = d.stats||{{}};
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">' +
+      '<div class="crm-kpi" style="border-left:3px solid #7c5dff"><small>Aktive Kunden</small><strong>'+(s.kunden_aktiv||0)+'</strong></div>' +
+      '<div class="crm-kpi" style="border-left:3px solid #df8f1f"><small>Leads</small><strong>'+(s.kunden_leads||0)+'</strong></div>' +
+      '<div class="crm-kpi" style="border-left:3px solid #149c68"><small>Aktive Projekte</small><strong>'+(s.projekte_aktiv||0)+'</strong></div>' +
+      '<div class="crm-kpi" style="border-left:3px solid #de5362"><small>Offene F\\u00e4lle</small><strong>'+(s.faelle_offen||0)+'</strong></div></div>';
+  }}).catch(e=>console.warn('CRM pipeline:',e));
+}}
+
+function crmOpenAktivitaet(id) {{
+  // Eintrag-Detail Modal oeffnen
+  fetch('/api/crm/aktivitaeten/'+id).then(r=>r.json()).then(d=>{{
+    if(!d.ok) return;
+    const a = d.aktivitaet;
+    crmShowModal('Eintrag #'+a.id, '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><strong>Typ:</strong> <span class="crm-tag gray">'+_crmEsc(a.ereignis_typ)+'</span></div>' +
+      '<div><strong>Zusammenfassung:</strong> '+_crmEsc(a.zusammenfassung||'')+'</div>' +
+      (a.volltext_auszug?'<div style="background:var(--bg);padding:12px;border-radius:var(--radius);font-size:var(--fs-sm);max-height:300px;overflow-y:auto;white-space:pre-wrap">'+_crmEsc(a.volltext_auszug)+'</div>':'') +
+      '<div><strong>Quelle:</strong> '+_crmEsc(a.quelle_tabelle||'')+' / '+_crmEsc(a.quelle_id||'')+'</div>' +
+      '<div><strong>Erstellt:</strong> '+_crmEsc(a.erstellt_am||'')+'</div></div>',
+      '<button class="crm-btn" onclick="crmCloseModal()">Schlie\\u00dfen</button>');
+  }}).catch(e=>console.warn('CRM aktivitaet:',e));
+}}
+
+// CRM Aktions-Funktionen
+function crmNeuerKunde() {{
+  crmShowModal('Neuer Kunde',
+    '<div class="crm-form-grid">' +
+    '<div class="crm-field"><label>Firmenname</label><input id="crmNkFirma"></div>' +
+    '<div class="crm-field"><label>Ansprechpartner</label><input id="crmNkName"></div>' +
+    '<div class="crm-field"><label>E-Mail</label><input id="crmNkEmail" type="email"></div>' +
+    '<div class="crm-field"><label>Kundentyp</label><select id="crmNkTyp"><option value="geschaeft">Gesch\\u00e4ft</option><option value="privat">Privat</option><option value="intern">Intern</option></select></div>' +
+    '<div class="crm-field"><label>Status</label><select id="crmNkStatus"><option value="aktiv">Aktiv</option><option value="lead">Lead</option></select></div>' +
+    '<div class="crm-field"><label>Telefon</label><input id="crmNkTel"></div>' +
+    '<div class="crm-field full"><label>Notiz</label><textarea id="crmNkNotiz" rows="3"></textarea></div></div>',
+    '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmSaveNeuerKunde()">Kunde anlegen</button>'
+  );
+}}
+
+function crmSaveNeuerKunde() {{
+  const data = {{
+    firmenname: document.getElementById('crmNkFirma')?.value||'',
+    name: document.getElementById('crmNkName')?.value||'',
+    email: document.getElementById('crmNkEmail')?.value||'',
+    kundentyp: document.getElementById('crmNkTyp')?.value||'geschaeft',
+    status: document.getElementById('crmNkStatus')?.value||'aktiv',
+    telefon: document.getElementById('crmNkTel')?.value||'',
+    notiz: document.getElementById('crmNkNotiz')?.value||'',
+  }};
+  if(!data.email && !data.firmenname && !data.name) {{ showToast('Mindestens Name oder E-Mail angeben','error'); return; }}
+  fetch('/api/crm/kunden', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Kunde angelegt','success'); crmCloseModal(); crmLoadKunden(); }}
+    else showToast(d.error||'Fehler','error');
+  }}).catch(e=>showToast('Fehler: '+e,'error'));
+}}
+
+function crmKontaktBearbeiten() {{
+  if(!_crmCurrentKunde) return;
+  const k = _crmCurrentKunde;
+  crmShowModal('Kontakt bearbeiten',
+    '<div class="crm-form-grid">' +
+    '<div class="crm-field"><label>Firmenname</label><input id="crmEkFirma" value="'+_crmEsc(k.firmenname||'')+'"></div>' +
+    '<div class="crm-field"><label>Ansprechpartner</label><input id="crmEkName" value="'+_crmEsc(k.ansprechpartner||k.name||'')+'"></div>' +
+    '<div class="crm-field"><label>E-Mail</label><input id="crmEkEmail" value="'+_crmEsc(k.email||'')+'"></div>' +
+    '<div class="crm-field"><label>Kundentyp</label><select id="crmEkTyp">' +
+    ['geschaeft','privat','intern','unbekannt'].map(t=>'<option value="'+t+'"'+(t===(k.kundentyp||'unbekannt')?' selected':'')+'>'+t+'</option>').join('') +
+    '</select></div>' +
+    '<div class="crm-field"><label>Status</label><select id="crmEkStatus">' +
+    ['aktiv','lead','inaktiv','archiv'].map(s=>'<option value="'+s+'"'+(s===(k.status||'aktiv')?' selected':'')+'>'+s+'</option>').join('') +
+    '</select></div>' +
+    '<div class="crm-field full"><label>Notiz</label><textarea id="crmEkNotiz" rows="3">'+_crmEsc(k.notiz||'')+'</textarea></div></div>',
+    '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmSaveKontakt()">Speichern</button>'
+  );
+}}
+
+function crmSaveKontakt() {{
+  if(!_crmCurrentKunde) return;
+  const data = {{
+    firmenname: document.getElementById('crmEkFirma')?.value,
+    name: document.getElementById('crmEkName')?.value,
+    email: document.getElementById('crmEkEmail')?.value,
+    kundentyp: document.getElementById('crmEkTyp')?.value,
+    status: document.getElementById('crmEkStatus')?.value,
+    notiz: document.getElementById('crmEkNotiz')?.value,
+  }};
+  fetch('/api/crm/kunden/'+_crmCurrentKunde.id, {{
+    method:'PUT', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Kontakt aktualisiert','success'); crmCloseModal(); crmOpenKunde(_crmCurrentKunde.id); }}
+    else showToast(d.error||'Fehler','error');
+  }}).catch(e=>showToast('Fehler: '+e,'error'));
+}}
+
+function crmNeuerFall() {{
+  if(!_crmCurrentKunde) return;
+  crmShowModal('Neuer Fall',
+    '<div class="crm-form-grid">' +
+    '<div class="crm-field full"><label>Titel</label><input id="crmNfTitel"></div>' +
+    '<div class="crm-field"><label>Typ</label><select id="crmNfTyp">' +
+    ['anfrage','angebot','nachfass','rechnung','reklamation','maengel','streitfall','intern','freigabe'].map(t=>'<option value="'+t+'">'+t+'</option>').join('') +
+    '</select></div>' +
+    '<div class="crm-field"><label>Priorit\\u00e4t</label><select id="crmNfPrio"><option value="normal">Normal</option><option value="hoch">Hoch</option><option value="niedrig">Niedrig</option><option value="kritisch">Kritisch</option></select></div>' +
+    '<div class="crm-field"><label>F\\u00e4llig am</label><input id="crmNfFaellig" type="date"></div>' +
+    '<div class="crm-field full"><label>N\\u00e4chste Aktion</label><input id="crmNfAktion"></div></div>',
+    '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmSaveNeuerFall()">Fall anlegen</button>'
+  );
+}}
+
+function crmSaveNeuerFall() {{
+  if(!_crmCurrentKunde) return;
+  const data = {{
+    kunden_id: _crmCurrentKunde.id,
+    projekt_id: _crmCurrentProjekt,
+    fall_typ: document.getElementById('crmNfTyp')?.value||'anfrage',
+    titel: document.getElementById('crmNfTitel')?.value||'',
+    prioritaet: document.getElementById('crmNfPrio')?.value||'normal',
+    faellig_am: document.getElementById('crmNfFaellig')?.value||null,
+    naechste_aktion: document.getElementById('crmNfAktion')?.value||'',
+  }};
+  if(!data.titel) {{ showToast('Titel ist Pflicht','error'); return; }}
+  fetch('/api/crm/faelle', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Fall angelegt','success'); crmCloseModal(); crmShowAkteTab('faelle'); }}
+    else showToast(d.error||'Fehler','error');
+  }}).catch(e=>showToast('Fehler: '+e,'error'));
+}}
+
+function crmNeueEmail() {{
+  if(!_crmCurrentKunde) return;
+  // Bestehendes Compose-Fenster oeffnen mit vorausgefuelltem Empfaenger
+  if(typeof window.pfComposeOpen==='function') {{
+    window.pfComposeOpen({{to: _crmCurrentKunde.email||'', subject: ''}});
+  }} else if(typeof window.openComposeWindow==='function') {{
+    window.openComposeWindow(_crmCurrentKunde.email||'');
+  }} else {{
+    showToast('Postfach-Compose nicht verf\\u00fcgbar','error');
+  }}
+}}
+
+function crmKiraFragen() {{
+  if(!_crmCurrentKunde) return;
+  if(typeof window.openKiraWorkspace==='function') {{
+    const ctx = 'Kundenakte: '+ (_crmCurrentKunde.firmenname||_crmCurrentKunde.name||'') +
+      ' (ID:'+_crmCurrentKunde.id+', E-Mail:'+(_crmCurrentKunde.email||'')+')';
+    window.openKiraWorkspace(ctx);
+    if(typeof kiraSetQuickActions==='function') kiraSetQuickActions('crm');
+    _rtlog('ui','kira_kontext_gestartet','Kira mit CRM-Kontext geöffnet: Kunde #'+_crmCurrentKunde.id,{{submodul:'crm'}});
+  }}
+}}
+
+function crmNeuesAngebot() {{
+  if(!_crmCurrentKunde) {{ showToast('Kein Kunde ausgew\\u00e4hlt','error'); return; }}
+  showPanel('lexware');
+  showToast('Lexware ge\\u00f6ffnet \\u2014 Angebot f\\u00fcr '+(_crmCurrentKunde.firmenname||_crmCurrentKunde.name||''),'info');
+}}
+
+function crmNeuesProjektFuerKunde() {{
+  if(!_crmCurrentKunde) return;
+  crmShowModal('Neues Projekt',
+    '<div class="crm-form-grid">' +
+    '<div class="crm-field full"><label>Projektname</label><input id="crmNpName"></div>' +
+    '<div class="crm-field"><label>Beginn</label><input id="crmNpBeginn" type="date"></div>' +
+    '<div class="crm-field"><label>Auftragswert (\\u20ac)</label><input id="crmNpWert" type="number"></div>' +
+    '<div class="crm-field full"><label>Beschreibung</label><textarea id="crmNpBeschr" rows="3"></textarea></div></div>',
+    '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmSaveNeuesProjekt()">Projekt anlegen</button>'
+  );
+}}
+
+function crmNeuesProjekt() {{ crmNeuesProjektFuerKunde(); }}
+
+function crmSaveNeuesProjekt() {{
+  if(!_crmCurrentKunde) return;
+  const data = {{
+    projektname: document.getElementById('crmNpName')?.value||'',
+    beginn_am: document.getElementById('crmNpBeginn')?.value||null,
+    auftragswert: parseFloat(document.getElementById('crmNpWert')?.value)||0,
+    beschreibung: document.getElementById('crmNpBeschr')?.value||'',
+  }};
+  if(!data.projektname) {{ showToast('Projektname ist Pflicht','error'); return; }}
+  fetch('/api/crm/kunden/'+_crmCurrentKunde.id+'/projekte', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(data)
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Projekt angelegt','success'); crmCloseModal(); crmLoadProjektSwitch(_crmCurrentKunde.id); }}
+    else showToast(d.error||'Fehler','error');
+  }}).catch(e=>showToast('Fehler: '+e,'error'));
+}}
+
+function crmFallNeueEmail() {{
+  if(!_crmCurrentKunde || !_crmCurrentFall) return;
+  const subj = (_crmCurrentFall.titel||'') + ' [Fall #'+_crmCurrentFall.id+']';
+  if(typeof window.pfComposeOpen==='function') {{
+    window.pfComposeOpen({{to: _crmCurrentKunde.email||'', subject: subj}});
+  }}
+}}
+
+function crmFallNeueNotiz() {{
+  if(!_crmCurrentFall) return;
+  crmShowModal('Neue Notiz',
+    '<div class="crm-field full"><label>Notiz</label><textarea id="crmNotizText" rows="5"></textarea></div>',
+    '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
+    '<button class="crm-btn crm-btn-primary" onclick="crmSaveNotiz()">Speichern</button>'
+  );
+}}
+
+function crmSaveNotiz() {{
+  if(!_crmCurrentFall) return;
+  const text = document.getElementById('crmNotizText')?.value||'';
+  if(!text) return;
+  fetch('/api/crm/faelle/'+_crmCurrentFall.id+'/aktivitaeten', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{ereignis_typ:'memo', zusammenfassung:text.substring(0,200), volltext_auszug:text}})
+  }}).then(r=>r.json()).then(d=>{{
+    if(d.ok) {{ showToast('Notiz gespeichert','success'); crmCloseModal(); crmOpenFall(_crmCurrentFall.id); }}
+  }}).catch(e=>showToast('Fehler: '+e,'error'));
+}}
+
+function crmFallDokument() {{ showToast('Dokument-Upload wird implementiert','info'); }}
+function crmFallKira() {{ crmKiraFragen(); }}
+function crmFallExport() {{ showToast('Export/Streitfall wird implementiert','info'); }}
+function crmZuordnen(logId) {{ showToast('Zuordnungs-Dialog wird implementiert','info'); }}
+
+function crmShowModal(title, body, footer) {{
+  document.getElementById('crmModalTitle').textContent = title;
+  document.getElementById('crmModalBody').innerHTML = body;
+  document.getElementById('crmModalFooter').innerHTML = footer||'';
+  document.getElementById('crmModalOverlay').style.display = 'flex';
+}}
+
+function crmCloseModal() {{
+  document.getElementById('crmModalOverlay').style.display = 'none';
 }}
 
 // === Lexware Office JS (session-eee) ===
@@ -21140,6 +22186,18 @@ function saveSettings() {{
       pfad:   _v('cfg-backup-pfad'),
       keep_n: _i('cfg-backup-keep', 7)
     }},
+    crm: {{
+      auto_zuordnung:     _c('cfg-crm-auto-zuordnung'),
+      llm_classifier:     _c('cfg-crm-llm-classifier'),
+      confidence_schwelle: _v('cfg-crm-confidence-schwelle', 'wahrscheinlich'),
+      geschaeftsfilter:   _c('cfg-crm-geschaeftsfilter'),
+      auto_fall:          _c('cfg-crm-auto-fall'),
+      fall_typen:         _v('cfg-crm-fall-typen', 'anfrage,angebot,reklamation,maengel,streitfall,allgemein'),
+      default_prioritaet: _v('cfg-crm-default-prio', 'normal'),
+      log_detail:         _v('cfg-crm-log-detail', 'standard'),
+      export_format:      _v('cfg-crm-export-format', 'pdf'),
+      lexware_sync:       _c('cfg-crm-lexware-sync')
+    }},
     benutzer_profile: _bpCollectProfile(),
     firma_name:         _v('cfg-profil-firma'),
     firma_branche:      _v('cfg-profil-branche'),
@@ -22883,6 +23941,7 @@ function kiraSetQuickActions(typ) {{
     suche:    ['Suche in Mails','Suche in Aufgaben','Suche in Wissen','Volltext-Suche'],
     dokument: ['Zusammenfassen','Kernaussagen','Aktionspunkte','Fragen generieren'],
     mail:     ['Was ist zu tun?','Antwort vorschlagen','Aufgabe daraus erstellen','Risiko einschätzen','Weiterleiten an?'],
+    crm:      ['Kundenakte zeigen','Offene Fälle diese Woche','Mail zuordnen','Unzugeordnete prüfen','Neuen Fall erstellen'],
   }};
   const items = sets[typ] || sets.frage;
   bar.innerHTML = '<span class="kw-quick-lbl">Schnell:</span>' +
@@ -24442,6 +25501,122 @@ a:hover{text-decoration:underline;}
 .proto-st.warnung{background:rgba(239,159,39,.1);color:#b87c10;}
 .proto-bereich{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;}
 
+/* CRM / Kunden Panel (session-ss) */
+.crm-module{display:grid;grid-template-columns:240px 1fr;height:100%;overflow:hidden;}
+.crm-subnav{background:var(--bg);border-right:1px solid var(--border);overflow-y:auto;padding:0;}
+.crm-subnav-head{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.crm-subnav-title{font-size:var(--fs-lg);font-weight:800;margin-bottom:4px;}
+.crm-subnav-desc{color:var(--muted);font-size:var(--fs-xs);}
+.crm-subnav-items{padding:8px 6px;}
+.crm-subnav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);cursor:pointer;font-size:var(--fs-sm);font-weight:600;transition:background .15s;}
+.crm-subnav-item:hover{background:var(--bg-raised);}
+.crm-subnav-item.active{background:var(--accent-bg);color:var(--accent);border:1px solid rgba(124,93,255,.15);}
+.crm-subnav-icon{font-size:16px;width:22px;text-align:center;}
+.crm-subnav-label{flex:1;}
+.crm-subnav-badge{min-width:22px;height:20px;padding:0 6px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--bg-raised);color:var(--muted);}
+.crm-subnav-badge.crm-badge-warn{background:rgba(239,159,39,.12);color:#b87c10;}
+.crm-main{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
+.crm-main-header{display:flex;align-items:center;gap:12px;}
+.crm-main-header h1{margin:0;font-size:var(--fs-xxl);font-weight:800;}
+.crm-back-btn{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);font-weight:700;}
+.crm-back-btn:hover{background:var(--bg-raised);}
+.crm-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+.crm-kpi{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.crm-kpi small{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:6px;}
+.crm-kpi strong{font-size:22px;font-weight:850;}
+.crm-kpi strong.crm-warn{color:#df8f1f;}
+.crm-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+.crm-toolbar-left,.crm-toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.crm-search{width:320px;max-width:50vw;height:40px;border-radius:var(--radius);border:1px solid var(--border);padding:0 14px;font:inherit;font-size:var(--fs-sm);background:var(--bg-raised);color:var(--text);}
+.crm-filter-select{height:40px;border-radius:var(--radius);border:1px solid var(--border);padding:0 10px;font:inherit;font-size:var(--fs-sm);background:var(--bg-raised);color:var(--text);}
+.crm-btn{height:38px;padding:0 16px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-raised);font:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.crm-btn:hover{background:var(--bg);}
+.crm-btn-primary{background:linear-gradient(135deg,#7c5dff 0%,#5b3fd9 100%);color:#fff;border-color:#7c5dff;}
+.crm-btn-primary:hover{opacity:.9;}
+.crm-btn-warn{background:rgba(222,83,98,.08);color:#de5362;border-color:rgba(222,83,98,.3);}
+.crm-accordion{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px;background:var(--bg-raised);}
+.crm-acc-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;font-weight:700;background:var(--bg);border-bottom:1px solid var(--border);}
+.crm-acc-head:hover{background:var(--bg-raised);}
+.crm-acc-title{font-size:var(--fs-md);}
+.crm-acc-count{font-size:var(--fs-xs);background:var(--accent-bg);color:var(--accent);padding:2px 8px;border-radius:99px;margin-left:6px;}
+.crm-acc-arrow{font-size:12px;color:var(--muted);transition:transform .2s;}
+.crm-accordion.collapsed .crm-acc-arrow{transform:rotate(0);}
+.crm-table{width:100%;border-collapse:collapse;}
+.crm-table th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:8px 12px;border-bottom:1px solid var(--border);}
+.crm-table td{padding:10px 12px;font-size:var(--fs-sm);border-bottom:1px solid var(--border);cursor:pointer;}
+.crm-table tbody tr:hover td{background:rgba(124,93,255,.04);}
+.crm-tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;font-size:11px;font-weight:800;}
+.crm-tag.green{background:rgba(20,156,104,.1);color:#0f7c53;}
+.crm-tag.orange{background:rgba(223,143,31,.1);color:#b96900;}
+.crm-tag.red{background:rgba(222,83,98,.1);color:#c74355;}
+.crm-tag.blue{background:rgba(23,136,210,.1);color:#4569d7;}
+.crm-tag.violet{background:rgba(124,93,255,.1);color:#734ef0;}
+.crm-tag.gray{background:var(--bg);color:var(--muted);}
+.crm-panel{min-height:200px;}
+.crm-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.crm-section-header h2{margin:0;font-size:var(--fs-xl);font-weight:800;}
+/* Kundenakte */
+.crm-akte-header{padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:12px;}
+.crm-akte-project-switch{margin-bottom:12px;}
+.crm-akte-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.crm-tab{background:none;border:none;border-bottom:2px solid transparent;padding:8px 16px;font:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;color:var(--muted);}
+.crm-tab:hover{color:var(--text);}
+.crm-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.crm-akte-layout{display:grid;grid-template-columns:1fr 320px;gap:16px;}
+.crm-akte-main{min-width:0;overflow-y:auto;}
+.crm-akte-tab-content{display:none;}
+.crm-akte-tab-content.active{display:block;}
+.crm-akte-sidebar{display:flex;flex-direction:column;gap:12px;}
+.crm-akte-sidebar-section{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.crm-sidebar-title{font-size:var(--fs-sm);font-weight:800;margin-bottom:10px;color:var(--text);}
+.crm-action-btn{display:block;width:100%;text-align:left;background:none;border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;margin-bottom:6px;font:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer;transition:background .15s;}
+.crm-action-btn:hover{background:var(--bg);}
+/* Timeline */
+.crm-timeline{display:flex;flex-direction:column;gap:10px;}
+.crm-timeline-item{display:grid;grid-template-columns:42px 1fr;gap:10px;cursor:pointer;}
+.crm-timeline-item:hover .crm-bubble{box-shadow:0 4px 12px rgba(0,0,0,.06);}
+.crm-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;}
+.crm-avatar.mail{background:#1797d6;}.crm-avatar.kira{background:#865dff;}
+.crm-avatar.memo{background:#df8f1f;}.crm-avatar.biz{background:#149c68;}
+.crm-avatar.lexware{background:#0070c0;}.crm-avatar.manuell{background:#6e7a8f;}
+.crm-avatar.routing{background:#de5362;}.crm-avatar.dokument{background:#7c5dff;}
+.crm-bubble{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.crm-bubble-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.crm-bubble-title{font-size:var(--fs-sm);font-weight:800;}
+.crm-bubble-time{font-size:11px;color:var(--muted);font-weight:600;}
+.crm-bubble-text{font-size:var(--fs-sm);color:var(--muted);line-height:1.5;}
+/* Fallansicht */
+.crm-fall-header{padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:12px;}
+.crm-fall-layout{display:grid;grid-template-columns:1fr 300px;gap:16px;}
+.crm-fall-main{min-width:0;}
+.crm-fall-timeline{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.crm-fall-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.crm-fall-sidebar{display:flex;flex-direction:column;gap:12px;}
+/* Projekte Grid */
+.crm-projekte-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.crm-projekt-card{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:box-shadow .15s;}
+.crm-projekt-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06);}
+/* Modal */
+.crm-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.crm-modal{background:var(--bg-raised);border-radius:var(--radius);width:90vw;max-width:640px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,.15);}
+.crm-modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);}
+.crm-modal-header h3{margin:0;font-size:var(--fs-lg);font-weight:800;}
+.crm-modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);padding:0 4px;}
+.crm-modal-body{padding:20px;overflow-y:auto;flex:1;}
+.crm-modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+/* Formular */
+.crm-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.crm-field label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin-bottom:6px;}
+.crm-field input,.crm-field select,.crm-field textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font:inherit;font-size:var(--fs-sm);background:var(--bg-raised);color:var(--text);}
+.crm-field textarea{min-height:80px;resize:vertical;}
+.crm-field.full{grid-column:1/-1;}
+@media(max-width:900px){
+  .crm-module{grid-template-columns:1fr;}
+  .crm-subnav{display:none;}
+  .crm-kpis{grid-template-columns:repeat(3,1fr);}
+  .crm-akte-layout,.crm-fall-layout{grid-template-columns:1fr;}
+}
+
 /* Lexware Office Panel (session-fff — UI Komplettausbau) */
 /* Modul-Shell */
 .lx-module{display:flex;flex-direction:column;gap:0;height:100%;flex:1;}
@@ -25541,6 +26716,22 @@ window.KIRA_TOUR_DASHBOARD = [
    text:'Das Dashboard gibt dir t\u00e4glich den n\u00f6tigen \u00dcberblick. Starte jeden Morgen hier \u2014 dann siehst du sofort was heute Priorit\u00e4t hat.'}
 ];
 
+// \u2500\u2500 Kunden / CRM Tour (session-ss) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.KIRA_TOUR_CRM = [
+  {area:'\u00dcberblick',title:'Kunden / CRM \u2014 Dein Kundenzentrum',
+   text:'Das CRM-Modul ist die zentrale Stelle f\u00fcr alle Kundendaten. Hier laufen Mails, Projekte, F\u00e4lle und Aktivit\u00e4ten zusammen \u2014 alles an einem Ort. Links die Navigation, rechts der Inhalt.'},
+  {area:'\u00dcbersicht',title:'Kunden\u00fcbersicht mit Akkordeon',target:'#crmAccordionContainer',
+   text:'Die \u00dcbersicht gruppiert alle Kunden nach Status: Aktive, Leads, Inaktive, Archiv. Jede Gruppe l\u00e4sst sich auf- und zuklappen. Oben filterst du nach Name, Typ oder Status. Klicke auf einen Kunden um seine Akte zu \u00f6ffnen.'},
+  {area:'Projekttrennung',title:'Projekte \u2014 das Herzst\u00fcck',
+   text:'Jeder Kunde kann mehrere Projekte haben (z.B. Sichtbeton K\u00fcche 2023, Badezimmer 2026). Mit dem Projektumschalter in der Kundenakte filterst du den Verlauf nach Projekt \u2014 so bleibt alles \u00fcbersichtlich.'},
+  {area:'Fallansicht',title:'F\u00e4lle / Tickets',
+   text:'Ein Fall ist ein konkreter Gesch\u00e4ftsvorfall: Anfrage, Angebot, Reklamation, M\u00e4ngel. Jeder Fall b\u00fcndelt alle relevanten Mails, Notizen und Dokumente. Von hier startest du auch E-Mails oder fragst Kira.'},
+  {area:'Classifier',title:'KI-Zuordnung',
+   text:'KIRA erkennt automatisch welcher Kunde und welches Projekt zu einer Mail geh\u00f6ren. Bei unsicheren Ergebnissen landest du in der Pr\u00fcfliste (Men\u00fc: Aktivit\u00e4ten) \u2014 dort best\u00e4tigst oder korrigierst du per Klick.'},
+  {area:'Fertig',title:'Tour abgeschlossen!',
+   text:'Das CRM-Modul gibt dir die volle Kontrolle \u00fcber alle Kundenbeziehungen. Tipp: Nutze den lila "Kira fragen"-Button in der Kundenakte \u2014 Kira kennt dann den vollen Kundenkontext.'}
+];
+
 // \u2500\u2500 Einstellungen Tour (D-10) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.KIRA_TOUR_EINSTELLUNGEN = [
   {area:'Ueberblick',title:'Einstellungen \u2014 3-Spalten',
@@ -26244,6 +27435,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif self.path.startswith('/api/kunden/360'):
             self._api_kunden_360()
+
+        # CRM API (session-ss)
+        elif self.path == '/api/crm/kunden':
+            self._api_crm_kunden_list()
+        elif self.path == '/api/crm/contacts':
+            self._api_crm_contacts()
+        elif self.path == '/api/crm/stats':
+            self._api_crm_stats()
+        elif self.path == '/api/crm/projekte':
+            self._api_crm_projekte_list()
+        elif self.path == '/api/crm/unzugeordnete':
+            self._api_crm_unzugeordnete()
+        elif re.match(r'^/api/crm/kunden/(\d+)/projekte$', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/projekte$', self.path)
+            self._api_crm_projekte_list(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)/aktivitaeten', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/aktivitaeten', self.path)
+            self._api_crm_aktivitaeten(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)/faelle', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/faelle', self.path)
+            self._api_crm_faelle_list(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)$', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)$', self.path)
+            self._api_crm_kunden_get(int(_m.group(1)))
+        elif re.match(r'^/api/crm/faelle/(\d+)/aktivitaeten$', self.path):
+            _m = re.match(r'^/api/crm/faelle/(\d+)/aktivitaeten$', self.path)
+            # GET handled below in POST section
+            self._json({"ok": False, "error": "Nur POST"})
+        elif re.match(r'^/api/crm/faelle/(\d+)$', self.path):
+            _m = re.match(r'^/api/crm/faelle/(\d+)$', self.path)
+            self._api_crm_faelle_get(int(_m.group(1)))
+        elif re.match(r'^/api/crm/aktivitaeten/(\d+)$', self.path):
+            _m = re.match(r'^/api/crm/aktivitaeten/(\d+)$', self.path)
+            self._api_crm_aktivitaet_get(int(_m.group(1)))
 
         elif self.path.startswith('/api/kira/kosten/uebersicht'):
             self._api_kosten_uebersicht()
@@ -32679,6 +33904,30 @@ Regeln:
             self._api_zeiterfassung_delete(body)
             return
 
+        # CRM API POST/PUT (session-ss)
+        if self.path == '/api/crm/kunden':
+            self._api_crm_kunden_create(body)
+            return
+        if self.path == '/api/crm/faelle':
+            self._api_crm_faelle_create(body)
+            return
+        _crm_put_kunde = re.match(r'^/api/crm/kunden/(\d+)$', self.path)
+        if _crm_put_kunde:
+            self._api_crm_kunden_update(int(_crm_put_kunde.group(1)), body)
+            return
+        _crm_put_fall = re.match(r'^/api/crm/faelle/(\d+)$', self.path)
+        if _crm_put_fall:
+            self._api_crm_faelle_update(int(_crm_put_fall.group(1)), body)
+            return
+        _crm_proj = re.match(r'^/api/crm/kunden/(\d+)/projekte$', self.path)
+        if _crm_proj:
+            self._api_crm_projekte_create(int(_crm_proj.group(1)), body)
+            return
+        _crm_fall_akt = re.match(r'^/api/crm/faelle/(\d+)/aktivitaeten$', self.path)
+        if _crm_fall_akt:
+            self._api_crm_faelle_add_aktivitaet(int(_crm_fall_akt.group(1)), body)
+            return
+
         # Kunden-Alias speichern
         if self.path == '/api/kunden/alias':
             alias_email = (body.get('alias_email','') or '').strip().lower()
@@ -33443,6 +34692,344 @@ Regeln:
         except Exception:
             pass
         self._json(result)
+
+    # ── CRM API (session-ss) ─────────────────────────────────────────────────
+
+    def _crm_db(self):
+        from case_engine import _ensure_crm_tables, KUNDEN_DB as _CDB
+        _ensure_crm_tables()
+        db = sqlite3.connect(str(_CDB))
+        db.row_factory = sqlite3.Row
+        return db
+
+    def _api_crm_kunden_list(self):
+        """GET /api/crm/kunden — Kundenliste mit Stats."""
+        db = self._crm_db()
+        try:
+            rows = db.execute("""
+                SELECT k.*,
+                    (SELECT COUNT(*) FROM kunden_faelle kf WHERE kf.kunden_id=k.id AND kf.status NOT IN ('erledigt','archiv')) as offene_faelle,
+                    (SELECT kp.projektname FROM kunden_projekte kp WHERE kp.kunden_id=k.id ORDER BY kp.aktualisiert_am DESC LIMIT 1) as letztes_projekt
+                FROM kunden k ORDER BY k.letztkontakt DESC NULLS LAST
+            """).fetchall()
+            self._json({"ok": True, "kunden": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_kunden_get(self, kid):
+        """GET /api/crm/kunden/{id} — Einzelner Kunde."""
+        db = self._crm_db()
+        try:
+            row = db.execute("SELECT * FROM kunden WHERE id=?", (kid,)).fetchone()
+            if not row:
+                self._json({"ok": False, "error": "Kunde nicht gefunden"})
+                return
+            self._json({"ok": True, "kunde": dict(row)})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_kunden_create(self, data):
+        """POST /api/crm/kunden — Neuen Kunden anlegen."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            cur = db.execute("""
+                INSERT INTO kunden (email, name, firmenname, ansprechpartner, kundentyp, status, notiz, erstkontakt, letztkontakt, aktualisiert_am)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+            """, (
+                data.get("email", ""), data.get("name", ""),
+                data.get("firmenname", ""), data.get("name", ""),
+                data.get("kundentyp", "geschaeft"), data.get("status", "aktiv"),
+                data.get("notiz", ""),
+            ))
+            kid = cur.lastrowid
+            # Identitaet anlegen
+            if data.get("email"):
+                db.execute("""
+                    INSERT OR IGNORE INTO kunden_identitaeten (kunden_id, typ, wert, confidence, quelle)
+                    VALUES (?, 'mail', ?, 'eindeutig', 'manuell')
+                """, (kid, data["email"].lower()))
+            if data.get("telefon"):
+                db.execute("""
+                    INSERT OR IGNORE INTO kunden_identitaeten (kunden_id, typ, wert, confidence, quelle)
+                    VALUES (?, 'telefon', ?, 'eindeutig', 'manuell')
+                """, (kid, data["telefon"]))
+            db.commit()
+            try:
+                from runtime_log import elog
+                elog("kunde_erstellt", f"Kunde #{kid} angelegt: {data.get('firmenname') or data.get('name','')}")
+            except Exception:
+                pass
+            self._json({"ok": True, "id": kid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_kunden_update(self, kid, data):
+        """PUT /api/crm/kunden/{id} — Kunde bearbeiten."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            sets = []
+            vals = []
+            for col in ("firmenname", "name", "ansprechpartner", "email", "kundentyp", "status", "notiz", "kundenwert"):
+                if col in data:
+                    sets.append(f"{col}=?")
+                    vals.append(data[col])
+            sets.append("aktualisiert_am=datetime('now')")
+            vals.append(kid)
+            db.execute(f"UPDATE kunden SET {','.join(sets)} WHERE id=?", vals)
+            db.commit()
+            try:
+                from runtime_log import elog
+                elog("kunde_aktualisiert", f"Kunde #{kid} aktualisiert")
+            except Exception:
+                pass
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_contacts(self):
+        """GET /api/crm/contacts — Alle Contacts."""
+        self._api_crm_kunden_list()
+
+    def _api_crm_stats(self):
+        """GET /api/crm/stats — CRM KPI-Zahlen."""
+        db = self._crm_db()
+        try:
+            stats = {}
+            for row in db.execute("SELECT COALESCE(status,'aktiv') as s, COUNT(*) as c FROM kunden GROUP BY s").fetchall():
+                stats[f"kunden_{row['s']}"] = row["c"]
+            try:
+                stats["projekte_aktiv"] = db.execute("SELECT COUNT(*) FROM kunden_projekte WHERE status IN ('aktiv','planung')").fetchone()[0]
+            except Exception:
+                stats["projekte_aktiv"] = 0
+            try:
+                stats["faelle_offen"] = db.execute("SELECT COUNT(*) FROM kunden_faelle WHERE status NOT IN ('erledigt','archiv')").fetchone()[0]
+            except Exception:
+                stats["faelle_offen"] = 0
+            try:
+                stats["unzugeordnet"] = db.execute("SELECT COUNT(*) FROM kunden_classifier_log WHERE user_bestaetigt=0 AND confidence IN ('pruefen','unklar')").fetchone()[0]
+            except Exception:
+                stats["unzugeordnet"] = 0
+            self._json({"ok": True, "stats": stats})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_projekte_list(self, kid=None):
+        """GET /api/crm/kunden/{id}/projekte oder /api/crm/projekte."""
+        db = self._crm_db()
+        try:
+            if kid:
+                rows = db.execute("""
+                    SELECT * FROM kunden_projekte WHERE kunden_id=? ORDER BY aktualisiert_am DESC
+                """, (kid,)).fetchall()
+            else:
+                rows = db.execute("""
+                    SELECT kp.*, k.name as kunde_name, k.firmenname
+                    FROM kunden_projekte kp
+                    LEFT JOIN kunden k ON k.id = kp.kunden_id
+                    ORDER BY kp.aktualisiert_am DESC LIMIT 100
+                """).fetchall()
+            self._json({"ok": True, "projekte": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_projekte_create(self, kid, data):
+        """POST /api/crm/kunden/{id}/projekte — Neues Projekt."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            cur = db.execute("""
+                INSERT INTO kunden_projekte (kunden_id, projektname, projekttyp, status, beginn_am, beschreibung, auftragswert)
+                VALUES (?, ?, 'standard', 'aktiv', ?, ?, ?)
+            """, (kid, data.get("projektname",""), data.get("beginn_am"), data.get("beschreibung",""), data.get("auftragswert",0)))
+            db.commit()
+            try:
+                from runtime_log import elog
+                elog("projekt_erstellt", f"Projekt #{cur.lastrowid} für Kunde #{kid}: {data.get('projektname','')}")
+            except Exception:
+                pass
+            self._json({"ok": True, "id": cur.lastrowid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_aktivitaeten(self, kid):
+        """GET /api/crm/kunden/{id}/aktivitaeten?projekt_id=X"""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        pid = qs.get("projekt_id", [None])[0]
+        db = self._crm_db()
+        try:
+            if pid:
+                rows = db.execute("""
+                    SELECT * FROM kunden_aktivitaeten WHERE kunden_id=? AND projekt_id=?
+                    ORDER BY erstellt_am DESC LIMIT 100
+                """, (kid, pid)).fetchall()
+            else:
+                rows = db.execute("""
+                    SELECT * FROM kunden_aktivitaeten WHERE kunden_id=?
+                    ORDER BY erstellt_am DESC LIMIT 100
+                """, (kid,)).fetchall()
+            self._json({"ok": True, "aktivitaeten": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_aktivitaet_get(self, aid):
+        """GET /api/crm/aktivitaeten/{id}."""
+        db = self._crm_db()
+        try:
+            row = db.execute("SELECT * FROM kunden_aktivitaeten WHERE id=?", (aid,)).fetchone()
+            if not row:
+                self._json({"ok": False, "error": "Aktivität nicht gefunden"})
+                return
+            self._json({"ok": True, "aktivitaet": dict(row)})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_list(self, kid):
+        """GET /api/crm/kunden/{id}/faelle?projekt_id=X"""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        pid = qs.get("projekt_id", [None])[0]
+        db = self._crm_db()
+        try:
+            if pid:
+                rows = db.execute("SELECT * FROM kunden_faelle WHERE kunden_id=? AND projekt_id=? ORDER BY aktualisiert_am DESC", (kid, pid)).fetchall()
+            else:
+                rows = db.execute("SELECT * FROM kunden_faelle WHERE kunden_id=? ORDER BY aktualisiert_am DESC", (kid,)).fetchall()
+            self._json({"ok": True, "faelle": [dict(r) for r in rows]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_create(self, data):
+        """POST /api/crm/faelle — Neuen Fall anlegen."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            cur = db.execute("""
+                INSERT INTO kunden_faelle (kunden_id, projekt_id, fall_typ, titel, status, prioritaet, naechste_aktion, faellig_am)
+                VALUES (?, ?, ?, ?, 'offen', ?, ?, ?)
+            """, (
+                data.get("kunden_id"), data.get("projekt_id"),
+                data.get("fall_typ","anfrage"), data.get("titel",""),
+                data.get("prioritaet","normal"), data.get("naechste_aktion",""),
+                data.get("faellig_am"),
+            ))
+            db.commit()
+            try:
+                from runtime_log import elog
+                elog("fall_erstellt", f"Fall #{cur.lastrowid}: {data.get('titel','')} ({data.get('fall_typ','')})")
+            except Exception:
+                pass
+            self._json({"ok": True, "id": cur.lastrowid})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_get(self, fid):
+        """GET /api/crm/faelle/{id} — Fall-Details + Timeline."""
+        db = self._crm_db()
+        try:
+            fall = db.execute("SELECT * FROM kunden_faelle WHERE id=?", (fid,)).fetchone()
+            if not fall:
+                self._json({"ok": False, "error": "Fall nicht gefunden"})
+                return
+            aktivitaeten = db.execute("""
+                SELECT * FROM kunden_aktivitaeten WHERE fall_id=? ORDER BY erstellt_am DESC LIMIT 50
+            """, (fid,)).fetchall()
+            self._json({"ok": True, "fall": dict(fall), "aktivitaeten": [dict(a) for a in aktivitaeten]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_update(self, fid, data):
+        """PUT /api/crm/faelle/{id} — Fall bearbeiten."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            sets = []
+            vals = []
+            for col in ("status", "prioritaet", "naechste_aktion", "faellig_am", "titel"):
+                if col in data:
+                    sets.append(f"{col}=?")
+                    vals.append(data[col])
+            sets.append("aktualisiert_am=datetime('now')")
+            vals.append(fid)
+            db.execute(f"UPDATE kunden_faelle SET {','.join(sets)} WHERE id=?", vals)
+            db.commit()
+            try:
+                from runtime_log import elog
+                elog("fall_status_geaendert", f"Fall #{fid} aktualisiert: {data}")
+            except Exception:
+                pass
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_faelle_add_aktivitaet(self, fid, data):
+        """POST /api/crm/faelle/{id}/aktivitaeten — Aktivität zum Fall hinzufügen."""
+        if not data:
+            self._json({"ok": False, "error": "Keine Daten"})
+            return
+        db = self._crm_db()
+        try:
+            # Fall laden um kunden_id + projekt_id zu bekommen
+            fall = db.execute("SELECT kunden_id, projekt_id FROM kunden_faelle WHERE id=?", (fid,)).fetchone()
+            if not fall:
+                self._json({"ok": False, "error": "Fall nicht gefunden"})
+                return
+            db.execute("""
+                INSERT INTO kunden_aktivitaeten (kunden_id, projekt_id, fall_id, ereignis_typ, zusammenfassung, volltext_auszug)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (fall["kunden_id"], fall["projekt_id"], fid,
+                  data.get("ereignis_typ","manuell"), data.get("zusammenfassung",""), data.get("volltext_auszug","")))
+            db.commit()
+            self._json({"ok": True})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
+    def _api_crm_unzugeordnete(self):
+        """GET /api/crm/unzugeordnete — Unzugeordnete Klassifizierungen."""
+        try:
+            from kunden_classifier import get_unzugeordnete
+            items = get_unzugeordnete(50)
+            self._json({"ok": True, "items": items})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
 
     # ── LLM Kosten & Budget ──────────────────────────────────────────────────
 
