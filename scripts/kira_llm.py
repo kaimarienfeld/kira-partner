@@ -1359,6 +1359,21 @@ def _build_data_context(config, kira_cfg=None):
     except Exception:
         pass
 
+    ctx += """
+=== CRM-HANDLUNGSREGELN ===
+KIRA DARF IM CRM AKTIV HANDELN:
+  - Kunden und Leads anlegen (confidence >= 0.90)
+  - Neue Projekte anlegen (wenn klar neues Thema, confidence >= 0.85)
+  - Identitäten vorschlagen (Kai muss bestätigen ab confidence < 0.95)
+  - Lernregeln ableiten und speichern (aus Korrekturen)
+  - Clustering-Vorschläge erstellen
+  - Fälle anlegen und Status ändern
+OHNE Kai-OK NICHT:
+  - Kunden löschen
+  - Lexware-Sync auslösen
+  - Absender dauerhaft ignorieren
+"""
+
     return ctx
 
 
@@ -2460,6 +2475,38 @@ def get_tools(config=None):
             "required": ["regel_id"]
         }
     })
+    # v4 — Health Score Tool
+    tools.append({
+        "name": "crm_health_score_pruefen",
+        "description": (
+            "Berechnet und zeigt den Customer Health Score eines Kunden. "
+            "Score 0.0-1.0: über 0.65 = gesund (grün), 0.35-0.65 = Achtung (gelb), unter 0.35 = kritisch (rot). "
+            "Zeigt auch die 5 Einzelfaktoren: Kontakthäufigkeit, Zahlungsverhalten, offene Probleme, Projektaktivität, Risiko."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunden_id": {"type": "integer", "description": "Kunden-ID"}
+            },
+            "required": ["kunden_id"]
+        }
+    })
+
+    # v4 — Next-Best-Action Tool
+    tools.append({
+        "name": "crm_naechste_aktion",
+        "description": (
+            "Schlägt die sinnvollste nächste Aktion für einen Fall vor. "
+            "Analysiert Fall-Status, Priorität, letzte Aktivitäten und Kunden-Health-Score."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "fall_id": {"type": "integer", "description": "Fall-ID"}
+            },
+            "required": ["fall_id"]
+        }
+    })
 
     return tools
 
@@ -2553,6 +2600,8 @@ def execute_tool(name, params):
             "crm_korrektur_speichern": _tool_crm_korrektur_speichern,
             "crm_lernregeln_anzeigen": _tool_crm_lernregeln_anzeigen,
             "crm_lernregel_deaktivieren": _tool_crm_lernregel_deaktivieren,
+            "crm_health_score_pruefen": _tool_crm_health_score_pruefen,
+            "crm_naechste_aktion": _tool_crm_naechste_aktion,
         }
         handler = handlers.get(name)
         if not handler:
@@ -5883,6 +5932,48 @@ def _tool_crm_lernregel_deaktivieren(p):
             return {"ok": False, "error": "regel_id fehlt"}
         ok = lernregel_deaktivieren(rid)
         return {"ok": ok, "message": f"Lernregel {rid} deaktiviert" if ok else "Fehler"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_naechste_aktion(p):
+    """Schlägt nächste Aktion für einen Fall vor."""
+    try:
+        from kunden_classifier import next_best_action_fuer_fall
+        fid = int(p.get("fall_id", 0))
+        if not fid:
+            return {"ok": False, "error": "fall_id fehlt"}
+        result = next_best_action_fuer_fall(fid)
+        return {"ok": True, "fall_id": fid, "empfehlung": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _tool_crm_health_score_pruefen(p):
+    """Berechnet und zeigt Health Score eines Kunden."""
+    try:
+        from kunden_health import berechne_health_score
+        kid = int(p.get("kunden_id", 0))
+        if not kid:
+            return {"ok": False, "error": "kunden_id fehlt"}
+        result = berechne_health_score(kid)
+        score = result.get("score", 0)
+        detail = result.get("detail", {})
+        status = "gesund" if score > 0.65 else "Achtung" if score > 0.35 else "kritisch"
+        return {
+            "ok": True,
+            "kunden_id": kid,
+            "health_score": score,
+            "status": status,
+            "faktoren": {
+                "Kontakthäufigkeit": f"{detail.get('f_kontakt', 0):.0%} (letzte Aktivität vor {detail.get('letzter_kontakt_tage', '?')} Tagen)",
+                "Zahlungsverhalten": f"{detail.get('f_zahlung', 0):.0%}",
+                "Offene Probleme": f"{detail.get('f_probleme', 0):.0%} ({detail.get('offene_probleme', 0)} offen)",
+                "Projektaktivität": f"{detail.get('f_projekte', 0):.0%} ({detail.get('aktive_projekte', 0)} aktiv)",
+                "Risiko-Score": f"{detail.get('f_risiko', 0):.0%}"
+            },
+            "zusammenfassung": f"Health Score: {score:.0%} ({status})"
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

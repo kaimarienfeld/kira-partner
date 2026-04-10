@@ -622,3 +622,21 @@ Syntax-Checks: 4/4 OK. DB: 11 Tabellen OK. CRM_TECHNIK_REFERENZ.md vollständig 
 **Erledigt:** CRM Vollausbau v3 komplett — 2 DB-Tabellen, 600 LOC Classifier, 8 API-Endpunkte, 6 Kira-Tools, UI (Identitäten/Zeitstrahl/Korrektur), Tour 9 Schritte, Technik-Referenz aktualisiert.
 **Offen geblieben:** Browser-Live-Test, feature_registry.json, partner_view.
 **Status:** ✅ erledigt
+
+---
+
+## 2026-04-11 00:15 — Session-Start (session-uu2)
+**Auftrag:** CRM Nachbesserung + Innovationen v4 — 5 fehlende Punkte nachholen + 5 Innovationen einbauen
+**Status:** erledigt
+
+### 2026-04-11 14:25 — Session-Ende
+**Erledigt:**
+- Block A (5 fehlende Punkte): A-1 kunden_ignoriert Domain-Check, A-2 Runtime-Log Events, A-3 Retroaktiv-Scan UI, A-4 PDF-Export, A-5 Quick-Actions + Handlungsregeln
+- Block B (5 Innovationen): B-1 Health Score (kunden_health.py + API + UI + Kira-Tool), B-2 Schreibstil-Fingerprinting (LLM, 7d-Cache), B-3 Sentiment-Trend (Score + 30/30-Tage-Vergleich), B-4 Cross-Channel Thread-Linking (72h LLM), B-5 Next-Best-Action (15min-Cache + NBA-Banner)
+- 10 neue DB-Spalten (6 kunden + 4 kunden_aktivitaeten)
+- 3 neue API-Endpunkte, 2 neue Kira-Tools, 5 neue Einstellungen
+- feature_registry.json: 5 neue Features (114 total)
+- CRM_TECHNIK_REFERENZ.md v4-Sektion
+- Alle 5 Python-Dateien syntax-clean
+**Offen geblieben:** —
+**Status:** erledigt

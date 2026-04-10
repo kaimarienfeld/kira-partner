@@ -11,8 +11,8 @@ Pipeline:
 
 Läuft NACH vorgang_router.py in der Mail-Verarbeitungspipeline.
 """
-import json, logging, re, sqlite3, hashlib, time, threading, datetime as _dt
-from datetime import datetime
+import json, logging, re, sqlite3, hashlib, time, threading, datetime as _dt, uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 logger = logging.getLogger("kunden_classifier")
@@ -369,6 +369,14 @@ def _build_kunden_kontext_erweitert(conn=None) -> str:
                     desc = r['regel_typ']
                 zeilen.append(f"  Lernregel: {desc}")
 
+            # B-2: Schreibstil-Fingerprinting (lazy, 7d-Cache)
+            try:
+                schreibstil = _build_schreibstil_profil(kid, conn)
+                if schreibstil:
+                    zeilen.append(f"  Schreibstil: {schreibstil}")
+            except Exception:
+                pass
+
         if close_db:
             conn.close()
         return '\n'.join(zeilen) if zeilen else "Noch keine Kunden vorhanden."
@@ -419,6 +427,312 @@ def _build_lernregeln_kontext(conn=None) -> str:
         return "(Fehler beim Laden der Lernregeln)"
 
 
+# ── B-2: Schreibstil-Fingerprinting ──────────────────────────────────────────
+_SCHREIBSTIL_CACHE = {}  # {kunden_id: (timestamp, profil_text)}
+_SCHREIBSTIL_TTL = 7 * 86400  # 7 Tage Cache
+
+
+def _build_schreibstil_profil(kunden_id: int, conn) -> str:
+    """
+    Extrahiert charakteristische Schreibmerkmale aus den letzten Mails
+    eines Kunden für den LLM-Kontext.
+    Max. 5 repräsentative Sätze — kein vollständiger Text.
+    Lazy gebaut, 7-Tage-Cache.
+    """
+    # Cache prüfen
+    cached = _SCHREIBSTIL_CACHE.get(kunden_id)
+    if cached and (time.time() - cached[0]) < _SCHREIBSTIL_TTL:
+        return cached[1]
+
+    aktivitaeten = conn.execute('''
+        SELECT quelle_id, volltext_auszug
+        FROM kunden_aktivitaeten
+        WHERE kunden_id = ?
+          AND ereignis_typ = 'mail'
+          AND volltext_auszug IS NOT NULL
+        ORDER BY erstellt_am DESC
+        LIMIT 10
+    ''', (kunden_id,)).fetchall()
+
+    if not aktivitaeten:
+        return ""
+
+    auszuege = '\n---\n'.join([a['volltext_auszug'][:200] for a in aktivitaeten[:5]])
+
+    prompt = f"""Analysiere den Schreibstil dieser Mails und beschreibe ihn in maximal 2 Sätzen.
+Fokus auf: Anrede (formell/informell?), Satzlänge, typische Formulierungen, Abschlussformel.
+NICHT den Inhalt beschreiben — nur den Stil.
+
+Mails:
+{auszuege}
+
+Antwort (max 2 Sätze, kein JSON):"""
+
+    try:
+        from kira_llm import _call_llm_simple
+        profil = _call_llm_simple(prompt, max_tokens=100)
+        _SCHREIBSTIL_CACHE[kunden_id] = (time.time(), profil)
+        return profil
+    except Exception:
+        return ""
+
+
+# ── B-3: Sentiment-Analyse ──────────────────────────────────────────────────
+
+
+def _sentiment_analysieren(mail_auszug: str) -> float:
+    """
+    Schnelle Sentiment-Einschätzung via LLM.
+    Gibt Score zwischen -1.0 und 1.0 zurück.
+    Verwendet das günstigste verfügbare Modell.
+    """
+    if not mail_auszug or len(mail_auszug) < 20:
+        return 0.0
+
+    prompt = f"""Bewerte den Ton dieser Nachricht auf einer Skala von -1.0 bis 1.0.
+-1.0 = sehr negativ/unzufrieden/fordernd
+ 0.0 = neutral/sachlich
++1.0 = sehr positiv/freundlich/zufrieden
+
+Nachricht: {mail_auszug[:300]}
+
+Antworte NUR mit einer Zahl zwischen -1.0 und 1.0, z.B.: 0.3"""
+
+    try:
+        from kira_llm import _call_llm_simple
+        antwort = _call_llm_simple(prompt, max_tokens=5)
+        return max(-1.0, min(1.0, float(antwort.strip())))
+    except Exception:
+        return 0.0
+
+
+def _sentiment_trend_berechnen(kunden_id: int, conn) -> float:
+    """
+    Berechnet den Sentiment-Trend eines Kunden über die letzten 30 Tage.
+    Vergleicht mit den 30 Tagen davor. Negatives Ergebnis = Verschlechterung.
+    """
+    letzte_30 = conn.execute('''
+        SELECT AVG(sentiment_score) FROM kunden_aktivitaeten
+        WHERE kunden_id = ? AND ereignis_typ = 'mail'
+          AND sentiment_score IS NOT NULL
+          AND erstellt_am >= ?
+    ''', (kunden_id, (datetime.now() - timedelta(days=30)).isoformat())
+    ).fetchone()[0] or 0.0
+
+    davor_30 = conn.execute('''
+        SELECT AVG(sentiment_score) FROM kunden_aktivitaeten
+        WHERE kunden_id = ? AND ereignis_typ = 'mail'
+          AND sentiment_score IS NOT NULL
+          AND erstellt_am BETWEEN ? AND ?
+    ''', (
+        kunden_id,
+        (datetime.now() - timedelta(days=60)).isoformat(),
+        (datetime.now() - timedelta(days=30)).isoformat()
+    )).fetchone()[0] or 0.0
+
+    trend = letzte_30 - davor_30
+
+    if trend < -0.3 and letzte_30 < 0.0:
+        _sentiment_warnung(kunden_id, trend, letzte_30, conn)
+
+    conn.execute('''
+        UPDATE kunden SET sentiment_trend = ?, sentiment_warnung = ?
+        WHERE id = ?
+    ''', (round(trend, 3), 1 if trend < -0.3 else 0, kunden_id))
+
+    return trend
+
+
+def _sentiment_warnung(kunden_id, trend, aktuell, conn):
+    """Aufgabe für Kai wenn Sentiment sich stark verschlechtert."""
+    kunde = conn.execute(
+        'SELECT name, firmenname FROM kunden WHERE id = ?', (kunden_id,)
+    ).fetchone()
+    if not kunde:
+        return
+    name = kunde['firmenname'] or kunde['name'] or f"Kunde #{kunden_id}"
+
+    try:
+        tdb = sqlite3.connect(str(TASKS_DB))
+        tdb.row_factory = sqlite3.Row
+        # Prüfen ob bereits kürzlich gewarnt (14 Tage)
+        recent = tdb.execute("""
+            SELECT MAX(created_at) FROM tasks
+            WHERE title LIKE ? AND created_at > ?
+        """, (
+            f"%Ton-Veränderung%{kunden_id}%",
+            (datetime.now() - timedelta(days=14)).isoformat()
+        )).fetchone()[0]
+        if recent:
+            tdb.close()
+            return
+
+        tdb.execute('''
+            INSERT INTO tasks (title, body, status, priority, created_at)
+            VALUES (?, ?, 'offen', 'normal', ?)
+        ''', (
+            f"Ton-Veränderung bei {name} (Kunde #{kunden_id})",
+            f"Kira hat bemerkt: Der Ton bei {name} hat sich in letzter Zeit "
+            f"messbar verschlechtert.\n\n"
+            f"Aktueller Durchschnitt: {aktuell:+.1f} | Veränderung: {trend:+.1f}\n\n"
+            f"Empfehlung: Proaktiv Kontakt aufnehmen bevor eine Reklamation entsteht.",
+            datetime.now().isoformat()
+        ))
+        tdb.commit()
+        tdb.close()
+        _elog_safe("sentiment_warnung", f"Kunde {kunden_id} ({name}): Trend {trend:+.2f}")
+    except Exception as e:
+        logger.warning("Sentiment-Warnung Fehler: %s", e)
+
+
+# ── B-4: Cross-Channel Thread-Linking ────────────────────────────────────────
+
+
+def _thread_link_erkennen(neue_aktivitaet: dict,
+                          kunden_id: int, conn) -> str | None:
+    """
+    Prüft ob eine neue Aktivität zu einem bestehenden Thread gehört.
+    Nutzt: zeitliche Nähe (72h), gleicher Fall, Inhaltsbezug.
+    Gibt thread_id zurück oder None wenn neuer Thread.
+    """
+    letzte = conn.execute('''
+        SELECT id, thread_id, zusammenfassung, erstellt_am, ereignis_typ
+        FROM kunden_aktivitaeten
+        WHERE kunden_id = ?
+          AND erstellt_am >= ?
+          AND sichtbar_in_verlauf = 1
+        ORDER BY erstellt_am DESC
+        LIMIT 10
+    ''', (
+        kunden_id,
+        (datetime.now() - timedelta(hours=72)).isoformat()
+    )).fetchall()
+
+    if not letzte:
+        return None
+
+    letzte_text = '\n'.join([
+        f"[{a['ereignis_typ'].upper()}] {a['erstellt_am'][:16]}: {(a['zusammenfassung'] or '')[:80]}"
+        for a in letzte
+    ])
+
+    prompt = f"""Prüfe ob diese neue Aktivität zu einer der letzten gehört.
+
+NEUE AKTIVITÄT:
+[{neue_aktivitaet.get('typ', '').upper()}] {(neue_aktivitaet.get('zusammenfassung', '') or '')[:200]}
+
+LETZTE AKTIVITÄTEN (letzte 72h):
+{letzte_text}
+
+Gehört die neue Aktivität zu einer der letzten? (gleiche Konversation / Folge-Aktion)
+
+Antworte NUR als JSON:
+{{"ist_folge": true/false, "gehoert_zu_index": null, "begruendung": "max 1 Satz"}}"""
+
+    try:
+        from kira_llm import _call_llm_simple
+        raw = _call_llm_simple(prompt, max_tokens=80)
+        # JSON aus Antwort extrahieren
+        json_match = re.search(r'\{[^}]+\}', raw)
+        if not json_match:
+            return None
+        antwort = json.loads(json_match.group())
+        if antwort.get('ist_folge') and antwort.get('gehoert_zu_index') is not None:
+            idx = int(antwort['gehoert_zu_index'])
+            if 0 <= idx < len(letzte):
+                thread_id = letzte[idx]['thread_id']
+                if not thread_id:
+                    thread_id = str(uuid.uuid4())[:8]
+                    conn.execute('''
+                        UPDATE kunden_aktivitaeten
+                        SET thread_id = ?, thread_typ = 'haupt'
+                        WHERE id = ?
+                    ''', (thread_id, letzte[idx]['id']))
+                return thread_id
+    except Exception:
+        pass
+    return None
+
+
+# ── B-5: Next-Best-Action ────────────────────────────────────────────────────
+_NBA_CACHE = {}  # {fall_id: (timestamp, result)}
+_NBA_TTL = 900  # 15 Minuten Cache
+
+
+def next_best_action_fuer_fall(fall_id: int, conn=None) -> dict:
+    """
+    Analysiert einen Fall und schlägt die sinnvollste nächste Aktion vor.
+    Ergebnis wird gecacht (15 Minuten).
+    """
+    cached = _NBA_CACHE.get(fall_id)
+    if cached and (time.time() - cached[0]) < _NBA_TTL:
+        return cached[1]
+
+    close_db = False
+    if conn is None:
+        conn = _get_kunden_db()
+        close_db = True
+    try:
+        fall = conn.execute('SELECT * FROM kunden_faelle WHERE id = ?', (fall_id,)).fetchone()
+        if not fall:
+            return {"aktion": "Prüfen", "begruendung": "Fall nicht gefunden", "dringlichkeit": "keine_eile"}
+        kunde = conn.execute('SELECT * FROM kunden WHERE id = ?', (fall['kunden_id'],)).fetchone()
+        letzte_aktivitaeten = conn.execute('''
+            SELECT ereignis_typ, zusammenfassung, erstellt_am
+            FROM kunden_aktivitaeten
+            WHERE fall_id = ?
+            ORDER BY erstellt_am DESC
+            LIMIT 10
+        ''', (fall_id,)).fetchall()
+
+        tage_seit_update = 99
+        if fall['aktualisiert_am']:
+            try:
+                tage_seit_update = (datetime.now() - datetime.fromisoformat(
+                    fall['aktualisiert_am'].split('+')[0]
+                )).days
+            except Exception:
+                pass
+
+        kunden_name = (kunde['firmenname'] or kunde['name']) if kunde else f"Kunde #{fall['kunden_id']}"
+
+        prompt = f"""Du bist der Geschäftsstratege für ein Handwerksunternehmen.
+
+FALL:
+Typ: {fall['fall_typ']}
+Status: {fall['status']}
+Priorität: {fall['prioritaet']}
+Fällig: {fall['faellig_am'] or 'kein Datum'}
+Zuletzt aktualisiert: vor {tage_seit_update} Tagen
+
+KUNDE:
+Name: {kunden_name}
+Health-Score: {(kunde.get('health_score') or 0.5) if kunde else 0.5:.0%}
+Zahlungsverhalten: {(kunde.get('zahlungsverhalten_score') or 0.5) if kunde else 0.5:.0%}
+
+LETZTE AKTIVITÄTEN:
+{chr(10).join([f"[{a['erstellt_am'][:10]}] {a['ereignis_typ']}: {(a['zusammenfassung'] or '')[:80]}" for a in letzte_aktivitaeten]) or '(keine)'}
+
+Was ist die sinnvollste nächste Aktion? Sei konkret und handlungsorientiert.
+Antworte NUR als JSON:
+{{"aktion": "Mail senden|Anrufen|Angebot erstellen|Status ändern|Warten|Prüfen", "begruendung": "max 1 Satz warum", "dringlichkeit": "sofort|diese_woche|naechste_woche|keine_eile", "vorschlagstext": "Optional: konkreter Vorschlagstext (max 2 Sätze)"}}"""
+
+        from kira_llm import _call_llm_simple
+        raw = _call_llm_simple(prompt, max_tokens=200)
+        json_match = re.search(r'\{[^}]+\}', raw, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+            _NBA_CACHE[fall_id] = (time.time(), result)
+            return result
+        return {"aktion": "Prüfen", "begruendung": "Keine Empfehlung möglich", "dringlichkeit": "keine_eile"}
+    except Exception as e:
+        logger.warning("NBA Fehler für Fall %s: %s", fall_id, e)
+        return {"aktion": "Prüfen", "begruendung": str(e), "dringlichkeit": "keine_eile"}
+    finally:
+        if close_db:
+            conn.close()
+
+
 def _build_llm_prompt(absender: str, betreff: str, text_auszug: str,
                       datum: str, kunden_kontext: str,
                       lernregeln_kontext: str = "") -> str:
@@ -449,6 +763,8 @@ Inhalt:
 
 Prüfe NICHT nur die E-Mail-Adresse. Prüfe auch:
 - Wird ein bekannter Firmenname erwähnt?
+- Schreibstil — passt er zum bekannten Stil eines Kunden?
+  (Formell/informell, typische Formulierungen, Anrede)
 - Passt der Inhalt / die Wortwahl zu einem bekannten Kunden?
 - Gibt es zeitliche Nähe zu bekannten Aktivitäten dieses Kunden?
 - Gibt es gelernte Regeln die hier greifen?
@@ -978,12 +1294,17 @@ def _ntfy_push(titel: str, nachricht: str, prioritaet: str = "default"):
 # ── Ignoriert-Check ────────────────────────────────────────────────────────
 
 def _ist_absender_ignoriert(email: str) -> bool:
-    """Prüft ob Absender in kunden_ignoriert steht."""
+    """Prüft ob Absender oder dessen Domain in kunden_ignoriert steht."""
     try:
+        email_lower = email.lower().strip()
+        domain = email_lower.split('@')[1] if '@' in email_lower else ''
         db = _get_kunden_db()
         row = db.execute(
-            "SELECT id FROM kunden_ignoriert WHERE LOWER(absender_email) = ?",
-            (email.lower(),)
+            """SELECT id FROM kunden_ignoriert
+               WHERE LOWER(absender_email) = ?
+                  OR (absender_domain = ? AND absender_domain != '')
+               LIMIT 1""",
+            (email_lower, domain)
         ).fetchone()
         db.close()
         return row is not None
@@ -1794,13 +2115,48 @@ def apply_classification_v2(eingabe_typ: str, eingabe_id: str, result: dict) -> 
 
         # Aktivitäts-Eintrag erstellen
         auto = conf_score >= 0.70
+        zusammenfassung = (result.get("reasoning", "") or "")[:300]
+        text_auszug = result.get("text_auszug", "")
+
+        # B-3: Sentiment-Analyse
+        sent_score = None
+        cfg = _get_config()
+        try:
+            if cfg.get("crm", {}).get("sentiment", True) and text_auszug:
+                sent_score = _sentiment_analysieren(text_auszug)
+        except Exception:
+            pass
+
+        # B-4: Cross-Channel Thread-Linking
+        thread_id = None
+        try:
+            if cfg.get("crm", {}).get("thread_link", True):
+                thread_id = _thread_link_erkennen(
+                    {"typ": eingabe_typ, "zusammenfassung": zusammenfassung},
+                    kid, db)
+        except Exception:
+            pass
+
         db.execute("""
             INSERT INTO kunden_aktivitaeten
             (kunden_id, projekt_id, ereignis_typ, quelle_id, quelle_tabelle,
-             zusammenfassung, sichtbar_in_verlauf)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+             zusammenfassung, sichtbar_in_verlauf, sentiment_score, thread_id, thread_typ)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         """, (kid, result.get("projekt_id"), eingabe_typ, eingabe_id,
-              eingabe_typ, (result.get("reasoning", "") or "")[:300]))
+              eingabe_typ, zusammenfassung,
+              sent_score, thread_id, 'folge' if thread_id else None))
+
+        # B-3: Sentiment-Trend aktualisieren
+        if sent_score is not None:
+            try:
+                _sentiment_trend_berechnen(kid, db)
+            except Exception:
+                pass
+
+        # Projekt-Zuordnung loggen
+        if result.get("projekt_id"):
+            _elog_safe("projekt_zugeordnet_auto",
+                       f"Aktivität {eingabe_id} → Projekt {result['projekt_id']} (Kunde {kid}, Score {conf_score:.2f})")
 
         # Kunden-Kontakt aktualisieren
         db.execute("""
@@ -2046,6 +2402,9 @@ def korrektur_verarbeiten(aktivitaet_id: int, richtige_kunden_id: int,
         _elog_safe("korrektur_gespeichert",
                    f"Korrektur: Akt {aktivitaet_id} → Kunde {richtige_kunden_id} "
                    f"(vorher {alter_kunde}), Projekt {richtige_projekt_id}")
+        if richtige_projekt_id:
+            _elog_safe("projekt_zugeordnet_manuell",
+                       f"Manuelle Zuordnung: Akt {aktivitaet_id} → Projekt {richtige_projekt_id} (durch Kai)")
 
         return {
             "status": "ok",

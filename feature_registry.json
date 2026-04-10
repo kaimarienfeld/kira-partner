@@ -1379,7 +1379,77 @@
       "last_updated": "2026-04-10",
       "session": "session-uu",
       "description": "LLM-basiertes Clustering unzugeordneter Aktivitaeten, Vorschlag-API, Anwenden-API, Kira-Tool crm_projekt_clustering"
+    },
+    {
+      "id": "crm-health-score",
+      "name": "Customer Health Score",
+      "icon": "💚",
+      "leni_name": "Kunden-Gesundheitsampel",
+      "leni_desc": "Kira bewertet taeglich jeden Kunden mit 5 Faktoren. Unter 35% gibts eine Warnung.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_health.py + server.py + kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-04-11",
+      "session": "session-vv",
+      "description": "5-Faktor Health Score (Kontakt/Zahlung/Probleme/Projekte/Risiko), Health-Bar in Kundenliste, API, Kira-Tool crm_health_score_pruefen"
+    },
+    {
+      "id": "crm-schreibstil",
+      "name": "Schreibstil-Fingerprinting",
+      "icon": "✍️",
+      "leni_name": "Schreibstil-Erkennung",
+      "leni_desc": "Kira erkennt Kunden am Schreibstil, auch wenn sie von einer neuen Mailadresse schreiben.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py",
+      "status": "done",
+      "last_updated": "2026-04-11",
+      "session": "session-vv",
+      "description": "LLM-Schreibstilanalyse, 7-Tage-Cache, Integration in Kunden-Kontext und Super-Prompt"
+    },
+    {
+      "id": "crm-sentiment-trend",
+      "name": "Sentiment-Trend",
+      "icon": "📈",
+      "leni_name": "Stimmungs-Fruehwarnung",
+      "leni_desc": "Kira erkennt wenn ein Kunde in seinen Mails zunehmend unzufriedener klingt — bevor es zur Reklamation kommt.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py + server.py + case_engine.py",
+      "status": "done",
+      "last_updated": "2026-04-11",
+      "session": "session-vv",
+      "description": "Sentiment-Score pro Aktivitaet, 30/30-Tage-Trend, Warnung bei Verschlechterung, Trend-Icon in Kundenliste"
+    },
+    {
+      "id": "crm-thread-linking",
+      "name": "Cross-Channel Thread-Linking",
+      "icon": "🔗",
+      "leni_name": "Kanaluebergreifende Gespraeche",
+      "leni_desc": "Kira verbindet Mails, WhatsApp und Memos die zum selben Gespraech gehoeren — automatisch.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py + server.py + case_engine.py",
+      "status": "done",
+      "last_updated": "2026-04-11",
+      "session": "session-vv",
+      "description": "72h-Fenster LLM-Thread-Erkennung, Thread-Gruppierung in Timeline UI, CSS-Klassen crm-thread-*"
+    },
+    {
+      "id": "crm-next-best-action",
+      "name": "Next-Best-Action",
+      "icon": "💡",
+      "leni_name": "Naechster-Schritt-Empfehlung",
+      "leni_desc": "Kira schlaegt in jedem Fall die beste naechste Aktion vor — konkret und handlungsorientiert.",
+      "leni_visible": true,
+      "leni_note": null,
+      "module": "kunden_classifier.py + server.py + kira_llm.py",
+      "status": "done",
+      "last_updated": "2026-04-11",
+      "session": "session-vv",
+      "description": "LLM-basierte Aktionsempfehlung, 15min-Cache, NBA-Banner in Fallansicht, API, Kira-Tool crm_naechste_aktion"
     }
   ],
-  "_total": 109
+  "_total": 114
 }

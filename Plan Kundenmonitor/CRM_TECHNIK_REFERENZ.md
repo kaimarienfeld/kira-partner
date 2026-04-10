@@ -765,7 +765,95 @@ Gestartet via Tour-Button in der CRM-Toolbar:
 
 ---
 
-## 13. Abhängigkeiten zu bestehenden Modulen
+## 13. v4 — Intelligente Analyse + Innovationen (session-vv)
+
+### 13.1 Neue Datei: `scripts/kunden_health.py` (~200 LOC)
+
+**Funktionen:**
+- `berechne_health_score(kunden_id, conn)` — 5-Faktor Health Score (0.0–1.0)
+- `_health_warnung_erzeugen(kunden_id, score, detail, conn)` — Aufgabe bei Score < 0.35
+- `berechne_alle_health_scores()` — Batch für alle aktiven Kunden
+
+**5 Faktoren (gewichtet):**
+| Faktor | Gewicht | Berechnung |
+|---|---|---|
+| Kontakthäufigkeit | 35% | max(0, 1 - tage_seit_kontakt/180) |
+| Zahlungsverhalten | 25% | Aus kunden.zahlungsverhalten_score |
+| Offene Probleme | 20% | max(0, 1 - offene_probleme * 0.3) |
+| Projektaktivität | 10% | min(1, aktive_projekte * 0.5) |
+| Risiko-Score | 10% | 1 - kunden.risiko_score |
+
+### 13.2 Neue Spalten in `kunden` (ALTER TABLE, case_engine.py)
+
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `health_score` | REAL DEFAULT 0.5 | Zusammengesetzter Health-Score |
+| `health_score_detail_json` | TEXT | JSON mit Einzelfaktoren |
+| `health_score_berechnet_am` | TEXT | ISO-Timestamp |
+| `letzte_aktivitaet_am` | TEXT | Letzte CRM-Aktivität |
+| `sentiment_trend` | REAL DEFAULT 0.0 | 30-Tage-Trend |
+| `sentiment_warnung` | INTEGER DEFAULT 0 | 1 = aktive Warnung |
+
+### 13.3 Neue Spalten in `kunden_aktivitaeten` (ALTER TABLE)
+
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `sentiment_score` | REAL | -1.0 bis +1.0 |
+| `sentiment_keywords` | TEXT | Komma-getrennte Signalwörter |
+| `thread_id` | TEXT | Thread-Gruppen-ID (8 Zeichen) |
+| `thread_typ` | TEXT | 'haupt' oder 'folge' |
+
+### 13.4 Neue Funktionen in `kunden_classifier.py`
+
+| Funktion | Block | Beschreibung |
+|---|---|---|
+| `_build_schreibstil_profil(kid, conn)` | B-2 | LLM-Schreibstilanalyse, 7-Tage-Cache |
+| `_sentiment_analysieren(mail_auszug)` | B-3 | Sentiment Score via LLM (-1.0 bis +1.0) |
+| `_sentiment_trend_berechnen(kid, conn)` | B-3 | 30/30-Tage-Vergleich + Warnung |
+| `_sentiment_warnung(kid, trend, aktuell, conn)` | B-3 | Aufgabe bei starkem Abfall |
+| `_thread_link_erkennen(neue_akt, kid, conn)` | B-4 | 72h-Fenster LLM-Matching |
+| `next_best_action_fuer_fall(fall_id, conn)` | B-5 | Kontextuelle Aktionsempfehlung, 15min-Cache |
+
+### 13.5 Neue API-Endpunkte (3)
+
+| Methode | Pfad | Funktion |
+|---|---|---|
+| GET | `/api/crm/kunden/{id}/health` | Health-Score berechnen + zurückgeben |
+| GET | `/api/crm/faelle/{id}/next-action` | Next-Best-Action (gecacht 15min) |
+| (intern) | Sentiment in `apply_classification_v2` | Automatisch bei Zuordnung |
+
+### 13.6 Neue Kira-Tools (2)
+
+| Tool | Beschreibung |
+|---|---|
+| `crm_health_score_pruefen` | Health-Score berechnen + 5 Faktoren zeigen |
+| `crm_naechste_aktion` | NBA für einen Fall |
+
+### 13.7 Neue Einstellungen (5)
+
+| ID | Config-Key | Standard | Beschreibung |
+|---|---|---|---|
+| `cfg-crm-health-score` | `crm.health_score` | true | Health Score aktiv |
+| `cfg-crm-sentiment` | `crm.sentiment` | true | Sentiment-Trend verfolgen |
+| `cfg-crm-thread-link` | `crm.thread_link` | true | Cross-Channel Linking |
+| `cfg-crm-nba` | `crm.nba` | true | Next-Best-Action |
+| `cfg-crm-schreibstil` | `crm.schreibstil` | true | Schreibstil-Fingerprinting |
+
+### 13.8 Neue CSS-Klassen
+
+| Klasse | Verwendung |
+|---|---|
+| `.crm-health-indicator` | Health-Score-Balken in Kundenliste |
+| `.crm-health-bar` | Innerer Balken (farbig) |
+| `.crm-thread-gruppe` | Thread-Gruppierung in Timeline |
+| `.crm-thread-linie` | Vertikale Verbindungslinie |
+| `.crm-thread-folge` | Eingezogene Folge-Aktivität |
+| `.crm-next-action-banner` | NBA-Banner in Fallansicht |
+| `.crm-nba-icon` / `.crm-nba-text` | Banner-Inhalte |
+
+---
+
+## 14. Abhängigkeiten zu bestehenden Modulen
 
 | Bestehendes Modul | Wie genutzt |
 |---|---|

@@ -642,6 +642,13 @@ def _ensure_crm_tables():
             ("risiko_score", "REAL DEFAULT 0"),
             ("metadata_json", "TEXT DEFAULT '{}'"),
             ("aktualisiert_am", "TEXT"),
+            # v4 — Health Score + Sentiment
+            ("health_score", "REAL DEFAULT 0.5"),
+            ("health_score_detail_json", "TEXT DEFAULT '{}'"),
+            ("health_score_berechnet_am", "TEXT"),
+            ("letzte_aktivitaet_am", "TEXT"),
+            ("sentiment_trend", "REAL DEFAULT 0.0"),
+            ("sentiment_warnung", "INTEGER DEFAULT 0"),
         ]
         for col, col_type in kunden_neue_spalten:
             try:
@@ -736,6 +743,20 @@ def _ensure_crm_tables():
         db.execute("CREATE INDEX IF NOT EXISTS idx_ka_projekt ON kunden_aktivitaeten(projekt_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_ka_fall ON kunden_aktivitaeten(fall_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_ka_zeit ON kunden_aktivitaeten(erstellt_am)")
+
+        # v4 — Neue Spalten für Aktivitäten (Sentiment + Thread)
+        akt_neue_spalten = [
+            ("sentiment_score", "REAL"),
+            ("sentiment_keywords", "TEXT"),
+            ("thread_id", "TEXT"),
+            ("thread_typ", "TEXT"),
+        ]
+        for col, col_type in akt_neue_spalten:
+            try:
+                db.execute(f"ALTER TABLE kunden_aktivitaeten ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
+        db.execute("CREATE INDEX IF NOT EXISTS idx_ka_thread ON kunden_aktivitaeten(thread_id)")
 
         # kunden_classifier_log
         db.execute("""

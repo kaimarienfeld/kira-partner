@@ -12827,10 +12827,51 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
       <button class="es-btn" onclick="crmLexwareSyncJetzt()" id="btn-crm-sync-jetzt" style="background:var(--blue);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer">Lexware-Sync starten</button>
       <span class="es-hint">Kunden aus Lexware Office importieren/aktualisieren</span>
     </div>
-    <div class="es-row">
+    <div class="es-row" style="flex-wrap:wrap;gap:8px">
       <label class="es-lbl">Retroaktiver Mail-Scan</label>
-      <button class="es-btn" onclick="crmRetroScanJetzt()" id="btn-crm-retro-scan" style="background:var(--violet,#7c3aed);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer">Mail-Archiv scannen</button>
+      <select id="cfg-crm-retro-tage" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border)">
+        <option value="365">Letztes Jahr</option>
+        <option value="1095" selected>Letzte 3 Jahre</option>
+        <option value="1825">Letzte 5 Jahre</option>
+        <option value="99999">Alles verf&uuml;gbare</option>
+      </select>
+      <button class="es-btn" onclick="crmRetroVorschau()" id="btn-crm-retro-preview" style="background:var(--violet,#7c3aed);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer">Vorschau anzeigen</button>
       <span class="es-hint">Bestehende Mails gegen Lexware-Kundenliste abgleichen</span>
+    </div>
+    <div id="crm-retro-preview" style="display:none;padding:8px 12px;margin:4px 0;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">
+      <div id="crm-retro-preview-text" style="font-size:13px;margin-bottom:8px"></div>
+      <button onclick="crmRetroBestaetigen()" style="background:#27ae60;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;margin-right:8px">Best&auml;tigen &mdash; Aktivit&auml;ten einbuchen</button>
+      <button onclick="document.getElementById('crm-retro-preview').style.display='none'" style="background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:6px 16px;border-radius:6px;cursor:pointer">Abbrechen</button>
+    </div>
+  </div>
+
+  <div class="es-grp">
+    <div class="es-grp-h">Intelligente Analyse (v4)</div>
+    <div class="es-grp-sub">Erweiterte KI-Funktionen f&uuml;r Kundenverst&auml;ndnis und Fr&uuml;hwarnung.</div>
+    <div class="es-row">
+      <label class="es-lbl">Customer Health Score</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-health-score" {'checked' if crm_cfg.get('health_score', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">T&auml;glich berechnet. Warnung wenn Score unter 35%.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Sentiment-Trend verfolgen</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-sentiment" {'checked' if crm_cfg.get('sentiment', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Erkennt wenn ein Kunde zunehmend negativer schreibt.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Cross-Channel Thread-Linking</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-thread-link" {'checked' if crm_cfg.get('thread_link', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Verbindet Aktivit&auml;ten verschiedener Kan&auml;le wenn sie zusammengeh&ouml;ren.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">N&auml;chste-Aktion-Empfehlung (Kira)</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-nba" {'checked' if crm_cfg.get('nba', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Kira schl&auml;gt in der Fallansicht die sinnvollste n&auml;chste Aktion vor.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Schreibstil-Fingerprinting</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-schreibstil" {'checked' if crm_cfg.get('schreibstil', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Hilft Kira Kunden zu erkennen auch wenn sie von einer anderen Mailadresse schreiben.</span>
     </div>
   </div>
 </div>
@@ -14706,7 +14747,7 @@ def build_kunden():
     </div>
     <div class="crm-acc-body" id="crmBodyAktiv">
       <table class="crm-table" id="crmTableAktiv"><thead><tr>
-        <th>Name / Firma</th><th>Typ</th><th>Letztes Projekt</th><th>Letzte Aktivit&auml;t</th><th>Offene F&auml;lle</th><th>Status</th>
+        <th>Name / Firma</th><th>Typ</th><th>Letztes Projekt</th><th>Letzte Aktivit&auml;t</th><th>Offene F&auml;lle</th><th>Health</th><th>Trend</th><th>Status</th>
       </tr></thead><tbody id="crmTbodyAktiv"></tbody></table>
     </div>
   </div>
@@ -14799,6 +14840,7 @@ def build_kunden():
     fallansicht = """
 <div id="crmFallPanel" class="crm-panel" style="display:none">
   <div class="crm-fall-header" id="crmFallHeader"></div>
+  <div class="crm-next-action-banner" id="crmNbaBanner" style="display:none"></div>
   <div class="crm-fall-layout">
     <div class="crm-fall-main">
       <div class="crm-fall-timeline" id="crmFallTimeline"></div>
@@ -18370,12 +18412,21 @@ function _crmRenderKunden(kunden) {{
       const identIcon = (k.status||'')==='lead' ? '<span class="crm-ident-indicator crm-ident-lead" title="Lead — noch nicht best\\u00e4tigt">&#x25CF;</span>'
         : (k.ident_unsicher ? '<span class="crm-ident-indicator crm-ident-pruefen" title="Identit\\u00e4t pr\\u00fcfen">&#x2753;</span>'
         : '<span class="crm-ident-indicator crm-ident-ok" title="Identit\\u00e4t best\\u00e4tigt">&#x2714;</span>');
+      const hs = parseFloat(k.health_score||0.5);
+      const hsColor = hs > 0.65 ? '#27ae60' : hs > 0.35 ? '#f39c12' : '#e74c3c';
+      const hsBar = '<div class="crm-health-indicator" title="Health Score: '+(hs*100).toFixed(0)+'%"><div class="crm-health-bar" style="width:'+(hs*100)+'%;background:'+hsColor+'"></div></div>';
+      const sentTrend = parseFloat(k.sentiment_trend||0);
+      const sentIcon = sentTrend > 0.1 ? '<span title="Positiver Trend" style="color:#27ae60">&#x25B2;</span>'
+        : sentTrend < -0.1 ? '<span title="Negativer Trend" style="color:#e74c3c">&#x25BC;</span>'
+        : '<span title="Neutral" style="color:var(--muted)">&#x25CF;</span>';
       return '<tr onclick="crmOpenKunde('+k.id+')">' +
         '<td>'+identIcon+' <strong>'+_crmEsc(name)+'</strong><br><small style="color:var(--muted)">'+_crmEsc(k.email||'')+'</small></td>' +
         '<td><span class="crm-tag '+typClass+'">'+_crmEsc(typ)+'</span></td>' +
         '<td>'+_crmEsc(k.letztes_projekt||'\\u2014')+'</td>' +
         '<td>'+letzteAkt+'</td>' +
         '<td>'+(k.offene_faelle||0)+'</td>' +
+        '<td>'+hsBar+'</td>' +
+        '<td>'+sentIcon+'</td>' +
         '<td><span class="crm-tag '+statusClass+'">'+_crmEsc(k.status||'aktiv')+'</span></td></tr>';
     }}).join('');
   }});
@@ -18582,21 +18633,65 @@ function crmOpenFall(fallId) {{
           '<option value="'+s+'"'+(s===f.status?' selected':'')+'>'+s+'</option>'
         ).join('') + '</select></div></div>';
     }}
+    // B-5: Next-Best-Action Banner laden
+    const nbaEl = document.getElementById('crmNbaBanner');
+    if(nbaEl) {{
+      nbaEl.innerHTML='<small style="color:var(--muted)">Kiras Empfehlung wird geladen...</small>';
+      nbaEl.style.display='';
+      fetch('/api/crm/faelle/'+fallId+'/next-action').then(r=>r.json()).then(nb=>{{
+        if(nb.ok && nb.aktion) {{
+          const dringCls = {{'sofort':'red','diese_woche':'orange','naechste_woche':'blue','keine_eile':'gray'}};
+          nbaEl.innerHTML='<div class="crm-nba-icon">\\ud83d\\udca1</div>' +
+            '<div class="crm-nba-text"><strong>Kiras Empfehlung:</strong> '+_crmEsc(nb.aktion.aktion||'Pr\\u00fcfen')+
+            (nb.aktion.begruendung?' \\u2014 '+_crmEsc(nb.aktion.begruendung):'')+
+            (nb.aktion.vorschlagstext?'<br><small>'+_crmEsc(nb.aktion.vorschlagstext)+'</small>':'')+
+            '</div>' +
+            '<span class="crm-tag '+(dringCls[nb.aktion.dringlichkeit]||'gray')+'">'+_crmEsc(nb.aktion.dringlichkeit||'')+'</span>';
+        }} else {{ nbaEl.style.display='none'; }}
+      }}).catch(()=>{{ nbaEl.style.display='none'; }});
+    }}
     // Timeline
     const tl = d.aktivitaeten||[];
     const te = document.getElementById('crmFallTimeline');
     if(te) {{
-      te.innerHTML = tl.length===0 ? '<div style="color:var(--muted);padding:20px;text-align:center">Noch keine Eintr\\u00e4ge in diesem Fall.</div>' :
-        tl.map(a => {{
+      if(tl.length===0) {{
+        te.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">Noch keine Eintr\\u00e4ge in diesem Fall.</div>';
+      }} else {{
+        // B-4: Thread-Gruppierung
+        const icons = {{mail:'\\u2709',kira:'\\u2728',memo:'\\ud83d\\udcdd',dokument:'\\ud83d\\udcc4',geschaeft:'\\ud83d\\udcb0',lexware:'\\ud83d\\udccb',manuell:'\\u270f',routing:'\\u27a1'}};
+        const sentChip = (s) => {{
+          if(s===null||s===undefined) return '';
+          const n=parseFloat(s); if(isNaN(n)) return '';
+          const cl=n>0.2?'green':n<-0.2?'red':'gray';
+          return ' <span class="crm-tag '+cl+'" style="font-size:10px">'+(n>0?'+':'')+n.toFixed(1)+'</span>';
+        }};
+        const renderItem = (a, isFollowUp) => {{
           const typ = a.ereignis_typ||'manuell';
-          const icons = {{mail:'\\u2709',kira:'\\u2728',memo:'\\ud83d\\udcdd',dokument:'\\ud83d\\udcc4',geschaeft:'\\ud83d\\udcb0',lexware:'\\ud83d\\udccb',manuell:'\\u270f',routing:'\\u27a1'}};
-          return '<div class="crm-timeline-item"><div class="crm-avatar '+typ+'">'+(icons[typ]||'\\u2022')+'</div>' +
+          return '<div class="crm-timeline-item'+(isFollowUp?' crm-thread-folge':'')+'">' +
+            '<div class="crm-avatar '+typ+'">'+(icons[typ]||'\\u2022')+'</div>' +
             '<div class="crm-bubble"><div class="crm-bubble-head">' +
-            '<span class="crm-bubble-title">'+_crmEsc(a.zusammenfassung||typ)+'</span>' +
+            '<span class="crm-bubble-title">'+_crmEsc(a.zusammenfassung||typ)+sentChip(a.sentiment_score)+'</span>' +
             '<span class="crm-bubble-time">'+_crmEsc((a.erstellt_am||'').substring(0,16))+'</span></div>' +
             (a.volltext_auszug?'<div class="crm-bubble-text">'+_crmEsc(a.volltext_auszug.substring(0,300))+'</div>':'') +
             '</div></div>';
-        }}).join('');
+        }};
+        // Gruppiere nach thread_id
+        let html=''; const rendered=new Set();
+        tl.forEach((a,i) => {{
+          if(rendered.has(i)) return;
+          rendered.add(i);
+          if(a.thread_id) {{
+            const siblings=tl.filter((b,j)=>j!==i&&b.thread_id===a.thread_id&&!rendered.has(j));
+            if(siblings.length>0) {{
+              html+='<div class="crm-thread-gruppe"><div class="crm-thread-linie"></div>';
+              html+=renderItem(a, false);
+              siblings.forEach(s=>{{ rendered.add(tl.indexOf(s)); html+=renderItem(s,true); }});
+              html+='</div>';
+            }} else {{ html+=renderItem(a,false); }}
+          }} else {{ html+=renderItem(a,false); }}
+        }});
+        te.innerHTML=html;
+      }}
     }}
     // Sidebar
     const fs = document.getElementById('crmFallSidebar');
@@ -18906,6 +19001,8 @@ function crmFallExport() {{
           &#x1F4C4; JSON-Export</button>
         <button class="crm-action-btn crm-btn-warn" onclick="crmDoExport(${{fid}},'streitfall')" style="flex:1;min-width:140px">
           &#x26A0;&#xFE0F; Streitfall-Dossier</button>
+        <button class="crm-action-btn" onclick="crmExportPDF(${{fid}})" style="flex:1;min-width:140px;background:var(--violet,#7c3aed);color:#fff">
+          &#x1F4C4; PDF-Dossier</button>
       </div>
       <div id="crmExportResult" style="margin-top:16px;display:none">
         <div style="background:var(--bg-raised);border-radius:8px;padding:12px;max-height:400px;overflow:auto">
@@ -18957,6 +19054,9 @@ function crmDownloadExport() {{
   URL.revokeObjectURL(a.href);
   showToast('Download gestartet','success');
 }}
+function crmExportPDF(fid) {{
+  window.open('/api/crm/faelle/' + fid + '/export-pdf', '_blank');
+}}
 function crmZuordnen(logId) {{ showToast('Zuordnungs-Dialog wird implementiert','info'); }}
 
 function crmShowModal(title, body, footer) {{
@@ -18987,20 +19087,50 @@ async function crmLexwareSyncJetzt() {{
   if(btn) {{ btn.disabled = false; btn.textContent = 'Lexware-Sync starten'; }}
 }}
 
-async function crmRetroScanJetzt() {{
-  const btn = document.getElementById('btn-crm-retro-scan');
-  if(btn) {{ btn.disabled = true; btn.textContent = 'Scanne...'; }}
+async function crmRetroVorschau() {{
+  const btn = document.getElementById('btn-crm-retro-preview');
+  const tage = parseInt(document.getElementById('cfg-crm-retro-tage').value || '1095');
+  if(btn) {{ btn.disabled = true; btn.textContent = 'Lade Vorschau...'; }}
   try {{
-    const r = await fetch('/api/crm/retro-scan', {{method:'POST'}});
+    const r = await fetch('/api/crm/retro-scan', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{dry_run: true, tage_zurueck: tage}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      const prev = document.getElementById('crm-retro-preview');
+      const txt = document.getElementById('crm-retro-preview-text');
+      const km = d.kunden_mailcount || {{}};
+      const kunden_detail = Object.entries(km).slice(0,10).map(
+        ([k,v]) => '<div style="margin:2px 0;font-size:12px">' + k + ': <b>' + v + ' Mails</b></div>'
+      ).join('');
+      txt.innerHTML = '<b>Vorschau (nichts gespeichert):</b><br>' +
+        d.mails_gesamt + ' Mails gepr\\xfcft, <b>' + d.zugeordnet + '</b> zuordenbar' +
+        (kunden_detail ? '<div style="margin-top:6px">' + kunden_detail + '</div>' : '');
+      prev.style.display = 'block';
+    }} else {{
+      showToast('Vorschau-Fehler: ' + (d.error||'Unbekannt'), 'error');
+    }}
+  }} catch(e) {{ showToast('Vorschau-Fehler: ' + e.message, 'error'); }}
+  if(btn) {{ btn.disabled = false; btn.textContent = 'Vorschau anzeigen'; }}
+}}
+
+async function crmRetroBestaetigen() {{
+  const tage = parseInt(document.getElementById('cfg-crm-retro-tage').value || '1095');
+  try {{
+    const r = await fetch('/api/crm/retro-scan', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{dry_run: false, tage_zurueck: tage}})
+    }});
     const d = await r.json();
     if(d.ok) {{
       showToast('Retro-Scan: ' + d.zugeordnet + '/' + d.mails_gesamt + ' Mails zugeordnet, ' + d.aktivitaeten_erstellt + ' Aktivit\\xe4ten', 'success');
+      document.getElementById('crm-retro-preview').style.display = 'none';
       crmLoadSyncStatus();
     }} else {{
       showToast('Scan-Fehler: ' + (d.error||'Unbekannt'), 'error');
     }}
   }} catch(e) {{ showToast('Scan-Fehler: ' + e.message, 'error'); }}
-  if(btn) {{ btn.disabled = false; btn.textContent = 'Mail-Archiv scannen'; }}
 }}
 
 async function crmLoadSyncStatus() {{
@@ -22707,7 +22837,12 @@ function saveSettings() {{
       ident_schwelle:     parseFloat((document.getElementById('cfg-crm-ident-schwelle')||{{}}).value||'0.85'),
       ident_fragen_ab:    parseFloat((document.getElementById('cfg-crm-ident-fragen')||{{}}).value||'0.70'),
       lernregeln_aktiv:   _c('cfg-crm-lernregeln'),
-      sync_interval:      _v('cfg-crm-sync-interval', 'taeglich')
+      sync_interval:      _v('cfg-crm-sync-interval', 'taeglich'),
+      health_score:       _c('cfg-crm-health-score'),
+      sentiment:          _c('cfg-crm-sentiment'),
+      thread_link:        _c('cfg-crm-thread-link'),
+      nba:                _c('cfg-crm-nba'),
+      schreibstil:        _c('cfg-crm-schreibstil')
     }},
     benutzer_profile: _bpCollectProfile(),
     firma_name:         _v('cfg-profil-firma'),
@@ -24452,7 +24587,7 @@ function kiraSetQuickActions(typ) {{
     suche:    ['Suche in Mails','Suche in Aufgaben','Suche in Wissen','Volltext-Suche'],
     dokument: ['Zusammenfassen','Kernaussagen','Aktionspunkte','Fragen generieren'],
     mail:     ['Was ist zu tun?','Antwort vorschlagen','Aufgabe daraus erstellen','Risiko einschätzen','Weiterleiten an?'],
-    crm:      ['Kundenakte zeigen','Offene Fälle diese Woche','Mail zuordnen','Unzugeordnete prüfen','Neuen Fall erstellen'],
+    crm:      ['Kundenakte zeigen','Offene F\u00e4lle diese Woche','Unzugeordnete Aktivit\u00e4ten pr\u00fcfen','Identit\u00e4ten eines Kunden pr\u00fcfen','Mail einem Kunden zuordnen','Neuen Fall erstellen','Projekt-Clustering starten','Lernregeln anzeigen','Korrektur speichern'],
   }};
   const items = sets[typ] || sets.frage;
   bar.innerHTML = '<span class="kw-quick-lbl">Schnell:</span>' +
@@ -26063,6 +26198,8 @@ a:hover{text-decoration:underline;}
 .crm-tag.blue{background:rgba(23,136,210,.1);color:#4569d7;}
 .crm-tag.violet{background:rgba(124,93,255,.1);color:#734ef0;}
 .crm-tag.gray{background:var(--bg);color:var(--muted);}
+.crm-health-indicator{width:60px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle;}
+.crm-health-bar{height:100%;border-radius:4px;transition:width .3s;}
 .crm-panel{min-height:200px;}
 .crm-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
 .crm-section-header h2{margin:0;font-size:var(--fs-xl);font-weight:800;}
@@ -26096,6 +26233,16 @@ a:hover{text-decoration:underline;}
 .crm-bubble-title{font-size:var(--fs-sm);font-weight:800;}
 .crm-bubble-time{font-size:11px;color:var(--muted);font-weight:600;}
 .crm-bubble-text{font-size:var(--fs-sm);color:var(--muted);line-height:1.5;}
+/* B-4: Thread-Gruppen */
+.crm-thread-gruppe{position:relative;padding-left:8px;margin-bottom:4px;}
+.crm-thread-linie{position:absolute;left:28px;top:42px;bottom:12px;width:2px;background:linear-gradient(180deg,var(--accent) 0%,transparent 100%);border-radius:1px;opacity:.4;}
+.crm-thread-folge{margin-left:20px;opacity:.88;}
+.crm-thread-folge .crm-avatar{width:28px;height:28px;font-size:11px;}
+/* B-5: Next-Best-Action Banner */
+.crm-next-action-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:14px;background:linear-gradient(135deg,rgba(124,93,255,.06) 0%,rgba(124,93,255,.02) 100%);border:1px solid rgba(124,93,255,.15);border-radius:var(--radius);font-size:var(--fs-sm);}
+.crm-nba-icon{font-size:20px;}
+.crm-nba-text{flex:1;}
+.crm-nba-text strong{font-weight:800;}
 /* Fallansicht */
 .crm-fall-header{padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:12px;}
 .crm-fall-layout{display:grid;grid-template-columns:1fr 300px;gap:16px;}
@@ -27994,6 +28141,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif re.match(r'^/api/crm/kunden/(\d+)/faelle', self.path):
             _m = re.match(r'^/api/crm/kunden/(\d+)/faelle', self.path)
             self._api_crm_faelle_list(int(_m.group(1)))
+        elif re.match(r'^/api/crm/kunden/(\d+)/health$', self.path):
+            _m = re.match(r'^/api/crm/kunden/(\d+)/health$', self.path)
+            self._api_crm_health_score(int(_m.group(1)))
         elif re.match(r'^/api/crm/kunden/(\d+)$', self.path):
             _m = re.match(r'^/api/crm/kunden/(\d+)$', self.path)
             self._api_crm_kunden_get(int(_m.group(1)))
@@ -28001,6 +28151,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             _m = re.match(r'^/api/crm/faelle/(\d+)/aktivitaeten$', self.path)
             # GET handled below in POST section
             self._json({"ok": False, "error": "Nur POST"})
+        elif re.match(r'^/api/crm/faelle/(\d+)/next-action$', self.path):
+            _m = re.match(r'^/api/crm/faelle/(\d+)/next-action$', self.path)
+            self._api_crm_faelle_next_action(int(_m.group(1)))
+        elif re.match(r'^/api/crm/faelle/(\d+)/export-pdf$', self.path):
+            _m = re.match(r'^/api/crm/faelle/(\d+)/export-pdf$', self.path)
+            self._api_crm_faelle_export_pdf(int(_m.group(1)))
         elif re.match(r'^/api/crm/faelle/(\d+)/export$', self.path):
             _m = re.match(r'^/api/crm/faelle/(\d+)/export$', self.path)
             self._api_crm_faelle_export(int(_m.group(1)))
@@ -35352,6 +35508,24 @@ Regeln:
         finally:
             db.close()
 
+    def _api_crm_faelle_next_action(self, fid):
+        """GET /api/crm/faelle/{id}/next-action — Kiras Next-Best-Action-Empfehlung."""
+        try:
+            from kunden_classifier import next_best_action_fuer_fall
+            result = next_best_action_fuer_fall(fid)
+            self._json({"ok": True, "fall_id": fid, "aktion": result})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_health_score(self, kid):
+        """GET /api/crm/kunden/{id}/health — Health-Score berechnen + zurückgeben."""
+        try:
+            from kunden_health import berechne_health_score
+            result = berechne_health_score(kid)
+            self._json({"ok": True, "kunden_id": kid, **result})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
     def _api_crm_kunden_create(self, data):
         """POST /api/crm/kunden — Neuen Kunden anlegen."""
         if not data:
@@ -35712,6 +35886,123 @@ Regeln:
         finally:
             db.close()
 
+    def _api_crm_faelle_export_pdf(self, fid):
+        """GET /api/crm/faelle/{id}/export-pdf — Fall als HTML-Dossier (druckbar)."""
+        db = self._crm_db()
+        try:
+            fall = db.execute("SELECT * FROM kunden_faelle WHERE id=?", (fid,)).fetchone()
+            if not fall:
+                self._json({"ok": False, "error": "Fall nicht gefunden"})
+                return
+            fall_d = dict(fall)
+            kunde = db.execute("SELECT * FROM kunden WHERE id=?", (fall_d.get("kunden_id"),)).fetchone()
+            kunde_d = dict(kunde) if kunde else {}
+            projekt = None
+            if fall_d.get("projekt_id"):
+                projekt = db.execute("SELECT * FROM kunden_projekte WHERE id=?", (fall_d["projekt_id"],)).fetchone()
+            projekt_d = dict(projekt) if projekt else {}
+            aktivitaeten = db.execute(
+                "SELECT * FROM kunden_aktivitaeten WHERE fall_id=? ORDER BY erstellt_am ASC", (fid,)
+            ).fetchall()
+            akt_list = [dict(a) for a in aktivitaeten]
+            identitaeten = db.execute(
+                "SELECT * FROM kunden_identitaeten WHERE kunden_id=?", (fall_d.get("kunden_id"),)
+            ).fetchall()
+            id_list = [dict(i) for i in identitaeten]
+
+            kunde_name = kunde_d.get("firmenname") or kunde_d.get("name", "Unbekannt")
+            zv = akt_list[0]["erstellt_am"][:10] if akt_list else "\u2014"
+            zb = akt_list[-1]["erstellt_am"][:10] if akt_list else "heute"
+
+            ident_html = "".join(
+                f"<p>\u2022 {i['typ'].upper()}: {i['wert']} ({i.get('confidence','?')})</p>"
+                for i in id_list
+            )
+
+            badge_colors = {"mail": "#4a90d9", "kira": "#7c5cbf", "lexware": "#27ae60",
+                            "manuell": "#888", "memo": "#e67e22", "dokument": "#2ecc71",
+                            "geschaeft": "#3498db", "routing": "#95a5a6"}
+            timeline_html = ""
+            for a in akt_list:
+                et = a.get("ereignis_typ", "manuell")
+                bc = badge_colors.get(et, "#888")
+                timeline_html += (
+                    f'<div style="border-left:3px solid {bc};padding:8px 16px;margin:12px 0">'
+                    f'<div style="margin-bottom:4px">'
+                    f'<span style="display:inline-block;padding:2px 8px;border-radius:12px;'
+                    f'font-size:9pt;font-weight:bold;color:white;background:{bc}">{et.upper()}</span>'
+                    f'<span style="color:#888;font-size:9pt;margin-left:8px">{(a.get("erstellt_am","") or "")[:16]}</span>'
+                    f'</div><div>{a.get("zusammenfassung","")}</div></div>'
+                )
+
+            html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Streitfall-Dossier</title>
+<style>
+body{{font-family:Arial,sans-serif;font-size:11pt;color:#1a1a1a;max-width:800px;margin:40px auto}}
+h1{{font-size:16pt;border-bottom:2px solid #1a1a1a;padding-bottom:8px}}
+h2{{font-size:13pt;color:#444;margin-top:24px}}
+.meta{{background:#f5f5f5;padding:12px;border-radius:4px;margin:16px 0}}
+.meta-row{{display:flex;margin-bottom:4px}}
+.meta-label{{font-weight:bold;width:160px;color:#666}}
+.footer{{margin-top:40px;border-top:1px solid #ddd;padding-top:12px;font-size:9pt;color:#999}}
+@media print{{body{{margin:0;max-width:100%}}}}
+@page{{margin:2cm}}
+</style></head><body>
+<h1>Streitfall-Dossier</h1>
+<p style="color:#888;font-size:9pt">Erstellt: {datetime.now().strftime('%d.%m.%Y %H:%M')} durch KIRA</p>
+<div class="meta">
+<div class="meta-row"><span class="meta-label">Fall:</span><span>{fall_d.get('titel','')}</span></div>
+<div class="meta-row"><span class="meta-label">Typ:</span><span>{fall_d.get('fall_typ','')}</span></div>
+<div class="meta-row"><span class="meta-label">Status:</span><span>{fall_d.get('status','')}</span></div>
+<div class="meta-row"><span class="meta-label">Kunde:</span><span>{kunde_name}</span></div>
+<div class="meta-row"><span class="meta-label">Projekt:</span><span>{projekt_d.get('projektname','\u2014')}</span></div>
+<div class="meta-row"><span class="meta-label">Zeitraum:</span><span>{zv} bis {zb}</span></div>
+<div class="meta-row"><span class="meta-label">Aktivit\u00e4ten:</span><span>{len(akt_list)}</span></div>
+</div>
+<h2>Bekannte Kontaktdaten</h2>
+{ident_html or '<p style="color:#888">Keine Identit\u00e4ten hinterlegt</p>'}
+<h2>Chronologischer Verlauf</h2>
+{timeline_html or '<p style="color:#888">Keine Aktivit\u00e4ten</p>'}
+<div class="footer">Dieses Dokument wurde automatisch durch KIRA generiert.<br>
+Alle Angaben beruhen auf den in KIRA gespeicherten Daten zum Zeitpunkt der Erstellung.</div>
+<script>window.onload=function(){{var b=document.createElement('button');b.textContent='Drucken';
+b.style.cssText='position:fixed;top:10px;right:10px;padding:8px 20px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px';
+b.onclick=function(){{window.print()}};document.body.appendChild(b)}}</script>
+</body></html>"""
+
+            # Versuche PDF-Konvertierung
+            pdf_bytes = None
+            try:
+                import weasyprint
+                pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+            except ImportError:
+                try:
+                    import pdfkit
+                    pdf_bytes = pdfkit.from_string(html, False)
+                except ImportError:
+                    pass
+
+            if pdf_bytes:
+                dateiname = f"streitfall_{fid}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/pdf')
+                self.send_header('Content-Disposition', f'attachment; filename="{dateiname}"')
+                self.send_header('Content-Length', str(len(pdf_bytes)))
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+            else:
+                # Fallback: HTML mit Drucken-Button
+                html_bytes = html.encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(html_bytes)))
+                self.end_headers()
+                self.wfile.write(html_bytes)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+        finally:
+            db.close()
+
     def _api_crm_unzugeordnete(self):
         """GET /api/crm/unzugeordnete — Unzugeordnete Klassifizierungen."""
         try:
@@ -35738,14 +36029,23 @@ Regeln:
     def _api_crm_retro_scan(self):
         """POST /api/crm/retro-scan — Mail-Archiv retroaktiv gegen Kundenliste scannen."""
         try:
+            data = self._read_json() or {}
+            dry_run = data.get("dry_run", True)
+            tage = int(data.get("tage_zurueck", 1095))
+            kunden_id = data.get("kunden_id")  # null = alle
             from kunden_mail_retroaktiv import scan_mails
-            result = scan_mails(dry_run=False)
-            try:
-                from runtime_log import elog
-                elog("mail_retroaktiv_manuell", f"Manueller Retro-Scan: {result['zugeordnet']}/{result['mails_gesamt']} Mails zugeordnet")
-            except Exception:
-                pass
-            self._json({"ok": True, **result})
+            from datetime import datetime, timedelta
+            seit_dt = (datetime.now() - timedelta(days=tage)).strftime("%Y-%m-%d")
+            result = scan_mails(dry_run=dry_run, seit=seit_dt)
+            if not dry_run:
+                try:
+                    from runtime_log import elog
+                    elog("mail_retroaktiv_manuell",
+                         f"Retro-Scan: {result.get('zugeordnet',0)}/{result.get('mails_gesamt',0)} "
+                         f"Mails zugeordnet (Tage: {tage})")
+                except Exception:
+                    pass
+            self._json({"ok": True, "dry_run": dry_run, **result})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 
