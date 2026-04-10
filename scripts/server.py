@@ -3276,6 +3276,7 @@ let _pfMarkReadMode = 'sofort'; // sofort|5s|30s|manuell
 let _pfMarkReadTimer = null;    // pending mark-read timeout
 let _pfAfterRemove = 'none';    // 'none' = "Keine Mail ausgewählt", 'next' = nächste Mail anzeigen
 let _pfAutoSelected = false;    // true wenn _pfAfterItemRemoved die nächste Mail automatisch auswählt
+let _pfKiraEditId = null;       // wenn gesetzt: Compose-Modal sendet über approve-API statt normale send-API
 
 // Preview zurücksetzen → "Keine E-Mail ausgewählt"
 function _pfClearPreview() {
@@ -4255,17 +4256,46 @@ window.pfKiraMailFreigebenSend = function(id, btn) {
 };
 window.pfKiraMailBearbeiten = function(id) {
   const item=window._pfCurrentKiraItem; if(!item) return;
-  var oldText=item.body_plain||'';
-  var modal=document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;';
-  modal.innerHTML='<div style="background:var(--bg-modal,#fff);border:1px solid var(--border-strong);border-radius:16px;padding:24px;width:min(600px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.35)">'
-    +'<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text)">&#x270E; Mail bearbeiten</div>'
-    +'<textarea id="kiraEditBody" style="width:100%;min-height:160px;background:var(--bg-raised);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">'+_esc(oldText)+'</textarea>'
-    +'<div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">'
-    +'<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px;cursor:pointer">Abbrechen</button>'
-    +'<button onclick="pfKiraMailSendenBearbeitet('+id+',this)" style="background:#065f46;color:#6ee7b7;border:1px solid #059669;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">Senden</button>'
-    +'</div></div>';
-  document.body.appendChild(modal);
+  _pfKiraEditId = id;
+  _pfComposeAttachments = [];
+  // Compose-Modal direkt öffnen (gleiche UI wie "Neue Mail")
+  const ov = document.getElementById('pf-compose-modal-overlay');
+  ov.style.display='flex';
+  document.getElementById('pf-cm-title').textContent='Kira-Entwurf bearbeiten';
+  // Von-Konto Optionen klonen aus Inline-Compose
+  const srcSel = document.getElementById('pf-comp-from');
+  const dstSel = document.getElementById('pf-cm-from');
+  if(srcSel && dstSel && dstSel.options.length!==srcSel.options.length) {
+    dstSel.innerHTML = srcSel.innerHTML;
+  }
+  // Konto setzen (aus Draft oder erstes verfügbares)
+  if(item.konto && dstSel) dstSel.value = item.konto;
+  // An, Betreff vorbefüllen
+  document.getElementById('pf-cm-to').value = item.an || '';
+  document.getElementById('pf-cm-subj').value = item.betreff || '';
+  document.getElementById('pf-cm-cc').value = '';
+  document.getElementById('pf-cm-bcc').value = '';
+  document.getElementById('pf-cm-cc-row').style.display='none';
+  document.getElementById('pf-cm-bcc-row').style.display='none';
+  // Quill-Editor mit Draft-Inhalt laden + Signatur
+  _pfEnsureQuillLoaded(function(){
+    if(!_pfComposeModalQuill){
+      _pfComposeModalQuill = _pfInitQuill('pf-cm-quill-editor','Nachricht eingeben...');
+    }
+    if(item.body_html) {
+      _pfComposeModalQuill.root.innerHTML = item.body_html;
+    } else {
+      const plain = (item.body_plain||'').replace(/\\n/g,'<br>');
+      _pfComposeModalQuill.root.innerHTML = '<p>'+plain+'</p>';
+    }
+    // Signatur anhängen wenn nicht schon im Text
+    const konto = dstSel ? dstSel.value : '';
+    if(konto) _pfInsertSignatur(_pfComposeModalQuill, konto);
+    _pfComposeModalQuill.focus();
+  });
+  // Sende-Optionen: nur "Jetzt senden" (kein Entwurf-speichern für Kira-Drafts)
+  const sendOpts = document.getElementById('pf-cm-send-opts');
+  if(sendOpts) sendOpts.value = 'send';
 };
 window.pfKiraMailSendenBearbeitet = function(id, btn) {
   var ta=document.getElementById('kiraEditBody');
@@ -5274,6 +5304,11 @@ window.pfComposePopout=function(){
 };
 
 window.pfComposeModalMinimize=function(){
+  // Bei Kira-Edit: Minimieren schließt nur das Modal (kein Inline-Panel)
+  if(_pfKiraEditId) {
+    document.getElementById('pf-compose-modal-overlay').style.display='none';
+    return;
+  }
   // Zurück ins Inline-Panel
   document.getElementById('pf-compose-modal-overlay').style.display='none';
   _pfComposeMode='inline';
@@ -5297,6 +5332,7 @@ window.pfComposeModalClose=function(){
   document.getElementById('pf-compose-modal-overlay').style.display='none';
   _pfComposeMode='inline';
   window._pfReplyMsgId=null;
+  _pfKiraEditId=null;
   _pfComposeAttachments=[];
 };
 
@@ -5374,6 +5410,34 @@ window.pfSend=function(){
 window.pfSendModal=function(){
   const opt=document.getElementById('pf-cm-send-opts').value;
   if(opt==='draft'){pfSaveDraftModal();return;}
+  // Kira-Entwurf: über approve-API senden
+  if(_pfKiraEditId) {
+    const btn = document.getElementById('pf-cm-send-btn');
+    const bodyPlain = _pfComposeModalQuill ? _pfComposeModalQuill.getText() : '';
+    const bodyHtml = _pfComposeModalQuill ? _pfComposeModalQuill.root.innerHTML : '';
+    const vonKonto = document.getElementById('pf-cm-from').value;
+    btn.disabled=true; btn.textContent='Wird gesendet\u2026';
+    fetch('/api/mail/approve/'+_pfKiraEditId, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'edit', body:bodyPlain, body_html:bodyHtml, from_email:vonKonto})
+    }).then(r=>r.json()).then(d=>{
+      btn.disabled=false; btn.innerHTML='&#x27A4; Senden';
+      document.getElementById('pf-compose-modal-overlay').style.display='none';
+      const editId = _pfKiraEditId;
+      _pfKiraEditId = null;
+      if(d.ok){
+        showToast('Kira-Entwurf gesendet \u2713','ok');
+        pfLoadKiraList(true);
+      } else {
+        showToast('Fehler: '+(d.error||'?'),'fehler');
+      }
+    }).catch(function(){
+      btn.disabled=false; btn.innerHTML='&#x27A4; Senden';
+      _pfKiraEditId = null;
+      showToast('Netzwerkfehler','fehler');
+    });
+    return;
+  }
   const from=document.getElementById('pf-cm-from').value;
   const to=document.getElementById('pf-cm-to').value.trim();
   const cc=document.getElementById('pf-cm-cc').value.trim();
@@ -28386,6 +28450,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             # approve oder edit (edit → body übernehmen, dann senden)
             body_plain = new_body if (action == "edit" and new_body) else (row["body_plain"] or "")
+            body_html_val = (body.get("body_html") or "").strip() if action == "edit" else (row["body_html"] or "")
             # from_email: aus Request (User hat Konto gewaehlt) > Queue-Konto > Standard
             from_email = (body.get("from_email") or "").strip() or row["konto"] or "info@raumkult.eu"
             # References-Kette aufbauen fuer Thread-Zuordnung
@@ -28413,6 +28478,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     to=row["an"],
                     subject=row["betreff"],
                     body_plain=body_plain,
+                    body_html=body_html_val,
                     in_reply_to=_in_reply_to,
                     references=_references,
                 )
