@@ -758,10 +758,21 @@ def _ensure_crm_tables():
         db.execute("CREATE INDEX IF NOT EXISTS idx_cl_eingabe ON kunden_classifier_log(eingabe_typ, eingabe_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_cl_zeit ON kunden_classifier_log(erstellt_am)")
 
+        # kunden_ignoriert (Absender die dauerhaft ignoriert werden)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS kunden_ignoriert (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                absender_email TEXT UNIQUE NOT NULL,
+                absender_domain TEXT,
+                grund TEXT DEFAULT 'manuell',
+                erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kig_email ON kunden_ignoriert(LOWER(absender_email))")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_kig_domain ON kunden_ignoriert(absender_domain)")
+
         # Migration entfernt (session-tt, 2026-04-10):
-        # Die alte Migration kopierte kunden.email aus dem Mail-Archiv in
-        # kunden_identitaeten — das war falsch, da Mail-Absender keine Kunden sind.
-        # Kunden kommen jetzt ausschließlich aus Lexware Office (REGEL-09).
+        # Kunden kommen ausschließlich aus Lexware Office (REGEL-09).
         # Import läuft über kunden_lexware_sync.py.
 
         db.commit()

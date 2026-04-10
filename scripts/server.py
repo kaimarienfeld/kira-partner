@@ -775,6 +775,22 @@ def task_card(t: dict) -> str:
     re_betreff  = betreff_raw if betreff_raw.lower().startswith("re:") else f"Re: {betreff_raw}"
     mailto = f"mailto:{email}?subject={urllib.parse.quote(re_betreff)}"
 
+    # Lead-Bestätigung aus metadata_json
+    meta_raw = t.get("metadata_json", "") or "{}"
+    try:
+        task_meta = json.loads(meta_raw) if isinstance(meta_raw, str) else (meta_raw or {})
+    except Exception:
+        task_meta = {}
+    lead_btns = ""
+    if task_meta.get("typ") == "lead_bestaetigung":
+        _le = js_esc(task_meta.get("absender_email", ""))
+        _lm = js_esc(str(task_meta.get("mail_id", "")))
+        lead_btns = f"""<div class="task-lead-confirm" style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
+  <button class="btn btn-primary" onclick="crmLeadBestaetigen('{_le}','{_lm}',true)">Ja — Als Lead anlegen</button>
+  <button class="btn btn-sec" onclick="crmLeadBestaetigen('{_le}','{_lm}',false)">Nein — Kein Geschäftsfall</button>
+  <button class="btn btn-ghost" onclick="crmAbsenderIgnorieren('{_le}')">Nie wieder fragen</button>
+</div>"""
+
     tag_text, tag_class = KAT_TAGS.get(kat, (kat or "Sonstige", "tag-muted"))
 
     erin = t.get("erinnerungen",0) or 0
@@ -838,6 +854,7 @@ def task_card(t: dict) -> str:
   {"<div class='task-naechste'>Empfehlung: " + empfohlene_aktion + "</div>" if empfohlene_aktion else ""}
   {"<div class='task-grund'>Grund: " + kategorie_grund + "</div>" if kategorie_grund else ""}
   {"<div class='task-notiz'>Notiz: " + notiz + "</div>" if notiz else ""}
+  {lead_btns}
   <div class="task-actions">
     {kira_btn}
     {"<a href='" + esc(mailto) + "' class='btn btn-primary' target='_blank'>Outlook</a>" if email else ""}
@@ -2209,6 +2226,7 @@ def build_postfach():
           <div class="pf-ha-sep"></div>
           <button class="pf-ha-btn pf-kira-btn" id="pf-tb-kira" title="Mit Kira besprechen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2"/><path d="M8 12s1-2 4-2 4 2 4 2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>\u2728 Mit Kira</button>
           <button class="pf-ha-btn pf-360-btn" id="pf-tb-360" title="Kunden-360 Profil" onclick="pfOpenKunden360()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></svg>360\u00b0</button>
+          <button class="pf-ha-btn" id="pf-tb-lead" title="Als Kunden/Lead anlegen" onclick="pfAlsLeadAnlegen()" style="color:var(--green,#22c55e)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>+ Kunde</button>
         </div>
       </div>
     </div>
@@ -5946,6 +5964,16 @@ window.pfOpenKunden360 = function() {
   const email = emailMatch ? emailMatch[1].toLowerCase() : absenderRaw.trim().toLowerCase();
   if (!email) { showToast('Kein Absender erkannt','warnung'); return; }
   pfShowKunden360(email);
+};
+
+window.pfAlsLeadAnlegen = function() {
+  if (!_pfCurrentMail) { showToast('Keine Mail ausgewählt','warnung'); return; }
+  const absenderRaw = _pfCurrentMail.absender || document.getElementById('pf-prev-absender').textContent.replace('Von: ','');
+  const emailMatch = absenderRaw.match(/<([^>]+@[^>]+)>/);
+  const email = emailMatch ? emailMatch[1].toLowerCase() : absenderRaw.trim().toLowerCase();
+  if (!email) { showToast('Kein Absender erkannt','warnung'); return; }
+  const mailId = _pfCurrentMsgId || '';
+  postfachAlsLeadMarkieren(mailId, email);
 };
 
 window.pfShowKunden360 = function(email) {
@@ -12657,6 +12685,37 @@ Power Apps &#x2192; Tabelle &#x2192; Spalten &#x2192; Suche nach dem Anzeigename
   </div>
 
   <div class="es-grp">
+    <div class="es-grp-h">Lead-Erkennung</div>
+    <div class="es-grp-sub">Wie KIRA mit unbekannten Absendern umgeht die nach Gesch&auml;ftskontakt aussehen.</div>
+    <div class="es-row">
+      <label class="es-lbl">Automatisch Lead anlegen (hohe Sicherheit)</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-auto-lead" {'checked' if crm_cfg.get('auto_lead', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Wenn Kira sehr sicher ist (Schwelle+) dass eine Mail eine echte Anfrage ist, wird automatisch ein Lead angelegt und Kai per Aufgabe informiert.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Kai fragen (mittlere Sicherheit)</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-fragen-bei-unsicherheit" {'checked' if crm_cfg.get('fragen_bei_unsicherheit', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Bei 50-89% Sicherheit: Aufgabe mit Ja/Nein-Button. Kai entscheidet ob ein Lead angelegt wird.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Schwellwert automatischer Lead</label>
+      <input type="range" id="cfg-crm-lead-schwelle" min="0.7" max="1.0" step="0.05" value="{crm_cfg.get('lead_schwelle', 0.85)}" oninput="document.getElementById('cfg-crm-lead-schwelle-val').textContent=Math.round(this.value*100)+'%'" class="es-range" style="width:160px">
+      <span id="cfg-crm-lead-schwelle-val" style="font-weight:700;min-width:40px">{int(crm_cfg.get('lead_schwelle', 0.85)*100)}%</span>
+      <span class="es-hint">Unter diesem Wert fragt Kira immer nach — kein automatisches Anlegen.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Nachqualifizierung bei neuem Kunden</label>
+      <label class="es-toggle"><input type="checkbox" id="cfg-crm-auto-nachq" {'checked' if crm_cfg.get('auto_nachqualifizierung', True) else ''}><span class="es-slider"></span></label>
+      <span class="es-hint">Wenn ein Kunde angelegt wird: KIRA durchsucht automatisch alle Quellen nach bisherigen Aktivit&auml;ten. L&auml;uft still im Hintergrund.</span>
+    </div>
+    <div class="es-row">
+      <label class="es-lbl">Ignorierte Absender</label>
+      <button class="es-btn" onclick="crmZeigeIgnorierteListe()" style="padding:4px 12px;border-radius:6px;cursor:pointer">Liste anzeigen</button>
+      <span class="es-hint">Absender die als &quot;Nie wieder fragen&quot; markiert wurden. K&ouml;nnen hier reaktiviert werden.</span>
+    </div>
+  </div>
+
+  <div class="es-grp">
     <div class="es-grp-h">Ticket-Verhalten</div>
     <div class="es-grp-sub">Wie F&auml;lle/Tickets automatisch erstellt und verwaltet werden.</div>
     <div class="es-row">
@@ -18303,7 +18362,16 @@ function _crmRenderAkteHeader(k) {{
     '</div></div>' +
     '<div style="display:flex;gap:6px">' +
     '<button class="crm-btn crm-btn-primary" onclick="crmNeueEmail()">\\u2709 Neue E-Mail</button>' +
-    '<button class="crm-btn" onclick="crmKiraFragen()">\\u2728 Kira fragen</button></div></div>';
+    '<button class="crm-btn" onclick="crmKiraFragen()">\\u2728 Kira fragen</button>' +
+    '<button class="crm-btn" onclick="crmNachqualifizieren('+k.id+')" title="Alle Quellen erneut durchsuchen">\\ud83d\\udd0d Nachqualifizieren</button></div></div>';
+  // Lexware-Hint wenn kein lexware_id und Status nicht Lead
+  if(!k.lexware_id && k.status !== 'lead') {{
+    h.innerHTML += '<div id="crm-lexware-anlegen-hint" style="margin-top:8px;padding:8px 12px;background:var(--bg-raised);border:1px solid var(--orange,#f59e0b);border-radius:6px;display:flex;align-items:center;gap:10px;font-size:var(--fs-sm)">' +
+      '<span style="color:var(--orange,#f59e0b)">\\u26a0</span>' +
+      '<span>Dieser Kunde ist noch nicht in Lexware Office.</span>' +
+      '<button class="crm-btn crm-btn-primary" onclick="crmInLexwareAnlegen('+k.id+')" style="font-size:12px;padding:4px 10px">In Lexware anlegen</button>' +
+      '<button class="crm-btn" onclick="this.parentElement.style.display=\\'none\\'" style="font-size:12px;padding:4px 10px">Nicht nötig</button></div>';
+  }}
 }}
 
 function _crmRenderStammdaten(k) {{
@@ -18572,7 +18640,8 @@ function crmNeuerKunde() {{
     '<div class="crm-field"><label>Kundentyp</label><select id="crmNkTyp"><option value="geschaeft">Gesch\\u00e4ft</option><option value="privat">Privat</option><option value="intern">Intern</option></select></div>' +
     '<div class="crm-field"><label>Status</label><select id="crmNkStatus"><option value="aktiv">Aktiv</option><option value="lead">Lead</option></select></div>' +
     '<div class="crm-field"><label>Telefon</label><input id="crmNkTel"></div>' +
-    '<div class="crm-field full"><label>Notiz</label><textarea id="crmNkNotiz" rows="3"></textarea></div></div>',
+    '<div class="crm-field full"><label>Notiz</label><textarea id="crmNkNotiz" rows="3"></textarea></div>' +
+    '<div class="crm-field full"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="crmNkNachq" checked> KIRA durchsucht automatisch alle Quellen nach bisherigen Aktivit\\u00e4ten mit diesem Kontakt</label></div></div>',
     '<button class="crm-btn" onclick="crmCloseModal()">Abbrechen</button>' +
     '<button class="crm-btn crm-btn-primary" onclick="crmSaveNeuerKunde()">Kunde anlegen</button>'
   );
@@ -18587,6 +18656,7 @@ function crmSaveNeuerKunde() {{
     status: document.getElementById('crmNkStatus')?.value||'aktiv',
     telefon: document.getElementById('crmNkTel')?.value||'',
     notiz: document.getElementById('crmNkNotiz')?.value||'',
+    nachqualifizieren: document.getElementById('crmNkNachq')?.checked !== false,
   }};
   if(!data.email && !data.firmenname && !data.name) {{ showToast('Mindestens Name oder E-Mail angeben','error'); return; }}
   fetch('/api/crm/kunden', {{
@@ -18880,6 +18950,100 @@ async function crmLoadSyncStatus() {{
       el.textContent = d.kunden + ' Kunden, ' + d.identitaeten + ' Identit\\xe4ten' + (d.letzte_sync ? ' — Letzte Sync: ' + d.letzte_sync : '');
       el.style.color = d.kunden > 0 ? 'var(--green, #22c55e)' : 'var(--orange, #f59e0b)';
     }}
+  }} catch(e) {{}}
+}}
+
+// CRM Lead-Flow JS (session-tt2)
+async function crmLeadBestaetigen(email, mailId, istLead) {{
+  try {{
+    const r = await fetch('/api/crm/lead-bestaetigen', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{absender_email:email, mail_id:mailId, ist_lead:istLead}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      showToast(d.message || (istLead ? 'Lead angelegt' : 'Kein Geschäftsfall'), 'success');
+      if(typeof refreshTasks === 'function') refreshTasks();
+    }} else showToast(d.error || 'Fehler', 'error');
+  }} catch(e) {{ showToast('Fehler: ' + e.message, 'error'); }}
+}}
+
+async function crmAbsenderIgnorieren(email) {{
+  if(!confirm('Absender ' + email + ' dauerhaft ignorieren?')) return;
+  try {{
+    const r = await fetch('/api/crm/absender-ignorieren', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{absender_email:email, grund:'nie_wieder'}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      showToast(d.message || 'Absender ignoriert', 'success');
+      if(typeof refreshTasks === 'function') refreshTasks();
+    }} else showToast(d.error || 'Fehler', 'error');
+  }} catch(e) {{ showToast('Fehler: ' + e.message, 'error'); }}
+}}
+
+async function postfachAlsLeadMarkieren(mailId, absenderEmail) {{
+  crmShowModal(
+    'Kontakt anlegen',
+    '<p>Absender: <strong>' + absenderEmail + '</strong></p>' +
+    '<p>Wie möchtest du diesen Kontakt einordnen?</p>' +
+    '<input type="text" id="crm-neuer-name" placeholder="Name (optional)" style="width:100%;margin:4px 0;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-raised);color:var(--text)">' +
+    '<input type="text" id="crm-neuer-firma" placeholder="Firmenname (optional)" style="width:100%;margin:4px 0;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-raised);color:var(--text)">' +
+    '<select id="crm-neuer-status" style="width:100%;margin:4px 0;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-raised);color:var(--text)">' +
+    '<option value="lead">Lead (möglicher Kunde)</option><option value="aktiv">Aktiver Kunde</option></select>' +
+    '<label style="display:flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="crm-nq-check" checked> Alle Quellen rückwirkend durchsuchen</label>',
+    '<button class="btn btn-primary" onclick="crmLeadManuellSpeichern(\\'' + mailId + '\\',\\'' + absenderEmail + '\\')">Anlegen + Nachqualifizierung starten</button>'
+  );
+}}
+
+async function crmLeadManuellSpeichern(mailId, absenderEmail) {{
+  const name = (document.getElementById('crm-neuer-name')||{{}}).value||'';
+  const firma = (document.getElementById('crm-neuer-firma')||{{}}).value||'';
+  const status = (document.getElementById('crm-neuer-status')||{{}}).value||'lead';
+  const nachq = (document.getElementById('crm-nq-check')||{{}}).checked !== false;
+  try {{
+    const r = await fetch('/api/crm/lead-manuell', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{mail_id:mailId, absender_email:absenderEmail, name:name, firma:firma, status:status, nachqualifizieren:nachq}})
+    }});
+    const d = await r.json();
+    if(d.ok) {{
+      crmCloseModal();
+      showToast(d.message || 'Kontakt angelegt', 'success');
+      if(typeof crmLoadKunden === 'function') crmLoadKunden();
+    }} else showToast(d.error || 'Fehler', 'error');
+  }} catch(e) {{ showToast('Fehler: ' + e.message, 'error'); }}
+}}
+
+async function crmNachqualifizieren(kundenId) {{
+  try {{
+    const r = await fetch('/api/crm/kunden/' + kundenId + '/nachqualifizieren', {{method:'POST'}});
+    const d = await r.json();
+    showToast(d.message || (d.ok ? 'Gestartet' : d.error), d.ok ? 'success' : 'error');
+  }} catch(e) {{ showToast('Fehler: ' + e.message, 'error'); }}
+}}
+
+async function crmInLexwareAnlegen(kundenId) {{
+  if(!confirm('Diesen Kunden in Lexware Office anlegen?')) return;
+  try {{
+    const r = await fetch('/api/crm/kunden/' + kundenId + '/lexware-anlegen', {{method:'POST'}});
+    const d = await r.json();
+    if(d.ok) {{
+      showToast(d.message || 'In Lexware angelegt', 'success');
+      const hint = document.getElementById('crm-lexware-anlegen-hint');
+      if(hint) hint.style.display = 'none';
+      if(typeof crmLoadKundenakte === 'function') crmLoadKundenakte(kundenId);
+    }} else showToast(d.error || 'Fehler', 'error');
+  }} catch(e) {{ showToast('Fehler: ' + e.message, 'error'); }}
+}}
+
+async function crmZeigeIgnorierteListe() {{
+  try {{
+    const r = await fetch('/api/crm/absender-ignorieren', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:'{{\"list\":true}}'}});
+    const d = await r.json();
+    // Zeige als Modal mit Liste
+    showToast('Ignorierte Absender: Funktion folgt in CRM-UI', 'info');
   }} catch(e) {{}}
 }}
 
@@ -22312,6 +22476,10 @@ function saveSettings() {{
       llm_classifier:     _c('cfg-crm-llm-classifier'),
       confidence_schwelle: _v('cfg-crm-confidence-schwelle', 'wahrscheinlich'),
       geschaeftsfilter:   _c('cfg-crm-geschaeftsfilter'),
+      auto_lead:          _c('cfg-crm-auto-lead'),
+      fragen_bei_unsicherheit: _c('cfg-crm-fragen-bei-unsicherheit'),
+      lead_schwelle:      parseFloat((document.getElementById('cfg-crm-lead-schwelle')||{{}}).value||'0.85'),
+      auto_nachqualifizierung: _c('cfg-crm-auto-nachq'),
       auto_fall:          _c('cfg-crm-auto-fall'),
       fall_typen:         _v('cfg-crm-fall-typen', 'anfrage,angebot,reklamation,maengel,streitfall,allgemein'),
       default_prioritaet: _v('cfg-crm-default-prio', 'normal'),
@@ -34067,6 +34235,25 @@ Regeln:
             self._api_crm_sync_status()
             return
 
+        # CRM Lead-Flow + Nachqualifizierung (session-tt2)
+        if self.path == '/api/crm/lead-bestaetigen':
+            self._api_crm_lead_bestaetigen(body)
+            return
+        if self.path == '/api/crm/lead-manuell':
+            self._api_crm_lead_manuell(body)
+            return
+        if self.path == '/api/crm/absender-ignorieren':
+            self._api_crm_absender_ignorieren(body)
+            return
+        _crm_nachq = re.match(r'^/api/crm/kunden/(\d+)/nachqualifizieren$', self.path)
+        if _crm_nachq:
+            self._api_crm_nachqualifizieren(int(_crm_nachq.group(1)))
+            return
+        _crm_lex_anlegen = re.match(r'^/api/crm/kunden/(\d+)/lexware-anlegen$', self.path)
+        if _crm_lex_anlegen:
+            self._api_crm_lexware_anlegen(int(_crm_lex_anlegen.group(1)))
+            return
+
         # Kunden-Alias speichern
         if self.path == '/api/kunden/alias':
             alias_email = (body.get('alias_email','') or '').strip().lower()
@@ -34905,7 +35092,14 @@ Regeln:
                 elog("kunde_erstellt", f"Kunde #{kid} angelegt: {data.get('firmenname') or data.get('name','')}")
             except Exception:
                 pass
-            self._json({"ok": True, "id": kid})
+            # Nachqualifizierung starten (wenn gewünscht, Standard: ja)
+            if data.get("nachqualifizieren", True):
+                try:
+                    from kunden_classifier import _nachqualifizierung_starten
+                    _nachqualifizierung_starten(kid)
+                except Exception:
+                    pass
+            self._json({"ok": True, "id": kid, "message": "Kunde angelegt. Nachqualifizierung läuft im Hintergrund."})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
         finally:
@@ -35267,6 +35461,133 @@ Regeln:
             from kunden_lexware_sync import get_sync_status
             status = get_sync_status()
             self._json({"ok": True, **status})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    # ── CRM Lead-Flow + Nachqualifizierung (session-tt2) ─────────────────────
+
+    def _api_crm_lead_bestaetigen(self, body: dict):
+        """POST /api/crm/lead-bestaetigen — Kai bestätigt/lehnt Lead ab."""
+        try:
+            from kunden_classifier import lead_bestaetigen
+            result = lead_bestaetigen(
+                absender_email=body.get("absender_email", ""),
+                mail_id=body.get("mail_id"),
+                ist_lead=body.get("ist_lead", True),
+                nie_wieder=body.get("nie_wieder", False),
+                name=body.get("name", ""),
+                firma=body.get("firma", ""),
+            )
+            self._json(result)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_lead_manuell(self, body: dict):
+        """POST /api/crm/lead-manuell — Lead/Kunde manuell aus Postfach anlegen."""
+        try:
+            from kunden_classifier import lead_manuell_anlegen
+            result = lead_manuell_anlegen(
+                absender_email=body.get("absender_email", ""),
+                mail_id=body.get("mail_id"),
+                name=body.get("name", ""),
+                firma=body.get("firma", ""),
+                status=body.get("status", "lead"),
+                nachqualifizieren=body.get("nachqualifizieren", True),
+            )
+            self._json(result)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_absender_ignorieren(self, body: dict):
+        """POST /api/crm/absender-ignorieren — Absender dauerhaft ignorieren."""
+        try:
+            from kunden_classifier import absender_ignorieren
+            email = body.get("absender_email", "")
+            grund = body.get("grund", "manuell")
+            if not email:
+                self._json({"ok": False, "error": "absender_email fehlt"})
+                return
+            ok = absender_ignorieren(email, grund)
+            self._json({"ok": ok, "message": f"{email} wird dauerhaft ignoriert." if ok else "Fehler"})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_nachqualifizieren(self, kunden_id: int):
+        """POST /api/crm/kunden/{id}/nachqualifizieren — Nachqualifizierung starten."""
+        try:
+            from kunden_classifier import nachqualifizierung_manuell
+            result = nachqualifizierung_manuell(kunden_id)
+            self._json(result)
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)})
+
+    def _api_crm_lexware_anlegen(self, kunden_id: int):
+        """POST /api/crm/kunden/{id}/lexware-anlegen — Kunden in Lexware zurückschreiben."""
+        try:
+            import sqlite3 as _sq3
+            kdb = _sq3.connect(str(KUNDEN_DB))
+            kdb.row_factory = _sq3.Row
+            kunde = kdb.execute("SELECT * FROM kunden WHERE id = ?", (kunden_id,)).fetchone()
+            if not kunde:
+                kdb.close()
+                self._json({"ok": False, "error": f"Kunde {kunden_id} nicht gefunden"})
+                return
+            if kunde["lexware_id"]:
+                kdb.close()
+                self._json({"ok": False, "error": f"Kunde hat bereits Lexware-ID: {kunde['lexware_id']}"})
+                return
+
+            # Lexware-Kontakt anlegen
+            from lexware_client import LexwareClient
+            client = LexwareClient()
+            kontakt_daten = {
+                "version": 0,
+                "roles": {"customer": {}},
+                "company": {
+                    "name": kunde["firmenname"] or "",
+                    "contactPersons": [{
+                        "firstName": (kunde["name"] or "").split()[0] if kunde["name"] else "",
+                        "lastName": " ".join((kunde["name"] or "").split()[1:]) if kunde["name"] else "",
+                        "emailAddress": kunde["email"] or "",
+                    }] if kunde["name"] else [],
+                } if kunde["firmenname"] else None,
+                "person": {
+                    "firstName": (kunde["name"] or "").split()[0] if kunde["name"] and not kunde["firmenname"] else "",
+                    "lastName": " ".join((kunde["name"] or "").split()[1:]) if kunde["name"] and not kunde["firmenname"] else "",
+                } if not kunde["firmenname"] else None,
+                "emailAddresses": {
+                    "business": [kunde["email"]] if kunde["email"] else [],
+                },
+            }
+            # Filter None values
+            kontakt_daten = {k: v for k, v in kontakt_daten.items() if v is not None}
+
+            try:
+                lex_result = client.create_contact(kontakt_daten)
+                lex_id = lex_result.get("id", "")
+                if lex_id:
+                    kdb.execute("UPDATE kunden SET lexware_id = ?, aktualisiert_am = datetime('now') WHERE id = ?",
+                                (lex_id, kunden_id))
+                    kdb.commit()
+                    try:
+                        from runtime_log import elog
+                        elog("lexware_ruecksync_ok", f"Kunde {kunden_id} in Lexware angelegt: {lex_id}")
+                    except Exception:
+                        pass
+                    kdb.close()
+                    self._json({"ok": True, "lexware_id": lex_id,
+                                "message": f"In Lexware angelegt (ID: {lex_id})"})
+                else:
+                    kdb.close()
+                    self._json({"ok": False, "error": "Lexware hat keine ID zurückgegeben"})
+            except Exception as lex_err:
+                kdb.close()
+                try:
+                    from runtime_log import elog
+                    elog("lexware_ruecksync_fehler", f"Kunde {kunden_id}: {lex_err}")
+                except Exception:
+                    pass
+                self._json({"ok": False, "error": f"Lexware-Fehler: {lex_err}"})
         except Exception as e:
             self._json({"ok": False, "error": str(e)})
 

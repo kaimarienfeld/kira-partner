@@ -273,6 +273,14 @@ def sync_lexware_kunden(dry_run: bool = False) -> dict:
                 ))
                 kunden_id = cur.lastrowid
                 stats["neu"] += 1
+                # Nachqualifizierung für neue Kunden starten
+                if not dry_run:
+                    try:
+                        kunden_db.commit()  # erst committen damit ID sicher
+                        from kunden_classifier import _nachqualifizierung_starten
+                        _nachqualifizierung_starten(kunden_id)
+                    except Exception as nq_err:
+                        logger.debug(f"Nachqualifizierung fuer {kunden_id}: {nq_err}")
 
             # E-Mail-Identitäten synchronisieren
             for email_addr in emails:

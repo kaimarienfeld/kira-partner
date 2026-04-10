@@ -11,7 +11,7 @@ Pipeline:
 
 Läuft NACH vorgang_router.py in der Mail-Verarbeitungspipeline.
 """
-import json, logging, re, sqlite3, hashlib, time
+import json, logging, re, sqlite3, hashlib, time, threading, datetime as _dt
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +20,28 @@ logger = logging.getLogger("kunden_classifier")
 SCRIPTS_DIR   = Path(__file__).parent
 KNOWLEDGE_DIR = SCRIPTS_DIR.parent / "knowledge"
 KUNDEN_DB     = KNOWLEDGE_DIR / "kunden.db"
+TASKS_DB      = KNOWLEDGE_DIR / "tasks.db"
+MAIL_INDEX_DB = KNOWLEDGE_DIR / "mail_index.db"
+CONFIG_FILE   = SCRIPTS_DIR / "config.json"
+
+# ── Lead-Signal-Erkennung ──────────────────────────────────────────────────
+_ANFRAGE_SIGNALE = re.compile(
+    r"(anfrage|angebot|interesse|projekt|termin|beratung|kosten|preis|"
+    r"möchte|moechte|würden sie|wuerden sie|auftrag|besichtigung|bestellung)",
+    re.IGNORECASE,
+)
+_FREEMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "gmx.de", "gmx.net", "web.de",
+    "yahoo.com", "yahoo.de", "outlook.com", "hotmail.com", "hotmail.de",
+    "t-online.de", "freenet.de", "posteo.de", "mailbox.org", "icloud.com",
+    "aol.com", "live.de", "live.com", "msn.com",
+}
+_MASSEN_DOMAINS = {
+    "mailchimp.com", "sendgrid.net", "constantcontact.com",
+    "hubspot.com", "mailjet.com", "sendinblue.com", "brevo.com",
+    "klicktipp.com", "cleverreach.com", "mailerlite.com",
+    "amazonses.com", "bounce.google.com",
+}
 
 # ── Cache für gleiche Absender+Betreff-Kombination (1h) ─────────────────────
 _CLASSIFY_CACHE: dict[str, tuple[float, dict]] = {}
@@ -354,19 +376,34 @@ def classify_kunde_projekt(
             pass
         return result
 
-    # 2. Fast-Path
+    # 2. Ignoriert-Check
+    if _ist_absender_ignoriert(email):
+        result = {
+            "kunden_id": None,
+            "kunden_confidence": "unklar",
+            "projekt_id": None,
+            "projekt_confidence": "unklar",
+            "fall_typ": "kein_geschaeftsfall",
+            "ist_geschaeftsfall": False,
+            "fast_path": True,
+            "reasoning": "Absender dauerhaft ignoriert",
+        }
+        _log_classification(eingabe_typ, eingabe_id, result, llm_modell="ignoriert")
+        return result
+
+    # 3. Fast-Path
     fp = _fast_path(email)
     if fp:
         _log_classification(eingabe_typ, eingabe_id, fp, llm_modell="fast_path")
         return fp
 
-    # 3. Cache prüfen
+    # 4. Cache prüfen
     cache_key = hashlib.md5(f"{email}:{betreff}".encode()).hexdigest()
     cached = _CLASSIFY_CACHE.get(cache_key)
     if cached and (time.time() - cached[0]) < _CACHE_TTL:
         return cached[1]
 
-    # 4. LLM-Klassifizierung
+    # 5. LLM-Klassifizierung
     try:
         from runtime_log import elog as _elog_cls
         _elog_cls("classifier_aufgerufen", f"LLM-Classifier für {absender[:50]} | {betreff[:40]}")
@@ -427,7 +464,23 @@ def classify_kunde_projekt(
         modell = llm_result.get("provider", "unbekannt")
         if llm_result.get("model"):
             modell = f"{modell}/{llm_result['model']}"
-        _log_classification(eingabe_typ, eingabe_id, result, llm_modell=modell)
+        log_id = _log_classification(eingabe_typ, eingabe_id, result, llm_modell=modell)
+
+        # 6. Lead-Flow: unbekannter Absender + Geschäftsfall
+        if result.get("kunden_id") is None and result.get("ist_geschaeftsfall"):
+            mail_daten = {
+                "absender_email": email,
+                "absender_name": _extract_name(absender),
+                "absender_firma": "",
+                "betreff": betreff,
+                "mail_id": eingabe_id,
+            }
+            classifier_ergebnis = {
+                "confidence_score": _confidence_to_score(result.get("kunden_confidence", "unklar")),
+                "reasoning_kurz": result.get("reasoning", ""),
+                "log_id": log_id,
+            }
+            result = _lead_flow(mail_daten, classifier_ergebnis, result, absender, betreff)
 
         return result
 
@@ -454,14 +507,14 @@ def _fallback_result(email: str, reason: str) -> dict:
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
-def _log_classification(eingabe_typ: str, eingabe_id: str, result: dict, llm_modell: str = ""):
-    """Speichert Klassifizierungsergebnis in kunden_classifier_log."""
+def _log_classification(eingabe_typ: str, eingabe_id: str, result: dict, llm_modell: str = "") -> int | None:
+    """Speichert Klassifizierungsergebnis in kunden_classifier_log. Gibt log_id zurück."""
     try:
         from case_engine import _ensure_crm_tables
         _ensure_crm_tables()
 
         db = _get_kunden_db()
-        db.execute("""
+        cur = db.execute("""
             INSERT INTO kunden_classifier_log
             (eingabe_typ, eingabe_id, kunden_id_vorschlag, projekt_id_vorschlag,
              fall_typ_vorschlag, confidence, reasoning_kurz, llm_modell)
@@ -476,10 +529,13 @@ def _log_classification(eingabe_typ: str, eingabe_id: str, result: dict, llm_mod
             (result.get("reasoning", "") or "")[:500],
             llm_modell,
         ))
+        log_id = cur.lastrowid
         db.commit()
         db.close()
+        return log_id
     except Exception as e:
         logger.warning("Classifier-Log Fehler: %s", e)
+        return None
 
 
 # ── Zuordnung ausführen ──────────────────────────────────────────────────────
@@ -629,3 +685,676 @@ def get_unzugeordnete(limit: int = 50) -> list[dict]:
     except Exception as e:
         logger.warning("Unzugeordnete-Abfrage Fehler: %s", e)
         return []
+
+
+# ── Hilfsfunktionen ────────────────────────────────────────────────────────
+
+def _extract_name(absender: str) -> str:
+    """Extrahiert Name aus 'Vorname Nachname <email>' Format."""
+    if "<" in absender:
+        name = absender.split("<")[0].strip().strip('"').strip("'")
+        if name:
+            return name
+    return ""
+
+
+def _confidence_to_score(confidence: str) -> float:
+    """Wandelt String-Confidence in numerischen Score."""
+    return {"eindeutig": 0.95, "wahrscheinlich": 0.75, "pruefen": 0.50, "unklar": 0.25}.get(confidence, 0.25)
+
+
+def _get_config() -> dict:
+    """Liest config.json."""
+    try:
+        return json.loads(CONFIG_FILE.read_text("utf-8"))
+    except Exception:
+        return {}
+
+
+def _ntfy_push(titel: str, nachricht: str, prioritaet: str = "default"):
+    """Sendet ntfy Push-Notification."""
+    try:
+        from kira_llm import _send_ntfy_push
+        _send_ntfy_push(titel, nachricht, prioritaet)
+    except Exception as e:
+        logger.debug("ntfy Push fehlgeschlagen: %s", e)
+
+
+# ── Ignoriert-Check ────────────────────────────────────────────────────────
+
+def _ist_absender_ignoriert(email: str) -> bool:
+    """Prüft ob Absender in kunden_ignoriert steht."""
+    try:
+        db = _get_kunden_db()
+        row = db.execute(
+            "SELECT id FROM kunden_ignoriert WHERE LOWER(absender_email) = ?",
+            (email.lower(),)
+        ).fetchone()
+        db.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+def absender_ignorieren(email: str, grund: str = "manuell") -> bool:
+    """Fügt Absender zur Ignoriert-Liste hinzu."""
+    try:
+        db = _get_kunden_db()
+        domain = _extract_domain(email)
+        db.execute("""
+            INSERT OR IGNORE INTO kunden_ignoriert
+                (absender_email, absender_domain, grund, erstellt_am)
+            VALUES (?, ?, ?, datetime('now'))
+        """, (email.lower(), domain, grund))
+        db.commit()
+        db.close()
+        try:
+            from runtime_log import elog
+            elog("absender_ignoriert", f"Absender ignoriert: {email} (Grund: {grund})")
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        logger.error("Absender-Ignorieren Fehler: %s", e)
+        return False
+
+
+def get_ignorierte(limit: int = 100) -> list[dict]:
+    """Gibt Liste der ignorierten Absender zurück."""
+    try:
+        db = _get_kunden_db()
+        rows = db.execute(
+            "SELECT id, absender_email, absender_domain, grund, erstellt_am "
+            "FROM kunden_ignoriert ORDER BY erstellt_am DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        db.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def absender_reaktivieren(email: str) -> bool:
+    """Entfernt Absender aus der Ignoriert-Liste."""
+    try:
+        db = _get_kunden_db()
+        db.execute("DELETE FROM kunden_ignoriert WHERE LOWER(absender_email) = ?", (email.lower(),))
+        db.commit()
+        db.close()
+        return True
+    except Exception:
+        return False
+
+
+# ── 3-Stufen Lead-Flow ─────────────────────────────────────────────────────
+
+def _lead_flow(mail_daten: dict, classifier_ergebnis: dict,
+               original_result: dict, absender: str, betreff: str) -> dict:
+    """
+    3-Stufen Lead-Flow für unbekannte Absender die ein Geschäftsfall sein könnten.
+    Stufe 1: confidence >= Schwelle → automatisch Lead anlegen
+    Stufe 2: confidence 0.50-Schwelle → Kai fragen (Aufgabe)
+    Stufe 3: kein Geschäftsfall → ignorieren
+    """
+    cfg = _get_config()
+    crm_cfg = cfg.get("crm", {})
+    auto_lead_aktiv = crm_cfg.get("auto_lead", True)
+    fragen_aktiv = crm_cfg.get("fragen_bei_unsicherheit", True)
+    schwelle = crm_cfg.get("lead_schwelle", 0.85)
+
+    score = classifier_ergebnis.get("confidence_score", 0)
+    email = mail_daten.get("absender_email", "")
+    domain = _extract_domain(email)
+
+    # Zusätzliche Signal-Prüfung
+    hat_anfrage_signal = bool(_ANFRAGE_SIGNALE.search(betreff or ""))
+    hat_echten_namen = bool(mail_daten.get("absender_name", "").strip())
+    ist_individuelle_domain = domain and domain not in _FREEMAIL_DOMAINS and domain not in _MASSEN_DOMAINS
+
+    # Stufe 1: Automatisch Lead anlegen
+    if auto_lead_aktiv and score >= schwelle:
+        signale_ok = hat_anfrage_signal or (hat_echten_namen and ist_individuelle_domain)
+        if signale_ok:
+            try:
+                kunden_id = _lead_aus_mail_anlegen(mail_daten, classifier_ergebnis)
+                original_result["kunden_id"] = kunden_id
+                original_result["lead_flow"] = "auto_lead"
+                original_result["reasoning"] += " → Automatisch als Lead angelegt"
+                try:
+                    from runtime_log import elog
+                    elog("lead_automatisch_angelegt",
+                         f"Auto-Lead: {email} | {betreff[:50]} | Score: {score:.0%}")
+                except Exception:
+                    pass
+                return original_result
+            except Exception as e:
+                logger.error("Auto-Lead Fehler: %s", e)
+
+    # Stufe 2: Kai fragen
+    if fragen_aktiv and score >= 0.50:
+        try:
+            _lead_bestaetigung_aufgabe(mail_daten, classifier_ergebnis)
+            original_result["lead_flow"] = "kai_fragen"
+            original_result["reasoning"] += " → Aufgabe für Kai erstellt (Lead-Bestätigung)"
+            try:
+                from runtime_log import elog
+                elog("lead_bestaetigung_aufgabe",
+                     f"Kai gefragt: {email} | {betreff[:50]} | Score: {score:.0%}")
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("Lead-Bestätigung Fehler: %s", e)
+
+    return original_result
+
+
+def _lead_aus_mail_anlegen(mail_daten: dict, classifier_ergebnis: dict) -> int:
+    """Legt einen neuen Lead aus einer eingehenden Mail an. Gibt kunden_id zurück."""
+    jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+    email = mail_daten.get("absender_email", "")
+
+    db = _get_kunden_db()
+    try:
+        # Prüfen ob Absender bereits als Kunde existiert
+        existing = db.execute(
+            "SELECT id FROM kunden WHERE LOWER(email) = ?", (email.lower(),)
+        ).fetchone()
+        if existing:
+            db.close()
+            return existing["id"]
+
+        # 1. Neuen Kunden mit status='lead' anlegen
+        cur = db.execute('''
+            INSERT INTO kunden
+                (name, firmenname, email, kundentyp, status,
+                 erstkontakt, letztkontakt, aktualisiert_am, metadata_json)
+            VALUES (?, ?, ?, 'unbekannt', 'lead', ?, ?, ?, ?)
+        ''', (
+            mail_daten.get("absender_name", ""),
+            mail_daten.get("absender_firma", ""),
+            email,
+            jetzt, jetzt, jetzt,
+            json.dumps({"quelle": "mail_eingang", "auto_lead": True})
+        ))
+        kunden_id = cur.lastrowid
+
+        # 2. Mail-Adresse als Identität
+        db.execute('''
+            INSERT OR IGNORE INTO kunden_identitaeten
+                (kunden_id, typ, wert, confidence, verifiziert, quelle, erstellt_am)
+            VALUES (?, 'mail', ?, 'wahrscheinlich', 0, 'auto_lead', ?)
+        ''', (kunden_id, email.lower(), jetzt))
+
+        # 3. Domain als Identität (wenn keine Freemail)
+        domain = _extract_domain(email)
+        if domain and domain not in _FREEMAIL_DOMAINS:
+            db.execute('''
+                INSERT OR IGNORE INTO kunden_identitaeten
+                    (kunden_id, typ, wert, confidence, verifiziert, quelle, erstellt_am)
+                VALUES (?, 'domain', ?, 'wahrscheinlich', 0, 'auto_lead', ?)
+            ''', (kunden_id, domain.lower(), jetzt))
+
+        # 4. Erste Aktivität eintragen (die auslösende Mail)
+        db.execute('''
+            INSERT INTO kunden_aktivitaeten
+                (kunden_id, ereignis_typ, quelle_id, quelle_tabelle,
+                 zusammenfassung, erstellt_am, sichtbar_in_verlauf)
+            VALUES (?, 'mail', ?, 'mail_index', ?, ?, 1)
+        ''', (kunden_id, str(mail_daten.get("mail_id", "")),
+              f"Erste Anfrage: {mail_daten.get('betreff', '')[:100]}", jetzt))
+
+        # 5. Aufgabe für Kai
+        tasks_db = sqlite3.connect(str(TASKS_DB))
+        tasks_db.execute('''
+            INSERT INTO tasks (title, body, status, priority, created_at, metadata_json)
+            VALUES (?, ?, 'offen', 'hoch', ?, ?)
+        ''', (
+            f"Neuer Lead: {mail_daten.get('absender_name') or email}",
+            f"Kira hat automatisch einen Lead angelegt.\n"
+            f"Absender: {email}\n"
+            f"Betreff: {mail_daten.get('betreff', '')}\n"
+            f"Confidence: {classifier_ergebnis.get('confidence_score', 0):.0%}\n"
+            f"Kira-Begründung: {classifier_ergebnis.get('reasoning_kurz', '')}\n\n"
+            f"Bitte prüfen und bestätigen:\n"
+            f"→ Im CRM unter 'Leads' findest du diesen Kontakt.\n"
+            f"→ Du kannst ihn zu 'Kunde' hochstufen oder als 'Kein Geschäftsfall' markieren.",
+            jetzt,
+            json.dumps({
+                "typ": "lead_info",
+                "kunden_id": kunden_id,
+                "absender_email": email,
+            })
+        ))
+        tasks_db.commit()
+        tasks_db.close()
+
+        db.commit()
+
+        # 6. ntfy-Push
+        _ntfy_push(
+            titel=f"Neuer Lead: {mail_daten.get('absender_name', email)}",
+            nachricht=f"Anfrage von {email} — bitte im CRM prüfen",
+            prioritaet="default"
+        )
+
+        # 7. Nachqualifizierung starten
+        cfg = _get_config()
+        if cfg.get("crm", {}).get("auto_nachqualifizierung", True):
+            _nachqualifizierung_starten(kunden_id)
+
+        return kunden_id
+    finally:
+        db.close()
+
+
+def _lead_bestaetigung_aufgabe(mail_daten: dict, classifier_ergebnis: dict):
+    """Erstellt eine Aufgabe mit Ja/Nein für Kai (Stufe 2)."""
+    jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+    email = mail_daten.get("absender_email", "")
+
+    tasks_db = sqlite3.connect(str(TASKS_DB))
+    tasks_db.execute('''
+        INSERT INTO tasks (title, body, status, priority, created_at, metadata_json)
+        VALUES (?, ?, 'offen', 'normal', ?, ?)
+    ''', (
+        f"Ist das ein Geschäftskontakt? {email}",
+        f"Kira ist nicht sicher ob diese Mail ein Geschäftsfall ist.\n\n"
+        f"Absender: {mail_daten.get('absender_name', '')} <{email}>\n"
+        f"Betreff: {mail_daten.get('betreff', '')}\n"
+        f"Kira meint: {classifier_ergebnis.get('reasoning_kurz', '')}\n\n"
+        f"Was möchtest du tun?\n"
+        f"[Ja — Als Lead anlegen] [Nein — Kein Geschäftsfall] [Nie wieder fragen]",
+        jetzt,
+        json.dumps({
+            "typ": "lead_bestaetigung",
+            "absender_email": email,
+            "absender_name": mail_daten.get("absender_name", ""),
+            "mail_id": mail_daten.get("mail_id"),
+            "classifier_log_id": classifier_ergebnis.get("log_id"),
+        })
+    ))
+    tasks_db.commit()
+    tasks_db.close()
+
+    _ntfy_push(
+        titel=f"Lead prüfen: {mail_daten.get('absender_name', email)}",
+        nachricht=f"Bitte entscheide: {email} — Geschäftskontakt?",
+        prioritaet="low"
+    )
+
+
+def lead_bestaetigen(absender_email: str, mail_id: str = None,
+                     ist_lead: bool = True, nie_wieder: bool = False,
+                     name: str = "", firma: str = "") -> dict:
+    """
+    Kai bestätigt oder lehnt einen Lead ab.
+    Aufgerufen von POST /api/crm/lead-bestaetigen.
+    """
+    if nie_wieder:
+        absender_ignorieren(absender_email, grund="nie_wieder")
+        try:
+            from runtime_log import elog
+            elog("absender_ignoriert", f"Nie-wieder-fragen: {absender_email}")
+        except Exception:
+            pass
+        return {"ok": True, "aktion": "ignoriert", "message": "Absender wird dauerhaft ignoriert."}
+
+    if not ist_lead:
+        try:
+            from runtime_log import elog
+            elog("lead_bestaetigt_nein", f"Kein Lead: {absender_email}")
+        except Exception:
+            pass
+        return {"ok": True, "aktion": "abgelehnt", "message": "Kein Geschäftsfall — kein Lead angelegt."}
+
+    # Lead anlegen
+    mail_daten = {
+        "absender_email": absender_email,
+        "absender_name": name,
+        "absender_firma": firma,
+        "betreff": "",
+        "mail_id": mail_id or "",
+    }
+    try:
+        kunden_id = _lead_aus_mail_anlegen(mail_daten, {"confidence_score": 0.75, "reasoning_kurz": "Manuell bestätigt"})
+        try:
+            from runtime_log import elog
+            elog("lead_bestaetigt_ja", f"Lead bestätigt: {absender_email} → Kunde {kunden_id}")
+        except Exception:
+            pass
+        return {"ok": True, "aktion": "angelegt", "kunden_id": kunden_id,
+                "message": f"Lead angelegt (ID: {kunden_id}). Nachqualifizierung läuft."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def lead_manuell_anlegen(absender_email: str, mail_id: str = None,
+                         name: str = "", firma: str = "",
+                         status: str = "lead",
+                         nachqualifizieren: bool = True) -> dict:
+    """
+    Legt manuell einen Lead/Kunden aus dem Postfach an.
+    Aufgerufen von POST /api/crm/lead-manuell.
+    """
+    jetzt = datetime.now().isoformat(sep=" ", timespec="seconds")
+    email = absender_email.lower().strip()
+
+    db = _get_kunden_db()
+    try:
+        # Prüfen ob bereits vorhanden
+        existing = db.execute(
+            "SELECT id FROM kunden WHERE LOWER(email) = ?", (email,)
+        ).fetchone()
+        if existing:
+            db.close()
+            return {"ok": False, "error": f"Kontakt mit {email} existiert bereits (ID: {existing['id']})"}
+
+        cur = db.execute('''
+            INSERT INTO kunden
+                (name, firmenname, email, kundentyp, status,
+                 erstkontakt, letztkontakt, aktualisiert_am, metadata_json)
+            VALUES (?, ?, ?, 'unbekannt', ?, ?, ?, ?, ?)
+        ''', (name, firma, email, status, jetzt, jetzt, jetzt,
+              json.dumps({"quelle": "manuell", "mail_id": mail_id})))
+        kunden_id = cur.lastrowid
+
+        # Identität
+        db.execute('''
+            INSERT OR IGNORE INTO kunden_identitaeten
+                (kunden_id, typ, wert, confidence, verifiziert, quelle, erstellt_am)
+            VALUES (?, 'mail', ?, 'wahrscheinlich', 0, 'manuell', ?)
+        ''', (kunden_id, email, jetzt))
+
+        domain = _extract_domain(email)
+        if domain and domain not in _FREEMAIL_DOMAINS:
+            db.execute('''
+                INSERT OR IGNORE INTO kunden_identitaeten
+                    (kunden_id, typ, wert, confidence, verifiziert, quelle, erstellt_am)
+                VALUES (?, 'domain', ?, 'wahrscheinlich', 0, 'manuell', ?)
+            ''', (kunden_id, domain.lower(), jetzt))
+
+        # Mail als erste Aktivität verknüpfen
+        if mail_id:
+            db.execute('''
+                INSERT INTO kunden_aktivitaeten
+                    (kunden_id, ereignis_typ, quelle_id, quelle_tabelle,
+                     zusammenfassung, erstellt_am, sichtbar_in_verlauf)
+                VALUES (?, 'mail', ?, 'mail_index', ?, ?, 1)
+            ''', (kunden_id, str(mail_id),
+                  f"Manuell zugeordnet", jetzt))
+
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        from runtime_log import elog
+        elog("kunde_erstellt", f"Manuell angelegt: {name or email} (Status: {status})")
+    except Exception:
+        pass
+
+    # Nachqualifizierung
+    if nachqualifizieren:
+        _nachqualifizierung_starten(kunden_id)
+
+    return {"ok": True, "kunden_id": kunden_id,
+            "message": f"Kontakt angelegt (ID: {kunden_id}).{' Nachqualifizierung läuft.' if nachqualifizieren else ''}"}
+
+
+# ── Retroaktive Nachqualifizierung ─────────────────────────────────────────
+
+def _nachqualifizierung_starten(kunden_id: int):
+    """Startet retroaktive Nachqualifizierung asynchron im Hintergrund."""
+    try:
+        from runtime_log import elog
+        elog("nachqualifizierung_gestartet", f"Kunde {kunden_id}: Hintergrund-Scan startet")
+    except Exception:
+        pass
+    t = threading.Thread(
+        target=_nachqualifizierung_ausfuehren,
+        args=(kunden_id,),
+        daemon=True,
+    )
+    t.start()
+    return t
+
+
+def nachqualifizierung_manuell(kunden_id: int) -> dict:
+    """Startet Nachqualifizierung manuell (API-Aufruf)."""
+    db = _get_kunden_db()
+    kunde = db.execute("SELECT id, name, firmenname FROM kunden WHERE id = ?", (kunden_id,)).fetchone()
+    db.close()
+    if not kunde:
+        return {"ok": False, "error": f"Kunde {kunden_id} nicht gefunden"}
+    _nachqualifizierung_starten(kunden_id)
+    return {"ok": True, "message": f"Nachqualifizierung für {kunde['name'] or kunde['firmenname']} gestartet."}
+
+
+def _nachqualifizierung_ausfuehren(kunden_id: int):
+    """Durchsucht alle Quellen nach Aktivitäten des Kunden."""
+    try:
+        conn = sqlite3.connect(str(KUNDEN_DB))
+        conn.row_factory = sqlite3.Row
+
+        kunde = conn.execute("SELECT * FROM kunden WHERE id = ?", (kunden_id,)).fetchone()
+        if not kunde:
+            conn.close()
+            return
+
+        identitaeten = conn.execute(
+            "SELECT typ, wert FROM kunden_identitaeten WHERE kunden_id = ?",
+            (kunden_id,)
+        ).fetchall()
+
+        mail_adressen = [i["wert"].lower() for i in identitaeten if i["typ"] == "mail"]
+        domains = [i["wert"].lower() for i in identitaeten if i["typ"] == "domain"]
+        firmennamen = []
+
+        if kunde["email"]:
+            mail_adressen.append(kunde["email"].lower())
+        if kunde["firmenname"]:
+            firmennamen.append(kunde["firmenname"].lower())
+
+        mail_adressen = list(set(mail_adressen))
+        firmennamen = list(set(filter(None, firmennamen)))
+
+        gefunden_gesamt = 0
+
+        # Quelle 1: Mail-Archiv
+        gefunden_gesamt += _scan_mail_archiv(kunden_id, mail_adressen, conn)
+
+        # Quelle 2: Vorgänge / Tasks
+        gefunden_gesamt += _scan_tasks(kunden_id, mail_adressen, firmennamen, conn)
+
+        # Quelle 3: Lexware-Belege (wenn lexware_id)
+        if kunde["lexware_id"]:
+            gefunden_gesamt += _scan_lexware_belege(kunden_id, kunde["lexware_id"], conn)
+
+        # Kunden-Statistiken aktualisieren
+        if gefunden_gesamt > 0:
+            _update_kunden_stats(kunden_id, conn)
+
+        conn.commit()
+        conn.close()
+
+        # Kira-Hinweis
+        if gefunden_gesamt > 0:
+            try:
+                from runtime_log import elog
+                elog("nachqualifizierung_abgeschlossen", json.dumps({
+                    "kunden_id": kunden_id,
+                    "kunden_name": kunde["name"] or kunde["firmenname"],
+                    "gefunden": gefunden_gesamt
+                }))
+            except Exception:
+                pass
+            if gefunden_gesamt >= 5:
+                _ntfy_push(
+                    titel=f"Nachqualifizierung: {kunde['name'] or kunde['firmenname']}",
+                    nachricht=f"{gefunden_gesamt} historische Aktivitäten gefunden und in Kundenakte eingebaut.",
+                    prioritaet="low"
+                )
+        else:
+            try:
+                from runtime_log import elog
+                elog("nachqualifizierung_abgeschlossen", json.dumps({
+                    "kunden_id": kunden_id,
+                    "kunden_name": kunde["name"] or kunde["firmenname"],
+                    "gefunden": 0
+                }))
+            except Exception:
+                pass
+
+    except Exception as e:
+        logger.error("Nachqualifizierung Fehler für Kunde %s: %s", kunden_id, e, exc_info=True)
+
+
+def _scan_mail_archiv(kunden_id: int, mail_adressen: list, conn) -> int:
+    """Sucht im Mail-Archiv nach Mails von/an bekannte Mailadressen."""
+    if not mail_adressen:
+        return 0
+    try:
+        mail_conn = sqlite3.connect(str(MAIL_INDEX_DB))
+        mail_conn.row_factory = sqlite3.Row
+
+        platzhalter = ",".join(["?" for _ in mail_adressen])
+        mails = mail_conn.execute(f'''
+            SELECT rowid, von, an, betreff, datum
+            FROM mail_index
+            WHERE LOWER(von) IN ({platzhalter})
+               OR LOWER(an) IN ({platzhalter})
+            ORDER BY datum ASC
+        ''', mail_adressen + mail_adressen).fetchall()
+
+        mail_conn.close()
+
+        geschrieben = 0
+        for mail in mails:
+            existiert = conn.execute(
+                "SELECT id FROM kunden_aktivitaeten WHERE kunden_id = ? AND quelle_id = ? AND quelle_tabelle = 'mail_index'",
+                (kunden_id, str(mail["rowid"]))
+            ).fetchone()
+            if existiert:
+                continue
+
+            conn.execute('''
+                INSERT INTO kunden_aktivitaeten
+                    (kunden_id, ereignis_typ, quelle_id, quelle_tabelle,
+                     zusammenfassung, erstellt_am, sichtbar_in_verlauf)
+                VALUES (?, 'mail', ?, 'mail_index', ?, ?, 1)
+            ''', (
+                kunden_id,
+                str(mail["rowid"]),
+                f"Mail: {(mail['betreff'] or '')[:100]}",
+                mail["datum"] or datetime.now().isoformat(sep=" ", timespec="seconds"),
+            ))
+            geschrieben += 1
+
+        return geschrieben
+    except Exception as e:
+        logger.debug("Mail-Archiv-Scan Fehler: %s", e)
+        return 0
+
+
+def _scan_tasks(kunden_id: int, mail_adressen: list, firmennamen: list, conn) -> int:
+    """Sucht in Tasks nach Bezug zum Kunden (Absender-Email in title/body)."""
+    if not mail_adressen and not firmennamen:
+        return 0
+    try:
+        tasks_conn = sqlite3.connect(str(TASKS_DB))
+        tasks_conn.row_factory = sqlite3.Row
+
+        geschrieben = 0
+        for addr in mail_adressen[:5]:
+            tasks = tasks_conn.execute(
+                "SELECT id, title, created_at FROM tasks WHERE LOWER(body) LIKE ? OR LOWER(title) LIKE ? LIMIT 20",
+                (f"%{addr}%", f"%{addr}%")
+            ).fetchall()
+            for t in tasks:
+                existiert = conn.execute(
+                    "SELECT id FROM kunden_aktivitaeten WHERE kunden_id = ? AND quelle_id = ? AND quelle_tabelle = 'tasks'",
+                    (kunden_id, str(t["id"]))
+                ).fetchone()
+                if existiert:
+                    continue
+                conn.execute('''
+                    INSERT INTO kunden_aktivitaeten
+                        (kunden_id, ereignis_typ, quelle_id, quelle_tabelle,
+                         zusammenfassung, erstellt_am, sichtbar_in_verlauf)
+                    VALUES (?, 'geschaeft', ?, 'tasks', ?, ?, 1)
+                ''', (kunden_id, str(t["id"]),
+                      f"Aufgabe: {(t['title'] or '')[:100]}",
+                      t["created_at"] or datetime.now().isoformat(sep=" ", timespec="seconds")))
+                geschrieben += 1
+
+        tasks_conn.close()
+        return geschrieben
+    except Exception as e:
+        logger.debug("Tasks-Scan Fehler: %s", e)
+        return 0
+
+
+def _scan_lexware_belege(kunden_id: int, lexware_id: str, conn) -> int:
+    """Sucht Lexware-Belege (Rechnungen, Angebote) in tasks.db/lexware_*."""
+    try:
+        tasks_conn = sqlite3.connect(str(TASKS_DB))
+        tasks_conn.row_factory = sqlite3.Row
+        geschrieben = 0
+
+        # Angebote
+        for tabelle, typ_name in [("angebote", "Angebot"), ("ausgangsrechnungen", "Rechnung")]:
+            try:
+                rows = tasks_conn.execute(f"""
+                    SELECT id, kontakt_id, titel, datum, betrag
+                    FROM {tabelle}
+                    WHERE kontakt_id = ?
+                    LIMIT 50
+                """, (lexware_id,)).fetchall()
+            except Exception:
+                continue
+
+            for r in rows:
+                quelle_id = f"{tabelle}:{r['id']}"
+                existiert = conn.execute(
+                    "SELECT id FROM kunden_aktivitaeten WHERE kunden_id = ? AND quelle_id = ? AND quelle_tabelle = ?",
+                    (kunden_id, quelle_id, tabelle)
+                ).fetchone()
+                if existiert:
+                    continue
+                betrag_str = f" — {r['betrag']:.2f}€" if r.get("betrag") else ""
+                conn.execute('''
+                    INSERT INTO kunden_aktivitaeten
+                        (kunden_id, ereignis_typ, quelle_id, quelle_tabelle,
+                         zusammenfassung, erstellt_am, sichtbar_in_verlauf)
+                    VALUES (?, 'lexware', ?, ?, ?, ?, 1)
+                ''', (kunden_id, quelle_id, tabelle,
+                      f"{typ_name}: {(r.get('titel') or '')[:80]}{betrag_str}",
+                      r.get("datum") or datetime.now().isoformat(sep=" ", timespec="seconds")))
+                geschrieben += 1
+
+        tasks_conn.close()
+        return geschrieben
+    except Exception as e:
+        logger.debug("Lexware-Belege-Scan Fehler: %s", e)
+        return 0
+
+
+def _update_kunden_stats(kunden_id: int, conn):
+    """Aktualisiert Kunden-Statistiken nach Nachqualifizierung."""
+    try:
+        stats = conn.execute("""
+            SELECT COUNT(*) as anzahl,
+                   MIN(erstellt_am) as erstes,
+                   MAX(erstellt_am) as letztes
+            FROM kunden_aktivitaeten
+            WHERE kunden_id = ? AND ereignis_typ = 'mail'
+        """, (kunden_id,)).fetchone()
+        if stats and stats["anzahl"]:
+            conn.execute("""
+                UPDATE kunden
+                SET anzahl_mails = ?, erstkontakt = ?, letztkontakt = ?,
+                    aktualisiert_am = datetime('now')
+                WHERE id = ?
+            """, (stats["anzahl"], stats["erstes"], stats["letztes"], kunden_id))
+    except Exception as e:
+        logger.debug("Kunden-Stats Update Fehler: %s", e)

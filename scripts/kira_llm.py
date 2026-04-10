@@ -2345,6 +2345,59 @@ def get_tools(config=None):
         }
     })
 
+    # Lead-Flow + Nachqualifizierung Tools (session-tt2)
+    tools.append({
+        "name": "crm_lead_anlegen",
+        "description": (
+            "Legt einen neuen Lead im CRM an und startet Nachqualifizierung. "
+            "Nutze dies wenn Kai dich bittet, einen Absender als Lead/Kunden anzulegen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "absender_email": {"type": "string", "description": "E-Mail des Absenders"},
+                "name": {"type": "string", "description": "Name (optional)"},
+                "firma": {"type": "string", "description": "Firmenname (optional)"},
+                "nachqualifizieren": {"type": "boolean", "description": "Alle Quellen durchsuchen (Standard: true)"}
+            },
+            "required": ["absender_email"]
+        }
+    })
+    tools.append({
+        "name": "crm_nachqualifizierung_starten",
+        "description": (
+            "Startet retroaktive Suche aller historischen Aktivitäten für einen Kunden. "
+            "Durchsucht Mail-Archiv, Aufgaben, Lexware-Belege nach dem Kunden."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kunden_id": {"type": "integer", "description": "Kunden-ID"}
+            },
+            "required": ["kunden_id"]
+        }
+    })
+    tools.append({
+        "name": "crm_absender_ignorieren",
+        "description": "Markiert einen Absender als dauerhaft ignoriert — wird nie wieder als Lead vorgeschlagen.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "absender_email": {"type": "string", "description": "E-Mail des Absenders"},
+                "grund": {"type": "string", "description": "Grund (optional, z.B. 'newsletter', 'spam')"}
+            },
+            "required": ["absender_email"]
+        }
+    })
+    tools.append({
+        "name": "crm_ignorierte_anzeigen",
+        "description": "Zeigt alle dauerhaft ignorierten Absender.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    })
+
     return tools
 
 
@@ -2426,6 +2479,11 @@ def execute_tool(name, params):
             "crm_fall_oeffnen": _tool_crm_fall_oeffnen,
             "crm_kunden_klassifizieren": _tool_crm_kunden_klassifizieren,
             "crm_aktivitaeten_pruefliste": _tool_crm_aktivitaeten_pruefliste,
+            # Lead-Flow + Nachqualifizierung (session-tt2)
+            "crm_lead_anlegen": _tool_crm_lead_anlegen,
+            "crm_nachqualifizierung_starten": _tool_crm_nachqualifizierung_starten,
+            "crm_absender_ignorieren": _tool_crm_absender_ignorieren,
+            "crm_ignorierte_anzeigen": _tool_crm_ignorierte_anzeigen,
         }
         handler = handlers.get(name)
         if not handler:
@@ -5581,6 +5639,65 @@ def _tool_crm_aktivitaeten_pruefliste(p):
         for it in items:
             lines.append(f"  [{it.get('id', '?')}] {it.get('eingabe_typ', '?')} | {it.get('confidence', '?')} | "
                          f"Vorschlag: Kunde #{it.get('kunden_id_vorschlag', '-')} | {(it.get('reasoning_kurz') or '')[:80]}")
+        return {"ok": True, "message": "\n".join(lines), "anzahl": len(items)}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_lead_anlegen(p):
+    """Legt einen neuen Lead an und startet Nachqualifizierung."""
+    email = p.get("absender_email", "")
+    if not email:
+        return {"ok": False, "error": "absender_email fehlt"}
+    try:
+        from kunden_classifier import lead_manuell_anlegen
+        result = lead_manuell_anlegen(
+            absender_email=email,
+            name=p.get("name", ""),
+            firma=p.get("firma", ""),
+            status="lead",
+            nachqualifizieren=p.get("nachqualifizieren", True),
+        )
+        return result
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_nachqualifizierung_starten(p):
+    """Startet Nachqualifizierung für einen Kunden."""
+    kunden_id = int(p.get("kunden_id", 0))
+    if not kunden_id:
+        return {"ok": False, "error": "kunden_id fehlt"}
+    try:
+        from kunden_classifier import nachqualifizierung_manuell
+        return nachqualifizierung_manuell(kunden_id)
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_absender_ignorieren(p):
+    """Markiert einen Absender als dauerhaft ignoriert."""
+    email = p.get("absender_email", "")
+    if not email:
+        return {"ok": False, "error": "absender_email fehlt"}
+    try:
+        from kunden_classifier import absender_ignorieren
+        ok = absender_ignorieren(email, p.get("grund", "kira"))
+        return {"ok": ok, "message": f"{email} wird dauerhaft ignoriert." if ok else "Fehler"}
+    except Exception as e:
+        return {"ok": False, "error": f"Fehler: {e}"}
+
+
+def _tool_crm_ignorierte_anzeigen(p):
+    """Zeigt alle dauerhaft ignorierten Absender."""
+    try:
+        from kunden_classifier import get_ignorierte
+        items = get_ignorierte(limit=100)
+        if not items:
+            return {"ok": True, "message": "Keine ignorierten Absender vorhanden.", "anzahl": 0}
+        lines = [f"{len(items)} ignorierte Absender:\n"]
+        for it in items:
+            lines.append(f"  {it.get('absender_email', '?')} — Grund: {it.get('grund', '?')} ({it.get('erstellt_am', '')})")
         return {"ok": True, "message": "\n".join(lines), "anzahl": len(items)}
     except Exception as e:
         return {"ok": False, "error": f"Fehler: {e}"}

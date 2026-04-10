@@ -526,3 +526,67 @@ do_PUT-Bug behoben (Alias do_PUT=do_POST in DashboardHandler). Export-API GET /a
 **Erledigt:** Kunden/CRM Modul vollständig implementiert (Paket 1-8 + Abschluss). ~3400 LOC total. do_PUT-Bug, Export-API, Streitfall-Dossier. Alle Tracking-Dateien aktualisiert.
 **Offen geblieben:** —
 **Status:** ✅ erledigt
+
+---
+
+## 2026-04-10 19:30 — Session-Start: CRM Lead-Flow + Nachqualifizierung (session-tt2)
+**Auftrag:** 000_PROMPT_CRM_LeadFlow_Nachqualifizierung.md ausführen — 3-Stufen Lead-Flow für neue Kontakte + retroaktive Kundenakte-Befüllung + nachträgliche Zuordnung. Autonomer Durchlauf.
+**Status:** erledigt
+
+### Paket 1 — DB: kunden_ignoriert + tasks.metadata_json
+- kunden_ignoriert Tabelle in kunden.db erstellt (mit Indexes)
+- tasks.metadata_json Spalte hinzugefügt (ALTER TABLE)
+- case_engine.py _ensure_crm_tables() um kunden_ignoriert erweitert
+
+### Paket 2 — 3-Stufen Lead-Flow in kunden_classifier.py
+- Ignoriert-Check vor LLM-Aufruf (absender in kunden_ignoriert → STOP)
+- Stufe 1: Auto-Lead (confidence >= Schwelle, Anfrage-Signale erkannt)
+- Stufe 2: Kai fragen (confidence 0.50-Schwelle, Aufgabe mit Ja/Nein/Nie-wieder)
+- Stufe 3: Still ignorieren (kein Geschäftsfall)
+- _lead_aus_mail_anlegen() + _lead_bestaetigung_aufgabe()
+- lead_bestaetigen(), lead_manuell_anlegen(), absender_ignorieren()
+- get_ignorierte(), absender_reaktivieren()
+
+### Paket 3 — Retroaktive Nachqualifizierung
+- _nachqualifizierung_starten() — asynchroner Thread
+- _nachqualifizierung_ausfuehren() — durchsucht alle Quellen
+- _scan_mail_archiv() — Mail-Index nach E-Mail-Match
+- _scan_tasks() — Tasks nach Absender-Bezug
+- _scan_lexware_belege() — Angebote/Rechnungen aus Lexware
+- _update_kunden_stats() — Kunden-Statistiken aktualisieren
+- Integration in kunden_lexware_sync.py (bei neuen Kunden)
+
+### Paket 4 — 5 neue API-Endpunkte
+- POST /api/crm/lead-bestaetigen
+- POST /api/crm/lead-manuell
+- POST /api/crm/absender-ignorieren
+- POST /api/crm/kunden/{id}/nachqualifizieren
+- POST /api/crm/kunden/{id}/lexware-anlegen (Rücksync)
+- _api_crm_kunden_create erweitert (Nachqualifizierung)
+
+### Paket 5 — UI
+- Lead-Bestätigungs-Buttons in task_card (metadata_json.typ=lead_bestaetigung)
+- "Als Kunden anlegen" Button im Postfach Preview-Toolbar (pf-tb-lead)
+- pfAlsLeadAnlegen() + postfachAlsLeadMarkieren() + crmLeadManuellSpeichern()
+- Nachqualifizierung-Checkbox im CRM Neuer-Kunde-Formular
+- Lexware-Hint in Kundenakte (wenn keine lexware_id)
+- Nachqualifizieren-Button in Kundenakte-Header
+
+### Paket 6 — Einstellungen + Kira-Tools + Runtime-Log
+- Lead-Erkennung Sektion (5 Optionen: Auto-Lead, Kai-fragen, Schwelle, Auto-NQ, Ignorierte)
+- saveSettings() erweitert (4 neue CRM-Keys)
+- 4 neue Kira-Tools: crm_lead_anlegen, crm_nachqualifizierung_starten, crm_absender_ignorieren, crm_ignorierte_anzeigen
+- elog-Events: lead_automatisch_angelegt, lead_bestaetigung_aufgabe, lead_bestaetigt_ja/nein, absender_ignoriert, nachqualifizierung_gestartet/abgeschlossen, lexware_ruecksync_ok/fehler
+
+### Paket 7 — Tests
+- DB-Integrität: kunden_ignoriert ✓, metadata_json ✓, Lexware-Check (273/273) ✓
+- Classifier-Funktionen: Import ✓, _extract_name ✓, _confidence_to_score ✓, ist_geschaeftskontakt ✓
+- Ignorieren/Reaktivieren: Round-Trip ✓
+- Kira-Tools: Alle 4 OK ✓
+- Lead-Anlegen: Erstellen ✓, Duplikat-Check ✓, Identitäten (mail+domain) ✓
+- Syntax: kunden_classifier.py ✓, server.py ✓, kira_llm.py ✓, case_engine.py ✓
+
+### 2026-04-10 20:00 — Session-Ende
+**Erledigt:** CRM Lead-Flow + Nachqualifizierung vollständig implementiert (7 Pakete).
+**Offen geblieben:** —
+**Status:** ✅ erledigt
